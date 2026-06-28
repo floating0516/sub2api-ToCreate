@@ -2,47 +2,105 @@
   <AppLayout>
     <div class="mx-auto max-w-5xl">
       <article class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-8">
-        <header class="mb-6 border-b border-gray-200 pb-5 dark:border-dark-700">
-          <p class="text-sm font-medium text-primary-700 dark:text-primary-300">
-            {{ t('admin.customBuild.badge') }}
-          </p>
-          <h1 class="mt-2 text-2xl font-bold tracking-normal text-gray-950 dark:text-white">
-            {{ t('admin.customBuild.title') }}
-          </h1>
-          <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
-            {{ t('admin.customBuild.description') }}
-          </p>
+        <header class="mb-6 border-b border-gray-200 pb-5 dark:border-dark-700 sm:flex sm:items-start sm:justify-between sm:gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-primary-700 dark:text-primary-300">
+              {{ t('admin.customBuild.badge') }}
+            </p>
+            <h1 class="mt-2 text-2xl font-bold tracking-normal text-gray-950 dark:text-white">
+              {{ t('admin.customBuild.title') }}
+            </h1>
+            <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
+              {{ t('admin.customBuild.description') }}
+            </p>
+            <p v-if="notes?.updated_at" class="mt-2 text-xs text-gray-500 dark:text-dark-400">
+              {{ t('admin.customBuild.updatedAt', { time: formatUpdatedAt(notes.updated_at) }) }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-secondary mt-4 flex-shrink-0 sm:mt-0"
+            :disabled="loading"
+            @click="loadNotes"
+          >
+            <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
+            {{ t('common.refresh') }}
+          </button>
         </header>
 
-        <div class="custom-build-content" v-html="renderedHtml"></div>
+        <div v-if="loading && !notes" class="flex min-h-[240px] items-center justify-center">
+          <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
+        </div>
+
+        <div
+          v-else-if="loadError"
+          class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+        >
+          {{ loadError }}
+        </div>
+
+        <div
+          v-else-if="renderedHtml"
+          class="custom-build-content"
+          v-html="renderedHtml"
+        ></div>
+
+        <div
+          v-else
+          class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-14 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-800 dark:text-dark-400"
+        >
+          {{ t('admin.customBuild.empty') }}
+        </div>
       </article>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { getLocale } from '@/i18n'
-import zhNotes from './custom-build-notes.zh.md?raw'
-import enNotes from './custom-build-notes.en.md?raw'
+import Icon from '@/components/icons/Icon.vue'
+import { customBuildAPI, type CustomBuildNotes } from '@/api/admin/customBuild'
 
 const { t } = useI18n()
+const loading = ref(false)
+const loadError = ref('')
+const notes = ref<CustomBuildNotes | null>(null)
 
 marked.setOptions({
   breaks: true,
   gfm: true,
 })
 
-const notesMarkdown = computed(() => getLocale() === 'zh' ? zhNotes : enNotes)
-
 const renderedHtml = computed(() => {
-  const html = marked.parse(notesMarkdown.value.trim()) as string
+  const content = notes.value?.content?.trim() || ''
+  if (!content) return ''
+  const html = marked.parse(content) as string
   return DOMPurify.sanitize(html)
 })
+
+function formatUpdatedAt(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+async function loadNotes() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    notes.value = await customBuildAPI.getNotes()
+  } catch (error: any) {
+    loadError.value = error?.message || t('admin.customBuild.loadFailed')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadNotes)
 </script>
 
 <style scoped>

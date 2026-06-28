@@ -23,6 +23,9 @@ func RegisterAdminRoutes(
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
 
+		// 自定义构建说明
+		registerCustomBuildRoutes(admin, h)
+
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 
@@ -106,6 +109,13 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerCustomBuildRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	customBuild := admin.Group("/custom-build")
+	{
+		customBuild.GET("/notes", h.Admin.CustomBuild.GetNotes)
 	}
 }
 

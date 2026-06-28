@@ -1487,7 +1487,10 @@ export default {
     customBuild: {
       title: 'Custom Build',
       description: 'View local custom changes, update method, and rollback steps',
-      badge: 'Local Custom Deployment'
+      badge: 'Local Custom Deployment',
+      updatedAt: 'Document updated: {time}',
+      empty: 'Custom build notes are empty.',
+      loadFailed: 'Failed to load custom build notes'
     },
 
     backup: {

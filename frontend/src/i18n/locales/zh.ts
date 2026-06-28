@@ -1508,7 +1508,10 @@ export default {
     customBuild: {
       title: '自定义构建',
       description: '查看当前部署的自定义修改、更新方式和回滚方式',
-      badge: '本机自定义部署'
+      badge: '本机自定义部署',
+      updatedAt: '文档更新时间：{time}',
+      empty: '自定义构建说明为空。',
+      loadFailed: '加载自定义构建说明失败'
     },
 
     backup: {
