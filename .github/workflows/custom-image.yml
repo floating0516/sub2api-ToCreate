@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Git ref to build, for example custom/one-purchase-limit'
+        description: 'Git ref to build, for example custom/subscription-quota-window'
         required: true
-        default: 'custom/one-purchase-limit'
+        default: 'custom/subscription-quota-window'
         type: string
       image_tag:
-        description: 'Docker image tag to publish, for example 0.1.139-custom.1'
+        description: 'Docker image tag to publish, for example 0.1.139-subscription-quota.1'
         required: true
-        default: '0.1.139-custom.1'
+        default: '0.1.139-subscription-quota.1'
         type: string
       push_latest_custom:
         description: 'Also publish latest-custom tag'
