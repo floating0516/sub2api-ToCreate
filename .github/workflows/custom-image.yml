@@ -9,9 +9,14 @@ on:
         default: 'custom/subscription-quota-window'
         type: string
       image_tag:
-        description: 'Docker image tag to publish, for example 0.1.139-subscription-quota.1'
+        description: 'Docker image tag to publish, for example 0.1.139-q1'
         required: true
-        default: '0.1.139-subscription-quota.1'
+        default: '0.1.139-q1'
+        type: string
+      app_version:
+        description: 'Application version shown in UI and update checks, for example 0.1.139'
+        required: true
+        default: '0.1.139'
         type: string
       push_latest_custom:
         description: 'Also publish latest-custom tag'
@@ -55,13 +60,13 @@ jobs:
         id: meta
         shell: bash
         run: |
-          VERSION='${{ github.event.inputs.image_tag }}'
-          VERSION="${VERSION#v}"
+          APP_VERSION='${{ github.event.inputs.app_version }}'
+          APP_VERSION="${APP_VERSION#v}"
           TAGS="${{ steps.image.outputs.name }}:${{ github.event.inputs.image_tag }}"
           if [ '${{ github.event.inputs.push_latest_custom }}' = 'true' ]; then
             TAGS="$TAGS,${{ steps.image.outputs.name }}:latest-custom"
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
