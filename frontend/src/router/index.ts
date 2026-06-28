@@ -550,6 +550,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/custom-build',
+    name: 'AdminCustomBuildNotes',
+    component: () => import('@/views/admin/CustomBuildNotesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Custom Build Notes',
+      titleKey: 'admin.customBuild.title',
+      descriptionKey: 'admin.customBuild.description'
+    }
+  },
+  {
     path: '/admin/risk-control',
     name: 'AdminRiskControl',
     component: () => import('@/views/admin/RiskControlView.vue'),

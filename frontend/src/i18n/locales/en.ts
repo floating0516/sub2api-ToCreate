@@ -396,6 +396,7 @@ export default {
     ops: 'Ops',
     promoCodes: 'Promo Codes',
     settings: 'Settings',
+    customBuild: 'Custom Build',
     myAccount: 'My Account',
     lightMode: 'Light Mode',
     darkMode: 'Dark Mode',
@@ -1481,6 +1482,12 @@ export default {
       requestsShort: 'Req',
       tokensShort: 'Tok',
       failedToLoad: 'Failed to load dashboard statistics'
+    },
+
+    customBuild: {
+      title: 'Custom Build',
+      description: 'View local custom changes, update method, and rollback steps',
+      badge: 'Local Custom Deployment'
     },
 
     backup: {

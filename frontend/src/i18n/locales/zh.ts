@@ -396,6 +396,7 @@ export default {
     ops: '运维监控',
     promoCodes: '优惠码',
     settings: '系统设置',
+    customBuild: '自定义构建',
     myAccount: '我的账户',
     lightMode: '浅色模式',
     darkMode: '深色模式',
@@ -1502,6 +1503,12 @@ export default {
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
       failedToLoad: '加载仪表盘数据失败'
+    },
+
+    customBuild: {
+      title: '自定义构建',
+      description: '查看当前部署的自定义修改、更新方式和回滚方式',
+      badge: '本机自定义部署'
     },
 
     backup: {
