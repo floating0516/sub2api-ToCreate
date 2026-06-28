@@ -74,7 +74,7 @@ Use a fixed tag in `docker-compose.yml`, not `latest-custom`.
 Good:
 
 ```yaml
-image: ghcr.io/floating0516/sub2api-tocreate:0.1.139-q2
+image: ghcr.io/floating0516/sub2api-tocreate:0.1.139-q3
 ```
 
 Avoid:

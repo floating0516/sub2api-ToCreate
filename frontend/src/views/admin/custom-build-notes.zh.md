@@ -74,7 +74,7 @@ cd /home/ubuntu/sub2api-deploy
 推荐：
 
 ```yaml
-image: ghcr.io/floating0516/sub2api-tocreate:0.1.139-q2
+image: ghcr.io/floating0516/sub2api-tocreate:0.1.139-q3
 ```
 
 避免：
