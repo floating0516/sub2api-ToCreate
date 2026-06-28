@@ -314,13 +314,15 @@ func (s *SubscriptionService) withSubscriptionUpdateTx(ctx context.Context, fn f
 
 func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, startsAt, expiresAt time.Time) *UserSubscription {
 	renewed := *existingSub
-	windowStart := startOfDay(startsAt)
+	dailyWindowStart := startsAt
+	weeklyWindowStart := startsAt
+	monthlyWindowStart := startsAt
 	renewed.StartsAt = startsAt
 	renewed.ExpiresAt = expiresAt
 	renewed.Status = SubscriptionStatusActive
-	renewed.DailyWindowStart = &windowStart
-	renewed.WeeklyWindowStart = &windowStart
-	renewed.MonthlyWindowStart = &windowStart
+	renewed.DailyWindowStart = &dailyWindowStart
+	renewed.WeeklyWindowStart = &weeklyWindowStart
+	renewed.MonthlyWindowStart = &monthlyWindowStart
 	renewed.DailyUsageUSD = 0
 	renewed.WeeklyUsageUSD = 0
 	renewed.MonthlyUsageUSD = 0
@@ -354,16 +356,22 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 		expiresAt = MaxExpiresAt
 	}
 
+	dailyWindowStart := now
+	weeklyWindowStart := now
+	monthlyWindowStart := now
 	sub := &UserSubscription{
-		UserID:     input.UserID,
-		GroupID:    input.GroupID,
-		StartsAt:   now,
-		ExpiresAt:  expiresAt,
-		Status:     SubscriptionStatusActive,
-		AssignedAt: now,
-		Notes:      input.Notes,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		UserID:             input.UserID,
+		GroupID:            input.GroupID,
+		StartsAt:           now,
+		ExpiresAt:          expiresAt,
+		Status:             SubscriptionStatusActive,
+		DailyWindowStart:   &dailyWindowStart,
+		WeeklyWindowStart:  &weeklyWindowStart,
+		MonthlyWindowStart: &monthlyWindowStart,
+		AssignedAt:         now,
+		Notes:              input.Notes,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 	// 只有当 AssignedBy > 0 时才设置（0 表示系统分配，如兑换码）
 	if input.AssignedBy > 0 {
@@ -734,9 +742,35 @@ func normalizeSubscriptionStatus(subs []UserSubscription) {
 	}
 }
 
-// startOfDay 返回给定时间所在日期的零点（保持原时区）
-func startOfDay(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+// currentRollingWindowStart returns the start of the rolling quota window that contains now.
+func currentRollingWindowStart(anchor, now time.Time, period time.Duration) time.Time {
+	if anchor.IsZero() {
+		return now
+	}
+	if period <= 0 || now.Before(anchor) {
+		return anchor
+	}
+	elapsed := now.Sub(anchor) / period
+	return anchor.Add(elapsed * period)
+}
+
+func subscriptionWindowAnchor(sub *UserSubscription) time.Time {
+	if sub == nil {
+		return time.Time{}
+	}
+	return sub.StartsAt
+}
+
+func dailyWindowStartFor(sub *UserSubscription, now time.Time) time.Time {
+	return currentRollingWindowStart(subscriptionWindowAnchor(sub), now, 24*time.Hour)
+}
+
+func weeklyWindowStartFor(sub *UserSubscription, now time.Time) time.Time {
+	return currentRollingWindowStart(subscriptionWindowAnchor(sub), now, 7*24*time.Hour)
+}
+
+func monthlyWindowStartFor(sub *UserSubscription, now time.Time) time.Time {
+	return currentRollingWindowStart(subscriptionWindowAnchor(sub), now, 30*24*time.Hour)
 }
 
 // CheckAndActivateWindow 检查并激活窗口（首次使用时）
@@ -745,13 +779,15 @@ func (s *SubscriptionService) CheckAndActivateWindow(ctx context.Context, sub *U
 		return nil
 	}
 
-	// 使用当天零点作为窗口起始时间
-	windowStart := startOfDay(time.Now())
+	windowStart := subscriptionWindowAnchor(sub)
+	if windowStart.IsZero() {
+		windowStart = time.Now()
+	}
 	return s.userSubRepo.ActivateWindows(ctx, sub.ID, windowStart)
 }
 
 // AdminResetQuota manually resets the daily, weekly, and/or monthly usage windows.
-// Uses startOfDay(now) as the new window start, matching automatic resets.
+// Uses the current rolling window start for each selected window.
 func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionID int64, resetDaily, resetWeekly, resetMonthly bool) (*UserSubscription, error) {
 	if !resetDaily && !resetWeekly && !resetMonthly {
 		return nil, ErrInvalidInput
@@ -760,18 +796,21 @@ func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionI
 	if err != nil {
 		return nil, err
 	}
-	windowStart := startOfDay(time.Now())
+	now := time.Now()
 	if resetDaily {
+		windowStart := dailyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetDailyUsage(ctx, sub.ID, windowStart); err != nil {
 			return nil, err
 		}
 	}
 	if resetWeekly {
+		windowStart := weeklyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetWeeklyUsage(ctx, sub.ID, windowStart); err != nil {
 			return nil, err
 		}
 	}
 	if resetMonthly {
+		windowStart := monthlyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetMonthlyUsage(ctx, sub.ID, windowStart); err != nil {
 			return nil, err
 		}
@@ -792,12 +831,12 @@ func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionI
 
 // CheckAndResetWindows 检查并重置过期的窗口
 func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *UserSubscription) error {
-	// 使用当天零点作为新窗口起始时间
-	windowStart := startOfDay(time.Now())
+	now := time.Now()
 	needsInvalidateCache := false
 
 	// 日窗口重置（24小时）
 	if sub.NeedsDailyReset() {
+		windowStart := dailyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetDailyUsage(ctx, sub.ID, windowStart); err != nil {
 			return err
 		}
@@ -808,6 +847,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 
 	// 周窗口重置（7天）
 	if sub.NeedsWeeklyReset() {
+		windowStart := weeklyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetWeeklyUsage(ctx, sub.ID, windowStart); err != nil {
 			return err
 		}
@@ -818,6 +858,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 
 	// 月窗口重置（30天）
 	if sub.NeedsMonthlyReset() {
+		windowStart := monthlyWindowStartFor(sub, now)
 		if err := s.userSubRepo.ResetMonthlyUsage(ctx, sub.ID, windowStart); err != nil {
 			return err
 		}

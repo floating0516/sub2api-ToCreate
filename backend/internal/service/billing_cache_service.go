@@ -894,16 +894,34 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 		return ErrSubscriptionInvalid
 	}
 
-	// 检查限额（使用传入的Group限额配置）
-	if group.HasDailyLimit() && subData.DailyUsage >= *group.DailyLimitUSD {
+	// 检查限额（使用传入的Group限额配置）。Redis subscription cache stores usage
+	// totals only, so use the request's subscription snapshot to decide whether a
+	// rolling quota window has already expired. Window maintenance will persist
+	// the reset asynchronously on the subscription service path.
+	dailyUsage := subData.DailyUsage
+	weeklyUsage := subData.WeeklyUsage
+	monthlyUsage := subData.MonthlyUsage
+	if subscription != nil {
+		if subscription.NeedsDailyReset() {
+			dailyUsage = 0
+		}
+		if subscription.NeedsWeeklyReset() {
+			weeklyUsage = 0
+		}
+		if subscription.NeedsMonthlyReset() {
+			monthlyUsage = 0
+		}
+	}
+
+	if group.HasDailyLimit() && dailyUsage >= *group.DailyLimitUSD {
 		return ErrDailyLimitExceeded
 	}
 
-	if group.HasWeeklyLimit() && subData.WeeklyUsage >= *group.WeeklyLimitUSD {
+	if group.HasWeeklyLimit() && weeklyUsage >= *group.WeeklyLimitUSD {
 		return ErrWeeklyLimitExceeded
 	}
 
-	if group.HasMonthlyLimit() && subData.MonthlyUsage >= *group.MonthlyLimitUSD {
+	if group.HasMonthlyLimit() && monthlyUsage >= *group.MonthlyLimitUSD {
 		return ErrMonthlyLimitExceeded
 	}
 

@@ -26,7 +26,7 @@ func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *tes
 	}
 	subRepo := newSubscriptionUserSubRepoStub()
 	oldStart := time.Now().AddDate(0, 0, -3)
-	oldWindowStart := startOfDay(oldStart)
+	oldWindowStart := oldStart
 	subRepo.seed(&UserSubscription{
 		ID:                 100,
 		UserID:             200,
@@ -58,7 +58,7 @@ func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *tes
 	require.True(t, renewed.StartsAt.After(oldStart), "重新购买过期订阅时应重置当前周期 StartsAt")
 	require.False(t, renewed.ExpiresAt.After(renewed.StartsAt.AddDate(0, 0, 1)))
 	require.NotNil(t, renewed.DailyWindowStart)
-	require.Equal(t, startOfDay(renewed.StartsAt), *renewed.DailyWindowStart)
+	require.Equal(t, renewed.StartsAt, *renewed.DailyWindowStart)
 	require.Equal(t, 0.0, renewed.DailyUsageUSD)
 	require.Equal(t, 0.0, renewed.WeeklyUsageUSD)
 	require.Equal(t, 0.0, renewed.MonthlyUsageUSD)
@@ -67,7 +67,7 @@ func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *tes
 
 func TestUserSubscriptionNeedsDailyReset_DailyCardKeepsOneTimeQuota(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
+	dailyWindowStart := start
 	sub := &UserSubscription{
 		StartsAt:         start,
 		ExpiresAt:        start.Add(24 * time.Hour),
@@ -81,7 +81,7 @@ func TestUserSubscriptionNeedsDailyReset_DailyCardKeepsOneTimeQuota(t *testing.T
 
 func TestUserSubscriptionNeedsDailyReset_MultiDaySubscriptionStillRefreshes(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
+	dailyWindowStart := start
 	sub := &UserSubscription{
 		StartsAt:         start,
 		ExpiresAt:        start.AddDate(0, 0, 2),
@@ -89,12 +89,12 @@ func TestUserSubscriptionNeedsDailyReset_MultiDaySubscriptionStillRefreshes(t *t
 	}
 
 	require.False(t, sub.HasOneTimeDailyQuota())
-	require.True(t, sub.NeedsDailyResetAt(dailyWindowStart.Add(24*time.Hour)), "多日订阅仍应按 24 小时日窗口刷新")
+	require.True(t, sub.NeedsDailyResetAt(dailyWindowStart.Add(24*time.Hour)), "多日订阅仍应按 starts_at 锚定的 24 小时日窗口刷新")
 }
 
 func TestUserSubscriptionDailyResetTime_DailyCardReturnsExpiry(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
+	dailyWindowStart := start
 	expiresAt := start.Add(24 * time.Hour)
 	sub := &UserSubscription{
 		StartsAt:         start,
@@ -153,6 +153,52 @@ func TestCheckAndResetWindows_MultiDaySubscriptionStillResetsDailyUsage(t *testi
 	require.Equal(t, 0.0, sub.DailyUsageUSD)
 }
 
+func TestCheckAndResetWindows_TwoDaySubscriptionDoesNotResetAtMidnight(t *testing.T) {
+	startsAt := time.Now().Add(-12 * time.Hour)
+	dailyWindowStart := startsAt
+	repo := &dailyResetTrackingUserSubRepo{}
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	sub := &UserSubscription{
+		ID:               1,
+		UserID:           10,
+		GroupID:          20,
+		StartsAt:         startsAt,
+		ExpiresAt:        startsAt.AddDate(0, 0, 2),
+		DailyUsageUSD:    10,
+		DailyWindowStart: &dailyWindowStart,
+	}
+
+	err := svc.CheckAndResetWindows(context.Background(), sub)
+
+	require.NoError(t, err)
+	require.False(t, repo.resetDailyCalled, "2 天卡不应因跨自然日 0 点刷新 daily usage")
+	require.Equal(t, 10.0, sub.DailyUsageUSD)
+}
+
+func TestCheckAndResetWindows_TwoDaySubscriptionResetsAtRollingDayBoundary(t *testing.T) {
+	startsAt := time.Now().Add(-25 * time.Hour)
+	dailyWindowStart := startsAt
+	repo := &dailyResetTrackingUserSubRepo{}
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	sub := &UserSubscription{
+		ID:               1,
+		UserID:           10,
+		GroupID:          20,
+		StartsAt:         startsAt,
+		ExpiresAt:        startsAt.AddDate(0, 0, 2),
+		DailyUsageUSD:    10,
+		DailyWindowStart: &dailyWindowStart,
+	}
+
+	err := svc.CheckAndResetWindows(context.Background(), sub)
+
+	require.NoError(t, err)
+	require.True(t, repo.resetDailyCalled, "2 天卡应在 starts_at+24h 后刷新 daily usage")
+	require.Equal(t, 0.0, sub.DailyUsageUSD)
+	require.NotNil(t, sub.DailyWindowStart)
+	require.WithinDuration(t, startsAt.Add(24*time.Hour), *sub.DailyWindowStart, time.Second)
+}
+
 func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuotaAfterMidnight(t *testing.T) {
 	start := time.Now().Add(-23 * time.Hour)
 	dailyWindowStart := time.Now().Add(-25 * time.Hour)
@@ -175,4 +221,55 @@ func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuotaAfterMidnight(t 
 	require.False(t, needsMaintenance, "日卡跨过日窗口后不应触发 daily reset 维护")
 	require.True(t, errors.Is(err, ErrDailyLimitExceeded))
 	require.Equal(t, dailyLimit+0.01, sub.DailyUsageUSD, "热路径不应清零日卡已用额度")
+}
+
+type subscriptionQuotaCacheStub struct {
+	billingCacheWorkerStub
+	data *SubscriptionCacheData
+}
+
+func (s *subscriptionQuotaCacheStub) GetSubscriptionCache(context.Context, int64, int64) (*SubscriptionCacheData, error) {
+	return s.data, nil
+}
+
+func TestBillingCacheSubscriptionEligibility_AllowsCachedDailyUsageAfterRollingReset(t *testing.T) {
+	dailyLimit := 10.0
+	startsAt := time.Now().Add(-25 * time.Hour)
+	dailyWindowStart := startsAt
+	group := &Group{ID: 20, DailyLimitUSD: &dailyLimit}
+	sub := &UserSubscription{
+		StartsAt:         startsAt,
+		ExpiresAt:        startsAt.AddDate(0, 0, 2),
+		DailyWindowStart: &dailyWindowStart,
+	}
+	svc := &BillingCacheService{cache: &subscriptionQuotaCacheStub{data: &SubscriptionCacheData{
+		Status:     SubscriptionStatusActive,
+		ExpiresAt:  sub.ExpiresAt,
+		DailyUsage: dailyLimit,
+	}}}
+
+	err := svc.checkSubscriptionEligibility(context.Background(), 10, group, sub)
+
+	require.NoError(t, err, "过了 starts_at 锚定的 24 小时窗口后，缓存中的旧 daily usage 不应继续拦截")
+}
+
+func TestBillingCacheSubscriptionEligibility_BlocksCachedDailyUsageBeforeRollingReset(t *testing.T) {
+	dailyLimit := 10.0
+	startsAt := time.Now().Add(-23 * time.Hour)
+	dailyWindowStart := startsAt
+	group := &Group{ID: 20, DailyLimitUSD: &dailyLimit}
+	sub := &UserSubscription{
+		StartsAt:         startsAt,
+		ExpiresAt:        startsAt.AddDate(0, 0, 2),
+		DailyWindowStart: &dailyWindowStart,
+	}
+	svc := &BillingCacheService{cache: &subscriptionQuotaCacheStub{data: &SubscriptionCacheData{
+		Status:     SubscriptionStatusActive,
+		ExpiresAt:  sub.ExpiresAt,
+		DailyUsage: dailyLimit,
+	}}}
+
+	err := svc.checkSubscriptionEligibility(context.Background(), 10, group, sub)
+
+	require.True(t, errors.Is(err, ErrDailyLimitExceeded))
 }
