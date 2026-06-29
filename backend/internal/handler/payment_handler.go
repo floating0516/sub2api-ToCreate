@@ -223,6 +223,39 @@ type CreateOrderRequest struct {
 	IsMobile *bool `json:"is_mobile,omitempty"`
 }
 
+type BalanceSubscriptionPurchaseRequest struct {
+	PlanID int64 `json:"plan_id" binding:"required"`
+}
+
+// PurchaseSubscriptionWithBalance buys a subscription using account balance.
+// POST /api/v1/payment/subscriptions/balance-purchase
+func (h *PaymentHandler) PurchaseSubscriptionWithBalance(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+
+	var req BalanceSubscriptionPurchaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.paymentService.PurchaseSubscriptionWithBalance(c.Request.Context(), service.BalanceSubscriptionPurchaseRequest{
+		UserID:   subject.UserID,
+		PlanID:   req.PlanID,
+		ClientIP: c.ClientIP(),
+		SrcHost:  c.Request.Host,
+		SrcURL:   c.Request.Referer(),
+		Locale:   c.GetHeader("Accept-Language"),
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 // CreateOrder creates a new payment order.
 // POST /api/v1/payment/orders
 func (h *PaymentHandler) CreateOrder(c *gin.Context) {

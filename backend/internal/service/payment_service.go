@@ -49,6 +49,7 @@ const (
 )
 
 const paymentResumeSigningKeyEnv = "PAYMENT_RESUME_SIGNING_KEY"
+const PaymentTypeBalanceWallet = "balance_wallet"
 
 // --- Types ---
 
@@ -108,6 +109,26 @@ type CreateOrderResponse struct {
 	ExpiresAt    time.Time                       `json:"expires_at"`
 	PaymentMode  string                          `json:"payment_mode,omitempty"`
 	ResumeToken  string                          `json:"resume_token,omitempty"`
+}
+
+type BalanceSubscriptionPurchaseRequest struct {
+	UserID   int64
+	PlanID   int64
+	ClientIP string
+	SrcHost  string
+	SrcURL   string
+	Locale   string
+}
+
+type BalanceSubscriptionPurchaseResponse struct {
+	OrderID        int64   `json:"order_id"`
+	Amount         float64 `json:"amount"`
+	Status         string  `json:"status"`
+	PaymentType    string  `json:"payment_type"`
+	PlanID         int64   `json:"plan_id"`
+	BalanceBefore  float64 `json:"balance_before"`
+	BalanceAfter   float64 `json:"balance_after"`
+	SubscriptionID int64   `json:"subscription_id,omitempty"`
 }
 
 type OrderListParams struct {
@@ -185,6 +206,7 @@ type PaymentService struct {
 	configService            *PaymentConfigService
 	userRepo                 UserRepository
 	groupRepo                GroupRepository
+	authCacheInvalidator     APIKeyAuthCacheInvalidator
 	resumeService            *PaymentResumeService
 	affiliateService         *AffiliateService
 	notificationEmailService *NotificationEmailService
@@ -198,6 +220,10 @@ func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, load
 
 func (s *PaymentService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+func (s *PaymentService) SetAuthCacheInvalidator(authCacheInvalidator APIKeyAuthCacheInvalidator) {
+	s.authCacheInvalidator = authCacheInvalidator
 }
 
 // --- Provider Registry ---

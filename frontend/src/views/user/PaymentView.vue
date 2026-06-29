@@ -139,6 +139,28 @@
                   </div>
                 </div>
               </div>
+              <div class="card p-6">
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.balancePurchase.currentBalance') }}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ formatBalanceAmount(userBalance) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.balancePurchase.deductAmount') }}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ formatBalanceAmount(selectedPlan.price) }}</span>
+                  </div>
+                  <p v-if="balanceShortfall > 0" class="border-t border-gray-200 pt-2 text-xs text-amber-600 dark:border-dark-600 dark:text-amber-300">
+                    {{ t('payment.balancePurchase.insufficient', { shortfall: formatBalanceAmount(balanceShortfall) }) }}
+                  </p>
+                </div>
+                <button class="btn btn-primary mt-4 w-full py-3 text-base font-medium" :disabled="!canPurchaseSubscriptionWithBalance || submitting || balanceSubmitting" @click="purchaseSubscriptionWithBalance">
+                  <span v-if="balanceSubmitting" class="flex items-center justify-center gap-2">
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                    {{ t('common.processing') }}
+                  </span>
+                  <span v-else>{{ t('payment.balancePurchase.useBalance') }}</span>
+                </button>
+              </div>
               <div v-if="enabledMethods.length >= 1" class="card p-6">
                 <PaymentMethodSelector
                   :methods="subMethodOptions"
@@ -162,7 +184,7 @@
                   </div>
                 </div>
               </div>
-              <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmitSubscription || submitting" @click="confirmSubscribe">
+              <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmitSubscription || submitting || balanceSubmitting" @click="confirmSubscribe">
                 <span v-if="submitting" class="flex items-center justify-center gap-2">
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   {{ t('common.processing') }}
@@ -299,6 +321,7 @@ function getDaysRemaining(expiresAt: string): number {
 
 const loading = ref(true)
 const submitting = ref(false)
+const balanceSubmitting = ref(false)
 const errorMessage = ref('')
 const errorHintMessage = ref('')
 const activeTab = ref<'recharge' | 'subscription'>('recharge')
@@ -544,6 +567,10 @@ function formatSelectedPaymentAmount(value: number): string {
   return formatPaymentAmount(value, selectedCurrency.value, localeCode.value)
 }
 
+function formatBalanceAmount(value: number): string {
+  return formatPaymentAmount(value, 'USD', localeCode.value)
+}
+
 const methodOptions = computed<PaymentMethodOption[]>(() =>
   enabledMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
@@ -613,10 +640,20 @@ const subTotalAmount = computed(() => {
   return Math.round((price + subFeeAmount.value) * 100) / 100
 })
 
+const userBalance = computed(() => user.value?.balance ?? 0)
+const balanceShortfall = computed(() => {
+  const price = selectedPlan.value?.price ?? 0
+  return Math.max(0, Math.round((price - userBalance.value) * 100) / 100)
+})
+
 const canSubmitSubscription = computed(() =>
   selectedPlan.value !== null
     && amountFitsMethod(selectedPlan.value.price, selectedMethod.value)
     && selectedLimit.value?.available !== false
+)
+
+const canPurchaseSubscriptionWithBalance = computed(() =>
+  selectedPlan.value !== null && balanceShortfall.value <= 0
 )
 
 // Auto-switch to first available method when current selection can't handle the amount
@@ -680,8 +717,30 @@ async function handleSubmitRecharge() {
 }
 
 async function confirmSubscribe() {
-  if (!selectedPlan.value || submitting.value) return
+  if (!selectedPlan.value || submitting.value || balanceSubmitting.value) return
   await createOrder(selectedPlan.value.price, 'subscription', selectedPlan.value.id)
+}
+
+async function purchaseSubscriptionWithBalance() {
+  if (!selectedPlan.value || !canPurchaseSubscriptionWithBalance.value || submitting.value || balanceSubmitting.value) return
+  balanceSubmitting.value = true
+  errorMessage.value = ''
+  errorHintMessage.value = ''
+  try {
+    await paymentStore.purchaseSubscriptionWithBalance({ plan_id: selectedPlan.value.id })
+    await Promise.all([
+      authStore.refreshUser(),
+      subscriptionStore.fetchActiveSubscriptions(true),
+    ])
+    selectedPlan.value = null
+    appStore.showSuccess(t('payment.balancePurchase.success'))
+  } catch (err: unknown) {
+    errorMessage.value = extractI18nErrorMessage(err, t, 'payment.errors', extractApiErrorMessage(err, t('common.error')))
+    errorHintMessage.value = ''
+    appStore.showError(errorMessage.value)
+  } finally {
+    balanceSubmitting.value = false
+  }
 }
 
 async function createOrder(orderAmount: number, orderType: OrderType, planId?: number, options: CreateOrderOptions = {}) {

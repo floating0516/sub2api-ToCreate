@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-5xl">
-      <article class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-8">
+    <div class="mx-auto max-w-7xl">
+      <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-6">
         <header class="mb-6 border-b border-gray-200 pb-5 dark:border-dark-700 sm:flex sm:items-start sm:justify-between sm:gap-4">
           <div class="min-w-0">
             <p class="text-sm font-medium text-primary-700 dark:text-primary-300">
@@ -39,11 +39,31 @@
           {{ loadError }}
         </div>
 
-        <div
-          v-else-if="renderedHtml"
-          class="custom-build-content"
-          v-html="renderedHtml"
-        ></div>
+        <div v-else-if="renderedHtml" class="custom-build-shell">
+          <aside v-if="tocItems.length > 0" class="custom-build-toc">
+            <div class="custom-build-toc-title">{{ t('admin.customBuild.toc') }}</div>
+            <nav class="custom-build-toc-nav">
+              <a
+                v-for="item in tocItems"
+                :key="item.id"
+                :href="'#' + item.id"
+                class="custom-build-toc-item"
+                :class="[
+                  `custom-build-toc-level-${item.level}`,
+                  { 'custom-build-toc-active': activeHeadingId === item.id }
+                ]"
+                @click.prevent="scrollToHeading(item.id)"
+              >
+                {{ item.text }}
+              </a>
+            </nav>
+          </aside>
+          <div
+            ref="contentRef"
+            class="custom-build-content"
+            v-html="renderedHtml"
+          ></div>
+        </div>
 
         <div
           v-else
@@ -57,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
@@ -69,6 +89,16 @@ const { t } = useI18n()
 const loading = ref(false)
 const loadError = ref('')
 const notes = ref<CustomBuildNotes | null>(null)
+const contentRef = ref<HTMLElement | null>(null)
+const tocItems = ref<TocItem[]>([])
+const activeHeadingId = ref('')
+let scrollRafId = 0
+
+interface TocItem {
+  id: string
+  text: string
+  level: number
+}
 
 marked.setOptions({
   breaks: true,
@@ -77,10 +107,69 @@ marked.setOptions({
 
 const renderedHtml = computed(() => {
   const content = notes.value?.content?.trim() || ''
-  if (!content) return ''
+  tocItems.value = []
+  activeHeadingId.value = ''
+  if (!content) {
+    return ''
+  }
   const html = marked.parse(content) as string
-  return DOMPurify.sanitize(html)
+  const sanitized = DOMPurify.sanitize(html)
+  return injectHeadingIds(sanitized)
 })
+
+function generateHeadingId(text: string, index: number): string {
+  const base = text
+    .toLowerCase()
+    .replace(/[^\w一-鿿]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return base ? `${base}-${index}` : `heading-${index}`
+}
+
+function injectHeadingIds(html: string): string {
+  const toc: TocItem[] = []
+  let headingIndex = 0
+  const withIds = html.replace(
+    /<(h[1-4])[^>]*>(.*?)<\/h[1-4]>/gi,
+    (_, tag: string, content: string) => {
+      const level = Number.parseInt(tag[1], 10)
+      const text = content.replace(/<[^>]+>/g, '').trim()
+      if (!text) return `<${tag}>${content}</${tag}>`
+      const id = generateHeadingId(text, headingIndex++)
+      toc.push({ id, text, level })
+      return `<${tag} id="${id}">${content}</${tag}>`
+    },
+  )
+  tocItems.value = toc
+  return withIds
+}
+
+function scrollToHeading(id: string) {
+  const container = contentRef.value
+  if (!container) return
+  const el = container.querySelector(`#${CSS.escape(id)}`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  activeHeadingId.value = id
+}
+
+function updateActiveHeading() {
+  if (scrollRafId) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = 0
+    const container = contentRef.value
+    if (!container || tocItems.value.length === 0) return
+
+    let current = tocItems.value[0]?.id || ''
+    for (const item of tocItems.value) {
+      const el = container.querySelector(`#${CSS.escape(item.id)}`) as HTMLElement | null
+      if (!el) continue
+      if (el.getBoundingClientRect().top <= 120) {
+        current = item.id
+      }
+    }
+    activeHeadingId.value = current
+  })
+}
 
 function formatUpdatedAt(value: string): string {
   const date = new Date(value)
@@ -100,10 +189,70 @@ async function loadNotes() {
   }
 }
 
-onMounted(loadNotes)
+watch(renderedHtml, async () => {
+  await nextTick()
+  activeHeadingId.value = tocItems.value[0]?.id || ''
+})
+
+onMounted(() => {
+  loadNotes()
+  window.addEventListener('scroll', updateActiveHeading, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', updateActiveHeading)
+  if (scrollRafId) {
+    cancelAnimationFrame(scrollRafId)
+    scrollRafId = 0
+  }
+})
 </script>
 
 <style scoped>
+.custom-build-shell {
+  @apply grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)];
+}
+
+.custom-build-toc {
+  @apply hidden lg:block;
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+}
+
+.custom-build-toc-title {
+  @apply mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400;
+}
+
+.custom-build-toc-nav {
+  @apply space-y-1 border-l border-gray-200 pl-2 dark:border-dark-700;
+}
+
+.custom-build-toc-item {
+  @apply block truncate rounded px-2 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-950 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white;
+}
+
+.custom-build-toc-active {
+  @apply bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/20 dark:text-primary-300;
+}
+
+.custom-build-toc-level-1 {
+  padding-left: 0.5rem;
+}
+
+.custom-build-toc-level-2 {
+  padding-left: 1rem;
+}
+
+.custom-build-toc-level-3 {
+  padding-left: 1.5rem;
+}
+
+.custom-build-toc-level-4 {
+  padding-left: 2rem;
+}
+
 .custom-build-content {
   line-height: 1.75;
   overflow-wrap: anywhere;

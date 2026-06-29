@@ -208,6 +208,21 @@ export interface CreateOrderResult {
   jsapi_payload?: WechatJSAPIPayload
 }
 
+export interface BalanceSubscriptionPurchaseRequest {
+  plan_id: number
+}
+
+export interface BalanceSubscriptionPurchaseResult {
+  order_id: number
+  amount: number
+  status: OrderStatus
+  payment_type: string
+  plan_id: number
+  balance_before: number
+  balance_after: number
+  subscription_id?: number
+}
+
 export interface DashboardStats {
   today_amount: number
   total_amount: number
