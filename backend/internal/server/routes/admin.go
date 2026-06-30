@@ -83,6 +83,9 @@ func RegisterAdminRoutes(
 		// 使用记录管理
 		registerUsageRoutes(admin, h)
 
+		// Token 排行榜
+		registerLeaderboardRoutes(admin, h)
+
 		// 用户属性管理
 		registerUserAttributeRoutes(admin, h)
 
@@ -109,6 +112,16 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerLeaderboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	leaderboard := admin.Group("/leaderboard")
+	{
+		leaderboard.GET("", h.Admin.Leaderboard.Get)
+		leaderboard.GET("/settings", h.Admin.Leaderboard.GetSettings)
+		leaderboard.PUT("/settings", h.Admin.Leaderboard.UpdateSettings)
+		leaderboard.POST("/rewards/generate", h.Admin.Leaderboard.GenerateReward)
 	}
 }
 

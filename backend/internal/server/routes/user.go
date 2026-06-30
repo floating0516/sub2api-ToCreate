@@ -93,6 +93,12 @@ func RegisterUserRoutes(
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
 		}
 
+		leaderboard := authenticated.Group("/leaderboard")
+		{
+			leaderboard.GET("", h.Leaderboard.Get)
+			leaderboard.PUT("/privacy", h.Leaderboard.UpdatePrivacy)
+		}
+
 		// 公告（用户可见）
 		announcements := authenticated.Group("/announcements")
 		{

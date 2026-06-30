@@ -372,12 +372,18 @@ export default {
     adminCompliance: '部署与运营合规承诺'
   },
 
+  leaderboard: {
+    title: 'Token 排行',
+    adminTitle: 'Token 排行管理'
+  },
+
   // Navigation
   nav: {
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
     usage: '使用记录',
+    leaderboard: 'Token 排行',
     redeem: '兑换',
     affiliate: '邀请返利',
     affiliateManagement: '邀请返利',

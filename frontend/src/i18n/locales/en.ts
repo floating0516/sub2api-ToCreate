@@ -372,12 +372,18 @@ export default {
     adminCompliance: 'Deployment and Operation Compliance Commitment'
   },
 
+  leaderboard: {
+    title: 'Token Leaderboard',
+    adminTitle: 'Token Leaderboard'
+  },
+
   // Navigation
   nav: {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     usage: 'Usage',
+    leaderboard: 'Token Leaderboard',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',
     affiliateManagement: 'Affiliate Rebates',

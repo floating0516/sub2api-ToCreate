@@ -218,6 +218,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/leaderboard',
+    name: 'Leaderboard',
+    component: () => import('@/views/user/LeaderboardView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Token Leaderboard',
+      titleKey: 'leaderboard.title'
+    }
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
@@ -523,6 +534,17 @@ const routes: RouteRecordRaw[] = [
       title: 'Redeem Code Management',
       titleKey: 'admin.redeem.title',
       descriptionKey: 'admin.redeem.description'
+    }
+  },
+  {
+    path: '/admin/leaderboard',
+    name: 'AdminLeaderboard',
+    component: () => import('@/views/admin/LeaderboardView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Token Leaderboard',
+      titleKey: 'leaderboard.adminTitle'
     }
   },
   {
