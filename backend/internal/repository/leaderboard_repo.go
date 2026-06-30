@@ -82,7 +82,7 @@ LIMIT $3`, start, end, limit)
 	}
 	defer rows.Close()
 
-	var entries []service.LeaderboardEntry
+	entries := make([]service.LeaderboardEntry, 0)
 	for rows.Next() {
 		var entry service.LeaderboardEntry
 		if err := rows.Scan(&entry.Rank, &entry.UserID, &entry.Username, &entry.Email, &entry.Role, &entry.Anonymous, &entry.TokenCount); err != nil {
@@ -160,7 +160,7 @@ ORDER BY lr.rank ASC, lr.created_at ASC`, period, start)
 	}
 	defer rows.Close()
 
-	var rewards []service.LeaderboardReward
+	rewards := make([]service.LeaderboardReward, 0)
 	for rows.Next() {
 		var reward service.LeaderboardReward
 		var createdBy sql.NullInt64
