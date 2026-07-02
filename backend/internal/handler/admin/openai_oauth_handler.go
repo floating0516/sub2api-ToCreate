@@ -424,6 +424,26 @@ func (h *OpenAIOAuthHandler) QueryQuota(c *gin.Context) {
 	response.Success(c, usage)
 }
 
+// QueryResetCredits queries available OpenAI/Codex reset credits and their expiration metadata.
+// GET /api/v1/admin/openai/accounts/:id/reset-credits
+func (h *OpenAIOAuthHandler) QueryResetCredits(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	if h.quotaService == nil {
+		response.BadRequest(c, "openai quota service is not enabled")
+		return
+	}
+	credits, err := h.quotaService.QueryResetCredits(c.Request.Context(), accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, credits)
+}
+
 // CreateShadowRequest is the request body for CreateShadow.
 type CreateShadowRequest struct {
 	Name        string  `json:"name"`

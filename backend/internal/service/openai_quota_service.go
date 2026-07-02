@@ -22,14 +22,15 @@ var ErrSparkShadowResetNotSupported = infraerrors.New(http.StatusConflict, "SPAR
 
 // Endpoints used by the OpenAI/ChatGPT/Codex quota query and reset feature.
 const (
-	chatGPTUsageURL             = "https://chatgpt.com/backend-api/wham/usage"
-	chatGPTRateLimitResetURL    = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume"
-	openaiQuotaUpstreamTimeout  = 20 * time.Second
-	openaiQuotaCodexOriginator  = "Codex Desktop"
-	openaiQuotaCodexLanguageTag = "zh-CN"
-	openaiQuotaSecFetchSite     = "none"
-	openaiQuotaSecFetchMode     = "no-cors"
-	openaiQuotaSecFetchDest     = "empty"
+	chatGPTUsageURL                 = "https://chatgpt.com/backend-api/wham/usage"
+	chatGPTRateLimitResetCreditsURL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
+	chatGPTRateLimitResetURL        = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume"
+	openaiQuotaUpstreamTimeout      = 20 * time.Second
+	openaiQuotaCodexOriginator      = "Codex Desktop"
+	openaiQuotaCodexLanguageTag     = "zh-CN"
+	openaiQuotaSecFetchSite         = "none"
+	openaiQuotaSecFetchMode         = "no-cors"
+	openaiQuotaSecFetchDest         = "empty"
 )
 
 // OpenAIRateLimitWindow describes a single rate-limit window returned by
@@ -61,6 +62,24 @@ type OpenAIAdditionalRateLimit struct {
 // rate_limit_reset_credit grant type, which the reset action consumes.
 type OpenAIRateLimitResetCredits struct {
 	AvailableCount int `json:"available_count"`
+}
+
+// OpenAIRateLimitResetCreditSummary is the safe metadata surfaced by
+// /wham/rate-limit-reset-credits. It intentionally excludes upstream IDs.
+type OpenAIRateLimitResetCreditSummary struct {
+	Status    string `json:"status,omitempty"`
+	Title     string `json:"title,omitempty"`
+	GrantedAt string `json:"granted_at,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+// OpenAIResetCredits is the standalone reset-credit payload used by reports and
+// future UI/API consumers that need credit expiration details.
+type OpenAIResetCredits struct {
+	AvailableCount  int                                  `json:"available_count"`
+	TotalEarnedCount int                                  `json:"total_earned_count,omitempty"`
+	Credits         []OpenAIRateLimitResetCreditSummary `json:"credits,omitempty"`
+	FetchedAt       int64                                `json:"fetched_at"`
 }
 
 // OpenAIQuotaUsage is the typed projection of /wham/usage we expose to the UI.
@@ -156,6 +175,43 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 		body := truncate(resp.String(), 240)
 		slog.Warn("openai_quota_query_failed", "account_id", accountID, "status", status, "body", body)
 		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_QUOTA_UPSTREAM_ERROR", "upstream returned %d: %s", status, body)
+	}
+
+	payload.FetchedAt = time.Now().Unix()
+	return &payload, nil
+}
+
+// QueryResetCredits fetches the reset-credit list for an OpenAI OAuth account.
+// The response includes expiration metadata for PushPlus reports and future UI
+// surfaces, while avoiding upstream unique IDs.
+func (s *OpenAIQuotaService) QueryResetCredits(ctx context.Context, accountID int64) (*OpenAIResetCredits, error) {
+	accessToken, chatGPTAccountID, proxyURL, fedRAMP, err := s.prepareUpstreamCall(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := s.privacyClientFactory(proxyURL)
+	if err != nil {
+		return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_RESET_CREDITS_CLIENT_ERROR", "failed to build upstream client: %v", err)
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, openaiQuotaUpstreamTimeout)
+	defer cancel()
+
+	var payload OpenAIResetCredits
+	resp, err := client.R().
+		SetContext(callCtx).
+		SetHeaders(buildCodexCommonHeaders(accessToken, chatGPTAccountID, fedRAMP)).
+		SetSuccessResult(&payload).
+		Get(chatGPTRateLimitResetCreditsURL)
+	if err != nil {
+		return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_RESET_CREDITS_REQUEST_FAILED", "upstream request failed: %v", err)
+	}
+	if !resp.IsSuccessState() {
+		status := resp.StatusCode
+		body := truncate(resp.String(), 240)
+		slog.Warn("openai_reset_credits_query_failed", "account_id", accountID, "status", status, "body", body)
+		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_RESET_CREDITS_UPSTREAM_ERROR", "upstream returned %d: %s", status, body)
 	}
 
 	payload.FetchedAt = time.Now().Unix()

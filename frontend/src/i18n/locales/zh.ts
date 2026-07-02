@@ -4378,6 +4378,14 @@ export default {
         todayTokens: '今日 Token',
         todayCost: '今日费用',
         usageTrend: '30天费用与请求趋势',
+        capacityTrend: '容量变化',
+        capacityPeak: '峰值',
+        peakConcurrent: '峰值并发',
+        avgConcurrent: '平均并发',
+        capacityLimit: '容量上限',
+        concurrentUsage: '并发占用',
+        samples: '采样',
+        waitingPeak: '等待峰值',
         noData: '该账号暂无使用数据'
       }
     },

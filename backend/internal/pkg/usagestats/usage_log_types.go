@@ -330,6 +330,27 @@ type AccountUsageHistory struct {
 	UserCost   float64 `json:"user_cost"`   // 用户口径费用（actual_cost，受分组倍率影响）
 }
 
+// AccountCapacityTrendPoint represents real sampled account capacity usage for a time bucket.
+type AccountCapacityTrendPoint struct {
+	BucketStart    string  `json:"bucket_start"`
+	BucketEnd      string  `json:"bucket_end"`
+	Label          string  `json:"label"`
+	PeakConcurrent int64   `json:"peak_concurrent"`
+	AvgConcurrent  float64 `json:"avg_concurrent"`
+	MaxConcurrency  int64   `json:"max_concurrency"`
+	WaitingPeak     int64   `json:"waiting_peak"`
+	Samples         int64   `json:"samples"`
+}
+
+// AccountCapacitySample represents one persisted real-time account capacity sample.
+type AccountCapacitySample struct {
+	AccountID          int64
+	SampledAt          time.Time
+	CurrentConcurrency int64
+	MaxConcurrency     int64
+	WaitingCount       int64
+}
+
 // AccountUsageSummary represents summary statistics for an account
 type AccountUsageSummary struct {
 	Days              int     `json:"days"`
@@ -369,9 +390,11 @@ type AccountUsageSummary struct {
 
 // AccountUsageStatsResponse represents the full usage statistics response for an account
 type AccountUsageStatsResponse struct {
-	History           []AccountUsageHistory `json:"history"`
-	Summary           AccountUsageSummary   `json:"summary"`
-	Models            []ModelStat           `json:"models"`
-	Endpoints         []EndpointStat        `json:"endpoints"`
-	UpstreamEndpoints []EndpointStat        `json:"upstream_endpoints"`
+	History           []AccountUsageHistory       `json:"history"`
+	CapacityTrend     []AccountCapacityTrendPoint `json:"capacity_trend"`
+	CapacityLimit     int64                       `json:"capacity_limit"`
+	Summary           AccountUsageSummary         `json:"summary"`
+	Models            []ModelStat                 `json:"models"`
+	Endpoints         []EndpointStat              `json:"endpoints"`
+	UpstreamEndpoints []EndpointStat              `json:"upstream_endpoints"`
 }

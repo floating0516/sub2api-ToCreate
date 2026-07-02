@@ -3734,6 +3734,9 @@ func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters Us
 // AccountUsageHistory represents daily usage history for an account
 type AccountUsageHistory = usagestats.AccountUsageHistory
 
+// AccountCapacityTrendPoint represents real sampled capacity usage for an account.
+type AccountCapacityTrendPoint = usagestats.AccountCapacityTrendPoint
+
 // AccountUsageSummary represents summary statistics for an account
 type AccountUsageSummary = usagestats.AccountUsageSummary
 
@@ -3742,6 +3745,78 @@ type AccountUsageStatsResponse = usagestats.AccountUsageStatsResponse
 
 // EndpointStat represents endpoint usage statistics row.
 type EndpointStat = usagestats.EndpointStat
+
+func (r *usageLogRepository) getAccountCapacityTrend(ctx context.Context, accountID int64, startTime, endTime time.Time) (trend []AccountCapacityTrendPoint, err error) {
+	if accountID <= 0 || !endTime.After(startTime) {
+		return []AccountCapacityTrendPoint{}, nil
+	}
+
+	query := `
+		WITH sampled AS (
+			SELECT
+				date_trunc('hour', sampled_at AT TIME ZONE $4) AT TIME ZONE $4 AS bucket_start,
+				current_concurrency,
+				max_concurrency,
+				waiting_count
+			FROM account_capacity_samples
+			WHERE account_id = $1
+			  AND sampled_at >= $2
+			  AND sampled_at < $3
+		)
+		SELECT
+			bucket_start,
+			bucket_start + INTERVAL '1 hour' AS bucket_end,
+			COALESCE(MAX(current_concurrency), 0)::bigint AS peak_concurrent,
+			COALESCE(AVG(current_concurrency), 0)::double precision AS avg_concurrent,
+			COALESCE(MAX(max_concurrency), 0)::bigint AS max_concurrency,
+			COALESCE(MAX(waiting_count), 0)::bigint AS waiting_peak,
+			COUNT(*)::bigint AS samples
+		FROM sampled
+		GROUP BY bucket_start
+		HAVING COUNT(*) > 0
+		ORDER BY bucket_start ASC
+	`
+
+	rows, err := r.sql.QueryContext(ctx, query, accountID, startTime, endTime, timezone.Name())
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			trend = nil
+		}
+	}()
+
+	trend = make([]AccountCapacityTrendPoint, 0)
+	for rows.Next() {
+		var bucketStartAt time.Time
+		var bucketEndAt time.Time
+		var peakConcurrent int64
+		var avgConcurrent float64
+		var maxConcurrency int64
+		var waitingPeak int64
+		var samples int64
+		if err = rows.Scan(&bucketStartAt, &bucketEndAt, &peakConcurrent, &avgConcurrent, &maxConcurrency, &waitingPeak, &samples); err != nil {
+			return nil, err
+		}
+		localStart := bucketStartAt.In(timezone.Location())
+		trend = append(trend, AccountCapacityTrendPoint{
+			BucketStart:    localStart.Format(time.RFC3339),
+			BucketEnd:      bucketEndAt.In(timezone.Location()).Format(time.RFC3339),
+			Label:          localStart.Format("01/02 15:00"),
+			PeakConcurrent: peakConcurrent,
+			AvgConcurrent:  avgConcurrent,
+			MaxConcurrency:  maxConcurrency,
+			WaitingPeak:     waitingPeak,
+			Samples:         samples,
+		})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return trend, nil
+}
 
 func (r *usageLogRepository) getEndpointStatsByColumnWithFilters(ctx context.Context, endpointColumn string, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, model string, modelSource string, requestType *int16, stream *bool, billingType *int8, billingMode string) (results []EndpointStat, err error) {
 	actualCostExpr := "COALESCE(SUM(actual_cost), 0) as actual_cost"
@@ -4065,9 +4140,15 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		logger.LegacyPrintf("repository.usage_log", "GetUpstreamEndpointStatsWithFilters failed in GetAccountUsageStats: %v", upstreamEndpointErr)
 		upstreamEndpoints = []EndpointStat{}
 	}
+	capacityTrend, capacityTrendErr := r.getAccountCapacityTrend(ctx, accountID, startTime, endTime)
+	if capacityTrendErr != nil {
+		logger.LegacyPrintf("repository.usage_log", "getAccountCapacityTrend failed in GetAccountUsageStats: %v", capacityTrendErr)
+		capacityTrend = []AccountCapacityTrendPoint{}
+	}
 
 	resp = &AccountUsageStatsResponse{
 		History:           history,
+		CapacityTrend:     capacityTrend,
 		Summary:           summary,
 		Models:            models,
 		Endpoints:         endpoints,

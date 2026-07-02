@@ -1721,6 +1721,17 @@ export interface AccountUsageHistory {
   user_cost: number // User/API key billed cost (group multiplier)
 }
 
+export interface AccountCapacityTrendPoint {
+  bucket_start: string
+  bucket_end: string
+  label: string
+  peak_concurrent: number
+  avg_concurrent: number
+  max_concurrency: number
+  waiting_peak: number
+  samples: number
+}
+
 export interface AccountUsageSummary {
   days: number
   actual_days_used: number
@@ -1759,6 +1770,8 @@ export interface AccountUsageSummary {
 
 export interface AccountUsageStatsResponse {
   history: AccountUsageHistory[]
+  capacity_trend: AccountCapacityTrendPoint[]
+  capacity_limit: number
   summary: AccountUsageSummary
   models: ModelStat[]
   endpoints: EndpointStat[]

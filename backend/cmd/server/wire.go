@@ -73,6 +73,7 @@ func provideCleanup(
 	entClient *ent.Client,
 	rdb *redis.Client,
 	opsMetricsCollector *service.OpsMetricsCollector,
+	accountCapacitySampler *service.AccountCapacitySamplerService,
 	opsAggregation *service.OpsAggregationService,
 	opsAlertEvaluator *service.OpsAlertEvaluatorService,
 	opsCleanup *service.OpsCleanupService,
@@ -146,6 +147,12 @@ func provideCleanup(
 			{"OpsMetricsCollector", func() error {
 				if opsMetricsCollector != nil {
 					opsMetricsCollector.Stop()
+				}
+				return nil
+			}},
+			{"AccountCapacitySamplerService", func() error {
+				if accountCapacitySampler != nil {
+					accountCapacitySampler.Stop()
 				}
 				return nil
 			}},

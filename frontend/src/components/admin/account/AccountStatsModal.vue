@@ -408,6 +408,27 @@
           </div>
         </div>
 
+        <!-- Capacity Trend Chart -->
+        <div class="card p-4">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.accounts.stats.capacityTrend') }}
+            </h3>
+            <span v-if="capacityPeakText" class="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.stats.capacityPeak') }} {{ capacityPeakText }}
+            </span>
+          </div>
+          <div class="h-64">
+            <Line v-if="capacityChartData" :data="capacityChartData" :options="capacityChartOptions" />
+            <div
+              v-else
+              class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+            >
+              {{ t('admin.dashboard.noDataAvailable') }}
+            </div>
+          </div>
+        </div>
+
         <!-- Model Distribution -->
         <ModelDistributionChart :model-stats="stats.models" :loading="false" />
 
@@ -459,7 +480,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  type ChartDataset
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -542,6 +564,71 @@ const trendChartData = computed(() => {
         yAxisID: 'y1'
       }
     ]
+  }
+})
+
+const capacityLimit = computed(() => stats.value?.capacity_limit || props.account?.concurrency || 0)
+
+const capacityPeakPoint = computed(() => {
+  const trend = stats.value?.capacity_trend || []
+  if (!trend.length) return null
+  return trend.reduce((max, point) => {
+    return point.peak_concurrent > max.peak_concurrent ? point : max
+  }, trend[0])
+})
+
+const capacityPeakText = computed(() => {
+  const peak = capacityPeakPoint.value
+  if (!peak) return ''
+  const peakLimit = peak.max_concurrency || capacityLimit.value
+  const limit = peakLimit > 0 ? `/${peakLimit}` : ''
+  return `${peak.label} · ${formatNumber(peak.peak_concurrent)}${limit}`
+})
+
+const capacityChartData = computed(() => {
+  const trend = stats.value?.capacity_trend || []
+  if (!trend.length) return null
+
+  const datasets: ChartDataset<'line', number[]>[] = [
+    {
+      label: t('admin.accounts.stats.peakConcurrent'),
+      data: trend.map((p) => p.peak_concurrent),
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.12)',
+      fill: true,
+      tension: 0.25,
+      pointRadius: 0,
+      pointHoverRadius: 3
+    },
+    {
+      label: t('admin.accounts.stats.avgConcurrent'),
+      data: trend.map((p) => p.avg_concurrent),
+      borderColor: '#14b8a6',
+      backgroundColor: 'rgba(20, 184, 166, 0.08)',
+      fill: false,
+      tension: 0.25,
+      pointRadius: 0,
+      pointHoverRadius: 3
+    }
+  ]
+
+  if (trend.some((p) => p.max_concurrency > 0) || capacityLimit.value > 0) {
+    datasets.push({
+      label: t('admin.accounts.stats.capacityLimit'),
+      data: trend.map((p) => p.max_concurrency || capacityLimit.value),
+      borderColor: '#ef4444',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+      fill: false,
+      tension: 0,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      borderDash: [6, 4]
+    })
+  }
+
+  return {
+    labels: trend.map((p) => p.label),
+    datasets
   }
 })
 
@@ -634,6 +721,91 @@ const lineChartOptions = computed(() => ({
         display: true,
         text: t('admin.accounts.stats.requests'),
         color: '#f97316',
+        font: {
+          size: 11
+        }
+      }
+    }
+  }
+}))
+
+const capacityChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    intersect: false,
+    mode: 'index' as const
+  },
+  plugins: {
+    legend: {
+      position: 'top' as const,
+      labels: {
+        color: chartColors.value.text,
+        usePointStyle: true,
+        pointStyle: 'circle',
+        padding: 15,
+        font: {
+          size: 11
+        }
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const label = context.dataset.label || ''
+          const value = Number(context.raw || 0)
+          if (label === t('admin.accounts.stats.avgConcurrent')) {
+            return `${label}: ${value.toFixed(2)}`
+          }
+          return `${label}: ${formatNumber(Math.round(value))}`
+        },
+        afterBody: (contexts: any[]) => {
+          const index = contexts?.[0]?.dataIndex
+          const point = stats.value?.capacity_trend?.[index]
+          if (!point) return []
+          const rows = [`${t('admin.accounts.stats.samples')}: ${formatNumber(point.samples)}`]
+          if (point.waiting_peak > 0) {
+            rows.push(`${t('admin.accounts.stats.waitingPeak')}: ${formatNumber(point.waiting_peak)}`)
+          }
+          return rows
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: {
+        color: chartColors.value.grid
+      },
+      ticks: {
+        color: chartColors.value.text,
+        font: {
+          size: 10
+        },
+        maxRotation: 45,
+        minRotation: 0,
+        autoSkip: true,
+        maxTicksLimit: 10
+      }
+    },
+    y: {
+      type: 'linear' as const,
+      beginAtZero: true,
+      suggestedMax: capacityLimit.value > 0 ? capacityLimit.value : undefined,
+      grid: {
+        color: chartColors.value.grid
+      },
+      ticks: {
+        color: '#2563eb',
+        font: {
+          size: 10
+        },
+        precision: 0
+      },
+      title: {
+        display: true,
+        text: t('admin.accounts.stats.concurrentUsage'),
+        color: '#2563eb',
         font: {
           size: 11
         }

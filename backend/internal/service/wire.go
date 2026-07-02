@@ -306,6 +306,17 @@ func ProvideOpsMetricsCollector(
 	return collector
 }
 
+// ProvideAccountCapacitySamplerService creates and starts the account capacity sampler.
+func ProvideAccountCapacitySamplerService(
+	accountRepo AccountRepository,
+	concurrencyService *ConcurrencyService,
+	sampleRepo AccountCapacitySampleRepository,
+) *AccountCapacitySamplerService {
+	svc := NewAccountCapacitySamplerService(accountRepo, concurrencyService, sampleRepo, accountCapacitySamplerInterval)
+	svc.Start()
+	return svc
+}
+
 // ProvideOpsAggregationService creates and starts OpsAggregationService (hourly/daily pre-aggregation).
 func ProvideOpsAggregationService(
 	opsRepo OpsRepository,
@@ -592,6 +603,7 @@ var ProviderSet = wire.NewSet(
 	ProvideOpsSystemLogSink,
 	ProvideOpsService,
 	ProvideOpsMetricsCollector,
+	ProvideAccountCapacitySamplerService,
 	ProvideOpsAggregationService,
 	ProvideOpsAlertEvaluatorService,
 	ProvideOpsCleanupService,

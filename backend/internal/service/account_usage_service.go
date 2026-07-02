@@ -1219,6 +1219,11 @@ func (s *AccountUsageService) GetAccountUsageStats(ctx context.Context, accountI
 	if err != nil {
 		return nil, fmt.Errorf("get account usage stats failed: %w", err)
 	}
+	if stats != nil && s.accountRepo != nil {
+		if account, accountErr := s.accountRepo.GetByID(ctx, accountID); accountErr == nil && account != nil {
+			stats.CapacityLimit = int64(account.EffectiveLoadFactor())
+		}
+	}
 	return stats, nil
 }
 

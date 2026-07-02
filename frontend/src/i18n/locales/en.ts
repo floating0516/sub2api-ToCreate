@@ -4227,6 +4227,14 @@ export default {
         todayTokens: 'Today Tokens',
         todayCost: 'Today Cost',
         usageTrend: '30-Day Cost & Request Trend',
+        capacityTrend: 'Capacity Trend',
+        capacityPeak: 'Peak',
+        peakConcurrent: 'Peak Concurrency',
+        avgConcurrent: 'Avg Concurrency',
+        capacityLimit: 'Capacity Limit',
+        concurrentUsage: 'Concurrent Usage',
+        samples: 'Samples',
+        waitingPeak: 'Waiting Peak',
         noData: 'No usage data available for this account'
       },
       usageWindow: {
