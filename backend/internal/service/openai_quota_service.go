@@ -1,9 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/imroc/req/v3"
 )
 
 // ErrSparkShadowResetNotSupported is returned when ResetCredit is called on a
@@ -22,15 +25,16 @@ var ErrSparkShadowResetNotSupported = infraerrors.New(http.StatusConflict, "SPAR
 
 // Endpoints used by the OpenAI/ChatGPT/Codex quota query and reset feature.
 const (
-	chatGPTUsageURL                 = "https://chatgpt.com/backend-api/wham/usage"
-	chatGPTRateLimitResetCreditsURL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
-	chatGPTRateLimitResetURL        = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume"
-	openaiQuotaUpstreamTimeout      = 20 * time.Second
-	openaiQuotaCodexOriginator      = "Codex Desktop"
-	openaiQuotaCodexLanguageTag     = "zh-CN"
-	openaiQuotaSecFetchSite         = "none"
-	openaiQuotaSecFetchMode         = "no-cors"
-	openaiQuotaSecFetchDest         = "empty"
+	chatGPTUsageURL             = "https://chatgpt.com/backend-api/wham/usage"
+	chatGPTRateLimitCreditsURL  = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
+	chatGPTRateLimitResetURL    = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume"
+	openaiQuotaUpstreamTimeout  = 20 * time.Second
+	openaiQuotaCodexBeta        = "codex-1"
+	openaiQuotaCodexOriginator  = "Codex Desktop"
+	openaiQuotaCodexLanguageTag = "zh-CN"
+	openaiQuotaSecFetchSite     = "none"
+	openaiQuotaSecFetchMode     = "no-cors"
+	openaiQuotaSecFetchDest     = "empty"
 )
 
 // OpenAIRateLimitWindow describes a single rate-limit window returned by
@@ -58,28 +62,29 @@ type OpenAIAdditionalRateLimit struct {
 	RateLimit      *OpenAIRateLimit `json:"rate_limit,omitempty"`
 }
 
-// OpenAIRateLimitResetCredits captures the "available_count" surfaced for the
-// rate_limit_reset_credit grant type, which the reset action consumes.
-type OpenAIRateLimitResetCredits struct {
-	AvailableCount int `json:"available_count"`
-}
-
-// OpenAIRateLimitResetCreditSummary is the safe metadata surfaced by
-// /wham/rate-limit-reset-credits. It intentionally excludes upstream IDs.
-type OpenAIRateLimitResetCreditSummary struct {
+// OpenAIRateLimitResetCreditDetail is the sanitized metadata surfaced for one
+// available reset credit. Do not add upstream ids or tokens here.
+type OpenAIRateLimitResetCreditDetail struct {
 	Status    string `json:"status,omitempty"`
 	Title     string `json:"title,omitempty"`
 	GrantedAt string `json:"granted_at,omitempty"`
 	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
+// OpenAIRateLimitResetCredits captures the "available_count" surfaced for the
+// rate_limit_reset_credit grant type, which the reset action consumes.
+type OpenAIRateLimitResetCredits struct {
+	AvailableCount int                                `json:"available_count"`
+	Credits        []OpenAIRateLimitResetCreditDetail `json:"credits,omitempty"`
+}
+
 // OpenAIResetCredits is the standalone reset-credit payload used by reports and
 // future UI/API consumers that need credit expiration details.
 type OpenAIResetCredits struct {
-	AvailableCount  int                                  `json:"available_count"`
-	TotalEarnedCount int                                  `json:"total_earned_count,omitempty"`
-	Credits         []OpenAIRateLimitResetCreditSummary `json:"credits,omitempty"`
-	FetchedAt       int64                                `json:"fetched_at"`
+	AvailableCount   int                                `json:"available_count"`
+	TotalEarnedCount int                                `json:"total_earned_count,omitempty"`
+	Credits          []OpenAIRateLimitResetCreditDetail `json:"credits,omitempty"`
+	FetchedAt        int64                              `json:"fetched_at"`
 }
 
 // OpenAIQuotaUsage is the typed projection of /wham/usage we expose to the UI.
@@ -178,6 +183,9 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 	}
 
 	payload.FetchedAt = time.Now().Unix()
+	if payload.RateLimitResetCredits != nil && payload.RateLimitResetCredits.AvailableCount > 0 {
+		payload.RateLimitResetCredits.Credits = s.queryResetCreditDetails(callCtx, client, accessToken, chatGPTAccountID, fedRAMP, accountID)
+	}
 	return &payload, nil
 }
 
@@ -203,7 +211,7 @@ func (s *OpenAIQuotaService) QueryResetCredits(ctx context.Context, accountID in
 		SetContext(callCtx).
 		SetHeaders(buildCodexCommonHeaders(accessToken, chatGPTAccountID, fedRAMP)).
 		SetSuccessResult(&payload).
-		Get(chatGPTRateLimitResetCreditsURL)
+		Get(chatGPTRateLimitCreditsURL)
 	if err != nil {
 		return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_RESET_CREDITS_REQUEST_FAILED", "upstream request failed: %v", err)
 	}
@@ -216,6 +224,28 @@ func (s *OpenAIQuotaService) QueryResetCredits(ctx context.Context, accountID in
 
 	payload.FetchedAt = time.Now().Unix()
 	return &payload, nil
+}
+
+func (s *OpenAIQuotaService) queryResetCreditDetails(ctx context.Context, client *req.Client, accessToken, chatGPTAccountID string, fedRAMP bool, accountID int64) []OpenAIRateLimitResetCreditDetail {
+	resp, err := client.R().
+		SetContext(ctx).
+		SetHeaders(buildCodexCommonHeaders(accessToken, chatGPTAccountID, fedRAMP)).
+		Get(chatGPTRateLimitCreditsURL)
+	if err != nil {
+		slog.Warn("openai_quota_reset_credit_details_failed", "account_id", accountID, "error", err)
+		return nil
+	}
+	if !resp.IsSuccessState() {
+		slog.Warn("openai_quota_reset_credit_details_failed", "account_id", accountID, "status", resp.StatusCode)
+		return nil
+	}
+
+	credits, err := parseOpenAIRateLimitResetCreditDetails(resp.Bytes())
+	if err != nil {
+		slog.Warn("openai_quota_reset_credit_details_parse_failed", "account_id", accountID, "error", err)
+		return nil
+	}
+	return credits
 }
 
 // ResetCredit consumes one rate_limit_reset_credit for the given OpenAI account.
@@ -362,6 +392,7 @@ func buildCodexCommonHeaders(accessToken, chatGPTAccountID string, fedRAMP bool)
 	headers := map[string]string{
 		"authorization":      "Bearer " + accessToken,
 		"chatgpt-account-id": chatGPTAccountID,
+		"openai-beta":        openaiQuotaCodexBeta,
 		"oai-language":       openaiQuotaCodexLanguageTag,
 		"originator":         openaiQuotaCodexOriginator,
 		"accept":             "application/json",
@@ -388,6 +419,78 @@ func generateRedeemRequestID() (string, error) {
 	b[8] = (b[8] & 0x3f) | 0x80
 	hexStr := hex.EncodeToString(b)
 	return fmt.Sprintf("%s-%s-%s-%s-%s", hexStr[0:8], hexStr[8:12], hexStr[12:16], hexStr[16:20], hexStr[20:]), nil
+}
+
+type openAIRateLimitResetCreditDetailPayload struct {
+	Status         string `json:"status,omitempty"`
+	Title          string `json:"title,omitempty"`
+	GrantedAt      string `json:"granted_at,omitempty"`
+	GrantedAtCamel string `json:"grantedAt,omitempty"`
+	ExpiresAt      string `json:"expires_at,omitempty"`
+	ExpiresAtCamel string `json:"expiresAt,omitempty"`
+}
+
+type openAIRateLimitResetCreditDetailsPayload struct {
+	Credits               []openAIRateLimitResetCreditDetailPayload `json:"credits,omitempty"`
+	RateLimitResetCredits []openAIRateLimitResetCreditDetailPayload `json:"rate_limit_reset_credits,omitempty"`
+	Items                 []openAIRateLimitResetCreditDetailPayload `json:"items,omitempty"`
+	Data                  []openAIRateLimitResetCreditDetailPayload `json:"data,omitempty"`
+}
+
+func parseOpenAIRateLimitResetCreditDetails(body []byte) ([]OpenAIRateLimitResetCreditDetail, error) {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return nil, nil
+	}
+
+	var rawCredits []openAIRateLimitResetCreditDetailPayload
+	if trimmed[0] == '[' {
+		if err := json.Unmarshal(trimmed, &rawCredits); err != nil {
+			return nil, err
+		}
+	} else {
+		var payload openAIRateLimitResetCreditDetailsPayload
+		if err := json.Unmarshal(trimmed, &payload); err != nil {
+			return nil, err
+		}
+		rawCredits = firstNonEmptyResetCreditPayload(
+			payload.Credits,
+			payload.RateLimitResetCredits,
+			payload.Items,
+			payload.Data,
+		)
+	}
+
+	credits := make([]OpenAIRateLimitResetCreditDetail, 0, len(rawCredits))
+	for _, raw := range rawCredits {
+		expiresAt := strings.TrimSpace(raw.ExpiresAt)
+		if expiresAt == "" {
+			expiresAt = strings.TrimSpace(raw.ExpiresAtCamel)
+		}
+		if expiresAt == "" {
+			continue
+		}
+		grantedAt := strings.TrimSpace(raw.GrantedAt)
+		if grantedAt == "" {
+			grantedAt = strings.TrimSpace(raw.GrantedAtCamel)
+		}
+		credits = append(credits, OpenAIRateLimitResetCreditDetail{
+			Status:    strings.TrimSpace(raw.Status),
+			Title:     strings.TrimSpace(raw.Title),
+			GrantedAt: grantedAt,
+			ExpiresAt: expiresAt,
+		})
+	}
+	return credits, nil
+}
+
+func firstNonEmptyResetCreditPayload(lists ...[]openAIRateLimitResetCreditDetailPayload) []openAIRateLimitResetCreditDetailPayload {
+	for _, list := range lists {
+		if len(list) > 0 {
+			return list
+		}
+	}
+	return nil
 }
 
 // buildCodexSparkWindowExtraUpdates extracts Codex Spark usage windows from the
