@@ -230,6 +230,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/check-in',
+    name: 'CheckIn',
+    component: () => import('@/views/user/CheckinView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: '每日签到'
+    }
+  },
+  {
     path: '/affiliate',
     name: 'Affiliate',
     component: () => import('@/views/user/AffiliateView.vue'),
