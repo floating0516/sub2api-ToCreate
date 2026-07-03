@@ -17,7 +17,7 @@
               </div>
               <div class="rounded-lg border border-white/25 bg-white/15 px-4 py-3 text-left backdrop-blur-sm md:min-w-44">
                 <p class="text-xs text-emerald-50">当前余额</p>
-                <p class="mt-1 text-2xl font-semibold">${{ currentBalance }}</p>
+                <p class="mt-1 text-2xl font-semibold">${{ formatMoney(displayBalance) }}</p>
               </div>
             </div>
           </div>
@@ -66,6 +66,28 @@
             <p v-if="status?.checked_in" class="mt-3 text-sm text-gray-500 dark:text-dark-400">
               下次可签到：{{ formatDateTime(status.next_checkin_at) }}
             </p>
+
+            <div
+              v-if="balanceChangeSummary"
+              class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-sm dark:bg-dark-900 dark:text-emerald-400">
+                    <Icon name="gift" size="md" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-emerald-900 dark:text-emerald-100">今日已到账</p>
+                    <p class="text-xs text-emerald-700 dark:text-emerald-200">
+                      余额 ${{ formatMoney(balanceChangeSummary.balanceBefore) }} -> ${{ formatMoney(balanceChangeSummary.balanceAfter) }}
+                    </p>
+                  </div>
+                </div>
+                <p class="text-2xl font-semibold text-emerald-700 dark:text-emerald-300">
+                  +${{ formatMoney(balanceChangeSummary.rewardAmount) }}
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -104,7 +126,7 @@
             <div class="text-right">
               <p class="font-semibold text-emerald-600 dark:text-emerald-400">+${{ item.reward_amount.toFixed(2) }}</p>
               <p v-if="item.balance_after !== undefined" class="text-xs text-gray-500 dark:text-dark-400">
-                余额 ${{ item.balance_after.toFixed(2) }}
+                发放后余额 ${{ item.balance_after.toFixed(2) }}
               </p>
             </div>
           </div>
@@ -135,8 +157,38 @@ const authStore = useAuthStore()
 const status = ref<CheckinStatus | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
+const claimedBalanceChange = ref<BalanceChangeSummary | null>(null)
 
-const currentBalance = computed(() => (authStore.user?.balance ?? 0).toFixed(2))
+interface BalanceChangeSummary {
+  rewardAmount: number
+  balanceBefore: number
+  balanceAfter: number
+}
+
+const balanceChangeSummary = computed<BalanceChangeSummary | null>(() => {
+  if (claimedBalanceChange.value) {
+    return claimedBalanceChange.value
+  }
+
+  const todayCheckin = status.value?.today_checkin
+  if (!status.value?.checked_in || todayCheckin?.balance_after === undefined) {
+    return null
+  }
+
+  const rewardAmount = todayCheckin.reward_amount ?? status.value.reward_amount
+  const balanceAfter = todayCheckin.balance_after
+  return {
+    rewardAmount,
+    balanceBefore: balanceAfter - rewardAmount,
+    balanceAfter
+  }
+})
+
+const displayBalance = computed(() => claimedBalanceChange.value?.balanceAfter ?? authStore.user?.balance ?? 0)
+
+function formatMoney(value: number) {
+  return value.toFixed(2)
+}
 
 async function loadStatus() {
   loading.value = true
@@ -154,8 +206,23 @@ async function submitCheckin() {
   if (submitting.value || status.value?.checked_in) return
   submitting.value = true
   try {
+    const balanceBefore = authStore.user?.balance ?? 0
     status.value = await checkinAPI.checkIn()
+    const todayCheckin = status.value.today_checkin
+    const rewardAmount = todayCheckin?.reward_amount ?? status.value.reward_amount
+    const balanceAfter = todayCheckin?.balance_after ?? balanceBefore + rewardAmount
+    claimedBalanceChange.value = {
+      rewardAmount,
+      balanceBefore,
+      balanceAfter
+    }
     await authStore.refreshUser()
+    if (authStore.user?.balance !== undefined) {
+      claimedBalanceChange.value = {
+        ...claimedBalanceChange.value,
+        balanceAfter: authStore.user.balance
+      }
+    }
     appStore.showSuccess('签到成功，奖励已加入余额')
   } catch (error: any) {
     const message = error?.message || '签到失败'
