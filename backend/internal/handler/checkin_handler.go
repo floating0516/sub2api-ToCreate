@@ -18,10 +18,26 @@ func NewCheckinHandler(checkinService *service.CheckinService) *CheckinHandler {
 	return &CheckinHandler{checkinService: checkinService}
 }
 
+func requireCheckinAdmin(c *gin.Context) bool {
+	role, ok := middleware2.GetUserRoleFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return false
+	}
+	if role != service.RoleAdmin {
+		response.Forbidden(c, "Admin access required")
+		return false
+	}
+	return true
+}
+
 func (h *CheckinHandler) GetStatus(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if !requireCheckinAdmin(c) {
 		return
 	}
 	status, err := h.checkinService.GetStatus(c.Request.Context(), subject.UserID)
@@ -38,6 +54,9 @@ func (h *CheckinHandler) CheckIn(c *gin.Context) {
 		response.Unauthorized(c, "User not authenticated")
 		return
 	}
+	if !requireCheckinAdmin(c) {
+		return
+	}
 	status, err := h.checkinService.CheckIn(c.Request.Context(), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -50,6 +69,9 @@ func (h *CheckinHandler) History(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if !requireCheckinAdmin(c) {
 		return
 	}
 	limit := 30
