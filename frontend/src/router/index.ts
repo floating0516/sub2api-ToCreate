@@ -235,7 +235,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/user/CheckinView.vue'),
     meta: {
       requiresAuth: true,
-      requiresAdmin: false,
+      requiresAdmin: true,
       title: '每日签到'
     }
   },
