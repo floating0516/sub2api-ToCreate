@@ -16,7 +16,7 @@
                   </span>
                 </div>
                 <p class="mt-2 text-sm text-gray-600 dark:text-dark-300">
-                  每日打卡推进月度进度，周末奖励以整天日卡和当日活动额度为主。
+                  每日打卡领取限时签到额度，额度下月末到期；周末额外发当天整天日卡。
                 </p>
               </div>
             </div>
@@ -30,8 +30,8 @@
                 <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-white">{{ monthCheckedCount }} 天</p>
               </div>
               <div class="rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-700">
-                <p class="text-xs text-gray-500 dark:text-dark-400">当前余额</p>
-                <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-white">${{ formatMoney(displayBalance) }}</p>
+                <p class="text-xs text-gray-500 dark:text-dark-400">月度额度上限</p>
+                <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-white">$20</p>
               </div>
             </div>
           </div>
@@ -52,19 +52,19 @@
               <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-500/10">
                 <div class="flex items-center gap-3">
                   <Icon name="bolt" size="md" class="text-sky-600 dark:text-sky-300" />
-                  <p class="text-sm font-medium text-sky-900 dark:text-sky-100">当前测试到账</p>
+                  <p class="text-sm font-medium text-sky-900 dark:text-sky-100">后端测试到账</p>
                 </div>
                 <p class="mt-3 text-lg font-semibold text-sky-900 dark:text-sky-100">${{ formatMoney(status?.reward_amount ?? 0.02) }}</p>
-                <p class="mt-1 text-sm text-sky-700 dark:text-sky-200">日卡和到期额度待后端规则接入</p>
+                <p class="mt-1 text-sm text-sky-700 dark:text-sky-200">当前仍写入余额，待替换为下月末到期额度</p>
               </div>
 
               <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
                 <div class="flex items-center gap-3">
                   <Icon name="badge" size="md" class="text-gray-600 dark:text-dark-300" />
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">下个里程碑</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">签到额度进度</p>
                 </div>
-                <p class="mt-3 text-lg font-semibold text-gray-900 dark:text-white">{{ nextMilestoneLabel }}</p>
-                <p class="mt-1 text-sm text-gray-600 dark:text-dark-300">{{ nextMilestoneHint }}</p>
+                <p class="mt-3 text-lg font-semibold text-gray-900 dark:text-white">${{ formatMoney(previewMonthlyCredit) }} / $20</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-dark-300">预估权益，统一 {{ monthlyCreditExpiryLabel }} 到期</p>
               </div>
             </div>
 
@@ -75,7 +75,7 @@
                     <Icon name="checkCircle" size="md" />
                   </div>
                   <div>
-                    <p class="text-sm font-medium text-gray-900 dark:text-white">今日已到账</p>
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">当前后端测试到账</p>
                     <p class="text-xs text-gray-500 dark:text-dark-400">
                       余额 ${{ formatMoney(balanceChangeSummary.balanceBefore) }} -> ${{ formatMoney(balanceChangeSummary.balanceAfter) }}
                     </p>
@@ -132,7 +132,7 @@
               <div class="flex items-center justify-between">
                 <div>
                   <h2 class="text-base font-semibold text-gray-900 dark:text-white">今日打卡</h2>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ status?.checked_in ? '今天已完成' : '领取当前测试奖励' }}</p>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ status?.checked_in ? '今天已完成' : '预览：领取 $0.25 签到额度' }}</p>
                 </div>
                 <span class="rounded-md px-2 py-1 text-xs font-medium" :class="status?.checked_in ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'">
                   {{ status?.checked_in ? '已签到' : '待签到' }}
@@ -158,6 +158,9 @@
               </button>
               <p v-if="status?.checked_in" class="mt-3 text-sm text-gray-500 dark:text-dark-400">
                 下次可打卡：{{ formatDateTime(status.next_checkin_at) }}
+              </p>
+              <p class="mt-3 text-sm text-gray-500 dark:text-dark-400">
+                新方案额度有效期：{{ monthlyCreditExpiryLabel }} 到期。
               </p>
             </div>
 
@@ -199,8 +202,9 @@
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">活动规则</h2>
               <div class="mt-3 space-y-2 leading-6">
                 <p>按北京时间自然日计算，每天只能打卡一次。</p>
+                <p>签到额度每月最多 $20，不发永久额度，领取月份的下月末到期。</p>
                 <p>周末日卡按当天 00:00 到次日 00:00 计算，不从点击时刻开始滚动。</p>
-                <p>当前页面用于 18080 预览，日卡和到期活动额度尚未真实发放。</p>
+                <p>当前页面用于 18080 预览，后端仍发放测试余额，日卡和到期额度尚未真实接入。</p>
               </div>
             </div>
           </aside>
@@ -232,7 +236,7 @@
             <div class="text-right">
               <p class="font-semibold text-emerald-600 dark:text-emerald-400">+${{ item.reward_amount.toFixed(2) }}</p>
               <p v-if="item.balance_after !== undefined" class="text-xs text-gray-500 dark:text-dark-400">
-                发放后余额 ${{ item.balance_after.toFixed(2) }}
+                当前测试余额 ${{ item.balance_after.toFixed(2) }}
               </p>
             </div>
           </div>
@@ -293,12 +297,15 @@ interface CalendarCell {
 
 const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
 const milestones = [
+  { days: 3, reward: '$0.50 签到额度' },
   { days: 7, reward: '$1 + 保护卡' },
-  { days: 14, reward: '$2 余额' },
-  { days: 21, reward: '$3 余额' },
-  { days: 30, reward: '$10 + 体验卡' }
+  { days: 14, reward: '$1.50 签到额度' },
+  { days: 21, reward: '$2 签到额度' },
+  { days: 30, reward: '补足到 $20' }
 ]
 const dayMs = 24 * 60 * 60 * 1000
+const monthlyCreditCap = 20
+const dailyCheckinCredit = 0.25
 
 const todayDate = computed(() => status.value?.today || formatShanghaiDate(new Date()))
 const todayParts = computed(() => splitDate(todayDate.value))
@@ -323,15 +330,25 @@ const monthProgressPercent = computed(() => {
 })
 
 const todayPlan = computed(() => rewardPlanForDate(todayDate.value))
-
-const nextMilestone = computed(() => milestones.find((item) => item.days > currentStreak.value) || null)
-const nextMilestoneLabel = computed(() => {
-  if (!nextMilestone.value) return '已完成全部里程碑'
-  return `连续 ${nextMilestone.value.days} 天`
+const monthlyCreditExpiryLabel = computed(() => {
+  const expiryTs = Date.UTC(todayParts.value.year, todayParts.value.month + 1, 1) - dayMs
+  return `${formatDateUTC(expiryTs)} 23:59`
 })
-const nextMilestoneHint = computed(() => {
-  if (!nextMilestone.value) return '等待月度全勤结算'
-  return `还差 ${nextMilestone.value.days - currentStreak.value} 天，可获得 ${nextMilestone.value.reward}`
+const previewMonthlyCredit = computed(() => {
+  const count = monthCheckedCount.value
+  const streak = currentStreak.value
+  let total = count * dailyCheckinCredit
+
+  if (streak >= 3) total += 0.5
+  if (streak >= 7) total += 1
+  if (streak >= 14) total += 1.5
+  if (streak >= 21) total += 2
+
+  if (count >= 10) total += 1
+  if (count >= 20) total += 2
+  if (count >= 25) total += 2
+
+  return Math.min(monthlyCreditCap, total)
 })
 
 const balanceChangeSummary = computed<BalanceChangeSummary | null>(() => {
@@ -352,8 +369,6 @@ const balanceChangeSummary = computed<BalanceChangeSummary | null>(() => {
     balanceAfter
   }
 })
-
-const displayBalance = computed(() => claimedBalanceChange.value?.balanceAfter ?? authStore.user?.balance ?? 0)
 
 const calendarCells = computed<CalendarCell[]>(() => {
   const start = dateUTC(monthStart.value)
@@ -397,13 +412,13 @@ const weekendRewards = computed(() => {
       date: saturday,
       title: '周六打卡',
       dateLabel: `${saturday} 00:00 - ${sunday} 00:00`,
-      summary: '周六整天日卡 + $5 当日活动额度'
+      summary: '周六整天日卡，不折算进钱包额度'
     },
     {
       date: sunday,
       title: '周日打卡',
       dateLabel: `${sunday} 00:00 - ${formatDateUTC(dateUTC(sunday) + dayMs)} 00:00`,
-      summary: '周日整天日卡 + $10 当日活动额度'
+      summary: '周日整天日卡，不折算进钱包额度'
     }
   ]
 })
@@ -412,24 +427,24 @@ function rewardPlanForDate(date: string): RewardPlan {
   const weekday = new Date(dateUTC(date)).getUTCDay()
   if (weekday === 6) {
     return {
-      title: '周六整天日卡',
-      summary: '周六 00:00 到周日 00:00，另含 $5 当日活动额度',
-      short: '周六日卡',
+      title: '$0.25 签到额度 + 周六整天日卡',
+      summary: `签到额度下月末到期；日卡周六 00:00 到周日 00:00`,
+      short: '$0.25 + 日卡',
       tone: 'saturday'
     }
   }
   if (weekday === 0) {
     return {
-      title: '周日整天日卡',
-      summary: '周日 00:00 到周一 00:00，另含 $10 当日活动额度',
-      short: '周日日卡',
+      title: '$0.25 签到额度 + 周日整天日卡',
+      summary: `签到额度下月末到期；日卡周日 00:00 到周一 00:00`,
+      short: '$0.25 + 日卡',
       tone: 'sunday'
     }
   }
   return {
-    title: '工作日基础奖励',
-    summary: '$0.05 账户余额，正式规则接入前仍按当前测试奖励发放',
-    short: '$0.05',
+    title: '$0.25 签到额度',
+    summary: `正式规则接入后不发永久额度，统一 ${monthlyCreditExpiryLabel.value} 到期`,
+    short: '$0.25',
     tone: 'weekday'
   }
 }
@@ -526,7 +541,7 @@ async function submitCheckin() {
       ...claimedBalanceChange.value,
       balanceAfter: userData.balance
     }
-    appStore.showSuccess('打卡成功，当前测试奖励已加入余额')
+    appStore.showSuccess('打卡成功，当前后端测试奖励已加入余额')
   } catch (error: any) {
     const message = error?.message || '签到失败'
     appStore.showError(message)
