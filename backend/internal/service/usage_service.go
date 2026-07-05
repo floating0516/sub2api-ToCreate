@@ -54,6 +54,37 @@ type UsageStats struct {
 	AverageDurationMs        float64 `json:"average_duration_ms"`
 }
 
+// SubscriptionUsageTimelineAggregate is one non-empty usage bucket returned by
+// the usage repository for a subscription quota window.
+type SubscriptionUsageTimelineAggregate struct {
+	Index      int     `json:"index"`
+	Requests   int64   `json:"requests"`
+	ActualCost float64 `json:"actual_cost"`
+}
+
+// SubscriptionUsageTimelineBucket is one fixed bucket in a subscription quota
+// window. Empty buckets are returned with zero usage so the frontend can render
+// a stable mini timeline.
+type SubscriptionUsageTimelineBucket struct {
+	Index      int       `json:"index"`
+	Start      time.Time `json:"start"`
+	End        time.Time `json:"end"`
+	Requests   int64     `json:"requests"`
+	ActualCost float64   `json:"actual_cost"`
+}
+
+type SubscriptionUsageTimeline struct {
+	SubscriptionID    int64                             `json:"subscription_id"`
+	Window            string                            `json:"window,omitempty"`
+	Start             time.Time                         `json:"start"`
+	End               time.Time                         `json:"end"`
+	BucketSeconds     int64                             `json:"bucket_seconds"`
+	TotalRequests     int64                             `json:"total_requests"`
+	TotalActualCost   float64                           `json:"total_actual_cost"`
+	MaxBucketCost     float64                           `json:"max_bucket_cost"`
+	Buckets           []SubscriptionUsageTimelineBucket `json:"buckets"`
+}
+
 // UsageService 使用统计服务
 type UsageService struct {
 	usageRepo            UsageLogRepository
@@ -70,6 +101,68 @@ func NewUsageService(usageRepo UsageLogRepository, userRepo UserRepository, entC
 		entClient:            entClient,
 		authCacheInvalidator: authCacheInvalidator,
 	}
+}
+
+// GetSubscriptionUsageTimeline returns a fixed-width usage timeline for one
+// subscription quota window. The repository returns only non-empty buckets; this
+// method fills missing buckets with zeroes for predictable UI rendering.
+func (s *UsageService) GetSubscriptionUsageTimeline(ctx context.Context, subscriptionID int64, startTime, endTime time.Time, bucketSeconds int64, bucketCount int) (*SubscriptionUsageTimeline, error) {
+	if subscriptionID <= 0 || bucketSeconds <= 0 || bucketCount <= 0 || !endTime.After(startTime) {
+		return nil, infraerrors.BadRequest("INVALID_TIMELINE_RANGE", "invalid subscription usage timeline range")
+	}
+
+	repo, ok := s.usageRepo.(interface {
+		GetSubscriptionUsageTimeline(ctx context.Context, subscriptionID int64, startTime, endTime time.Time, bucketSeconds int64) ([]SubscriptionUsageTimelineAggregate, error)
+	})
+	if !ok {
+		return nil, infraerrors.InternalServer("SUBSCRIPTION_TIMELINE_UNSUPPORTED", "subscription usage timeline is not supported by this repository")
+	}
+
+	aggregates, err := repo.GetSubscriptionUsageTimeline(ctx, subscriptionID, startTime, endTime, bucketSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	buckets := make([]SubscriptionUsageTimelineBucket, bucketCount)
+	for i := 0; i < bucketCount; i++ {
+		start := startTime.Add(time.Duration(i) * time.Duration(bucketSeconds) * time.Second)
+		end := start.Add(time.Duration(bucketSeconds) * time.Second)
+		if end.After(endTime) {
+			end = endTime
+		}
+		buckets[i] = SubscriptionUsageTimelineBucket{
+			Index: i,
+			Start: start,
+			End:   end,
+		}
+	}
+
+	timeline := &SubscriptionUsageTimeline{
+		SubscriptionID:  subscriptionID,
+		Start:           startTime,
+		End:             endTime,
+		BucketSeconds:   bucketSeconds,
+		Buckets:         buckets,
+		TotalRequests:   0,
+		TotalActualCost: 0,
+		MaxBucketCost:   0,
+	}
+
+	for _, aggregate := range aggregates {
+		if aggregate.Index < 0 || aggregate.Index >= len(timeline.Buckets) {
+			continue
+		}
+		bucket := &timeline.Buckets[aggregate.Index]
+		bucket.Requests = aggregate.Requests
+		bucket.ActualCost = aggregate.ActualCost
+		timeline.TotalRequests += aggregate.Requests
+		timeline.TotalActualCost += aggregate.ActualCost
+		if aggregate.ActualCost > timeline.MaxBucketCost {
+			timeline.MaxBucketCost = aggregate.ActualCost
+		}
+	}
+
+	return timeline, nil
 }
 
 // Create 创建使用日志

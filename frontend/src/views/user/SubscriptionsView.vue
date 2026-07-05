@@ -135,6 +135,11 @@
               >
                 {{ formatDailyUsageWindow(subscription) }}
               </p>
+              <SubscriptionUsageTimeline
+                :timeline="getUsageTimeline(subscription.id, 'daily')"
+                window="daily"
+                :loading="isUsageTimelineLoading(subscription.id, 'daily')"
+              />
             </div>
 
             <!-- Weekly Usage -->
@@ -176,6 +181,11 @@
                   })
                 }}
               </p>
+              <SubscriptionUsageTimeline
+                :timeline="getUsageTimeline(subscription.id, 'weekly')"
+                window="weekly"
+                :loading="isUsageTimelineLoading(subscription.id, 'weekly')"
+              />
             </div>
 
             <!-- Monthly Usage -->
@@ -217,6 +227,11 @@
                   })
                 }}
               </p>
+              <SubscriptionUsageTimeline
+                :timeline="getUsageTimeline(subscription.id, 'monthly')"
+                window="monthly"
+                :loading="isUsageTimelineLoading(subscription.id, 'monthly')"
+              />
             </div>
 
             <!-- No limits configured - Unlimited badge -->
@@ -253,9 +268,14 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
-import type { UserSubscription } from '@/types'
+import type {
+  SubscriptionUsageTimeline as SubscriptionUsageTimelineData,
+  SubscriptionUsageTimelineWindow,
+  UserSubscription
+} from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import SubscriptionUsageTimeline from '@/components/subscription/SubscriptionUsageTimeline.vue'
 import { formatDateOnly } from '@/utils/format'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
@@ -277,6 +297,8 @@ const appStore = useAppStore()
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)
+const usageTimelines = ref<Record<string, SubscriptionUsageTimelineData | undefined>>({})
+const usageTimelineLoading = ref<Record<string, boolean>>({})
 
 function subscriptionHasPeakRate(subscription: UserSubscription): boolean {
   return hasPeakRate(subscription.group)
@@ -289,13 +311,61 @@ function subscriptionPeakRateLabel(subscription: UserSubscription): string {
 async function loadSubscriptions() {
   try {
     loading.value = true
-    subscriptions.value = await subscriptionsAPI.getMySubscriptions()
+    usageTimelines.value = {}
+    usageTimelineLoading.value = {}
+    const items = await subscriptionsAPI.getMySubscriptions()
+    subscriptions.value = items
+    void loadUsageTimelines(items)
   } catch (error) {
     console.error('Failed to load subscriptions:', error)
     appStore.showError(t('userSubscriptions.failedToLoad'))
   } finally {
     loading.value = false
   }
+}
+
+async function loadUsageTimelines(items: UserSubscription[]) {
+  const tasks: Promise<void>[] = []
+
+  for (const subscription of items) {
+    if (subscription.group?.daily_limit_usd) {
+      tasks.push(loadUsageTimeline(subscription.id, 'daily'))
+    }
+    if (subscription.group?.weekly_limit_usd) {
+      tasks.push(loadUsageTimeline(subscription.id, 'weekly'))
+    }
+    if (subscription.group?.monthly_limit_usd) {
+      tasks.push(loadUsageTimeline(subscription.id, 'monthly'))
+    }
+  }
+
+  await Promise.allSettled(tasks)
+}
+
+async function loadUsageTimeline(subscriptionId: number, window: SubscriptionUsageTimelineWindow) {
+  const key = usageTimelineKey(subscriptionId, window)
+  usageTimelineLoading.value = { ...usageTimelineLoading.value, [key]: true }
+
+  try {
+    const timeline = await subscriptionsAPI.getSubscriptionUsageTimeline(subscriptionId, window)
+    usageTimelines.value = { ...usageTimelines.value, [key]: timeline }
+  } catch (error) {
+    console.warn(`Failed to load ${window} usage timeline for subscription ${subscriptionId}:`, error)
+  } finally {
+    usageTimelineLoading.value = { ...usageTimelineLoading.value, [key]: false }
+  }
+}
+
+function usageTimelineKey(subscriptionId: number, window: SubscriptionUsageTimelineWindow): string {
+  return `${subscriptionId}:${window}`
+}
+
+function getUsageTimeline(subscriptionId: number, window: SubscriptionUsageTimelineWindow) {
+  return usageTimelines.value[usageTimelineKey(subscriptionId, window)] || null
+}
+
+function isUsageTimelineLoading(subscriptionId: number, window: SubscriptionUsageTimelineWindow): boolean {
+  return Boolean(usageTimelineLoading.value[usageTimelineKey(subscriptionId, window)])
 }
 
 function getProgressWidth(used: number | undefined, limit: number | null | undefined): string {

@@ -73,17 +73,25 @@ func (s *UserSubscription) NeedsDailyResetAt(now time.Time) bool {
 }
 
 func (s *UserSubscription) NeedsWeeklyReset() bool {
+	return s.NeedsWeeklyResetAt(time.Now())
+}
+
+func (s *UserSubscription) NeedsWeeklyResetAt(now time.Time) bool {
 	if s.WeeklyWindowStart == nil {
 		return false
 	}
-	return time.Since(*s.WeeklyWindowStart) >= 7*24*time.Hour
+	return !now.Before(s.WeeklyWindowStart.Add(7 * 24 * time.Hour))
 }
 
 func (s *UserSubscription) NeedsMonthlyReset() bool {
+	return s.NeedsMonthlyResetAt(time.Now())
+}
+
+func (s *UserSubscription) NeedsMonthlyResetAt(now time.Time) bool {
 	if s.MonthlyWindowStart == nil {
 		return false
 	}
-	return time.Since(*s.MonthlyWindowStart) >= 30*24*time.Hour
+	return !now.Before(s.MonthlyWindowStart.Add(30 * 24 * time.Hour))
 }
 
 func (s *UserSubscription) DailyResetTime() *time.Time {

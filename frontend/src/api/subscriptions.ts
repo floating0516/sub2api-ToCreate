@@ -4,7 +4,12 @@
  */
 
 import { apiClient } from './client'
-import type { UserSubscription, SubscriptionProgress } from '@/types'
+import type {
+  SubscriptionProgress,
+  SubscriptionUsageTimeline,
+  SubscriptionUsageTimelineWindow,
+  UserSubscription
+} from '@/types'
 
 /**
  * Subscription summary for user dashboard
@@ -67,10 +72,25 @@ export async function getSubscriptionProgress(
   return response.data
 }
 
+/**
+ * Get fixed-bucket usage timeline for a subscription quota window
+ */
+export async function getSubscriptionUsageTimeline(
+  subscriptionId: number,
+  window: SubscriptionUsageTimelineWindow
+): Promise<SubscriptionUsageTimeline> {
+  const response = await apiClient.get<SubscriptionUsageTimeline>(
+    `/subscriptions/${subscriptionId}/usage-timeline`,
+    { params: { window } }
+  )
+  return response.data
+}
+
 export default {
   getMySubscriptions,
   getActiveSubscriptions,
   getSubscriptionsProgress,
   getSubscriptionSummary,
-  getSubscriptionProgress
+  getSubscriptionProgress,
+  getSubscriptionUsageTimeline
 }

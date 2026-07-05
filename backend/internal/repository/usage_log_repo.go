@@ -3039,6 +3039,45 @@ func (r *usageLogRepository) GetUsageTrendWithUsageFilters(ctx context.Context, 
 	return r.getUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.ModelFilterSource, filters.RequestType, filters.Stream, filters.BillingType, filters.BillingMode)
 }
 
+func (r *usageLogRepository) GetSubscriptionUsageTimeline(ctx context.Context, subscriptionID int64, startTime, endTime time.Time, bucketSeconds int64) ([]service.SubscriptionUsageTimelineAggregate, error) {
+	if subscriptionID <= 0 || bucketSeconds <= 0 || !endTime.After(startTime) {
+		return []service.SubscriptionUsageTimelineAggregate{}, nil
+	}
+
+	const query = `
+		SELECT
+			FLOOR(EXTRACT(EPOCH FROM (created_at - $1::timestamptz)) / $4)::int AS bucket_index,
+			COUNT(*) AS requests,
+			COALESCE(SUM(actual_cost), 0) AS actual_cost
+		FROM usage_logs
+		WHERE subscription_id = $3
+			AND created_at >= $1
+			AND created_at < $2
+			AND actual_cost > 0
+		GROUP BY bucket_index
+		ORDER BY bucket_index ASC
+	`
+
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, subscriptionID, bucketSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]service.SubscriptionUsageTimelineAggregate, 0)
+	for rows.Next() {
+		var row service.SubscriptionUsageTimelineAggregate
+		if err := rows.Scan(&row.Index, &row.Requests, &row.ActualCost); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, modelSource string, requestType *int16, stream *bool, billingType *int8, billingMode string) (results []TrendDataPoint, err error) {
 	if shouldUsePreaggregatedTrend(granularity, userID, apiKeyID, accountID, groupID, model, requestType, stream, billingType, billingMode) {
 		aggregated, aggregatedErr := r.getUsageTrendFromAggregates(ctx, startTime, endTime, granularity)

@@ -7015,7 +7015,13 @@ export default {
     resetIn: 'Resets in {time}',
     quotaEndsIn: 'Quota ends in {time}',
     windowNotActive: 'Awaiting first use',
-    usageOf: '{used} of {limit}'
+    usageOf: '{used} of {limit}',
+    usageTimeline: 'Usage timeline',
+    timelineLoading: 'Loading',
+    timelineSummary: '{amount} · {requests} requests',
+    noUsageInWindow: 'No usage in this window',
+    usageAmount: 'Usage',
+    requests: 'Requests'
   },
 
   // Onboarding Tour

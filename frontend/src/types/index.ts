@@ -1660,6 +1660,28 @@ export interface SubscriptionProgress {
   days_remaining: number | null
 }
 
+export type SubscriptionUsageTimelineWindow = 'daily' | 'weekly' | 'monthly'
+
+export interface SubscriptionUsageTimelineBucket {
+  index: number
+  start: string
+  end: string
+  requests: number
+  actual_cost: number
+}
+
+export interface SubscriptionUsageTimeline {
+  subscription_id: number
+  window?: SubscriptionUsageTimelineWindow
+  start: string
+  end: string
+  bucket_seconds: number
+  total_requests: number
+  total_actual_cost: number
+  max_bucket_cost: number
+  buckets: SubscriptionUsageTimelineBucket[]
+}
+
 export interface AssignSubscriptionRequest {
   user_id: number
   group_id: number

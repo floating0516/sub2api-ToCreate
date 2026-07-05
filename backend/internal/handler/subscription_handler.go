@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"math"
+	"strconv"
+	"time"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -33,12 +37,18 @@ type SubscriptionProgressInfo struct {
 // SubscriptionHandler handles user subscription operations
 type SubscriptionHandler struct {
 	subscriptionService *service.SubscriptionService
+	usageService        *service.UsageService
 }
 
 // NewSubscriptionHandler creates a new user subscription handler
-func NewSubscriptionHandler(subscriptionService *service.SubscriptionService) *SubscriptionHandler {
+func NewSubscriptionHandler(subscriptionService *service.SubscriptionService, usageService ...*service.UsageService) *SubscriptionHandler {
+	var usageSvc *service.UsageService
+	if len(usageService) > 0 {
+		usageSvc = usageService[0]
+	}
 	return &SubscriptionHandler{
 		subscriptionService: subscriptionService,
+		usageService:        usageSvc,
 	}
 }
 
@@ -185,4 +195,115 @@ func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 	}
 
 	response.Success(c, summary)
+}
+
+// GetUsageTimeline returns a fixed-bucket usage timeline for one owned subscription.
+// GET /api/v1/subscriptions/:id/usage-timeline?window=daily|weekly|monthly
+func (h *SubscriptionHandler) GetUsageTimeline(c *gin.Context) {
+	if h.usageService == nil {
+		response.InternalError(c, "Usage service not available")
+		return
+	}
+
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+
+	sub, err := h.subscriptionService.GetByID(c.Request.Context(), subscriptionID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if sub.UserID != subject.UserID {
+		response.Forbidden(c, "Not authorized to access this subscription")
+		return
+	}
+
+	window := c.DefaultQuery("window", "daily")
+	start, end, bucketSeconds, bucketCount, ok := subscriptionTimelineWindow(sub, window, time.Now())
+	if !ok {
+		response.BadRequest(c, "Invalid or unavailable subscription usage window")
+		return
+	}
+
+	timeline, err := h.usageService.GetSubscriptionUsageTimeline(c.Request.Context(), subscriptionID, start, end, bucketSeconds, bucketCount)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	timeline.Window = window
+	response.Success(c, timeline)
+}
+
+func subscriptionTimelineWindow(sub *service.UserSubscription, window string, now time.Time) (time.Time, time.Time, int64, int, bool) {
+	if sub == nil || sub.Group == nil || sub.StartsAt.IsZero() {
+		return time.Time{}, time.Time{}, 0, 0, false
+	}
+
+	switch window {
+	case "daily":
+		if !sub.Group.HasDailyLimit() {
+			return time.Time{}, time.Time{}, 0, 0, false
+		}
+		start := rollingTimelineWindowStart(sub.StartsAt, now, 24*time.Hour)
+		if sub.DailyWindowStart != nil && !sub.NeedsDailyResetAt(now) {
+			start = *sub.DailyWindowStart
+		}
+		end := start.Add(24 * time.Hour)
+		if sub.HasOneTimeDailyQuota() {
+			start = sub.StartsAt
+			end = sub.ExpiresAt
+		}
+		return normalizeTimelineRange(start, end, time.Hour, 24)
+	case "weekly":
+		if !sub.Group.HasWeeklyLimit() {
+			return time.Time{}, time.Time{}, 0, 0, false
+		}
+		start := rollingTimelineWindowStart(sub.StartsAt, now, 7*24*time.Hour)
+		if sub.WeeklyWindowStart != nil && !sub.NeedsWeeklyResetAt(now) {
+			start = *sub.WeeklyWindowStart
+		}
+		return normalizeTimelineRange(start, start.Add(7*24*time.Hour), 24*time.Hour, 7)
+	case "monthly":
+		if !sub.Group.HasMonthlyLimit() {
+			return time.Time{}, time.Time{}, 0, 0, false
+		}
+		start := rollingTimelineWindowStart(sub.StartsAt, now, 30*24*time.Hour)
+		if sub.MonthlyWindowStart != nil && !sub.NeedsMonthlyResetAt(now) {
+			start = *sub.MonthlyWindowStart
+		}
+		return normalizeTimelineRange(start, start.Add(30*24*time.Hour), 24*time.Hour, 30)
+	default:
+		return time.Time{}, time.Time{}, 0, 0, false
+	}
+}
+
+func rollingTimelineWindowStart(anchor, now time.Time, period time.Duration) time.Time {
+	if anchor.IsZero() || period <= 0 || now.Before(anchor) {
+		return anchor
+	}
+	elapsed := now.Sub(anchor) / period
+	return anchor.Add(elapsed * period)
+}
+
+func normalizeTimelineRange(start, end time.Time, bucketSize time.Duration, maxBuckets int) (time.Time, time.Time, int64, int, bool) {
+	if start.IsZero() || !end.After(start) || bucketSize <= 0 || maxBuckets <= 0 {
+		return time.Time{}, time.Time{}, 0, 0, false
+	}
+	bucketCount := int(math.Ceil(float64(end.Sub(start)) / float64(bucketSize)))
+	if bucketCount < 1 {
+		bucketCount = 1
+	}
+	if bucketCount > maxBuckets {
+		bucketCount = maxBuckets
+	}
+	return start, end, int64(bucketSize / time.Second), bucketCount, true
 }
