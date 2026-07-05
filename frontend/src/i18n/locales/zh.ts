@@ -7168,10 +7168,10 @@ export default {
     quotaEndsIn: '额度将在 {time} 后结束',
     windowNotActive: '等待首次使用',
     usageOf: '已用 {used} / {limit}',
-    usageTimeline: '使用时间分布',
+    usageTimeline: '本额度周期使用分布',
     timelineLoading: '加载中',
     timelineSummary: '{amount} · {requests} 次请求',
-    noUsageInWindow: '本周期暂无使用',
+    noUsageInWindow: '本额度周期暂无使用',
     usageAmount: '用量',
     requests: '请求'
   },

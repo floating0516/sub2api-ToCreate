@@ -7016,10 +7016,10 @@ export default {
     quotaEndsIn: 'Quota ends in {time}',
     windowNotActive: 'Awaiting first use',
     usageOf: '{used} of {limit}',
-    usageTimeline: 'Usage timeline',
+    usageTimeline: 'Current quota window usage',
     timelineLoading: 'Loading',
     timelineSummary: '{amount} · {requests} requests',
-    noUsageInWindow: 'No usage in this window',
+    noUsageInWindow: 'No usage in this quota window',
     usageAmount: 'Usage',
     requests: 'Requests'
   },

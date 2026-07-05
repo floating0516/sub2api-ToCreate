@@ -29,14 +29,14 @@
         :key="bucket.index"
         class="block h-5 min-w-0 rounded-sm transition-colors"
         :class="bucketClass(bucket)"
-        @mouseenter="activeBucket = bucket"
+        @mouseenter="setActiveBucket(bucket)"
       ></span>
       <div
-        v-if="activeBucket && bucketTooltip(activeBucket)"
+        v-if="activeBucket && activeBucketTooltip"
         class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[240px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-2 text-[11px] leading-4 text-white opacity-95 shadow-lg dark:bg-gray-100 dark:text-gray-900"
       >
         <div class="whitespace-nowrap font-medium">
-          {{ bucketTooltip(activeBucket)?.range }}
+          {{ activeBucketTooltip.range }}
         </div>
         <div class="mt-1 flex gap-3 whitespace-nowrap text-gray-200 dark:text-gray-600">
           <span>{{ t('userSubscriptions.usageAmount') }}: {{ formatCurrency(activeBucket.actual_cost) }}</span>
@@ -73,6 +73,9 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 const activeBucket = ref<SubscriptionUsageTimelineBucket | null>(null)
+const activeBucketTooltip = computed(() => {
+  return activeBucket.value ? bucketTooltip(activeBucket.value) : null
+})
 
 const defaultBucketCount = computed(() => {
   switch (props.window) {
@@ -125,12 +128,22 @@ function bucketClass(bucket: SubscriptionUsageTimelineBucket): string {
   return 'bg-emerald-500 dark:bg-emerald-400'
 }
 
+function setActiveBucket(bucket: SubscriptionUsageTimelineBucket) {
+  activeBucket.value = bucketTooltip(bucket) ? bucket : null
+}
+
 function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string } | null {
   if (!bucket.start || !bucket.end) return null
+  if (isFutureBucket(bucket)) return null
 
   return {
     range: `${formatDateTime(bucket.start)} - ${formatDateTime(bucket.end)}`
   }
+}
+
+function isFutureBucket(bucket: SubscriptionUsageTimelineBucket): boolean {
+  const startTime = Date.parse(bucket.start)
+  return Number.isFinite(startTime) && startTime > Date.now()
 }
 
 function formatEndpoint(value: string): string {
