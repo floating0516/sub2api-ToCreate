@@ -136,9 +136,9 @@ function bucketClass(bucket: SubscriptionUsageTimelineBucket): string {
   }
 
   const ratio = bucketIntensityRatio(bucket)
-  if (ratio >= 1.5) return 'bg-blue-800 dark:bg-blue-700'
-  if (ratio >= 0.75) return 'bg-blue-500 dark:bg-blue-500'
-  return 'bg-sky-200 dark:bg-sky-800'
+  if (ratio >= 1.5) return 'bg-emerald-700 dark:bg-emerald-500'
+  if (ratio >= 0.75) return 'bg-emerald-500 dark:bg-emerald-400'
+  return 'bg-emerald-100 dark:bg-emerald-900/70'
 }
 
 function setActiveBucket(bucket: SubscriptionUsageTimelineBucket) {
