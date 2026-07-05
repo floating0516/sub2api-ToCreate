@@ -19,7 +19,7 @@
     </div>
 
     <div
-      class="relative grid h-5 gap-px"
+      class="relative grid h-3 gap-px"
       :style="gridStyle"
       :aria-label="t('userSubscriptions.usageTimeline')"
       @mouseleave="activeBucket = null"
@@ -27,18 +27,18 @@
       <span
         v-for="bucket in displayBuckets"
         :key="bucket.index"
-        class="block h-5 min-w-0 rounded-sm transition-colors"
+        class="block h-3 min-w-0 rounded-sm transition-colors"
         :class="bucketClass(bucket)"
         @mouseenter="setActiveBucket(bucket)"
       ></span>
       <div
         v-if="activeBucket && activeBucketTooltip"
-        class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[240px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-2 text-[11px] leading-4 text-white opacity-95 shadow-lg dark:bg-gray-100 dark:text-gray-900"
+        class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 max-w-[220px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-2 text-[11px] leading-4 text-white opacity-95 shadow-lg dark:bg-gray-100 dark:text-gray-900"
       >
-        <div class="whitespace-nowrap font-medium">
+        <div class="font-medium">
           {{ activeBucketTooltip.range }}
         </div>
-        <div class="mt-1 flex gap-3 whitespace-nowrap text-gray-200 dark:text-gray-600">
+        <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-gray-200 dark:text-gray-600">
           <span>{{ t('userSubscriptions.usageAmount') }}: {{ formatCurrency(activeBucket.actual_cost) }}</span>
           <span>{{ t('userSubscriptions.requests') }}: {{ formatNumber(activeBucket.requests) }}</span>
         </div>
@@ -137,13 +137,42 @@ function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string
   if (isFutureBucket(bucket)) return null
 
   return {
-    range: `${formatDateTime(bucket.start)} - ${formatDateTime(bucket.end)}`
+    range: formatBucketRange(bucket)
   }
 }
 
 function isFutureBucket(bucket: SubscriptionUsageTimelineBucket): boolean {
   const startTime = Date.parse(bucket.start)
   return Number.isFinite(startTime) && startTime > Date.now()
+}
+
+function formatBucketRange(bucket: SubscriptionUsageTimelineBucket): string {
+  const start = new Date(bucket.start)
+  const end = new Date(bucket.end)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return ''
+
+  const startText = formatDateTime(start, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+
+  const sameDay = start.toDateString() === end.toDateString()
+  const endText = formatDateTime(end, sameDay ? {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  } : {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+
+  return `${startText} - ${endText}`
 }
 
 function formatEndpoint(value: string): string {
