@@ -19,17 +19,30 @@
     </div>
 
     <div
-      class="grid h-5 gap-px"
+      class="relative grid h-5 gap-px"
       :style="gridStyle"
       :aria-label="t('userSubscriptions.usageTimeline')"
+      @mouseleave="activeBucket = null"
     >
       <span
         v-for="bucket in displayBuckets"
         :key="bucket.index"
         class="block h-5 min-w-0 rounded-sm transition-colors"
         :class="bucketClass(bucket)"
-        :title="bucketTitle(bucket)"
+        @mouseenter="activeBucket = bucket"
       ></span>
+      <div
+        v-if="activeBucket && bucketTooltip(activeBucket)"
+        class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[240px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-2 text-[11px] leading-4 text-white opacity-95 shadow-lg dark:bg-gray-100 dark:text-gray-900"
+      >
+        <div class="whitespace-nowrap font-medium">
+          {{ bucketTooltip(activeBucket)?.range }}
+        </div>
+        <div class="mt-1 flex gap-3 whitespace-nowrap text-gray-200 dark:text-gray-600">
+          <span>{{ t('userSubscriptions.usageAmount') }}: {{ formatCurrency(activeBucket.actual_cost) }}</span>
+          <span>{{ t('userSubscriptions.requests') }}: {{ formatNumber(activeBucket.requests) }}</span>
+        </div>
+      </div>
     </div>
 
     <div v-if="timeline" class="flex justify-between text-[10px] leading-4 text-gray-400 dark:text-gray-500">
@@ -40,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateOnly, formatDateTime } from '@/utils/format'
 import type {
@@ -59,6 +72,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const activeBucket = ref<SubscriptionUsageTimelineBucket | null>(null)
 
 const defaultBucketCount = computed(() => {
   switch (props.window) {
@@ -111,14 +125,12 @@ function bucketClass(bucket: SubscriptionUsageTimelineBucket): string {
   return 'bg-emerald-500 dark:bg-emerald-400'
 }
 
-function bucketTitle(bucket: SubscriptionUsageTimelineBucket): string {
-  if (!bucket.start || !bucket.end) return ''
+function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string } | null {
+  if (!bucket.start || !bucket.end) return null
 
-  return [
-    `${formatDateTime(bucket.start)} - ${formatDateTime(bucket.end)}`,
-    `${t('userSubscriptions.usageAmount')}: ${formatCurrency(bucket.actual_cost)}`,
-    `${t('userSubscriptions.requests')}: ${formatNumber(bucket.requests)}`
-  ].join('\n')
+  return {
+    range: `${formatDateTime(bucket.start)} - ${formatDateTime(bucket.end)}`
+  }
 }
 
 function formatEndpoint(value: string): string {
