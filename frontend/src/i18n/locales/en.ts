@@ -7021,7 +7021,8 @@ export default {
     timelineSummary: '{amount} · {requests} requests',
     noUsageInWindow: 'No usage in this quota window',
     usageAmount: 'Usage',
-    requests: 'Requests'
+    requests: 'Requests',
+    timelineBucketRelative: 'About {percentage} of the even quota'
   },
 
   // Onboarding Tour

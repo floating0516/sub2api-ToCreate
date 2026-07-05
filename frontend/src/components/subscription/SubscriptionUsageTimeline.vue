@@ -42,6 +42,9 @@
           <span>{{ t('userSubscriptions.usageAmount') }}: {{ formatCurrency(activeBucket.actual_cost) }}</span>
           <span>{{ t('userSubscriptions.requests') }}: {{ formatNumber(activeBucket.requests) }}</span>
         </div>
+        <div v-if="activeBucketTooltip.relative" class="mt-0.5 text-gray-300 dark:text-gray-500">
+          {{ activeBucketTooltip.relative }}
+        </div>
       </div>
     </div>
 
@@ -65,9 +68,11 @@ import type {
 const props = withDefaults(defineProps<{
   timeline?: SubscriptionUsageTimeline | null
   window: SubscriptionUsageTimelineWindow
+  quotaLimit?: number | null
   loading?: boolean
 }>(), {
   timeline: null,
+  quotaLimit: null,
   loading: false
 })
 
@@ -109,6 +114,14 @@ const gridStyle = computed(() => ({
 
 const maxBucketCost = computed(() => props.timeline?.max_bucket_cost || 0)
 
+const evenBucketQuota = computed(() => {
+  if (!Number.isFinite(props.quotaLimit) || !props.quotaLimit || props.quotaLimit <= 0) {
+    return 0
+  }
+
+  return props.quotaLimit / defaultBucketCount.value
+})
+
 const hasUsage = computed(() => {
   return (props.timeline?.total_actual_cost || 0) > 0 || (props.timeline?.total_requests || 0) > 0
 })
@@ -118,27 +131,42 @@ function bucketClass(bucket: SubscriptionUsageTimelineBucket): string {
     return 'animate-pulse bg-gray-200 dark:bg-dark-600'
   }
 
-  if (!bucket.actual_cost || maxBucketCost.value <= 0) {
+  if (!bucket.actual_cost || (evenBucketQuota.value <= 0 && maxBucketCost.value <= 0)) {
     return 'bg-gray-100 dark:bg-dark-700'
   }
 
-  const ratio = bucket.actual_cost / maxBucketCost.value
-  if (ratio >= 0.75) return 'bg-rose-500 dark:bg-rose-400'
-  if (ratio >= 0.4) return 'bg-amber-500 dark:bg-amber-400'
-  return 'bg-emerald-500 dark:bg-emerald-400'
+  const ratio = bucketIntensityRatio(bucket)
+  if (ratio >= 1.5) return 'bg-blue-800 dark:bg-blue-700'
+  if (ratio >= 0.75) return 'bg-blue-500 dark:bg-blue-500'
+  return 'bg-sky-200 dark:bg-sky-800'
 }
 
 function setActiveBucket(bucket: SubscriptionUsageTimelineBucket) {
   activeBucket.value = bucketTooltip(bucket) ? bucket : null
 }
 
-function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string } | null {
+function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string; relative: string | null } | null {
   if (!bucket.start || !bucket.end) return null
   if (isFutureBucket(bucket)) return null
 
   return {
-    range: formatBucketRange(bucket)
+    range: formatBucketRange(bucket),
+    relative: formatBucketRelative(bucket)
   }
+}
+
+function bucketIntensityRatio(bucket: SubscriptionUsageTimelineBucket): number {
+  if (!bucket.actual_cost) return 0
+  if (evenBucketQuota.value > 0) return bucket.actual_cost / evenBucketQuota.value
+  if (maxBucketCost.value > 0) return bucket.actual_cost / maxBucketCost.value
+  return 0
+}
+
+function formatBucketRelative(bucket: SubscriptionUsageTimelineBucket): string | null {
+  if (!bucket.actual_cost || evenBucketQuota.value <= 0) return null
+  return t('userSubscriptions.timelineBucketRelative', {
+    percentage: formatPercentage(bucketIntensityRatio(bucket) * 100)
+  })
 }
 
 function isFutureBucket(bucket: SubscriptionUsageTimelineBucket): boolean {
@@ -195,5 +223,11 @@ function formatCurrency(value: number): string {
 
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString() : '0'
+}
+
+function formatPercentage(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0%'
+  if (value < 10) return `${value.toFixed(1)}%`
+  return `${Math.round(value)}%`
 }
 </script>

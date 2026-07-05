@@ -7173,7 +7173,8 @@ export default {
     timelineSummary: '{amount} · {requests} 次请求',
     noUsageInWindow: '本额度周期暂无使用',
     usageAmount: '用量',
-    requests: '请求'
+    requests: '请求',
+    timelineBucketRelative: '约为均分额度的 {percentage}'
   },
 
   // Onboarding Tour

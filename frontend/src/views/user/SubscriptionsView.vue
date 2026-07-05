@@ -138,6 +138,7 @@
               <SubscriptionUsageTimeline
                 :timeline="getUsageTimeline(subscription.id, 'daily')"
                 window="daily"
+                :quota-limit="subscription.group.daily_limit_usd"
                 :loading="isUsageTimelineLoading(subscription.id, 'daily')"
               />
             </div>
@@ -184,6 +185,7 @@
               <SubscriptionUsageTimeline
                 :timeline="getUsageTimeline(subscription.id, 'weekly')"
                 window="weekly"
+                :quota-limit="subscription.group.weekly_limit_usd"
                 :loading="isUsageTimelineLoading(subscription.id, 'weekly')"
               />
             </div>
@@ -230,6 +232,7 @@
               <SubscriptionUsageTimeline
                 :timeline="getUsageTimeline(subscription.id, 'monthly')"
                 window="monthly"
+                :quota-limit="subscription.group.monthly_limit_usd"
                 :loading="isUsageTimelineLoading(subscription.id, 'monthly')"
               />
             </div>
