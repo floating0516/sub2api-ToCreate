@@ -21,6 +21,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 
@@ -663,6 +664,189 @@ func (r *userRepository) GetLatestUsedAtByUserID(ctx context.Context, userID int
 		return nil, err
 	}
 	return latestByUserID[userID], nil
+}
+
+func (r *userRepository) GetUserUsageInsightsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]*service.UserUsageSummary, map[int64][]service.UserModelPreference, error) {
+	summaries := make(map[int64]*service.UserUsageSummary)
+	modelPrefs := make(map[int64][]service.UserModelPreference)
+	normalizedUserIDs := normalizePositiveInt64IDs(userIDs)
+	if len(normalizedUserIDs) == 0 {
+		return summaries, modelPrefs, nil
+	}
+	if r.sql == nil {
+		return nil, nil, fmt.Errorf("sql executor is not configured")
+	}
+
+	for _, userID := range normalizedUserIDs {
+		summaries[userID] = &service.UserUsageSummary{}
+	}
+
+	now := timezone.Now()
+	todayStart := timezone.StartOfDay(now)
+	start7D := now.AddDate(0, 0, -7)
+	start30D := now.AddDate(0, 0, -30)
+	tzName := timezone.Name()
+
+	if err := r.loadUserUsageSummaries(ctx, normalizedUserIDs, summaries, todayStart, start7D, start30D, tzName); err != nil {
+		return nil, nil, err
+	}
+	if err := r.loadUserModelPreferences(ctx, normalizedUserIDs, modelPrefs, start30D); err != nil {
+		return nil, nil, err
+	}
+
+	return summaries, modelPrefs, nil
+}
+
+func (r *userRepository) loadUserUsageSummaries(
+	ctx context.Context,
+	userIDs []int64,
+	out map[int64]*service.UserUsageSummary,
+	todayStart time.Time,
+	start7D time.Time,
+	start30D time.Time,
+	tzName string,
+) error {
+	tokenExpr := `
+		COALESCE(ul.input_tokens, 0)::bigint +
+		COALESCE(ul.output_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_tokens, 0)::bigint +
+		COALESCE(ul.cache_read_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_5m_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_1h_tokens, 0)::bigint +
+		COALESCE(ul.image_output_tokens, 0)::bigint
+	`
+	query := `
+		SELECT
+			ul.user_id,
+			COUNT(*)::bigint AS total_requests,
+			COUNT(*) FILTER (WHERE ul.created_at >= $2)::bigint AS today_requests,
+			COUNT(*) FILTER (WHERE ul.created_at >= $3)::bigint AS requests_7d,
+			COUNT(*) FILTER (WHERE ul.created_at >= $4)::bigint AS requests_30d,
+			COUNT(DISTINCT (ul.created_at AT TIME ZONE $5)::date) FILTER (WHERE ul.created_at >= $4)::bigint AS active_days_30d,
+			COALESCE(SUM(` + tokenExpr + `), 0)::bigint AS total_tokens,
+			COALESCE(SUM(` + tokenExpr + `) FILTER (WHERE ul.created_at >= $4), 0)::bigint AS tokens_30d,
+			COALESCE(SUM(ul.total_cost), 0)::double precision AS total_cost,
+			COALESCE(SUM(ul.total_cost) FILTER (WHERE ul.created_at >= $4), 0)::double precision AS cost_30d,
+			COALESCE(SUM(ul.actual_cost), 0)::double precision AS total_actual_cost,
+			COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.created_at >= $4), 0)::double precision AS actual_cost_30d,
+			MAX(ul.created_at) AS last_usage_at
+		FROM usage_logs ul
+		WHERE ul.user_id = ANY($1)
+		  AND ` + usageLogSuccessFilterUL + `
+		GROUP BY ul.user_id
+	`
+	rows, err := r.sql.QueryContext(ctx, query, pq.Array(userIDs), todayStart, start7D, start30D, tzName)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var (
+			userID      int64
+			lastUsageAt sql.NullTime
+			summary     service.UserUsageSummary
+		)
+		if err := rows.Scan(
+			&userID,
+			&summary.TotalRequests,
+			&summary.TodayRequests,
+			&summary.Requests7D,
+			&summary.Requests30D,
+			&summary.ActiveDays30D,
+			&summary.TotalTokens,
+			&summary.Tokens30D,
+			&summary.TotalCost,
+			&summary.Cost30D,
+			&summary.TotalActualCost,
+			&summary.ActualCost30D,
+			&lastUsageAt,
+		); err != nil {
+			return err
+		}
+		if lastUsageAt.Valid {
+			ts := lastUsageAt.Time.UTC()
+			summary.LastUsageAt = &ts
+		}
+		out[userID] = &summary
+	}
+	return rows.Err()
+}
+
+func (r *userRepository) loadUserModelPreferences(
+	ctx context.Context,
+	userIDs []int64,
+	out map[int64][]service.UserModelPreference,
+	start30D time.Time,
+) error {
+	tokenExpr := `
+		COALESCE(ul.input_tokens, 0)::bigint +
+		COALESCE(ul.output_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_tokens, 0)::bigint +
+		COALESCE(ul.cache_read_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_5m_tokens, 0)::bigint +
+		COALESCE(ul.cache_creation_1h_tokens, 0)::bigint +
+		COALESCE(ul.image_output_tokens, 0)::bigint
+	`
+	query := `
+		WITH per_model AS (
+			SELECT
+				ul.user_id,
+				COALESCE(NULLIF(TRIM(ul.requested_model), ''), NULLIF(TRIM(ul.model), ''), '(unknown)') AS model,
+				COUNT(*)::bigint AS requests,
+				COALESCE(SUM(` + tokenExpr + `), 0)::bigint AS tokens,
+				COALESCE(SUM(ul.total_cost), 0)::double precision AS cost,
+				COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost
+			FROM usage_logs ul
+			WHERE ul.user_id = ANY($1)
+			  AND ul.created_at >= $2
+			  AND ` + usageLogSuccessFilterUL + `
+			GROUP BY ul.user_id, COALESCE(NULLIF(TRIM(ul.requested_model), ''), NULLIF(TRIM(ul.model), ''), '(unknown)')
+		),
+		ranked AS (
+			SELECT
+				per_model.*,
+				SUM(actual_cost) OVER (PARTITION BY user_id) AS user_actual_cost,
+				ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY actual_cost DESC, cost DESC, requests DESC, model ASC) AS rn
+			FROM per_model
+		)
+		SELECT
+			user_id,
+			model,
+			requests,
+			tokens,
+			cost,
+			actual_cost,
+			CASE WHEN user_actual_cost > 0 THEN actual_cost / user_actual_cost ELSE 0 END AS share
+		FROM ranked
+		WHERE rn <= 3
+		ORDER BY user_id, rn
+	`
+	rows, err := r.sql.QueryContext(ctx, query, pq.Array(userIDs), start30D)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var (
+			userID int64
+			pref   service.UserModelPreference
+		)
+		if err := rows.Scan(
+			&userID,
+			&pref.Model,
+			&pref.Requests,
+			&pref.Tokens,
+			&pref.Cost,
+			&pref.ActualCost,
+			&pref.Share,
+		); err != nil {
+			return err
+		}
+		out[userID] = append(out[userID], pref)
+	}
+	return rows.Err()
 }
 
 func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {

@@ -43,9 +43,40 @@ type AdminUser struct {
 
 	Notes      string     `json:"notes"`
 	LastUsedAt *time.Time `json:"last_used_at"`
+	// UsageSummary is a compact admin-only rollup for the user management list.
+	UsageSummary *AdminUserUsageSummary `json:"usage_summary,omitempty"`
+	// ModelPreferences contains the user's top recent models, ordered by cost share.
+	ModelPreferences []AdminUserModelPreference `json:"model_preferences,omitempty"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]rateMultiplier
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
+}
+
+type AdminUserUsageSummary struct {
+	TotalRequests int64 `json:"total_requests"`
+	TodayRequests int64 `json:"today_requests"`
+	Requests7D    int64 `json:"requests_7d"`
+	Requests30D   int64 `json:"requests_30d"`
+
+	ActiveDays30D int64 `json:"active_days_30d"`
+	TotalTokens   int64 `json:"total_tokens"`
+	Tokens30D     int64 `json:"tokens_30d"`
+
+	TotalCost       float64 `json:"total_cost"`
+	Cost30D         float64 `json:"cost_30d"`
+	TotalActualCost float64 `json:"total_actual_cost"`
+	ActualCost30D   float64 `json:"actual_cost_30d"`
+
+	LastUsageAt *time.Time `json:"last_usage_at,omitempty"`
+}
+
+type AdminUserModelPreference struct {
+	Model      string  `json:"model"`
+	Requests   int64   `json:"requests"`
+	Tokens     int64   `json:"tokens"`
+	Cost       float64 `json:"cost"`
+	ActualCost float64 `json:"actual_cost"`
+	Share      float64 `json:"share"`
 }
 
 type APIKey struct {

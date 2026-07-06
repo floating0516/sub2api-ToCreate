@@ -104,10 +104,36 @@ export interface AdminUser extends User {
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null
+  usage_summary?: AdminUserUsageSummary | null
+  model_preferences?: AdminUserModelPreference[]
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
+}
+
+export interface AdminUserUsageSummary {
+  total_requests: number
+  today_requests: number
+  requests_7d: number
+  requests_30d: number
+  active_days_30d: number
+  total_tokens: number
+  tokens_30d: number
+  total_cost: number
+  cost_30d: number
+  total_actual_cost: number
+  actual_cost_30d: number
+  last_usage_at?: string | null
+}
+
+export interface AdminUserModelPreference {
+  model: string
+  requests: number
+  tokens: number
+  cost: number
+  actual_cost: number
+  share: number
 }
 
 export interface LoginRequest {

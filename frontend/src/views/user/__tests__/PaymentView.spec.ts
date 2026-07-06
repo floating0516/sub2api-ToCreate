@@ -236,6 +236,14 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
 }
 
 describe('PaymentView subscription confirmation amounts', () => {
+  it('shows subscription purchase behavior hint', async () => {
+    const wrapper = await mountSubscriptionConfirm()
+
+    expect(wrapper.text()).toContain('payment.subscriptionHint.title')
+    expect(wrapper.text()).toContain('payment.subscriptionHint.samePlan')
+    expect(wrapper.text()).toContain('payment.subscriptionHint.differentPlans')
+  })
+
   it('keeps subscription plan price independent from balance recharge multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {

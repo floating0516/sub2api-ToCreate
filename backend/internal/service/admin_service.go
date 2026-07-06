@@ -133,6 +133,10 @@ type AdminService interface {
 	ResetAccountQuota(ctx context.Context, id int64) error
 }
 
+type userUsageInsightsBatchReader interface {
+	GetUserUsageInsightsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]*UserUsageSummary, map[int64][]UserModelPreference, error)
+}
+
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
 	Email         string
@@ -650,6 +654,7 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 			}
 		}
 	}
+	s.attachUserUsageInsights(ctx, users)
 	// 批量加载用户专属分组倍率
 	if s.userGroupRateRepo != nil && len(users) > 0 {
 		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {
@@ -673,6 +678,37 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 		}
 	}
 	return users, result.Total, nil
+}
+
+func (s *adminServiceImpl) attachUserUsageInsights(ctx context.Context, users []User) {
+	if len(users) == 0 {
+		return
+	}
+	reader, ok := s.userRepo.(userUsageInsightsBatchReader)
+	if !ok {
+		return
+	}
+	userIDs := make([]int64, 0, len(users))
+	for i := range users {
+		userIDs = append(userIDs, users[i].ID)
+	}
+	summaries, modelPrefs, err := reader.GetUserUsageInsightsByUserIDs(ctx, userIDs)
+	if err != nil {
+		logger.LegacyPrintf("service.admin", "failed to load user usage insights: err=%v", err)
+		return
+	}
+	for i := range users {
+		userID := users[i].ID
+		if summary, ok := summaries[userID]; ok {
+			users[i].UsageSummary = summary
+			if summary.LastUsageAt != nil && users[i].LastUsedAt == nil {
+				users[i].LastUsedAt = summary.LastUsageAt
+			}
+		}
+		if prefs, ok := modelPrefs[userID]; ok {
+			users[i].ModelPreferences = prefs
+		}
+	}
 }
 
 func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users []User) {
@@ -699,6 +735,20 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 		logger.LegacyPrintf("service.admin", "failed to load user last_used_at: user_id=%d err=%v", id, latestErr)
 	} else {
 		user.LastUsedAt = lastUsedAt
+	}
+	if reader, ok := s.userRepo.(userUsageInsightsBatchReader); ok {
+		summaries, modelPrefs, usageErr := reader.GetUserUsageInsightsByUserIDs(ctx, []int64{id})
+		if usageErr != nil {
+			logger.LegacyPrintf("service.admin", "failed to load user usage insights: user_id=%d err=%v", id, usageErr)
+		} else {
+			if summary, ok := summaries[id]; ok {
+				user.UsageSummary = summary
+				if summary.LastUsageAt != nil && user.LastUsedAt == nil {
+					user.LastUsedAt = summary.LastUsageAt
+				}
+			}
+			user.ModelPreferences = modelPrefs[id]
+		}
 	}
 	// 加载用户专属分组倍率
 	if s.userGroupRateRepo != nil {

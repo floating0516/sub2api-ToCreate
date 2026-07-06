@@ -67,11 +67,51 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		return nil
 	}
 	return &AdminUser{
-		User:       *base,
-		Notes:      u.Notes,
-		LastUsedAt: u.LastUsedAt,
-		GroupRates: u.GroupRates,
+		User:             *base,
+		Notes:            u.Notes,
+		LastUsedAt:       u.LastUsedAt,
+		UsageSummary:     AdminUserUsageSummaryFromService(u.UsageSummary),
+		ModelPreferences: AdminUserModelPreferencesFromService(u.ModelPreferences),
+		GroupRates:       u.GroupRates,
 	}
+}
+
+func AdminUserUsageSummaryFromService(s *service.UserUsageSummary) *AdminUserUsageSummary {
+	if s == nil {
+		return nil
+	}
+	return &AdminUserUsageSummary{
+		TotalRequests:   s.TotalRequests,
+		TodayRequests:   s.TodayRequests,
+		Requests7D:      s.Requests7D,
+		Requests30D:     s.Requests30D,
+		ActiveDays30D:   s.ActiveDays30D,
+		TotalTokens:     s.TotalTokens,
+		Tokens30D:       s.Tokens30D,
+		TotalCost:       s.TotalCost,
+		Cost30D:         s.Cost30D,
+		TotalActualCost: s.TotalActualCost,
+		ActualCost30D:   s.ActualCost30D,
+		LastUsageAt:     s.LastUsageAt,
+	}
+}
+
+func AdminUserModelPreferencesFromService(in []service.UserModelPreference) []AdminUserModelPreference {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]AdminUserModelPreference, 0, len(in))
+	for i := range in {
+		out = append(out, AdminUserModelPreference{
+			Model:      in[i].Model,
+			Requests:   in[i].Requests,
+			Tokens:     in[i].Tokens,
+			Cost:       in[i].Cost,
+			ActualCost: in[i].ActualCost,
+			Share:      in[i].Share,
+		})
+	}
+	return out
 }
 
 func APIKeyFromService(k *service.APIKey) *APIKey {

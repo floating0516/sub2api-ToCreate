@@ -257,7 +257,7 @@
           :columns="columns"
           :data="sortedUsers"
           :loading="loading"
-          :actions-count="7"
+          :actions-count="8"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -523,6 +523,45 @@
             </div>
           </template>
 
+          <template #cell-usage_overview="{ row }">
+            <div class="min-w-[190px] space-y-1.5">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="rounded-md bg-primary-50 px-2 py-0.5 font-medium text-primary-700 dark:bg-primary-900/25 dark:text-primary-300">
+                  {{ t('admin.users.today') }} {{ formatRequestCount(getUsageSummary(row).today_requests) }}
+                </span>
+                <span class="text-gray-500 dark:text-dark-400">
+                  {{ t('admin.users.last7d') }} {{ formatRequestCount(getUsageSummary(row).requests_7d) }}
+                </span>
+                <span class="text-gray-500 dark:text-dark-400">
+                  {{ t('admin.users.last30d') }} {{ formatRequestCount(getUsageSummary(row).requests_30d) }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-dark-400">
+                <span>{{ t('admin.users.tokens30d') }} {{ formatTokenCount(getUsageSummary(row).tokens_30d) }}</span>
+                <span class="h-1 w-1 rounded-full bg-gray-300 dark:bg-dark-600"></span>
+                <span>{{ t('admin.users.cost30d') }} {{ formatUsageCost(getUsageSummary(row).actual_cost_30d) }}</span>
+              </div>
+            </div>
+          </template>
+
+          <template #cell-model_preferences="{ row }">
+            <div
+              v-if="getModelPreferences(row).length > 0"
+              class="flex max-w-[280px] flex-wrap gap-1.5"
+            >
+              <span
+                v-for="pref in getModelPreferences(row)"
+                :key="pref.model"
+                class="inline-flex min-w-0 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200"
+                :title="getModelPreferenceTitle(pref)"
+              >
+                <span class="max-w-[130px] truncate font-medium">{{ formatModelName(pref.model) }}</span>
+                <span class="text-gray-500 dark:text-dark-400">{{ formatPercent(pref.share) }}</span>
+              </span>
+            </div>
+            <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+          </template>
+
           <template #cell-usage="{ row }">
             <PlatformUsageBreakdown
               :today="usageStats[row.id]?.today_actual_cost ?? 0"
@@ -588,17 +627,26 @@
             <div class="flex items-center gap-1">
               <!-- Edit Button -->
               <button
-                @click="handleEdit(row)"
+                @click.stop="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
 
+              <!-- Details Button -->
+              <button
+                @click.stop="handleUserDetails(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+              >
+                <Icon name="chartBar" size="sm" />
+                <span class="text-xs">{{ t('admin.users.details') }}</span>
+              </button>
+
               <!-- Toggle Status Button (not for admin) -->
               <button
                 v-if="row.role !== 'admin'"
-                @click="handleToggleStatus(row)"
+                @click.stop="handleToggleStatus(row)"
                 :class="[
                   'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
                   row.status === 'active'
@@ -613,7 +661,7 @@
 
               <!-- More Actions Menu Trigger -->
               <button
-                @click="openActionMenu(row, $event)"
+                @click.stop="openActionMenu(row, $event)"
                 class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white"
                 :class="{ 'bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-white': activeMenuId === row.id }"
               >
@@ -732,6 +780,182 @@
       </div>
     </Teleport>
 
+    <!-- User Detail Drawer -->
+    <Teleport to="body">
+      <div
+        v-if="detailUser"
+        class="fixed inset-0 z-[60] flex justify-end bg-gray-950/40 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        @click.self="closeUserDetails"
+      >
+        <aside
+          class="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl dark:bg-dark-900"
+          @click.stop
+        >
+          <div class="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 dark:border-dark-700 dark:bg-dark-900">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
+                  <span class="text-base font-semibold text-primary-700 dark:text-primary-300">
+                    {{ detailUser.email.charAt(0).toUpperCase() }}
+                  </span>
+                </div>
+                <div class="min-w-0">
+                  <h3 class="truncate text-lg font-semibold text-gray-900 dark:text-white">
+                    {{ detailUser.email }}
+                  </h3>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-dark-400">
+                    <span>ID {{ detailUser.id }}</span>
+                    <span v-if="detailUser.username">{{ detailUser.username }}</span>
+                    <span :class="['badge', detailUser.role === 'admin' ? 'badge-purple' : 'badge-gray']">
+                      {{ t('admin.users.roles.' + detailUser.role) }}
+                    </span>
+                    <span
+                      :class="[
+                        'inline-flex items-center rounded-md px-2 py-0.5 font-medium',
+                        detailUser.status === 'active'
+                          ? 'bg-green-50 text-green-700 dark:bg-green-900/25 dark:text-green-300'
+                          : 'bg-red-50 text-red-700 dark:bg-red-900/25 dark:text-red-300'
+                      ]"
+                    >
+                      {{ detailUser.status === 'active' ? t('common.active') : t('admin.users.disabled') }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span v-if="detailLoading" class="text-xs text-gray-400 dark:text-dark-500">
+                  {{ t('common.loading') }}
+                </span>
+                <button
+                  type="button"
+                  class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-700 dark:hover:text-dark-100"
+                  :aria-label="t('common.close')"
+                  @click="closeUserDetails"
+                >
+                  <Icon name="x" size="md" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-6 py-5">
+            <section class="space-y-3">
+              <div class="flex items-center gap-2">
+                <Icon name="chartBar" size="sm" class="text-primary-500" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('admin.users.usageOverview') }}
+                </h4>
+              </div>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div
+                  v-for="item in getUsageDetailItems(detailUser)"
+                  :key="item.key"
+                  class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-dark-700 dark:bg-dark-800/60"
+                >
+                  <div class="text-xs text-gray-500 dark:text-dark-400">{{ item.label }}</div>
+                  <div class="mt-1 truncate text-base font-semibold text-gray-900 dark:text-white">{{ item.value }}</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="mt-6 space-y-3">
+              <div class="flex items-center gap-2">
+                <Icon name="brain" size="sm" class="text-primary-500" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('admin.users.modelPreferences') }}
+                </h4>
+              </div>
+              <div v-if="getModelPreferences(detailUser).length > 0" class="space-y-3">
+                <div
+                  v-for="pref in getModelPreferences(detailUser)"
+                  :key="pref.model"
+                  class="rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-900"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
+                      {{ formatModelName(pref.model) }}
+                    </span>
+                    <span class="text-sm font-semibold text-primary-600 dark:text-primary-400">
+                      {{ formatPercent(pref.share) }}
+                    </span>
+                  </div>
+                  <div class="mt-2 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
+                    <div
+                      class="h-full rounded-full bg-primary-500"
+                      :style="{ width: getModelShareWidth(pref.share) }"
+                    ></div>
+                  </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-dark-400">
+                    <span>{{ formatRequestCount(pref.requests) }} {{ t('admin.users.requests') }}</span>
+                    <span>{{ formatTokenCount(pref.tokens) }} {{ t('admin.users.tokens') }}</span>
+                    <span>{{ formatUsageCost(pref.actual_cost) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400 dark:border-dark-700 dark:text-dark-500"
+              >
+                {{ t('admin.users.noModelPreference') }}
+              </div>
+            </section>
+
+            <section class="mt-6 space-y-3">
+              <div class="flex items-center gap-2">
+                <Icon name="clock" size="sm" class="text-primary-500" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('admin.users.activity') }}
+                </h4>
+              </div>
+              <dl class="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-dark-700 dark:border-dark-700">
+                <div class="flex items-center justify-between gap-4 px-4 py-3">
+                  <dt class="text-sm text-gray-500 dark:text-dark-400">{{ t('admin.users.columns.lastActive') }}</dt>
+                  <dd class="text-right text-sm font-medium text-gray-900 dark:text-white">
+                    {{ formatDateTimeOrDash(detailUser.last_active_at) }}
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3">
+                  <dt class="text-sm text-gray-500 dark:text-dark-400">{{ t('admin.users.columns.lastUsed') }}</dt>
+                  <dd class="text-right text-sm font-medium text-gray-900 dark:text-white">
+                    {{ formatDateTimeOrDash(getLastUsedAt(detailUser)) }}
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-4 py-3">
+                  <dt class="text-sm text-gray-500 dark:text-dark-400">{{ t('admin.users.createdAt') }}</dt>
+                  <dd class="text-right text-sm font-medium text-gray-900 dark:text-white">
+                    {{ formatDateTimeOrDash(detailUser.created_at) }}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="mt-6 space-y-3">
+              <div class="flex items-center gap-2">
+                <Icon name="userCircle" size="sm" class="text-primary-500" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('admin.users.basicInfo') }}
+                </h4>
+              </div>
+              <dl class="grid grid-cols-2 gap-3">
+                <div class="rounded-lg border border-gray-200 px-3 py-2.5 dark:border-dark-700">
+                  <dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.users.columns.balance') }}</dt>
+                  <dd class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ formatUsageCost(detailUser.balance) }}</dd>
+                </div>
+                <div class="rounded-lg border border-gray-200 px-3 py-2.5 dark:border-dark-700">
+                  <dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.users.columns.concurrency') }}</dt>
+                  <dd class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ detailUser.current_concurrency ?? 0 }} / {{ detailUser.concurrency }}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </Teleport>
+
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.users.deleteUser')" :message="t('admin.users.deleteConfirm', { email: deletingUser?.email })" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <UserCreateModal :show="showCreateModal" @close="showCreateModal = false" @success="loadUsers" />
     <UserEditModal :show="showEditModal" :user="editingUser" @close="closeEditModal" @success="loadUsers" />
@@ -755,12 +979,12 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
-import { formatDateTime } from '@/utils/format'
+import { formatCurrency, formatDateTime, formatNumber } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminGroup, UserAttributeDefinition } from '@/types'
+import type { AdminUser, AdminGroup, AdminUserModelPreference, AdminUserUsageSummary, UserAttributeDefinition } from '@/types'
 import type { BatchUserUsageStats } from '@/api/admin/dashboard'
 import type { PlatformQuotaItem } from '@/api/admin/users'
 import type { Column } from '@/components/common/types'
@@ -849,6 +1073,8 @@ const allColumns = computed<Column[]>(() => [
   { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
   { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
   { key: 'balance_platform_quota', label: t('admin.users.columns.balancePlatformQuota'), sortable: false },
+  { key: 'usage_overview', label: t('admin.users.columns.usageOverview'), sortable: false },
+  { key: 'model_preferences', label: t('admin.users.columns.modelPreferences'), sortable: false },
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
   { key: 'usage_anthropic', label: t('admin.users.columns.usageAnthropic'), sortable: false },
   { key: 'usage_openai', label: t('admin.users.columns.usageOpenAI'), sortable: false },
@@ -1175,6 +1401,83 @@ const platformQuotaStats = ref<Record<number, PlatformQuotaItem[]>>({})
 const getPlatformUsage = (userId: number, platform: string) =>
   usageStats.value[userId]?.by_platform?.find((p) => p.platform === platform)
 
+const emptyUsageSummary: AdminUserUsageSummary = {
+  total_requests: 0,
+  today_requests: 0,
+  requests_7d: 0,
+  requests_30d: 0,
+  active_days_30d: 0,
+  total_tokens: 0,
+  tokens_30d: 0,
+  total_cost: 0,
+  cost_30d: 0,
+  total_actual_cost: 0,
+  actual_cost_30d: 0,
+  last_usage_at: null
+}
+
+const getUsageSummary = (user: AdminUser): AdminUserUsageSummary =>
+  user.usage_summary ?? emptyUsageSummary
+
+const getModelPreferences = (user: AdminUser): AdminUserModelPreference[] =>
+  user.model_preferences?.filter((pref) => pref.model) ?? []
+
+const formatRequestCount = (value: number | null | undefined): string =>
+  formatNumber(value ?? 0)
+
+const formatTokenCount = (value: number | null | undefined): string =>
+  formatNumber(value ?? 0)
+
+const formatUsageCost = (value: number | null | undefined): string =>
+  formatCurrency(value ?? 0)
+
+const normalizeSharePercent = (share: number | null | undefined): number => {
+  const raw = Number(share ?? 0)
+  if (!Number.isFinite(raw) || raw <= 0) return 0
+  return raw <= 1 ? raw * 100 : raw
+}
+
+const formatPercent = (share: number | null | undefined): string => {
+  const percent = normalizeSharePercent(share)
+  if (percent <= 0) return '0%'
+  if (percent < 1) return '<1%'
+  return `${Math.round(percent)}%`
+}
+
+const getModelShareWidth = (share: number | null | undefined): string => {
+  const percent = normalizeSharePercent(share)
+  if (percent <= 0) return '0%'
+  return `${Math.min(100, Math.max(2, percent))}%`
+}
+
+const formatModelName = (model: string | null | undefined): string => {
+  const value = (model ?? '').trim()
+  return value || '-'
+}
+
+const getModelPreferenceTitle = (pref: AdminUserModelPreference): string =>
+  `${formatModelName(pref.model)} · ${formatPercent(pref.share)} · ${formatRequestCount(pref.requests)} ${t('admin.users.requests')} · ${formatTokenCount(pref.tokens)} ${t('admin.users.tokens')} · ${formatUsageCost(pref.actual_cost)}`
+
+const formatDateTimeOrDash = (value: string | null | undefined): string =>
+  value ? formatDateTime(value) : '-'
+
+const getLastUsedAt = (user: AdminUser): string | null | undefined =>
+  user.last_used_at ?? user.usage_summary?.last_usage_at ?? null
+
+const getUsageDetailItems = (user: AdminUser) => {
+  const summary = getUsageSummary(user)
+  return [
+    { key: 'today', label: t('admin.users.requestsToday'), value: formatRequestCount(summary.today_requests) },
+    { key: 'requests_7d', label: t('admin.users.requests7d'), value: formatRequestCount(summary.requests_7d) },
+    { key: 'requests_30d', label: t('admin.users.requests30d'), value: formatRequestCount(summary.requests_30d) },
+    { key: 'tokens_30d', label: t('admin.users.tokens30d'), value: formatTokenCount(summary.tokens_30d) },
+    { key: 'cost_30d', label: t('admin.users.cost30d'), value: formatUsageCost(summary.actual_cost_30d) },
+    { key: 'total_cost', label: t('admin.users.totalCost'), value: formatUsageCost(summary.total_actual_cost) },
+    { key: 'total_requests', label: t('admin.users.totalRequests'), value: formatRequestCount(summary.total_requests) },
+    { key: 'active_days_30d', label: t('admin.users.activeDays30d'), value: formatRequestCount(summary.active_days_30d) }
+  ]
+}
+
 // 用量列前端排序：DataTable 工作在 server-side-sort 模式，所有 sortable
 // 字段都会触发后端查询，而用量列数据是异步批量拉取后再合并到当前页，
 // 因此采用独立的前端排序状态对当前页 users 做本地排序。
@@ -1288,6 +1591,40 @@ const editingUser = ref<AdminUser | null>(null)
 const deletingUser = ref<AdminUser | null>(null)
 const viewingUser = ref<AdminUser | null>(null)
 const platformQuotaUser = ref<AdminUser | null>(null)
+const detailUser = ref<AdminUser | null>(null)
+const detailLoading = ref(false)
+let detailRequestSeq = 0
+
+const handleUserDetails = async (user: AdminUser) => {
+  closeActionMenu()
+  detailUser.value = user
+  const seq = ++detailRequestSeq
+  detailLoading.value = true
+  try {
+    const freshUser = await adminAPI.users.getById(user.id)
+    if (seq !== detailRequestSeq) return
+    const mergedUser = { ...user, ...freshUser }
+    detailUser.value = mergedUser
+    const index = users.value.findIndex((item) => item.id === user.id)
+    if (index >= 0) {
+      users.value.splice(index, 1, mergedUser)
+    }
+  } catch (error: any) {
+    if (seq !== detailRequestSeq) return
+    console.error('Failed to load user details:', error)
+    appStore.showError(error.response?.data?.detail || t('admin.users.failedToLoadDetails'))
+  } finally {
+    if (seq === detailRequestSeq) {
+      detailLoading.value = false
+    }
+  }
+}
+
+const closeUserDetails = () => {
+  detailRequestSeq++
+  detailLoading.value = false
+  detailUser.value = null
+}
 
 const handlePlatformQuota = (user: AdminUser) => {
   platformQuotaUser.value = user

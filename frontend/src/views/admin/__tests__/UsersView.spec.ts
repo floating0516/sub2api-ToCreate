@@ -6,12 +6,14 @@ import UsersView from '../UsersView.vue'
 
 const {
   listUsers,
+  getUserById,
   getAllGroups,
   getBatchUsersUsage,
   listEnabledDefinitions,
   getBatchUserAttributes
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
+  getUserById: vi.fn(),
   getAllGroups: vi.fn(),
   getBatchUsersUsage: vi.fn(),
   listEnabledDefinitions: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     users: {
       list: listUsers,
+      getById: getUserById,
       toggleStatus: vi.fn(),
       delete: vi.fn()
     },
@@ -100,6 +103,7 @@ describe('admin UsersView', () => {
     localStorage.clear()
 
     listUsers.mockReset()
+    getUserById.mockReset()
     getAllGroups.mockReset()
     getBatchUsersUsage.mockReset()
     listEnabledDefinitions.mockReset()
@@ -113,6 +117,7 @@ describe('admin UsersView', () => {
       pages: 1
     })
     getAllGroups.mockResolvedValue([])
+    getUserById.mockResolvedValue(createAdminUser())
     getBatchUsersUsage.mockResolvedValue({ stats: {} })
     listEnabledDefinitions.mockResolvedValue([])
     getBatchUserAttributes.mockResolvedValue({ values: {} })

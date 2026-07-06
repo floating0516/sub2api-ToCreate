@@ -61,6 +61,36 @@ type User struct {
 
 	APIKeys       []APIKey
 	Subscriptions []UserSubscription
+
+	UsageSummary     *UserUsageSummary
+	ModelPreferences []UserModelPreference
+}
+
+type UserUsageSummary struct {
+	TotalRequests int64
+	TodayRequests int64
+	Requests7D    int64
+	Requests30D   int64
+
+	ActiveDays30D int64
+	TotalTokens   int64
+	Tokens30D     int64
+
+	TotalCost       float64
+	Cost30D         float64
+	TotalActualCost float64
+	ActualCost30D   float64
+
+	LastUsageAt *time.Time
+}
+
+type UserModelPreference struct {
+	Model      string
+	Requests   int64
+	Tokens     int64
+	Cost       float64
+	ActualCost float64
+	Share      float64
 }
 
 func (u *User) IsAdmin() bool {
