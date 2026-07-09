@@ -1,4 +1,14 @@
 export default {
+    customBuild: {
+      badge: 'ToCreate 自定义版本',
+      title: '自定义构建说明',
+      description: '查看当前自定义镜像、版本命名、部署流程和历史变更记录。',
+      updatedAt: '文档更新时间：{time}',
+      toc: '目录',
+      empty: '暂无构建说明',
+      loadFailed: '加载构建说明失败'
+    },
+
     scheduledTests: {
       title: '定时测试',
       addPlan: '添加计划',

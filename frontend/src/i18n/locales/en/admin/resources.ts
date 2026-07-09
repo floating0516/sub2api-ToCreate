@@ -1,4 +1,14 @@
 export default {
+    customBuild: {
+      badge: 'ToCreate Custom Version',
+      title: 'Custom Build Notes',
+      description: 'Review the current custom image, version naming, deployment workflow, and change history.',
+      updatedAt: 'Document updated: {time}',
+      toc: 'Contents',
+      empty: 'No build notes yet',
+      loadFailed: 'Failed to load build notes'
+    },
+
     scheduledTests: {
       title: 'Scheduled Tests',
       addPlan: 'Add Plan',
