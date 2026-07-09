@@ -671,9 +671,33 @@
       :message="t('admin.subscriptions.resetQuotaConfirm', { user: resettingSubscription?.user?.email })"
       :confirm-text="t('admin.subscriptions.resetQuota')"
       :cancel-text="t('common.cancel')"
+      :confirm-disabled="resettingQuota || !resetQuotaHasSelection"
       @confirm="confirmResetQuota"
-      @cancel="showResetQuotaConfirm = false"
-    />
+      @cancel="cancelResetQuota"
+    >
+      <div class="space-y-2">
+        <label
+          v-for="option in resetQuotaOptions"
+          :key="option.key"
+          class="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700"
+          :class="resetQuotaForm[option.key] ? 'border-primary-300 bg-primary-50/60 dark:border-primary-700 dark:bg-primary-900/20' : ''"
+        >
+          <input
+            v-model="resetQuotaForm[option.key]"
+            type="checkbox"
+            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500 dark:bg-dark-700"
+          />
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ option.label }}</span>
+            <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{ option.description }}</span>
+          </span>
+          <span class="shrink-0 font-mono text-xs text-gray-500 dark:text-gray-400">{{ option.usage }}</span>
+        </label>
+        <p v-if="!resetQuotaHasSelection" class="text-xs text-orange-600 dark:text-orange-400">
+          {{ t('admin.subscriptions.resetQuotaSelectAtLeastOne') }}
+        </p>
+      </div>
+    </ConfirmDialog>
     <!-- Subscription Guide Modal -->
     <teleport to="body">
       <transition name="modal">
@@ -764,7 +788,7 @@ import { adminAPI } from '@/api/admin'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
-import { formatDateOnly } from '@/utils/format'
+import { formatCurrency, formatDateOnly } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -790,6 +814,8 @@ interface GroupOption {
   subscriptionType: SubscriptionType
   rate: number
 }
+
+type ResetQuotaWindow = 'daily' | 'weekly' | 'monthly'
 
 // Guide modal state
 const showGuideModal = ref(false)
@@ -967,6 +993,40 @@ const resettingQuota = ref(false)
 const extendingSubscription = ref<UserSubscription | null>(null)
 const revokingSubscription = ref<UserSubscription | null>(null)
 const restoringSubscription = ref<UserSubscription | null>(null)
+
+const resetQuotaForm = reactive<Record<ResetQuotaWindow, boolean>>({
+  daily: true,
+  weekly: true,
+  monthly: true
+})
+
+const resetQuotaHasSelection = computed(() =>
+  resetQuotaForm.daily || resetQuotaForm.weekly || resetQuotaForm.monthly
+)
+
+const resetQuotaOptions = computed(() => {
+  const subscription = resettingSubscription.value
+  return [
+    {
+      key: 'daily' as const,
+      label: t('admin.subscriptions.resetQuotaDaily'),
+      description: t('admin.subscriptions.resetQuotaDailyHint'),
+      usage: formatCurrency(subscription?.daily_usage_usd)
+    },
+    {
+      key: 'weekly' as const,
+      label: t('admin.subscriptions.resetQuotaWeekly'),
+      description: t('admin.subscriptions.resetQuotaWeeklyHint'),
+      usage: formatCurrency(subscription?.weekly_usage_usd)
+    },
+    {
+      key: 'monthly' as const,
+      label: t('admin.subscriptions.resetQuotaMonthly'),
+      description: t('admin.subscriptions.resetQuotaMonthlyHint'),
+      usage: formatCurrency(subscription?.monthly_usage_usd)
+    }
+  ]
+})
 
 const assignForm = reactive({
   user_id: null as number | null,
@@ -1304,18 +1364,33 @@ const confirmRestore = async () => {
 
 const handleResetQuota = (subscription: UserSubscription) => {
   resettingSubscription.value = subscription
+  resetQuotaForm.daily = true
+  resetQuotaForm.weekly = true
+  resetQuotaForm.monthly = true
   showResetQuotaConfirm.value = true
+}
+
+const cancelResetQuota = () => {
+  showResetQuotaConfirm.value = false
+  resettingSubscription.value = null
 }
 
 const confirmResetQuota = async () => {
   if (!resettingSubscription.value) return
   if (resettingQuota.value) return
+  if (!resetQuotaHasSelection.value) {
+    appStore.showError(t('admin.subscriptions.resetQuotaSelectAtLeastOne'))
+    return
+  }
   resettingQuota.value = true
   try {
-    await adminAPI.subscriptions.resetQuota(resettingSubscription.value.id, { daily: true, weekly: true, monthly: true })
+    await adminAPI.subscriptions.resetQuota(resettingSubscription.value.id, {
+      daily: resetQuotaForm.daily,
+      weekly: resetQuotaForm.weekly,
+      monthly: resetQuotaForm.monthly
+    })
     appStore.showSuccess(t('admin.subscriptions.quotaResetSuccess'))
-    showResetQuotaConfirm.value = false
-    resettingSubscription.value = null
+    cancelResetQuota()
     await loadSubscriptions()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.subscriptions.failedToResetQuota'))
