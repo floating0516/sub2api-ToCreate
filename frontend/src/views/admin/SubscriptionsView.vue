@@ -577,7 +577,7 @@
     <BaseDialog
       :show="showExtendModal"
       :title="t('admin.subscriptions.adjustSubscription')"
-      width="narrow"
+      width="normal"
       @close="closeExtendModal"
     >
       <form
@@ -610,18 +610,114 @@
             </span>
           </p>
         </div>
-        <div>
-          <label class="input-label">{{ t('admin.subscriptions.form.adjustDays') }}</label>
-          <div class="flex items-center gap-2">
-            <input
-              v-model.number="extendForm.days"
-              type="number"
-              required
-              class="input text-center"
-              :placeholder="t('admin.subscriptions.adjustDaysPlaceholder')"
-            />
+        <div class="space-y-4">
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.form.adjustMode') }}</label>
+            <div class="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+                :class="
+                  extendForm.mode === 'extend'
+                    ? 'bg-white text-primary-700 shadow-sm dark:bg-dark-600 dark:text-primary-300'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                "
+                @click="setExtendMode('extend')"
+              >
+                <Icon name="plus" size="sm" />
+                {{ t('admin.subscriptions.adjustModeExtend') }}
+              </button>
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                :class="
+                  extendForm.mode === 'shorten'
+                    ? 'bg-white text-orange-700 shadow-sm dark:bg-dark-600 dark:text-orange-300'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                "
+                :disabled="!canShortenSubscription"
+                :title="!canShortenSubscription ? t('admin.subscriptions.adjustShortenDisabled') : ''"
+                @click="setExtendMode('shorten')"
+              >
+                <span class="text-base leading-none">-</span>
+                {{ t('admin.subscriptions.adjustModeShorten') }}
+              </button>
+            </div>
           </div>
-          <p class="input-hint">{{ t('admin.subscriptions.adjustHint') }}</p>
+
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.form.adjustDays') }}</label>
+            <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <input
+                v-model.number="extendForm.days"
+                type="number"
+                required
+                min="1"
+                max="36500"
+                step="1"
+                class="input text-center"
+                :placeholder="t('admin.subscriptions.adjustDaysPlaceholder')"
+              />
+              <div class="grid grid-cols-4 gap-1 sm:flex">
+                <button
+                  v-for="days in extendQuickDays"
+                  :key="days"
+                  type="button"
+                  class="rounded-md border border-gray-200 px-2.5 py-2 text-xs font-medium text-gray-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-dark-600 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  :class="extendForm.days === days ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : ''"
+                  @click="setExtendDays(days)"
+                >
+                  {{ t('admin.subscriptions.adjustQuickDays', { days }) }}
+                </button>
+              </div>
+            </div>
+            <p class="input-hint">{{ t('admin.subscriptions.adjustHint') }}</p>
+          </div>
+
+          <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('admin.subscriptions.adjustPreview') }}
+              </span>
+              <span
+                class="rounded-full px-2.5 py-1 text-xs font-medium"
+                :class="
+                  extendForm.mode === 'extend'
+                    ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                    : 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
+                "
+              >
+                {{ adjustedDaysLabel }}
+              </span>
+            </div>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.subscriptions.newExpiration') }}
+                </div>
+                <div
+                  class="mt-1 text-sm font-medium"
+                  :class="adjustedExpirationInvalid ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'"
+                >
+                  {{ adjustedExpirationLabel }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.subscriptions.newRemainingDays') }}
+                </div>
+                <div
+                  class="mt-1 text-sm font-medium"
+                  :class="adjustedExpirationInvalid ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'"
+                >
+                  {{ adjustedRemainingDaysLabel }}
+                </div>
+              </div>
+            </div>
+            <p v-if="adjustedExpirationInvalid" class="mt-3 text-xs text-red-600 dark:text-red-400">
+              {{ t('admin.subscriptions.adjustWouldExpire') }}
+            </p>
+          </div>
         </div>
       </form>
       <template #footer>
@@ -632,7 +728,7 @@
           <button
             type="submit"
             form="extend-subscription-form"
-            :disabled="submitting"
+            :disabled="extendSubmitDisabled"
             class="btn btn-primary"
           >
             {{ submitting ? t('admin.subscriptions.adjusting') : t('admin.subscriptions.adjust') }}
@@ -816,6 +912,7 @@ interface GroupOption {
 }
 
 type ResetQuotaWindow = 'daily' | 'weekly' | 'monthly'
+type ExtendMode = 'extend' | 'shorten'
 
 // Guide modal state
 const showGuideModal = ref(false)
@@ -1035,8 +1132,83 @@ const assignForm = reactive({
 })
 
 const extendForm = reactive({
+  mode: 'extend' as ExtendMode,
   days: 30
 })
+
+const extendQuickDays = [1, 7, 30, 90]
+
+const canShortenSubscription = computed(() => {
+  const expiresAt = extendingSubscription.value?.expires_at
+  return !!expiresAt && new Date(expiresAt) > new Date()
+})
+
+const extendDaysValid = computed(() => {
+  const days = Number(extendForm.days)
+  return Number.isInteger(days) && days >= 1 && days <= 36500
+})
+
+const extendSignedDays = computed(() => {
+  const days = Number(extendForm.days) || 0
+  return extendForm.mode === 'shorten' ? -days : days
+})
+
+const adjustedExpirationDate = computed(() => {
+  const subscription = extendingSubscription.value
+  if (!subscription || !extendDaysValid.value) return null
+  if (extendForm.mode === 'shorten' && !canShortenSubscription.value) return null
+
+  const now = new Date()
+  const expiresAt = subscription.expires_at ? new Date(subscription.expires_at) : now
+  const base = expiresAt > now ? expiresAt : now
+  const adjusted = new Date(base)
+  adjusted.setDate(adjusted.getDate() + extendSignedDays.value)
+  return adjusted
+})
+
+const adjustedExpirationInvalid = computed(() => {
+  const adjusted = adjustedExpirationDate.value
+  return !!adjusted && adjusted <= new Date()
+})
+
+const adjustedRemainingDays = computed(() => {
+  const adjusted = adjustedExpirationDate.value
+  if (!adjusted) return null
+  const diff = adjusted.getTime() - new Date().getTime()
+  if (diff <= 0) return null
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+})
+
+const adjustedExpirationLabel = computed(() => {
+  if (!extendDaysValid.value) return t('admin.subscriptions.invalidAdjustDays')
+  if (extendForm.mode === 'shorten' && !canShortenSubscription.value) {
+    return t('admin.subscriptions.adjustShortenDisabled')
+  }
+  return adjustedExpirationDate.value
+    ? formatDateOnly(adjustedExpirationDate.value.toISOString())
+    : '-'
+})
+
+const adjustedRemainingDaysLabel = computed(() => {
+  if (!extendDaysValid.value) return '-'
+  if (adjustedRemainingDays.value === null) return t('admin.subscriptions.adjustWouldExpire')
+  return t('admin.subscriptions.remainingDaysValue', { days: adjustedRemainingDays.value })
+})
+
+const adjustedDaysLabel = computed(() => {
+  if (!extendDaysValid.value) return t('admin.subscriptions.invalidAdjustDays')
+  const key = extendForm.mode === 'extend'
+    ? 'admin.subscriptions.adjustPreviewExtend'
+    : 'admin.subscriptions.adjustPreviewShorten'
+  return t(key, { days: Number(extendForm.days) })
+})
+
+const extendSubmitDisabled = computed(() =>
+  submitting.value ||
+  !extendDaysValid.value ||
+  adjustedExpirationInvalid.value ||
+  (extendForm.mode === 'shorten' && !canShortenSubscription.value)
+)
 
 // Group options for filter (all groups)
 const groupOptions = computed(() => [
@@ -1284,6 +1456,7 @@ const handleAssignSubscription = async () => {
 
 const handleExtend = (subscription: UserSubscription) => {
   extendingSubscription.value = subscription
+  extendForm.mode = 'extend'
   extendForm.days = 30
   showExtendModal.value = true
 }
@@ -1293,23 +1466,29 @@ const closeExtendModal = () => {
   extendingSubscription.value = null
 }
 
+const setExtendMode = (mode: ExtendMode) => {
+  if (mode === 'shorten' && !canShortenSubscription.value) return
+  extendForm.mode = mode
+}
+
+const setExtendDays = (days: number) => {
+  extendForm.days = days
+}
+
 const handleExtendSubscription = async () => {
   if (!extendingSubscription.value) return
+  if (extendSubmitDisabled.value) return
 
   // 前端验证：调整后的过期时间必须在未来
-  if (extendingSubscription.value.expires_at) {
-    const expiresAt = new Date(extendingSubscription.value.expires_at)
-    const newExpiresAt = new Date(expiresAt.getTime() + extendForm.days * 24 * 60 * 60 * 1000)
-    if (newExpiresAt <= new Date()) {
-      appStore.showError(t('admin.subscriptions.adjustWouldExpire'))
-      return
-    }
+  if (adjustedExpirationInvalid.value) {
+    appStore.showError(t('admin.subscriptions.adjustWouldExpire'))
+    return
   }
 
   submitting.value = true
   try {
     await adminAPI.subscriptions.extend(extendingSubscription.value.id, {
-      days: extendForm.days
+      days: extendSignedDays.value
     })
     appStore.showSuccess(t('admin.subscriptions.subscriptionAdjusted'))
     closeExtendModal()
