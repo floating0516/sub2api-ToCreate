@@ -135,7 +135,14 @@ export default {
     resetIn: 'Resets in {time}',
     quotaEndsIn: 'Quota ends in {time}',
     windowNotActive: 'Awaiting first use',
-    usageOf: '{used} of {limit}'
+    usageOf: '{used} of {limit}',
+    usageTimeline: 'Usage timeline',
+    timelineLoading: 'Loading',
+    timelineSummary: '{amount} · {requests} requests',
+    noUsageInWindow: 'No usage in this window',
+    usageAmount: 'Usage',
+    requests: 'Requests',
+    timelineBucketRelative: 'About {percentage} of the even quota'
   },
 
   // Onboarding Tour
@@ -302,6 +309,7 @@ export default {
       wxpay: 'WeChat Pay',
       stripe: 'Stripe',
       airwallex: 'Airwallex',
+      balance_wallet: 'Balance',
       card: 'Card',
       link: 'Link',
       alipay_direct: 'Alipay (Direct)',
@@ -369,6 +377,13 @@ export default {
       viewOrders: 'View Orders',
     },
     currentBalance: 'Current Balance',
+    balancePurchase: {
+      currentBalance: 'Available balance',
+      deductAmount: 'Deduct amount',
+      insufficient: 'Insufficient balance. Short by {shortfall}',
+      useBalance: 'Use Balance',
+      success: 'Subscription activated',
+    },
     groupFallback: 'Group #{id}',
     rechargeAccount: 'Recharge Account',
     activeSubscription: 'Active Subscription',
@@ -378,6 +393,11 @@ export default {
     noPlans: 'No subscription plans available',
     notAvailable: 'Top-up is currently unavailable',
     confirmSubscription: 'Confirm Subscription',
+    subscriptionHint: {
+      title: 'Purchase note',
+      samePlan: 'Buying the same subscription adds to its duration instead of creating a separate subscription.',
+      differentPlans: 'Different subscriptions can coexist, and you can create API keys against each subscription separately.',
+    },
     confirmCancel: 'Are you sure you want to cancel this order?',
     amountTooLow: 'Minimum amount is {min}',
     amountTooHigh: 'Maximum amount is {max}',
@@ -432,6 +452,7 @@ export default {
       INVALID_ORDER_TYPE: 'Only balance orders can request a refund.',
       INVALID_STATUS: 'The current order status does not allow this operation.',
       BALANCE_NOT_ENOUGH: 'Refund amount exceeds balance.',
+      INSUFFICIENT_BALANCE: 'Insufficient balance. Current {current}, required {required}.',
       REFUND_AMOUNT_EXCEEDED: 'Refund amount exceeds the recharge amount.',
       REFUND_FAILED: 'Refund failed.',
     },

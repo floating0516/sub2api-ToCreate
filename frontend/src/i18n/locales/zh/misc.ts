@@ -132,7 +132,14 @@ export default {
     resetIn: '{time} 后重置',
     quotaEndsIn: '额度将在 {time} 后结束',
     windowNotActive: '等待首次使用',
-    usageOf: '已用 {used} / {limit}'
+    usageOf: '已用 {used} / {limit}',
+    usageTimeline: '使用时间分布',
+    timelineLoading: '加载中',
+    timelineSummary: '{amount} · {requests} 次请求',
+    noUsageInWindow: '本周期暂无使用',
+    usageAmount: '用量',
+    requests: '请求',
+    timelineBucketRelative: '约为均分额度的 {percentage}'
   },
 
   // Onboarding Tour
@@ -326,6 +333,7 @@ export default {
       wxpay: '微信支付',
       stripe: 'Stripe',
       airwallex: 'Airwallex',
+      balance_wallet: '余额',
       card: '银行卡',
       link: 'Link',
       alipay_direct: '支付宝（直连）',
@@ -393,6 +401,13 @@ export default {
       viewOrders: '查看订单',
     },
     currentBalance: '当前余额',
+    balancePurchase: {
+      currentBalance: '可用余额',
+      deductAmount: '扣除金额',
+      insufficient: '余额不足，还差 {shortfall}',
+      useBalance: '使用余额购买',
+      success: '订阅已开通',
+    },
     groupFallback: '分组 #{id}',
     rechargeAccount: '充值账户',
     activeSubscription: '当前订阅',
@@ -402,6 +417,11 @@ export default {
     noPlans: '暂无可用订阅套餐',
     notAvailable: '充值功能暂未开放',
     confirmSubscription: '确认订阅',
+    subscriptionHint: {
+      title: '购买提示',
+      samePlan: '购买同一订阅时长会叠加，不会创建新的独立订阅。',
+      differentPlans: '购买不同订阅后，它们会同时存在，并且可以分别基于各自的订阅创建 API Key。',
+    },
     confirmCancel: '确定要取消此订单吗？',
     amountTooLow: '最低金额为 {min}',
     amountTooHigh: '最高金额为 {max}',
@@ -456,6 +476,7 @@ export default {
       INVALID_ORDER_TYPE: '仅余额订单可申请退款',
       INVALID_STATUS: '当前订单状态不允许此操作',
       BALANCE_NOT_ENOUGH: '退款金额超过余额',
+      INSUFFICIENT_BALANCE: '余额不足，当前 {current}，需要 {required}',
       REFUND_AMOUNT_EXCEEDED: '退款金额超过充值金额',
       REFUND_FAILED: '退款失败',
     },
