@@ -617,6 +617,48 @@ func TestEnsureOpenAIResponsesImageGenerationTool_PreservesExistingImageTool(t *
 	require.Equal(t, "webp", tool["output_format"])
 }
 
+func TestEnsureOpenAIResponsesImageGenerationTool_PrefersClientImageGenNamespace(t *testing.T) {
+	reqBody := map[string]any{
+		"model": "gpt-5.4",
+		"tools": []any{
+			map[string]any{
+				"type": "namespace",
+				"name": "image_gen",
+				"tools": []any{
+					map[string]any{"type": "function", "name": "imagegen"},
+				},
+			},
+			map[string]any{"type": "web_search"},
+		},
+	}
+
+	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
+	require.False(t, modified)
+
+	tools, ok := reqBody["tools"].([]any)
+	require.True(t, ok)
+	require.Len(t, tools, 2)
+	require.False(t, hasOpenAINativeImageGenerationTool(reqBody))
+}
+
+func TestEnsureOpenAIResponsesImageGenerationTool_PrefersResponsesLiteImageGenNamespace(t *testing.T) {
+	reqBody := map[string]any{
+		"model": "gpt-5.4",
+		"input": []any{
+			map[string]any{
+				"type": "additional_tools",
+				"tools": []any{
+					map[string]any{"type": "namespace", "name": "image_gen"},
+				},
+			},
+		},
+	}
+
+	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
+	require.False(t, modified)
+	require.NotContains(t, reqBody, "tools")
+}
+
 func TestApplyCodexImageGenerationBridgeInstructions_AppendsBridgeOnce(t *testing.T) {
 	reqBody := map[string]any{
 		"model":        "gpt-5.4",
@@ -658,6 +700,26 @@ func TestApplyCodexImageGenerationBridgeInstructions_SkipsWithoutImageTool(t *te
 		"instructions": "existing instructions",
 		"tools": []any{
 			map[string]any{"type": "web_search"},
+		},
+	}
+
+	modified := applyCodexImageGenerationBridgeInstructions(reqBody)
+	require.False(t, modified)
+	require.Equal(t, "existing instructions", reqBody["instructions"])
+}
+
+func TestApplyCodexImageGenerationBridgeInstructions_SkipsClientImageGenNamespace(t *testing.T) {
+	reqBody := map[string]any{
+		"model":        "gpt-5.4",
+		"instructions": "existing instructions",
+		"tools": []any{
+			map[string]any{
+				"type": "namespace",
+				"name": "image_gen",
+				"tools": []any{
+					map[string]any{"type": "function", "name": "imagegen"},
+				},
+			},
 		},
 	}
 

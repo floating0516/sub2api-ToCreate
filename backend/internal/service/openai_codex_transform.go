@@ -599,6 +599,24 @@ func hasOpenAIImageGenerationTool(reqBody map[string]any) bool {
 	return inputContainsImageGenNamespace(reqBody["input"])
 }
 
+func hasOpenAINativeImageGenerationTool(reqBody map[string]any) bool {
+	rawTools := reqBody["tools"]
+	tools, ok := rawTools.([]any)
+	if !ok {
+		return false
+	}
+	for _, rawTool := range tools {
+		toolMap, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(firstNonEmptyString(toolMap["type"])) == "image_generation" {
+			return true
+		}
+	}
+	return false
+}
+
 func toolsContainImageGeneration(rawTools any) bool {
 	if rawTools == nil {
 		return false
@@ -780,6 +798,13 @@ func ensureOpenAIResponsesImageGenerationTool(reqBody map[string]any) bool {
 	if isCodexSparkModel(firstNonEmptyString(reqBody["model"])) {
 		return false
 	}
+	// New Codex clients expose image generation through the client-owned
+	// image_gen namespace. Prefer that path because the client persists and
+	// renders the result; injecting a second native tool can produce an
+	// image_generation_call that Codex CLI ignores.
+	if hasOpenAIImageGenerationTool(reqBody) {
+		return false
+	}
 
 	tool := map[string]any{
 		"type":          "image_generation",
@@ -826,7 +851,7 @@ func ensureOpenAIResponsesImageGenerationToolChoiceAuto(reqBody map[string]any) 
 }
 
 func applyCodexImageGenerationBridgeInstructions(reqBody map[string]any) bool {
-	if len(reqBody) == 0 || !hasOpenAIImageGenerationTool(reqBody) {
+	if len(reqBody) == 0 || !hasOpenAINativeImageGenerationTool(reqBody) {
 		return false
 	}
 	if isCodexSparkModel(firstNonEmptyString(reqBody["model"])) {

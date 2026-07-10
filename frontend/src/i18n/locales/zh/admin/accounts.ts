@@ -556,7 +556,8 @@ export default {
         codexImageToolInherit: '跟随渠道',
         codexImageToolInheritDesc: '不写入账号覆盖，是否注入由渠道或全局策略决定；客户端自带的图片工具照常放行。',
         codexImageToolEnabled: '强制注入',
-        codexImageToolEnabledDesc: '始终为 Codex /responses 请求注入图片工具。',
+        codexImageToolEnabledDesc:
+          '确保 Codex /responses 具备图片工具；客户端已自带 image_gen 时优先使用客户端工具，避免重复注入。',
         codexImageToolDisabled: '关闭注入',
         codexImageToolDisabledDesc: '不自动注入；客户端自带的图片工具仍会放行。',
         codexImageToolBlock: '完全阻断',

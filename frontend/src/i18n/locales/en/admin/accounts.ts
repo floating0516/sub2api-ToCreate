@@ -458,7 +458,8 @@ export default {
         codexImageToolInherit: 'Follow channel',
         codexImageToolInheritDesc: 'No account override; injection follows the channel or global policy, and client-provided image tools pass through.',
         codexImageToolEnabled: 'Force inject',
-        codexImageToolEnabledDesc: 'Always inject the image tool for Codex /responses requests.',
+        codexImageToolEnabledDesc:
+          'Ensure Codex /responses has an image tool; prefer a client-provided image_gen tool to avoid duplicate injection.',
         codexImageToolDisabled: 'No injection',
         codexImageToolDisabledDesc: 'Never auto-inject; client-provided image tools still pass through.',
         codexImageToolBlock: 'Block all',
