@@ -1181,7 +1181,8 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		logger.LegacyPrintf("repository.usage_log", "GetUpstreamEndpointStatsWithFilters failed in GetAccountUsageStats: %v", upstreamEndpointErr)
 		upstreamEndpoints = []EndpointStat{}
 	}
-	capacityTrend, capacityErr := r.getAccountCapacityTrend(ctx, accountID, startTime, endTime)
+	capacityStartTime, capacityEndTime := accountCapacityTrendRange(startTime, endTime, timezone.Now())
+	capacityTrend, capacityErr := r.getAccountCapacityTrend(ctx, accountID, capacityStartTime, capacityEndTime)
 	if capacityErr != nil {
 		logger.LegacyPrintf("repository.usage_log", "getAccountCapacityTrend failed in GetAccountUsageStats: %v", capacityErr)
 		capacityTrend = []usagestats.AccountCapacityTrendPoint{}
@@ -1198,11 +1199,30 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 	return resp, nil
 }
 
+const accountCapacityTrendWindow = 24 * time.Hour
+
+func accountCapacityTrendRange(startTime, endTime, now time.Time) (time.Time, time.Time) {
+	if !endTime.After(startTime) {
+		return startTime, endTime
+	}
+
+	capacityEnd := endTime
+	if startTime.Before(now) && endTime.After(now) {
+		capacityEnd = now
+	}
+
+	capacityStart := capacityEnd.Add(-accountCapacityTrendWindow)
+	if capacityStart.Before(startTime) {
+		capacityStart = startTime
+	}
+	return capacityStart, capacityEnd
+}
+
 func (r *usageLogRepository) getAccountCapacityTrend(ctx context.Context, accountID int64, startTime, endTime time.Time) (results []usagestats.AccountCapacityTrendPoint, err error) {
 	query := `
 		WITH bucketed AS (
 			SELECT
-				date_trunc('day', sampled_at AT TIME ZONE $4) AT TIME ZONE $4 AS bucket_start,
+				date_trunc('hour', sampled_at AT TIME ZONE $4) AT TIME ZONE $4 AS bucket_start,
 				current_concurrency,
 				max_concurrency,
 				waiting_count
@@ -1213,8 +1233,8 @@ func (r *usageLogRepository) getAccountCapacityTrend(ctx context.Context, accoun
 		)
 		SELECT
 			bucket_start,
-			bucket_start + INTERVAL '1 day' AS bucket_end,
-			TO_CHAR(bucket_start AT TIME ZONE $4, 'MM/DD') AS label,
+			bucket_start + INTERVAL '1 hour' AS bucket_end,
+			TO_CHAR(bucket_start AT TIME ZONE $4, 'HH24:MI') AS label,
 			COALESCE(MAX(current_concurrency), 0) AS peak_concurrent,
 			COALESCE(AVG(current_concurrency), 0) AS avg_concurrent,
 			COALESCE(MAX(max_concurrency), 0) AS max_concurrency,

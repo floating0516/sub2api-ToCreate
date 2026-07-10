@@ -1265,7 +1265,7 @@ export default {
         todayTokens: '今日 Token',
         todayCost: '今日费用',
         usageTrend: '30天费用与请求趋势',
-        capacityTrend: '并发容量趋势',
+        capacityTrend: '近24小时并发容量趋势',
         capacityPeak: '峰值',
         peakConcurrent: '峰值并发',
         avgConcurrent: '平均并发',

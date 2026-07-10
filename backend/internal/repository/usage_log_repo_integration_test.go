@@ -1558,24 +1558,25 @@ func (s *UsageLogRepoSuite) TestGetAccountUsageStats_IncludesCapacityTrend() {
 			max_concurrency,
 			waiting_count
 		) VALUES
-			($1, $2, 1, 5, 0),
-			($1, $3, 3, 5, 1),
-			($1, $4, 2, 6, 4)
-	`, account.ID, base.Add(time.Hour), base.Add(2*time.Hour), base.Add(25*time.Hour))
+			($1, $2, 9, 9, 9),
+			($1, $3, 1, 5, 0),
+			($1, $4, 3, 5, 1),
+			($1, $5, 2, 6, 4)
+	`, account.ID, base.Add(47*time.Hour), base.Add(49*time.Hour+5*time.Minute), base.Add(49*time.Hour+20*time.Minute), base.Add(50*time.Hour+30*time.Minute))
 	s.Require().NoError(err)
 
 	resp, err := s.repo.GetAccountUsageStats(s.ctx, account.ID, base, base.Add(72*time.Hour))
 	s.Require().NoError(err, "GetAccountUsageStats with capacity trend")
 	s.Require().Len(resp.CapacityTrend, 2)
 
-	s.Require().Equal("01/15", resp.CapacityTrend[0].Label)
+	s.Require().Equal("01:00", resp.CapacityTrend[0].Label)
 	s.Require().Equal(int64(3), resp.CapacityTrend[0].PeakConcurrent)
 	s.Require().InDelta(2.0, resp.CapacityTrend[0].AvgConcurrent, 0.0001)
 	s.Require().Equal(int64(5), resp.CapacityTrend[0].MaxConcurrency)
 	s.Require().Equal(int64(1), resp.CapacityTrend[0].WaitingPeak)
 	s.Require().Equal(int64(2), resp.CapacityTrend[0].Samples)
 
-	s.Require().Equal("01/16", resp.CapacityTrend[1].Label)
+	s.Require().Equal("02:00", resp.CapacityTrend[1].Label)
 	s.Require().Equal(int64(2), resp.CapacityTrend[1].PeakConcurrent)
 	s.Require().Equal(int64(6), resp.CapacityTrend[1].MaxConcurrency)
 	s.Require().Equal(int64(4), resp.CapacityTrend[1].WaitingPeak)

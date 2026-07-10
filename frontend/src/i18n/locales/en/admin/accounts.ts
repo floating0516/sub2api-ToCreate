@@ -1185,7 +1185,7 @@ export default {
         todayTokens: 'Today Tokens',
         todayCost: 'Today Cost',
         usageTrend: '30-Day Cost & Request Trend',
-        capacityTrend: 'Concurrency Capacity Trend',
+        capacityTrend: 'Last 24h Concurrency Capacity Trend',
         capacityPeak: 'Peak',
         peakConcurrent: 'Peak Concurrent',
         avgConcurrent: 'Avg Concurrent',

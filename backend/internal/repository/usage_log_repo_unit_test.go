@@ -65,3 +65,34 @@ func TestBuildUsageLogBatchInsertQuery_UsesConflictDoNothing(t *testing.T) {
 	require.Contains(t, query, "ON CONFLICT (request_id, api_key_id) DO NOTHING")
 	require.NotContains(t, strings.ToUpper(query), "DO UPDATE")
 }
+
+func TestAccountCapacityTrendRange(t *testing.T) {
+	now := time.Date(2026, 7, 10, 13, 30, 0, 0, time.UTC)
+
+	t.Run("current range ends at now", func(t *testing.T) {
+		start, end := accountCapacityTrendRange(now.AddDate(0, 0, -29), now.AddDate(0, 0, 1), now)
+
+		require.Equal(t, now.Add(-accountCapacityTrendWindow), start)
+		require.Equal(t, now, end)
+	})
+
+	t.Run("historical range uses last 24 hours before end time", func(t *testing.T) {
+		rangeStart := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+		rangeEnd := rangeStart.Add(72 * time.Hour)
+
+		start, end := accountCapacityTrendRange(rangeStart, rangeEnd, now)
+
+		require.Equal(t, rangeEnd.Add(-accountCapacityTrendWindow), start)
+		require.Equal(t, rangeEnd, end)
+	})
+
+	t.Run("short range is not expanded", func(t *testing.T) {
+		rangeStart := now.Add(-6 * time.Hour)
+		rangeEnd := now.Add(-time.Hour)
+
+		start, end := accountCapacityTrendRange(rangeStart, rangeEnd, now)
+
+		require.Equal(t, rangeStart, start)
+		require.Equal(t, rangeEnd, end)
+	})
+}
