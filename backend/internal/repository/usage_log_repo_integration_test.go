@@ -1546,6 +1546,42 @@ func (s *UsageLogRepoSuite) TestGetAccountUsageStats() {
 	s.Require().Len(resp.Models, 2)
 }
 
+func (s *UsageLogRepoSuite) TestGetAccountUsageStats_IncludesCapacityTrend() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-capacity-trend"})
+	base := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+
+	_, err := s.repo.sql.ExecContext(s.ctx, `
+		INSERT INTO account_capacity_samples (
+			account_id,
+			sampled_at,
+			current_concurrency,
+			max_concurrency,
+			waiting_count
+		) VALUES
+			($1, $2, 1, 5, 0),
+			($1, $3, 3, 5, 1),
+			($1, $4, 2, 6, 4)
+	`, account.ID, base.Add(time.Hour), base.Add(2*time.Hour), base.Add(25*time.Hour))
+	s.Require().NoError(err)
+
+	resp, err := s.repo.GetAccountUsageStats(s.ctx, account.ID, base, base.Add(72*time.Hour))
+	s.Require().NoError(err, "GetAccountUsageStats with capacity trend")
+	s.Require().Len(resp.CapacityTrend, 2)
+
+	s.Require().Equal("01/15", resp.CapacityTrend[0].Label)
+	s.Require().Equal(int64(3), resp.CapacityTrend[0].PeakConcurrent)
+	s.Require().InDelta(2.0, resp.CapacityTrend[0].AvgConcurrent, 0.0001)
+	s.Require().Equal(int64(5), resp.CapacityTrend[0].MaxConcurrency)
+	s.Require().Equal(int64(1), resp.CapacityTrend[0].WaitingPeak)
+	s.Require().Equal(int64(2), resp.CapacityTrend[0].Samples)
+
+	s.Require().Equal("01/16", resp.CapacityTrend[1].Label)
+	s.Require().Equal(int64(2), resp.CapacityTrend[1].PeakConcurrent)
+	s.Require().Equal(int64(6), resp.CapacityTrend[1].MaxConcurrency)
+	s.Require().Equal(int64(4), resp.CapacityTrend[1].WaitingPeak)
+	s.Require().Equal(int64(1), resp.CapacityTrend[1].Samples)
+}
+
 func (s *UsageLogRepoSuite) TestGetAccountUsageStats_EmptyRange() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-emptystats"})
 
@@ -1558,6 +1594,76 @@ func (s *UsageLogRepoSuite) TestGetAccountUsageStats_EmptyRange() {
 
 	s.Require().Len(resp.History, 0)
 	s.Require().Equal(int64(0), resp.Summary.TotalRequests)
+}
+
+func (s *UsageLogRepoSuite) TestGetSubscriptionUsageTimeline() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "sub-timeline@test.com"})
+	apiKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-sub-timeline", Name: "k"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-sub-timeline"})
+	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "group-sub-timeline"})
+
+	base := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+	sub := mustCreateSubscription(s.T(), s.client, &service.UserSubscription{
+		UserID:    user.ID,
+		GroupID:   group.ID,
+		StartsAt:  base,
+		ExpiresAt: base.Add(24 * time.Hour),
+	})
+	groupID := group.ID
+	subID := sub.ID
+
+	logs := []*service.UsageLog{
+		{
+			UserID:         user.ID,
+			APIKeyID:       apiKey.ID,
+			AccountID:      account.ID,
+			GroupID:        &groupID,
+			SubscriptionID: &subID,
+			RequestID:      uuid.NewString(),
+			Model:          "claude-3-opus",
+			TotalCost:      0.10,
+			ActualCost:     0.10,
+			CreatedAt:      base.Add(30 * time.Minute),
+		},
+		{
+			UserID:         user.ID,
+			APIKeyID:       apiKey.ID,
+			AccountID:      account.ID,
+			GroupID:        &groupID,
+			SubscriptionID: &subID,
+			RequestID:      uuid.NewString(),
+			Model:          "claude-3-sonnet",
+			TotalCost:      0.25,
+			ActualCost:     0.25,
+			CreatedAt:      base.Add(90 * time.Minute),
+		},
+		{
+			UserID:         user.ID,
+			APIKeyID:       apiKey.ID,
+			AccountID:      account.ID,
+			GroupID:        &groupID,
+			SubscriptionID: &subID,
+			RequestID:      uuid.NewString(),
+			Model:          "claude-3-haiku",
+			TotalCost:      0.05,
+			ActualCost:     0.05,
+			CreatedAt:      base.Add(110 * time.Minute),
+		},
+	}
+	for _, log := range logs {
+		_, err := s.repo.Create(s.ctx, log)
+		s.Require().NoError(err)
+	}
+
+	buckets, err := s.repo.GetSubscriptionUsageTimeline(s.ctx, sub.ID, base, base.Add(3*time.Hour), int64(time.Hour.Seconds()))
+	s.Require().NoError(err)
+	s.Require().Len(buckets, 2)
+	s.Require().Equal(0, buckets[0].Index)
+	s.Require().Equal(int64(1), buckets[0].Requests)
+	s.Require().InDelta(0.10, buckets[0].ActualCost, 0.0001)
+	s.Require().Equal(1, buckets[1].Index)
+	s.Require().Equal(int64(2), buckets[1].Requests)
+	s.Require().InDelta(0.30, buckets[1].ActualCost, 0.0001)
 }
 
 // --- GetUserUsageTrend ---

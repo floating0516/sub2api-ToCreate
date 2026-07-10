@@ -811,6 +811,54 @@ type AccountUsageStatsResponse = usagestats.AccountUsageStatsResponse
 // EndpointStat represents endpoint usage statistics row.
 type EndpointStat = usagestats.EndpointStat
 
+// GetSubscriptionUsageTimeline returns non-empty fixed-width usage buckets for
+// one subscription. The service layer fills missing buckets so the frontend can
+// render a stable timeline.
+func (r *usageLogRepository) GetSubscriptionUsageTimeline(ctx context.Context, subscriptionID int64, startTime, endTime time.Time, bucketSeconds int64) (results []service.SubscriptionUsageTimelineAggregate, err error) {
+	query := `
+		SELECT
+			bucket_index,
+			COUNT(*) AS requests,
+			COALESCE(SUM(actual_cost), 0) AS actual_cost
+		FROM (
+			SELECT
+				FLOOR(EXTRACT(EPOCH FROM (created_at - $2::timestamptz)) / $4::double precision)::int AS bucket_index,
+				actual_cost
+			FROM usage_logs
+			WHERE subscription_id = $1
+			  AND created_at >= $2
+			  AND created_at < $3
+		) bucketed
+		WHERE bucket_index >= 0
+		GROUP BY bucket_index
+		ORDER BY bucket_index ASC
+	`
+
+	rows, err := r.sql.QueryContext(ctx, query, subscriptionID, startTime, endTime, bucketSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
+
+	results = make([]service.SubscriptionUsageTimelineAggregate, 0)
+	for rows.Next() {
+		var row service.SubscriptionUsageTimelineAggregate
+		if err = rows.Scan(&row.Index, &row.Requests, &row.ActualCost); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func (r *usageLogRepository) getEndpointStatsByColumnWithFilters(ctx context.Context, endpointColumn string, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, model string, modelSource string, requestType *int16, stream *bool, billingType *int8, billingMode string) (results []EndpointStat, err error) {
 	actualCostExpr := "COALESCE(SUM(actual_cost), 0) as actual_cost"
 	if accountID > 0 && userID == 0 && apiKeyID == 0 {
@@ -1133,13 +1181,84 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		logger.LegacyPrintf("repository.usage_log", "GetUpstreamEndpointStatsWithFilters failed in GetAccountUsageStats: %v", upstreamEndpointErr)
 		upstreamEndpoints = []EndpointStat{}
 	}
+	capacityTrend, capacityErr := r.getAccountCapacityTrend(ctx, accountID, startTime, endTime)
+	if capacityErr != nil {
+		logger.LegacyPrintf("repository.usage_log", "getAccountCapacityTrend failed in GetAccountUsageStats: %v", capacityErr)
+		capacityTrend = []usagestats.AccountCapacityTrendPoint{}
+	}
 
 	resp = &AccountUsageStatsResponse{
 		History:           history,
+		CapacityTrend:     capacityTrend,
 		Summary:           summary,
 		Models:            models,
 		Endpoints:         endpoints,
 		UpstreamEndpoints: upstreamEndpoints,
 	}
 	return resp, nil
+}
+
+func (r *usageLogRepository) getAccountCapacityTrend(ctx context.Context, accountID int64, startTime, endTime time.Time) (results []usagestats.AccountCapacityTrendPoint, err error) {
+	query := `
+		WITH bucketed AS (
+			SELECT
+				date_trunc('day', sampled_at AT TIME ZONE $4) AT TIME ZONE $4 AS bucket_start,
+				current_concurrency,
+				max_concurrency,
+				waiting_count
+			FROM account_capacity_samples
+			WHERE account_id = $1
+			  AND sampled_at >= $2
+			  AND sampled_at < $3
+		)
+		SELECT
+			bucket_start,
+			bucket_start + INTERVAL '1 day' AS bucket_end,
+			TO_CHAR(bucket_start AT TIME ZONE $4, 'MM/DD') AS label,
+			COALESCE(MAX(current_concurrency), 0) AS peak_concurrent,
+			COALESCE(AVG(current_concurrency), 0) AS avg_concurrent,
+			COALESCE(MAX(max_concurrency), 0) AS max_concurrency,
+			COALESCE(MAX(waiting_count), 0) AS waiting_peak,
+			COUNT(*) AS samples
+		FROM bucketed
+		GROUP BY bucket_start
+		ORDER BY bucket_start ASC
+	`
+
+	rows, err := r.sql.QueryContext(ctx, query, accountID, startTime, endTime, timezone.Name())
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
+
+	results = make([]usagestats.AccountCapacityTrendPoint, 0)
+	for rows.Next() {
+		var row usagestats.AccountCapacityTrendPoint
+		var bucketStart time.Time
+		var bucketEnd time.Time
+		if err = rows.Scan(
+			&bucketStart,
+			&bucketEnd,
+			&row.Label,
+			&row.PeakConcurrent,
+			&row.AvgConcurrent,
+			&row.MaxConcurrency,
+			&row.WaitingPeak,
+			&row.Samples,
+		); err != nil {
+			return nil, err
+		}
+		row.BucketStart = bucketStart.Format(time.RFC3339)
+		row.BucketEnd = bucketEnd.Format(time.RFC3339)
+		results = append(results, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
