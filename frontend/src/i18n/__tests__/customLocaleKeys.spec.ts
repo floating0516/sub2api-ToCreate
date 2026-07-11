@@ -25,6 +25,8 @@ const requiredCustomKeys = [
   'admin.users.last7d',
   'admin.users.last30d',
   'admin.users.usageOverview',
+  'admin.dailyReport.title',
+  'admin.dailyReport.description',
   'admin.users.modelPreferences',
   'admin.users.requestsToday',
   'admin.users.requests7d',

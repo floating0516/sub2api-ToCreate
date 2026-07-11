@@ -1,0 +1,32 @@
+export default {
+  dailyReport: {
+    title: 'Daily Report',
+    description: 'Daily overview by user, group and billing multiplier',
+    previousDay: 'Previous day',
+    nextDay: 'Next day',
+    refresh: 'Refresh',
+    export: 'Export CSV',
+    activeUsers: 'Active users',
+    requests: 'Requests',
+    tokens: 'Tokens',
+    standardCost: 'Standard cost',
+    actualCost: 'Actual usage',
+    accountCost: 'Account cost',
+    comparedWithPrevious: 'vs previous day',
+    trend: '7-day trend',
+    multiplierBreakdown: 'Multiplier usage',
+    groupBreakdown: 'Group usage',
+    userRanking: 'User spending ranking',
+    multiplier: 'Multiplier',
+    users: 'Users',
+    group: 'Group',
+    user: 'User',
+    share: 'Share',
+    details: 'Multiplier details',
+    noData: 'No usage data for this date',
+    loadFailed: 'Failed to load daily report',
+    exportSuccess: 'Report exported',
+    deletedGroup: 'Deleted group',
+    ungrouped: 'Ungrouped'
+  }
+}

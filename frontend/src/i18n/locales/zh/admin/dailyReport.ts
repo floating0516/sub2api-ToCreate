@@ -1,0 +1,32 @@
+export default {
+  dailyReport: {
+    title: '数据日报',
+    description: '查看每日用户、分组和倍率消耗总览',
+    previousDay: '前一天',
+    nextDay: '后一天',
+    refresh: '刷新',
+    export: '导出 CSV',
+    activeUsers: '活跃用户',
+    requests: '请求数',
+    tokens: 'Token',
+    standardCost: '原始额度',
+    actualCost: '实际消耗',
+    accountCost: '账号成本',
+    comparedWithPrevious: '较前一天',
+    trend: '近 7 日趋势',
+    multiplierBreakdown: '倍率消耗',
+    groupBreakdown: '分组使用',
+    userRanking: '用户消耗排行',
+    multiplier: '倍率',
+    users: '用户数',
+    group: '分组',
+    user: '用户',
+    share: '占比',
+    details: '倍率明细',
+    noData: '所选日期暂无使用数据',
+    loadFailed: '加载数据日报失败',
+    exportSuccess: '日报已导出',
+    deletedGroup: '已删除分组',
+    ungrouped: '未分组'
+  }
+}
