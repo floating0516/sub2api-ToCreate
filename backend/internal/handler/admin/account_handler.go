@@ -194,6 +194,24 @@ type AccountSchedulerGroupScore struct {
 	AccountSchedulerScore
 }
 
+func (h *AccountHandler) GetConcurrencyDetails(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || accountID <= 0 {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	if h.concurrencyService == nil {
+		response.Success(c, []service.AccountConcurrencyDetail{})
+		return
+	}
+	details, err := h.concurrencyService.GetAccountConcurrencyDetails(c.Request.Context(), accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, details)
+}
+
 const accountListGroupUngroupedQueryValue = "ungrouped"
 
 func (h *AccountHandler) buildAccountResponseWithRuntime(ctx context.Context, account *service.Account) AccountWithConcurrency {

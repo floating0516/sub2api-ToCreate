@@ -127,6 +127,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+		ctx = service.WithConcurrencyActor(ctx, service.ConcurrencyActor{UserID: apiKey.User.ID, UserEmail: apiKey.User.Email, APIKeyID: apiKey.ID, APIKeyName: apiKey.Name})
 		c.Request = c.Request.WithContext(ctx)
 
 		// ── 4. SimpleMode → early return ─────────────────────────────

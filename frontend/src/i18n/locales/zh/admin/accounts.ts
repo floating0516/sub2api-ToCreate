@@ -1,5 +1,11 @@
 export default {
-    accounts: {
+  accounts: {
+    concurrencyDetails: {
+      open: '查看并发详情',
+      title: '当前并发详情',
+      empty: '当前没有活跃请求',
+      userFallback: '用户 #{id}'
+    },
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
       createAccount: '添加账号',

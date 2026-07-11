@@ -1,11 +1,13 @@
 <template>
   <div class="flex flex-col gap-0.5">
     <!-- 并发槽位 -->
-    <CapacityBadge :color-class="concurrencyClass" :current="currentConcurrency" :max="account.concurrency">
-      <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-      </svg>
-    </CapacityBadge>
+    <button type="button" :disabled="currentConcurrency === 0" class="w-fit disabled:cursor-default" @click="openConcurrencyDetails">
+      <CapacityBadge :color-class="concurrencyClass" :tooltip="currentConcurrency > 0 ? t('admin.accounts.concurrencyDetails.open') : ''" :current="currentConcurrency" :max="account.concurrency">
+        <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+        </svg>
+      </CapacityBadge>
+    </button>
 
     <!-- 5h窗口费用限制 -->
     <CapacityBadge v-if="showWindowCost" :color-class="windowCostClass" :tooltip="windowCostTooltip" :current="'$' + formatCost(currentWindowCost)" :max="'$' + formatCost(account.window_cost_limit)">
@@ -33,12 +35,31 @@
     <QuotaBadge v-if="showWeeklyQuota" :used="account.quota_weekly_used ?? 0" :limit="account.quota_weekly_limit!" label="W" />
     <QuotaBadge v-if="showTotalQuota" :used="account.quota_used ?? 0" :limit="account.quota_limit!" />
   </div>
+  <BaseDialog :show="showDetails" :title="t('admin.accounts.concurrencyDetails.title')" width="normal" @close="showDetails = false">
+    <div v-if="detailsLoading" class="py-8 text-center text-sm text-gray-500">{{ t('common.loading') }}</div>
+    <div v-else-if="details.length === 0" class="py-8 text-center text-sm text-gray-500">{{ t('admin.accounts.concurrencyDetails.empty') }}</div>
+    <div v-else class="divide-y divide-gray-200 dark:divide-dark-600">
+      <div v-for="item in details" :key="item.request_id" class="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_auto]">
+        <div>
+          <div class="font-medium text-gray-900 dark:text-white">{{ item.user_email || t('admin.accounts.concurrencyDetails.userFallback', { id: item.user_id || '?' }) }}</div>
+          <div class="text-xs text-gray-500">{{ item.api_key_name || `API Key #${item.api_key_id || '?'}` }}</div>
+        </div>
+        <div class="text-xs text-gray-500 sm:text-right">
+          <div>{{ formatRelativeTime(new Date(item.started_at * 1000)) }}</div>
+          <div class="font-mono">{{ item.request_id }}</div>
+        </div>
+      </div>
+    </div>
+  </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Account } from '@/types'
+import type { Account, AccountConcurrencyDetail } from '@/types'
+import { adminAPI } from '@/api/admin'
+import { formatRelativeTime } from '@/utils/format'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import CapacityBadge from '@/components/account/CapacityBadge.vue'
 import QuotaBadge from '@/components/account/QuotaBadge.vue'
 
@@ -50,6 +71,22 @@ const { t } = useI18n()
 
 // ====== 并发 ======
 const currentConcurrency = computed(() => props.account.current_concurrency || 0)
+const showDetails = ref(false)
+const detailsLoading = ref(false)
+const details = ref<AccountConcurrencyDetail[]>([])
+
+const openConcurrencyDetails = async () => {
+  if (currentConcurrency.value <= 0) return
+  showDetails.value = true
+  detailsLoading.value = true
+  try {
+    details.value = await adminAPI.accounts.concurrencyDetails(props.account.id)
+  } catch {
+    details.value = []
+  } finally {
+    detailsLoading.value = false
+  }
+}
 
 const concurrencyClass = computed(() => {
   const current = currentConcurrency.value

@@ -1,5 +1,11 @@
 export default {
-    accounts: {
+  accounts: {
+    concurrencyDetails: {
+      open: 'View concurrency details',
+      title: 'Active Requests',
+      empty: 'No active requests',
+      userFallback: 'User #{id}'
+    },
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',

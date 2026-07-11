@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +18,56 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"golang.org/x/sync/singleflight"
 )
+
+type concurrencyActorContextKey struct{}
+
+type ConcurrencyActor struct {
+	UserID     int64  `json:"user_id"`
+	UserEmail  string `json:"user_email,omitempty"`
+	APIKeyID   int64  `json:"api_key_id"`
+	APIKeyName string `json:"api_key_name,omitempty"`
+}
+
+type AccountConcurrencyDetail struct {
+	RequestID  string `json:"request_id"`
+	UserID     int64  `json:"user_id,omitempty"`
+	UserEmail  string `json:"user_email,omitempty"`
+	APIKeyID   int64  `json:"api_key_id,omitempty"`
+	APIKeyName string `json:"api_key_name,omitempty"`
+	StartedAt  int64  `json:"started_at"`
+}
+
+func WithConcurrencyActor(ctx context.Context, actor ConcurrencyActor) context.Context {
+	return context.WithValue(ctx, concurrencyActorContextKey{}, actor)
+}
+
+func encodeConcurrencyRequestID(ctx context.Context, requestID string) string {
+	actor, ok := ctx.Value(concurrencyActorContextKey{}).(ConcurrencyActor)
+	if !ok {
+		return requestID
+	}
+	payload, err := json.Marshal(actor)
+	if err != nil {
+		return requestID
+	}
+	return requestID + "." + base64.RawURLEncoding.EncodeToString(payload)
+}
+
+func DecodeConcurrencyRequestID(member string) (string, ConcurrencyActor, bool) {
+	requestID, encoded, ok := strings.Cut(member, ".")
+	if !ok {
+		return member, ConcurrencyActor{}, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return member, ConcurrencyActor{}, false
+	}
+	var actor ConcurrencyActor
+	if err := json.Unmarshal(payload, &actor); err != nil {
+		return member, ConcurrencyActor{}, false
+	}
+	return requestID, actor, true
+}
 
 // ConcurrencyCache 定义并发控制的缓存接口
 // 使用有序集合存储槽位，按时间戳清理过期条目
@@ -181,7 +234,7 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 	}
 
 	// Generate unique request ID for this slot
-	requestID := generateRequestID()
+	requestID := encodeConcurrencyRequestID(ctx, generateRequestID())
 
 	acquired, err := s.cache.AcquireAccountSlot(ctx, accountID, maxConcurrency, requestID)
 	if err != nil {
@@ -205,6 +258,20 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 		Acquired:    false,
 		ReleaseFunc: nil,
 	}, nil
+}
+
+type accountConcurrencyDetailCache interface {
+	GetAccountConcurrencyDetails(ctx context.Context, accountID int64) ([]AccountConcurrencyDetail, error)
+}
+
+func (s *ConcurrencyService) GetAccountConcurrencyDetails(ctx context.Context, accountID int64) ([]AccountConcurrencyDetail, error) {
+	cache, ok := s.cache.(accountConcurrencyDetailCache)
+	if !ok {
+		return []AccountConcurrencyDetail{}, nil
+	}
+	redisCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	return cache.GetAccountConcurrencyDetails(redisCtx, accountID)
 }
 
 // AcquireUserSlot attempts to acquire a concurrency slot for a user.

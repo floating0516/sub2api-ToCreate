@@ -1710,6 +1710,15 @@ export interface UserSubscription {
   group?: Group
 }
 
+export interface AccountConcurrencyDetail {
+  request_id: string
+  user_id?: number
+  user_email?: string
+  api_key_id?: number
+  api_key_name?: string
+  started_at: number
+}
+
 export interface SubscriptionProgress {
   subscription_id: number
   daily: {

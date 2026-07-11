@@ -576,6 +576,36 @@ func (c *concurrencyCache) GetAccountConcurrencyBatch(ctx context.Context, accou
 	return result, nil
 }
 
+func (c *concurrencyCache) GetAccountConcurrencyDetails(ctx context.Context, accountID int64) ([]service.AccountConcurrencyDetail, error) {
+	key := accountSlotKey(accountID)
+	now, err := c.rdb.Time(ctx).Result()
+	if err != nil {
+		return nil, err
+	}
+	cutoff := now.Unix() - int64(c.slotTTLSeconds)
+	if err := c.rdb.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatInt(cutoff, 10)).Err(); err != nil {
+		return nil, err
+	}
+	entries, err := c.rdb.ZRangeWithScores(ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	details := make([]service.AccountConcurrencyDetail, 0, len(entries))
+	for _, entry := range entries {
+		member, _ := entry.Member.(string)
+		detail := service.AccountConcurrencyDetail{RequestID: member, StartedAt: int64(entry.Score)}
+		if requestID, actor, ok := service.DecodeConcurrencyRequestID(member); ok {
+			detail.RequestID = requestID
+			detail.UserID = actor.UserID
+			detail.UserEmail = actor.UserEmail
+			detail.APIKeyID = actor.APIKeyID
+			detail.APIKeyName = actor.APIKeyName
+		}
+		details = append(details, detail)
+	}
+	return details, nil
+}
+
 // User slot operations
 
 func (c *concurrencyCache) AcquireUserSlot(ctx context.Context, userID int64, maxConcurrency int, requestID string) (bool, error) {

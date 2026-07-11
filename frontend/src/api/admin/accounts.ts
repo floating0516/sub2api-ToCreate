@@ -20,8 +20,14 @@ import type {
   CodexSessionImportResult,
   OpenAICodexPATCreateRequest,
   CheckMixedChannelRequest,
-  CheckMixedChannelResponse
+  CheckMixedChannelResponse,
+  AccountConcurrencyDetail
 } from '@/types'
+
+export async function concurrencyDetails(accountId: number): Promise<AccountConcurrencyDetail[]> {
+  const { data } = await apiClient.get<AccountConcurrencyDetail[]>(`/admin/accounts/${accountId}/concurrency-details`)
+  return data
+}
 
 /**
  * List all accounts with pagination

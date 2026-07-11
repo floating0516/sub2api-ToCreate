@@ -38,6 +38,7 @@ type stubConcurrencyCacheForTest struct {
 	// 记录调用
 	releasedAccountIDs       []int64
 	releasedRequestIDs       []string
+	acquiredRequestIDs       []string
 	loadBatchCalls           atomic.Int64
 	trackedAPIKeyIDs         []int64
 	trackedAPIKeyRequestIDs  []string
@@ -47,7 +48,8 @@ type stubConcurrencyCacheForTest struct {
 
 var _ ConcurrencyCache = (*stubConcurrencyCacheForTest)(nil)
 
-func (c *stubConcurrencyCacheForTest) AcquireAccountSlot(_ context.Context, _ int64, _ int, _ string) (bool, error) {
+func (c *stubConcurrencyCacheForTest) AcquireAccountSlot(_ context.Context, _ int64, _ int, requestID string) (bool, error) {
+	c.acquiredRequestIDs = append(c.acquiredRequestIDs, requestID)
 	return c.acquireResult, c.acquireErr
 }
 func (c *stubConcurrencyCacheForTest) ReleaseAccountSlot(_ context.Context, accountID int64, requestID string) error {
@@ -208,6 +210,24 @@ func TestAcquireAccountSlot_ReleaseDecrements(t *testing.T) {
 	require.Equal(t, int64(42), cache.releasedAccountIDs[0])
 	require.Len(t, cache.releasedRequestIDs, 1)
 	require.NotEmpty(t, cache.releasedRequestIDs[0], "requestID 不应为空")
+}
+
+func TestAcquireAccountSlot_PreservesConcurrencyActorMetadata(t *testing.T) {
+	cache := &stubConcurrencyCacheForTest{acquireResult: true}
+	svc := NewConcurrencyService(cache)
+	actor := ConcurrencyActor{UserID: 7, UserEmail: "user@example.com", APIKeyID: 11, APIKeyName: "daily"}
+
+	result, err := svc.AcquireAccountSlot(WithConcurrencyActor(context.Background(), actor), 42, 5)
+	require.NoError(t, err)
+	require.Len(t, cache.acquiredRequestIDs, 1)
+
+	requestID, decoded, ok := DecodeConcurrencyRequestID(cache.acquiredRequestIDs[0])
+	require.True(t, ok)
+	require.NotEmpty(t, requestID)
+	require.Equal(t, actor, decoded)
+
+	result.ReleaseFunc()
+	require.Equal(t, cache.acquiredRequestIDs, cache.releasedRequestIDs)
 }
 
 func TestAcquireUserSlot_IndependentFromAccount(t *testing.T) {
