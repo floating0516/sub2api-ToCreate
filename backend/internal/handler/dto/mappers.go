@@ -787,6 +787,7 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 	}
 	return &AdminUserSubscription{
 		UserSubscription: userSubscriptionFromServiceBase(sub),
+		LastUsedAt:       sub.LastUsedAt,
 		AssignedBy:       sub.AssignedBy,
 		AssignedAt:       sub.AssignedAt,
 		Notes:            sub.Notes,

@@ -8,6 +8,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
+	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -312,6 +313,32 @@ func (r *userSubscriptionRepository) List(ctx context.Context, params pagination
 	}
 
 	result := userSubscriptionEntitiesToService(subs)
+	if len(result) > 0 {
+		ids := make([]int64, 0, len(result))
+		for i := range result {
+			ids = append(ids, result[i].ID)
+		}
+		var rows []struct {
+			SubscriptionID int64     `json:"subscription_id"`
+			LastUsedAt     time.Time `json:"last_used_at"`
+		}
+		if err := client.UsageLog.Query().
+			Where(usagelog.SubscriptionIDIn(ids...)).
+			GroupBy(usagelog.FieldSubscriptionID).
+			Aggregate(dbent.As(dbent.Max(usagelog.FieldCreatedAt), "last_used_at")).
+			Scan(ctx, &rows); err != nil {
+			return nil, nil, err
+		}
+		lastUsed := make(map[int64]time.Time, len(rows))
+		for _, row := range rows {
+			lastUsed[row.SubscriptionID] = row.LastUsedAt
+		}
+		for i := range result {
+			if usedAt, ok := lastUsed[result[i].ID]; ok {
+				result[i].LastUsedAt = &usedAt
+			}
+		}
+	}
 	if includeSoftDeleted {
 		if err := r.attachUserSubscriptionRelations(ctx, result); err != nil {
 			return nil, nil, err

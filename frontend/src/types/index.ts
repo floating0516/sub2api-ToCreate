@@ -1703,6 +1703,7 @@ export interface UserSubscription {
   monthly_window_start: string | null
   created_at: string
   updated_at: string
+  last_used_at?: string | null
   revoked_at?: string | null
   expires_at: string | null
   user?: User

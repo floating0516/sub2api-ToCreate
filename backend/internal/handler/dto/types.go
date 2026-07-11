@@ -654,6 +654,7 @@ type UserSubscription struct {
 // 注意：普通用户接口不得返回 assigned_by/assigned_at/notes/assigned_by_user 等管理员字段。
 type AdminUserSubscription struct {
 	UserSubscription
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 
 	AssignedBy *int64    `json:"assigned_by"`
 	AssignedAt time.Time `json:"assigned_at"`

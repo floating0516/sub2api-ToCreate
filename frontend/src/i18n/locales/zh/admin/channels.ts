@@ -630,6 +630,7 @@ export default {
         user: '用户',
         group: '分组',
         usage: '用量',
+        lastUsed: '最近使用',
         expires: '到期时间',
         status: '状态',
         actions: '操作'

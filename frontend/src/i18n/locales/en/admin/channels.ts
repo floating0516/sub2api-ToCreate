@@ -630,6 +630,7 @@ export default {
         user: 'User',
         group: 'Group',
         usage: 'Usage',
+        lastUsed: 'Last Used',
         expires: 'Expires',
         status: 'Status',
         actions: 'Actions'

@@ -181,9 +181,10 @@
           <template #cell-user="{ row }">
             <div class="flex items-center gap-2">
               <div
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30"
+                :class="['flex h-8 w-8 items-center justify-center rounded-full ring-2 ring-offset-1 dark:ring-offset-dark-800', getLastUsedAvatarClass(row.last_used_at)]"
+                :title="formatRelativeTime(row.last_used_at)"
               >
-                <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+                <span class="text-sm font-medium">
                   {{ userColumnMode === 'email'
                     ? (row.user?.email?.charAt(0).toUpperCase() || '?')
                     : (row.user?.username?.charAt(0).toUpperCase() || '?')
@@ -196,6 +197,13 @@
                   : (row.user?.username || '-')
                 }}
               </span>
+            </div>
+          </template>
+
+          <template #cell-last_used_at="{ value }">
+            <div class="flex items-center gap-2 whitespace-nowrap">
+              <span :class="['h-2 w-2 rounded-full', getLastUsedDotClass(value)]"></span>
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{ formatRelativeTime(value) }}</span>
             </div>
           </template>
 
@@ -884,7 +892,7 @@ import { adminAPI } from '@/api/admin'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
-import { formatCurrency, formatDateOnly } from '@/utils/format'
+import { formatCurrency, formatDateOnly, formatRelativeTime } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -962,10 +970,25 @@ const allColumns = computed<Column[]>(() => [
   },
   { key: 'group', label: t('admin.subscriptions.columns.group'), sortable: false },
   { key: 'usage', label: t('admin.subscriptions.columns.usage'), sortable: false },
+  { key: 'last_used_at', label: t('admin.subscriptions.columns.lastUsed'), sortable: false },
   { key: 'expires_at', label: t('admin.subscriptions.columns.expires'), sortable: true },
   { key: 'status', label: t('admin.subscriptions.columns.status'), sortable: true },
   { key: 'actions', label: t('admin.subscriptions.columns.actions'), sortable: false }
 ])
+
+const lastUsedAge = (value?: string | null) => value ? Date.now() - new Date(value).getTime() : Number.POSITIVE_INFINITY
+const getLastUsedDotClass = (value?: string | null) => {
+  const age = lastUsedAge(value)
+  if (age <= 10 * 60 * 1000) return 'bg-emerald-500'
+  if (age <= 24 * 60 * 60 * 1000) return 'bg-amber-500'
+  return 'bg-gray-400 dark:bg-gray-600'
+}
+const getLastUsedAvatarClass = (value?: string | null) => {
+  const age = lastUsedAge(value)
+  if (age <= 10 * 60 * 1000) return 'bg-emerald-100 text-emerald-700 ring-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (age <= 24 * 60 * 60 * 1000) return 'bg-amber-100 text-amber-700 ring-amber-400 dark:bg-amber-900/30 dark:text-amber-300'
+  return 'bg-gray-100 text-gray-600 ring-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600'
+}
 
 // Columns that can be toggled (exclude user and actions which are always visible)
 const toggleableColumns = computed(() =>
