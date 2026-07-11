@@ -811,7 +811,8 @@ export async function createSparkShadow(parentId: number, payload: SparkShadowCr
 }
 
 export const accountsAPI = {
-  list,
+	concurrencyDetails,
+	list,
   listWithEtag,
   getById,
   create,

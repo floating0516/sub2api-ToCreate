@@ -7,11 +7,11 @@
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.dailyReport.description') }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button class="btn btn-secondary btn-sm" :title="t('admin.dailyReport.previousDay')" @click="moveDate(-1)"><ArrowLeftIcon class="h-4 w-4" /></button>
+          <button class="btn btn-secondary btn-sm" :title="t('admin.dailyReport.previousDay')" @click="moveDate(-1)"><Icon name="arrowLeft" size="sm" /></button>
           <input v-model="selectedDate" type="date" :max="today" class="input h-9 w-[150px]" @change="loadReport" />
-          <button class="btn btn-secondary btn-sm" :disabled="selectedDate >= today" :title="t('admin.dailyReport.nextDay')" @click="moveDate(1)"><ArrowRightIcon class="h-4 w-4" /></button>
-          <button class="btn btn-secondary btn-sm gap-1.5" :disabled="loading" @click="loadReport"><ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': loading }" />{{ t('admin.dailyReport.refresh') }}</button>
-          <button class="btn btn-primary btn-sm gap-1.5" :disabled="!report" @click="exportCSV"><ArrowDownTrayIcon class="h-4 w-4" />{{ t('admin.dailyReport.export') }}</button>
+          <button class="btn btn-secondary btn-sm" :disabled="selectedDate >= today" :title="t('admin.dailyReport.nextDay')" @click="moveDate(1)"><Icon name="arrowRight" size="sm" /></button>
+          <button class="btn btn-secondary btn-sm gap-1.5" :disabled="loading" @click="loadReport"><Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />{{ t('admin.dailyReport.refresh') }}</button>
+          <button class="btn btn-primary btn-sm gap-1.5" :disabled="!report" @click="exportCSV"><Icon name="download" size="sm" />{{ t('admin.dailyReport.export') }}</button>
         </div>
       </header>
 
@@ -50,7 +50,7 @@
                 <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
                   <template v-for="group in report.groups" :key="group.group_id">
                     <tr class="hover:bg-gray-50 dark:hover:bg-dark-800/60">
-                      <td class="px-3 py-2"><button class="p-1" :title="t('admin.dailyReport.details')" @click="toggleGroup(group.group_id)"><ChevronRightIcon class="h-4 w-4 transition-transform" :class="{ 'rotate-90': expandedGroups.has(group.group_id) }" /></button></td>
+                      <td class="px-3 py-2"><button class="p-1" :title="t('admin.dailyReport.details')" @click="toggleGroup(group.group_id)"><Icon name="chevronRight" size="sm" class="transition-transform" :class="{ 'rotate-90': expandedGroups.has(group.group_id) }" /></button></td>
                       <td class="max-w-[240px] truncate px-3 py-2 font-medium text-gray-900 dark:text-white">{{ displayGroupName(group) }}</td>
                       <td class="px-3 py-2 text-right">{{ formatNumber(group.active_users) }}</td><td class="px-3 py-2 text-right">{{ formatNumber(group.requests) }}</td>
                       <td class="px-3 py-2 text-right">${{ formatCost(group.cost) }}</td><td class="px-3 py-2 text-right font-medium text-emerald-600">${{ formatCost(group.actual_cost) }}</td>
@@ -102,9 +102,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownTrayIcon, ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import Icon from '@/components/icons/Icon.vue'
 import { adminUsageAPI } from '@/api/admin/usage'
 import type { DailyReportGroupStat, DailyReportResponse } from '@/api/admin/usage'
 import { useAppStore } from '@/stores/app'
