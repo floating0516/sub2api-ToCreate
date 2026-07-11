@@ -348,6 +348,33 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
+// DailyReport returns one calendar day's usage overview and breakdowns.
+// GET /api/v1/admin/usage/daily-report
+func (h *UsageHandler) DailyReport(c *gin.Context) {
+	tzName := strings.TrimSpace(c.DefaultQuery("timezone", "Asia/Shanghai"))
+	now := timezone.NowInUserLocation(tzName)
+	date := now.AddDate(0, 0, -1).Format("2006-01-02")
+	if value := strings.TrimSpace(c.Query("date")); value != "" {
+		date = value
+	}
+	startTime, err := timezone.ParseInUserLocation("2006-01-02", date, tzName)
+	if err != nil {
+		response.BadRequest(c, "Invalid date format, use YYYY-MM-DD")
+		return
+	}
+	if startTime.After(timezone.StartOfDayInUserLocation(now, tzName)) {
+		response.BadRequest(c, "Report date cannot be in the future")
+		return
+	}
+	endTime := startTime.AddDate(0, 0, 1)
+	report, err := h.usageService.GetDailyReport(c.Request.Context(), startTime, endTime, startTime.AddDate(0, 0, -1), startTime.AddDate(0, 0, -6), tzName)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, report)
+}
+
 // SearchUsers handles searching users by email keyword
 // GET /api/v1/admin/usage/search-users
 func (h *UsageHandler) SearchUsers(c *gin.Context) {

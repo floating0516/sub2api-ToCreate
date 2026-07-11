@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -18,6 +19,11 @@ type adminUsageRepoCapture struct {
 	listParams   pagination.PaginationParams
 	listFilters  usagestats.UsageLogFilters
 	statsFilters usagestats.UsageLogFilters
+	dailyStart   time.Time
+	dailyEnd     time.Time
+	dailyPrev    time.Time
+	dailyTrend   time.Time
+	dailyTZ      string
 }
 
 func (s *adminUsageRepoCapture) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters usagestats.UsageLogFilters) ([]service.UsageLog, *pagination.PaginationResult, error) {
@@ -36,6 +42,15 @@ func (s *adminUsageRepoCapture) GetStatsWithFilters(ctx context.Context, filters
 	return &usagestats.UsageStats{}, nil
 }
 
+func (s *adminUsageRepoCapture) GetDailyReport(_ context.Context, startTime, endTime, previousStart, trendStart time.Time, timezoneName string) (*usagestats.DailyReport, error) {
+	s.dailyStart = startTime
+	s.dailyEnd = endTime
+	s.dailyPrev = previousStart
+	s.dailyTrend = trendStart
+	s.dailyTZ = timezoneName
+	return &usagestats.DailyReport{Date: startTime.Format("2006-01-02"), Timezone: timezoneName}, nil
+}
+
 func newAdminUsageRequestTypeTestRouter(repo *adminUsageRepoCapture) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	usageSvc := service.NewUsageService(repo, nil, nil, nil)
@@ -43,7 +58,35 @@ func newAdminUsageRequestTypeTestRouter(repo *adminUsageRepoCapture) *gin.Engine
 	router := gin.New()
 	router.GET("/admin/usage", handler.List)
 	router.GET("/admin/usage/stats", handler.Stats)
+	router.GET("/admin/usage/daily-report", handler.DailyReport)
 	return router
+}
+
+func TestAdminUsageDailyReportUsesCalendarDayInTimezone(t *testing.T) {
+	repo := &adminUsageRepoCapture{}
+	router := newAdminUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage/daily-report?date=2026-07-10&timezone=Asia/Shanghai", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "Asia/Shanghai", repo.dailyTZ)
+	require.Equal(t, "2026-07-10T00:00:00+08:00", repo.dailyStart.Format(time.RFC3339))
+	require.Equal(t, "2026-07-11T00:00:00+08:00", repo.dailyEnd.Format(time.RFC3339))
+	require.Equal(t, "2026-07-09", repo.dailyPrev.Format("2006-01-02"))
+	require.Equal(t, "2026-07-04", repo.dailyTrend.Format("2006-01-02"))
+}
+
+func TestAdminUsageDailyReportRejectsInvalidDate(t *testing.T) {
+	repo := &adminUsageRepoCapture{}
+	router := newAdminUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage/daily-report?date=not-a-date&timezone=Asia/Shanghai", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 func TestAdminUsageListRequestTypePriority(t *testing.T) {

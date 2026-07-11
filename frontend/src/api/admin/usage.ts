@@ -26,6 +26,60 @@ export interface AdminUsageStatsResponse {
   endpoint_paths?: EndpointStat[]
 }
 
+export interface DailyReportSummary {
+  active_users: number
+  total_requests: number
+  total_tokens: number
+  total_cost: number
+  total_actual_cost: number
+  total_account_cost: number
+}
+
+export interface DailyReportMultiplierStat {
+  rate_multiplier: number
+  requests: number
+  active_users: number
+  total_tokens: number
+  cost: number
+  actual_cost: number
+  account_cost: number
+}
+
+export interface DailyReportGroupStat {
+  group_id: number
+  group_name: string
+  requests: number
+  active_users: number
+  total_tokens: number
+  cost: number
+  actual_cost: number
+  account_cost: number
+  multipliers: DailyReportMultiplierStat[]
+}
+
+export interface DailyReportUserStat {
+  user_id: number
+  email: string
+  username: string
+  requests: number
+  total_tokens: number
+  cost: number
+  actual_cost: number
+}
+
+export interface DailyReportResponse {
+  date: string
+  timezone: string
+  start_time: string
+  end_time: string
+  summary: DailyReportSummary
+  previous_summary: DailyReportSummary
+  trend: Array<{ date: string; active_users: number; requests: number; actual_cost: number }>
+  multipliers: DailyReportMultiplierStat[]
+  groups: DailyReportGroupStat[]
+  users: DailyReportUserStat[]
+}
+
 export interface SimpleUser {
   id: number
   email: string
@@ -135,6 +189,13 @@ export async function getStats(params: {
   return data
 }
 
+export async function getDailyReport(date: string): Promise<DailyReportResponse> {
+  const { data } = await apiClient.get<DailyReportResponse>('/admin/usage/daily-report', {
+    params: { date }
+  })
+  return data
+}
+
 /**
  * Search users by email keyword (admin only)
  * @param keyword - Email keyword to search
@@ -207,6 +268,7 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
 export const adminUsageAPI = {
   list,
   getStats,
+  getDailyReport,
   searchUsers,
   searchApiKeys,
   listCleanupTasks,

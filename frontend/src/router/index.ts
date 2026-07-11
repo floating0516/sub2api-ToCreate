@@ -610,6 +610,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/daily-report',
+    name: 'AdminDailyReport',
+    component: () => import('@/views/admin/DailyReportView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Daily Report',
+      titleKey: 'admin.dailyReport.title',
+      descriptionKey: 'admin.dailyReport.description'
+    }
+  },
+  {
     path: '/admin/affiliates',
     redirect: '/admin/affiliates/invites'
   },

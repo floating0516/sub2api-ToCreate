@@ -74,15 +74,15 @@ type SubscriptionUsageTimelineBucket struct {
 }
 
 type SubscriptionUsageTimeline struct {
-	SubscriptionID    int64                             `json:"subscription_id"`
-	Window            string                            `json:"window,omitempty"`
-	Start             time.Time                         `json:"start"`
-	End               time.Time                         `json:"end"`
-	BucketSeconds     int64                             `json:"bucket_seconds"`
-	TotalRequests     int64                             `json:"total_requests"`
-	TotalActualCost   float64                           `json:"total_actual_cost"`
-	MaxBucketCost     float64                           `json:"max_bucket_cost"`
-	Buckets           []SubscriptionUsageTimelineBucket `json:"buckets"`
+	SubscriptionID  int64                             `json:"subscription_id"`
+	Window          string                            `json:"window,omitempty"`
+	Start           time.Time                         `json:"start"`
+	End             time.Time                         `json:"end"`
+	BucketSeconds   int64                             `json:"bucket_seconds"`
+	TotalRequests   int64                             `json:"total_requests"`
+	TotalActualCost float64                           `json:"total_actual_cost"`
+	MaxBucketCost   float64                           `json:"max_bucket_cost"`
+	Buckets         []SubscriptionUsageTimelineBucket `json:"buckets"`
 }
 
 // UsageService 使用统计服务
@@ -553,4 +553,14 @@ func (s *UsageService) GetStatsWithFilters(ctx context.Context, filters usagesta
 		return nil, fmt.Errorf("get usage stats with filters: %w", err)
 	}
 	return stats, nil
+}
+
+func (s *UsageService) GetDailyReport(ctx context.Context, startTime, endTime, previousStart, trendStart time.Time, timezoneName string) (*usagestats.DailyReport, error) {
+	repo, ok := s.usageRepo.(interface {
+		GetDailyReport(context.Context, time.Time, time.Time, time.Time, time.Time, string) (*usagestats.DailyReport, error)
+	})
+	if !ok {
+		return nil, infraerrors.InternalServer("DAILY_REPORT_UNSUPPORTED", "daily report is not supported by this repository")
+	}
+	return repo.GetDailyReport(ctx, startTime, endTime, previousStart, trendStart, timezoneName)
 }

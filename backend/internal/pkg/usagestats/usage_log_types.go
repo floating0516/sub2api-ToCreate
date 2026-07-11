@@ -162,6 +162,67 @@ type UserSpendingRankingResponse struct {
 	TotalTokens     int64                     `json:"total_tokens"`
 }
 
+type DailyReportSummary struct {
+	ActiveUsers      int64   `json:"active_users"`
+	TotalRequests    int64   `json:"total_requests"`
+	TotalTokens      int64   `json:"total_tokens"`
+	TotalCost        float64 `json:"total_cost"`
+	TotalActualCost  float64 `json:"total_actual_cost"`
+	TotalAccountCost float64 `json:"total_account_cost"`
+}
+
+type DailyReportMultiplierStat struct {
+	RateMultiplier float64 `json:"rate_multiplier"`
+	Requests       int64   `json:"requests"`
+	ActiveUsers    int64   `json:"active_users"`
+	TotalTokens    int64   `json:"total_tokens"`
+	Cost           float64 `json:"cost"`
+	ActualCost     float64 `json:"actual_cost"`
+	AccountCost    float64 `json:"account_cost"`
+}
+
+type DailyReportGroupStat struct {
+	GroupID     int64                       `json:"group_id"`
+	GroupName   string                      `json:"group_name"`
+	Requests    int64                       `json:"requests"`
+	ActiveUsers int64                       `json:"active_users"`
+	TotalTokens int64                       `json:"total_tokens"`
+	Cost        float64                     `json:"cost"`
+	ActualCost  float64                     `json:"actual_cost"`
+	AccountCost float64                     `json:"account_cost"`
+	Multipliers []DailyReportMultiplierStat `json:"multipliers"`
+}
+
+type DailyReportUserStat struct {
+	UserID      int64   `json:"user_id"`
+	Email       string  `json:"email"`
+	Username    string  `json:"username"`
+	Requests    int64   `json:"requests"`
+	TotalTokens int64   `json:"total_tokens"`
+	Cost        float64 `json:"cost"`
+	ActualCost  float64 `json:"actual_cost"`
+}
+
+type DailyReportTrendPoint struct {
+	Date        string  `json:"date"`
+	ActiveUsers int64   `json:"active_users"`
+	Requests    int64   `json:"requests"`
+	ActualCost  float64 `json:"actual_cost"`
+}
+
+type DailyReport struct {
+	Date            string                      `json:"date"`
+	Timezone        string                      `json:"timezone"`
+	StartTime       time.Time                   `json:"start_time"`
+	EndTime         time.Time                   `json:"end_time"`
+	Summary         DailyReportSummary          `json:"summary"`
+	PreviousSummary DailyReportSummary          `json:"previous_summary"`
+	Trend           []DailyReportTrendPoint     `json:"trend"`
+	Multipliers     []DailyReportMultiplierStat `json:"multipliers"`
+	Groups          []DailyReportGroupStat      `json:"groups"`
+	Users           []DailyReportUserStat       `json:"users"`
+}
+
 // UserBreakdownItem represents per-user usage breakdown within a dimension (group, model, endpoint).
 type UserBreakdownItem struct {
 	UserID       int64   `json:"user_id"`
@@ -342,9 +403,9 @@ type AccountCapacityTrendPoint struct {
 	Label          string  `json:"label"`
 	PeakConcurrent int64   `json:"peak_concurrent"`
 	AvgConcurrent  float64 `json:"avg_concurrent"`
-	MaxConcurrency  int64   `json:"max_concurrency"`
-	WaitingPeak     int64   `json:"waiting_peak"`
-	Samples         int64   `json:"samples"`
+	MaxConcurrency int64   `json:"max_concurrency"`
+	WaitingPeak    int64   `json:"waiting_peak"`
+	Samples        int64   `json:"samples"`
 }
 
 // AccountCapacitySample represents one persisted real-time account capacity sample.
