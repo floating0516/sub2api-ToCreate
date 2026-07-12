@@ -51,3 +51,10 @@ func TestCurrentSubscriptionUsageFloorUsesLargestLiveWindow(t *testing.T) {
 	sub := &UserSubscription{DailyUsageUSD: 12, WeeklyUsageUSD: 75, MonthlyUsageUSD: 63}
 	require.Equal(t, 75.0, currentSubscriptionUsageFloor(sub))
 }
+
+func TestCalculateSubscriptionQuotaOutcomePreservesOverage(t *testing.T) {
+	used, unused, overage := calculateSubscriptionQuotaOutcome(150, 240)
+	require.Equal(t, 240.0, used)
+	require.Equal(t, 0.0, unused)
+	require.Equal(t, 90.0, overage)
+}

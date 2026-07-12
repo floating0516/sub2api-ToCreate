@@ -180,7 +180,7 @@
                 {{ formatCurrency(retentionEstimate?.estimated_retention_usd || 0) }}
               </p>
             </div>
-            <div class="grid min-w-[280px] grid-cols-3 gap-x-6 gap-y-1 text-right">
+            <div class="grid min-w-[280px] grid-cols-2 gap-x-6 gap-y-2 text-right sm:grid-cols-4">
               <div>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionAllocated') }}</p>
                 <p class="text-sm font-medium tabular-nums text-gray-800 dark:text-gray-200">{{ formatCurrency(retentionEstimate?.allocated_quota_usd || 0) }}</p>
@@ -191,7 +191,11 @@
               </div>
               <div>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionUsageRate') }}</p>
-                <p class="text-sm font-medium tabular-nums text-gray-800 dark:text-gray-200">{{ retentionUsageRate }}</p>
+                <p :class="['text-sm font-medium tabular-nums', hasRetentionOverage ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200']">{{ retentionUsageRate }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionOverage') }}</p>
+                <p :class="['text-sm font-medium tabular-nums', hasRetentionOverage ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200']">{{ formatCurrency(retentionEstimate?.overage_usd || 0) }}</p>
               </div>
             </div>
           </div>
@@ -1095,11 +1099,12 @@ const statusOptions = computed(() => [
 const subscriptions = ref<UserSubscription[]>([])
 const retentionEstimate = ref<SubscriptionRetentionEstimate | null>(null)
 const showRetentionEstimate = computed(() => filters.status === '' || filters.status === 'active')
+const hasRetentionOverage = computed(() => (retentionEstimate.value?.overage_usd || 0) > 0)
 const retentionUsageRate = computed(() => {
   const allocated = retentionEstimate.value?.allocated_quota_usd || 0
   if (allocated <= 0) return '0.0%'
   const used = retentionEstimate.value?.used_quota_usd || 0
-  return `${Math.min(100, Math.max(0, used / allocated * 100)).toFixed(1)}%`
+  return `${Math.max(0, used / allocated * 100).toFixed(1)}%`
 })
 const groups = ref<Group[]>([])
 const loading = ref(false)

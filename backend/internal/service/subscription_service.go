@@ -819,6 +819,7 @@ type SubscriptionRetentionEstimate struct {
 	EstimatedRetentionUSD float64 `json:"estimated_retention_usd"`
 	AllocatedQuotaUSD     float64 `json:"allocated_quota_usd"`
 	UsedQuotaUSD          float64 `json:"used_quota_usd"`
+	OverageUSD            float64 `json:"overage_usd"`
 	SubscriptionCount     int     `json:"subscription_count"`
 	ExcludedCount         int     `json:"excluded_count"`
 }
@@ -861,14 +862,24 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 		if !ok || limit <= 0 {
 			continue
 		}
-		used := math.Max(termUsage[sub.ID], currentSubscriptionUsageFloor(sub))
-		used = math.Max(0, math.Min(used, limit))
+		used, unused, overage := calculateSubscriptionQuotaOutcome(
+			limit,
+			math.Max(termUsage[sub.ID], currentSubscriptionUsageFloor(sub)),
+		)
 		result.AllocatedQuotaUSD += limit
 		result.UsedQuotaUSD += used
-		result.EstimatedRetentionUSD += limit - used
+		result.EstimatedRetentionUSD += unused
+		result.OverageUSD += overage
 		result.SubscriptionCount++
 	}
 	return result, nil
+}
+
+func calculateSubscriptionQuotaOutcome(capacity, actualUsage float64) (used, unused, overage float64) {
+	used = math.Max(0, actualUsage)
+	unused = math.Max(0, capacity-used)
+	overage = math.Max(0, used-capacity)
+	return used, unused, overage
 }
 
 func currentSubscriptionUsageFloor(sub *UserSubscription) float64 {

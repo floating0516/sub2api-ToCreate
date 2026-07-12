@@ -31,35 +31,35 @@ func (s *SubscriptionService) snapshotSubscriptionTerm(ctx context.Context, sub 
 	if err != nil {
 		return err
 	}
-	used := math.Max(usageBySubscription[sub.ID], currentSubscriptionUsageFloor(sub))
-	if capacity > 0 {
-		used = math.Min(used, capacity)
-	}
-	unused := math.Max(0, capacity-used)
+	used, unused, overage := calculateSubscriptionQuotaOutcome(
+		capacity,
+		math.Max(usageBySubscription[sub.ID], currentSubscriptionUsageFloor(sub)),
+	)
 
 	var executor subscriptionSnapshotExecutor = s.entClient
 	if tx := dbent.TxFromContext(ctx); tx != nil {
 		executor = tx.Client()
 	}
-	return insertSubscriptionTermSnapshot(ctx, executor, sub, reason, capacity, used, unused)
+	return insertSubscriptionTermSnapshot(ctx, executor, sub, reason, capacity, used, unused, overage)
 }
 
-func insertSubscriptionTermSnapshot(ctx context.Context, executor subscriptionSnapshotExecutor, sub *UserSubscription, reason string, capacity, used, unused float64) error {
+func insertSubscriptionTermSnapshot(ctx context.Context, executor subscriptionSnapshotExecutor, sub *UserSubscription, reason string, capacity, used, unused, overage float64) error {
 	if executor == nil || sub == nil {
 		return nil
 	}
 	_, err := executor.ExecContext(ctx, `
 		INSERT INTO subscription_term_snapshots (
 			subscription_id, user_id, group_id, starts_at, expires_at,
-			settled_at, settlement_reason, total_quota_usd, used_quota_usd, unused_quota_usd
-		) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9)
+			settled_at, settlement_reason, total_quota_usd, used_quota_usd, unused_quota_usd, overage_usd
+		) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10)
 		ON CONFLICT (subscription_id, starts_at, expires_at) DO UPDATE SET
 			settled_at = EXCLUDED.settled_at,
 			settlement_reason = EXCLUDED.settlement_reason,
 			total_quota_usd = EXCLUDED.total_quota_usd,
 			used_quota_usd = EXCLUDED.used_quota_usd,
-			unused_quota_usd = EXCLUDED.unused_quota_usd
-	`, sub.ID, sub.UserID, sub.GroupID, sub.StartsAt, sub.ExpiresAt, reason, capacity, used, unused)
+			unused_quota_usd = EXCLUDED.unused_quota_usd,
+			overage_usd = EXCLUDED.overage_usd
+	`, sub.ID, sub.UserID, sub.GroupID, sub.StartsAt, sub.ExpiresAt, reason, capacity, used, unused, overage)
 	return err
 }
 
@@ -125,11 +125,11 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 	for i := range terms {
 		term := &terms[i]
 		capacity, _ := subscriptionTermQuotaCapacity(&term.sub)
-		used := math.Max(term.loggedUse, currentSubscriptionUsageFloor(&term.sub))
-		if capacity > 0 {
-			used = math.Min(used, capacity)
-		}
-		if err := insertSubscriptionTermSnapshot(ctx, db, &term.sub, subscriptionSettlementExpired, capacity, used, math.Max(0, capacity-used)); err != nil {
+		used, unused, overage := calculateSubscriptionQuotaOutcome(
+			capacity,
+			math.Max(term.loggedUse, currentSubscriptionUsageFloor(&term.sub)),
+		)
+		if err := insertSubscriptionTermSnapshot(ctx, db, &term.sub, subscriptionSettlementExpired, capacity, used, unused, overage); err != nil {
 			return err
 		}
 	}

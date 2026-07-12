@@ -695,6 +695,7 @@ export default {
       retentionAllocated: '订阅总可用额度',
       retentionUsed: '订阅累计已使用',
       retentionUsageRate: '使用率',
+      retentionOverage: '超额使用',
       adjustWouldExpire: '调整后剩余天数必须大于0',
       adjustOutOfRange: '调整天数必须在 -36500 到 36500 之间',
       pleaseSelectUser: '请选择用户',

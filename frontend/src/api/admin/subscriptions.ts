@@ -17,6 +17,7 @@ export interface SubscriptionRetentionEstimate {
   estimated_retention_usd: number
   allocated_quota_usd: number
   used_quota_usd: number
+  overage_usd: number
   subscription_count: number
   excluded_count: number
 }

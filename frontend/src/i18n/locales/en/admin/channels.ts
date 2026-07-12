@@ -695,6 +695,7 @@ export default {
       retentionAllocated: 'Total subscription quota',
       retentionUsed: 'Cumulative subscription usage',
       retentionUsageRate: 'Usage rate',
+      retentionOverage: 'Overage',
       adjustWouldExpire: 'Remaining days after adjustment must be greater than 0',
       adjustOutOfRange: 'Adjustment days must be between -36500 and 36500',
       pleaseSelectUser: 'Please select a user',
