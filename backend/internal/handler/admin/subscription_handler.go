@@ -96,6 +96,30 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 	response.PaginatedWithResult(c, out, toResponsePagination(pagination))
 }
 
+// RetentionEstimate returns the currently unused quota estimate for matching
+// active subscriptions, excluding the dedicated pro ride-sharing group.
+// GET /api/v1/admin/subscriptions/retention-estimate
+func (h *SubscriptionHandler) RetentionEstimate(c *gin.Context) {
+	var userID, groupID *int64
+	if raw := c.Query("user_id"); raw != "" {
+		if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			userID = &id
+		}
+	}
+	if raw := c.Query("group_id"); raw != "" {
+		if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			groupID = &id
+		}
+	}
+
+	estimate, err := h.subscriptionService.GetRetentionEstimate(c.Request.Context(), userID, groupID, c.Query("platform"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, estimate)
+}
+
 // GetByID handles getting a subscription by ID
 // GET /api/v1/admin/subscriptions/:id
 func (h *SubscriptionHandler) GetByID(c *gin.Context) {

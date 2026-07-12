@@ -169,6 +169,18 @@
 
       <!-- Subscriptions Table -->
       <template #table>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-600 dark:bg-dark-800/60">
+          <div>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionEstimate') }}</p>
+            <p class="mt-0.5 text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+              {{ formatCurrency(retentionEstimate?.estimated_retention_usd || 0) }}
+            </p>
+          </div>
+          <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+            <p>{{ t('admin.subscriptions.retentionEstimateSubscriptions', { count: retentionEstimate?.subscription_count || 0 }) }}</p>
+            <p>{{ t('admin.subscriptions.retentionEstimateHint') }}</p>
+          </div>
+        </div>
         <DataTable
           :columns="columns"
           :data="subscriptions"
@@ -889,6 +901,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
+import type { SubscriptionRetentionEstimate } from '@/api/admin/subscriptions'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
@@ -1062,6 +1075,7 @@ const statusOptions = computed(() => [
 ])
 
 const subscriptions = ref<UserSubscription[]>([])
+const retentionEstimate = ref<SubscriptionRetentionEstimate | null>(null)
 const groups = ref<Group[]>([])
 const loading = ref(false)
 let abortController: AbortController | null = null
@@ -1276,23 +1290,33 @@ const loadSubscriptions = async () => {
 
   loading.value = true
   try {
-    const response = await adminAPI.subscriptions.list(
-      pagination.page,
-      pagination.page_size,
-      {
-        status: (filters.status as any) || undefined,
-        group_id: filters.group_id ? parseInt(filters.group_id) : undefined,
-        platform: filters.platform || undefined,
-        user_id: filters.user_id || undefined,
-        sort_by: sortState.sort_by,
-        sort_order: sortState.sort_order
-      },
-      {
-        signal
-      }
-    )
+    const requestFilters = {
+      status: (filters.status as any) || undefined,
+      group_id: filters.group_id ? parseInt(filters.group_id) : undefined,
+      platform: filters.platform || undefined,
+      user_id: filters.user_id || undefined,
+      sort_by: sortState.sort_by,
+      sort_order: sortState.sort_order
+    }
+    const [response, estimate] = await Promise.all([
+      adminAPI.subscriptions.list(
+        pagination.page,
+        pagination.page_size,
+        requestFilters,
+        { signal }
+      ),
+      adminAPI.subscriptions.getRetentionEstimate(
+        {
+          group_id: requestFilters.group_id,
+          platform: requestFilters.platform,
+          user_id: requestFilters.user_id
+        },
+        { signal }
+      )
+    ])
     if (signal.aborted || abortController !== requestController) return
     subscriptions.value = response.items
+    retentionEstimate.value = estimate
     pagination.total = response.total
     pagination.pages = response.pages
   } catch (error: any) {

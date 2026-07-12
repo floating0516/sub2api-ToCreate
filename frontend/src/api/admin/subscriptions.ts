@@ -13,6 +13,14 @@ import type {
   PaginatedResponse
 } from '@/types'
 
+export interface SubscriptionRetentionEstimate {
+  estimated_retention_usd: number
+  allocated_quota_usd: number
+  used_quota_usd: number
+  subscription_count: number
+  excluded_count: number
+}
+
 /**
  * List all subscriptions with pagination
  * @param page - Page number (default: 1)
@@ -45,6 +53,18 @@ export async function list(
       },
       signal: options?.signal
     }
+  )
+  return data
+}
+
+export async function getRetentionEstimate(filters?: {
+  user_id?: number
+  group_id?: number
+  platform?: string
+}, options?: { signal?: AbortSignal }): Promise<SubscriptionRetentionEstimate> {
+  const { data } = await apiClient.get<SubscriptionRetentionEstimate>(
+    '/admin/subscriptions/retention-estimate',
+    { params: filters, signal: options?.signal }
   )
   return data
 }

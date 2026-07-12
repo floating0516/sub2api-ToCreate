@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
@@ -790,6 +791,83 @@ func (s *SubscriptionService) List(ctx context.Context, page, pageSize int, user
 	normalizeExpiredWindows(subs)
 	normalizeSubscriptionStatus(subs)
 	return subs, pag, nil
+}
+
+const excludedRetentionEstimateGroupName = "pro拼车"
+
+// SubscriptionRetentionEstimate summarizes the currently unused quota for active
+// cost-priced subscriptions. It is an estimate, not settled accounting profit.
+type SubscriptionRetentionEstimate struct {
+	EstimatedRetentionUSD float64 `json:"estimated_retention_usd"`
+	AllocatedQuotaUSD     float64 `json:"allocated_quota_usd"`
+	UsedQuotaUSD          float64 `json:"used_quota_usd"`
+	SubscriptionCount     int     `json:"subscription_count"`
+	ExcludedCount         int     `json:"excluded_count"`
+}
+
+// GetRetentionEstimate calculates unused quota across all matching active
+// subscriptions. Daily cards use daily quota, cards up to seven days use weekly
+// quota, and longer subscriptions use monthly quota to avoid double counting.
+func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, groupID *int64, platform string) (*SubscriptionRetentionEstimate, error) {
+	const firstPageSize = 1
+	first, pag, err := s.List(ctx, 1, firstPageSize, userID, groupID, SubscriptionStatusActive, platform, "created_at", "desc")
+	if err != nil {
+		return nil, err
+	}
+
+	subs := first
+	if pag != nil && pag.Total > firstPageSize {
+		subs, _, err = s.List(ctx, 1, int(pag.Total), userID, groupID, SubscriptionStatusActive, platform, "created_at", "desc")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result := &SubscriptionRetentionEstimate{}
+	for i := range subs {
+		sub := &subs[i]
+		if sub.Group == nil {
+			continue
+		}
+		if strings.TrimSpace(sub.Group.Name) == excludedRetentionEstimateGroupName {
+			result.ExcludedCount++
+			continue
+		}
+
+		limit, used, ok := retentionQuotaWindow(sub)
+		if !ok || limit <= 0 {
+			continue
+		}
+		used = math.Max(0, math.Min(used, limit))
+		result.AllocatedQuotaUSD += limit
+		result.UsedQuotaUSD += used
+		result.EstimatedRetentionUSD += limit - used
+		result.SubscriptionCount++
+	}
+	return result, nil
+}
+
+func retentionQuotaWindow(sub *UserSubscription) (limit, used float64, ok bool) {
+	if sub == nil || sub.Group == nil {
+		return 0, 0, false
+	}
+	duration := sub.ExpiresAt.Sub(sub.StartsAt)
+	if duration <= 24*time.Hour && sub.Group.DailyLimitUSD != nil {
+		return *sub.Group.DailyLimitUSD, sub.DailyUsageUSD, true
+	}
+	if duration <= 7*24*time.Hour && sub.Group.WeeklyLimitUSD != nil {
+		return *sub.Group.WeeklyLimitUSD, sub.WeeklyUsageUSD, true
+	}
+	if sub.Group.MonthlyLimitUSD != nil {
+		return *sub.Group.MonthlyLimitUSD, sub.MonthlyUsageUSD, true
+	}
+	if sub.Group.WeeklyLimitUSD != nil {
+		return *sub.Group.WeeklyLimitUSD, sub.WeeklyUsageUSD, true
+	}
+	if sub.Group.DailyLimitUSD != nil {
+		return *sub.Group.DailyLimitUSD, sub.DailyUsageUSD, true
+	}
+	return 0, 0, false
 }
 
 // normalizeExpiredWindows 将已过期窗口的数据清零（仅影响返回数据，不影响数据库）
