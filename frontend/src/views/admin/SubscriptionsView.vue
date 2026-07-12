@@ -169,14 +169,33 @@
 
       <!-- Subscriptions Table -->
       <template #table>
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-600 dark:bg-dark-800/60">
-          <div>
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionEstimate') }}</p>
-            <p class="mt-0.5 text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-              {{ formatCurrency(retentionEstimate?.estimated_retention_usd || 0) }}
-            </p>
+        <div
+          v-if="showRetentionEstimate"
+          class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-600 dark:bg-dark-800/60"
+        >
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionEstimate') }}</p>
+              <p class="mt-0.5 text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {{ formatCurrency(retentionEstimate?.estimated_retention_usd || 0) }}
+              </p>
+            </div>
+            <div class="grid min-w-[280px] grid-cols-3 gap-x-6 gap-y-1 text-right">
+              <div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionAllocated') }}</p>
+                <p class="text-sm font-medium tabular-nums text-gray-800 dark:text-gray-200">{{ formatCurrency(retentionEstimate?.allocated_quota_usd || 0) }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionUsed') }}</p>
+                <p class="text-sm font-medium tabular-nums text-gray-800 dark:text-gray-200">{{ formatCurrency(retentionEstimate?.used_quota_usd || 0) }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.retentionUsageRate') }}</p>
+                <p class="text-sm font-medium tabular-nums text-gray-800 dark:text-gray-200">{{ retentionUsageRate }}</p>
+              </div>
+            </div>
           </div>
-          <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+          <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
             <p>{{ t('admin.subscriptions.retentionEstimateSubscriptions', { count: retentionEstimate?.subscription_count || 0 }) }}</p>
             <p>{{ t('admin.subscriptions.retentionEstimateHint') }}</p>
           </div>
@@ -1076,6 +1095,13 @@ const statusOptions = computed(() => [
 
 const subscriptions = ref<UserSubscription[]>([])
 const retentionEstimate = ref<SubscriptionRetentionEstimate | null>(null)
+const showRetentionEstimate = computed(() => filters.status === '' || filters.status === 'active')
+const retentionUsageRate = computed(() => {
+  const allocated = retentionEstimate.value?.allocated_quota_usd || 0
+  if (allocated <= 0) return '0.0%'
+  const used = retentionEstimate.value?.used_quota_usd || 0
+  return `${Math.min(100, Math.max(0, used / allocated * 100)).toFixed(1)}%`
+})
 const groups = ref<Group[]>([])
 const loading = ref(false)
 let abortController: AbortController | null = null
