@@ -692,7 +692,6 @@ export default {
       failedToRestore: 'Failed to restore subscription',
       retentionEstimate: 'Current estimated unused quota',
       retentionEstimateSubscriptions: '{count} active subscriptions included',
-      retentionEstimateHint: 'Applies daily, weekly, and monthly limits across the full term and uses the strictest result; excludes "pro拼车"',
       retentionAllocated: 'Period quota',
       retentionUsed: 'Period usage',
       retentionUsageRate: 'Usage rate',

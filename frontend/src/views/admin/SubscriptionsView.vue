@@ -195,9 +195,8 @@
               </div>
             </div>
           </div>
-          <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <p>{{ t('admin.subscriptions.retentionEstimateSubscriptions', { count: retentionEstimate?.subscription_count || 0 }) }}</p>
-            <p>{{ t('admin.subscriptions.retentionEstimateHint') }}</p>
           </div>
         </div>
         <DataTable

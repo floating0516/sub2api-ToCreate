@@ -795,7 +795,12 @@ func (s *SubscriptionService) List(ctx context.Context, page, pageSize int, user
 	return subs, pag, nil
 }
 
-const excludedRetentionEstimateGroupName = "pro拼车"
+var excludedRetentionEstimateUserIDs = map[int64]struct{}{
+	1:  {},
+	7:  {},
+	11: {},
+	17: {},
+}
 
 // SubscriptionRetentionEstimate summarizes the currently unused quota for active
 // cost-priced subscriptions. It is an estimate, not settled accounting profit.
@@ -836,7 +841,7 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 		if sub.Group == nil {
 			continue
 		}
-		if strings.TrimSpace(sub.Group.Name) == excludedRetentionEstimateGroupName {
+		if _, excluded := excludedRetentionEstimateUserIDs[sub.UserID]; excluded {
 			result.ExcludedCount++
 			continue
 		}

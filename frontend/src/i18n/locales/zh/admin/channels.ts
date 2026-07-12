@@ -692,7 +692,6 @@ export default {
       failedToRestore: '恢复订阅失败',
       retentionEstimate: '当前预计未使用额度',
       retentionEstimateSubscriptions: '纳入 {count} 个有效订阅',
-      retentionEstimateHint: '按订阅总天数同时套用日、周、月上限并取最严格结果；已排除“pro拼车”',
       retentionAllocated: '本期总额度',
       retentionUsed: '本期已使用',
       retentionUsageRate: '使用率',

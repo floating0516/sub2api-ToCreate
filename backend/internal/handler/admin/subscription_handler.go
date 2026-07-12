@@ -97,7 +97,7 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 }
 
 // RetentionEstimate returns the currently unused quota estimate for matching
-// active subscriptions, excluding the dedicated pro ride-sharing group.
+// active subscriptions after applying the server-side user exclusions.
 // GET /api/v1/admin/subscriptions/retention-estimate
 func (h *SubscriptionHandler) RetentionEstimate(c *gin.Context) {
 	var userID, groupID *int64
