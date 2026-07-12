@@ -808,9 +808,12 @@ func (s *SubscriptionService) List(ctx context.Context, page, pageSize int, user
 
 var excludedRetentionEstimateUserIDs = map[int64]struct{}{
 	1:  {},
-	7:  {},
 	11: {},
-	17: {},
+}
+
+var excludedRetentionEstimateSubscriptionIDs = map[int64]struct{}{
+	2: {},
+	3: {},
 }
 
 // SubscriptionRetentionEstimate summarizes the currently unused quota for active
@@ -854,6 +857,10 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 			continue
 		}
 		if _, excluded := excludedRetentionEstimateUserIDs[sub.UserID]; excluded {
+			result.ExcludedCount++
+			continue
+		}
+		if _, excluded := excludedRetentionEstimateSubscriptionIDs[sub.ID]; excluded {
 			result.ExcludedCount++
 			continue
 		}
