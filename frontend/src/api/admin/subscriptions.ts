@@ -212,6 +212,7 @@ export async function listByUser(
 
 export const subscriptionsAPI = {
   list,
+  getRetentionEstimate,
   getById,
   getProgress,
   assign,
