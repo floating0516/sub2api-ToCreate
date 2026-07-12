@@ -314,6 +314,9 @@ func (s *SubscriptionService) updateExistingSubscriptionTerm(
 ) error {
 	return s.withSubscriptionUpdateTx(ctx, func(txCtx context.Context) error {
 		if isExpired {
+			if err := s.snapshotSubscriptionTerm(txCtx, existingSub, subscriptionSettlementRenewed); err != nil {
+				return fmt.Errorf("snapshot expired subscription: %w", err)
+			}
 			renewed := renewedSubscriptionTerm(existingSub, notes, startsAt, newExpiresAt)
 			if err := s.userSubRepo.Update(txCtx, renewed); err != nil {
 				return fmt.Errorf("renew expired subscription: %w", err)
@@ -595,6 +598,9 @@ func (s *SubscriptionService) RevokeSubscription(ctx context.Context, subscripti
 	if err := s.userSubRepo.Delete(ctx, subscriptionID); err != nil {
 		return err
 	}
+	if err := s.snapshotSubscriptionTerm(ctx, sub, subscriptionSettlementRevoked); err != nil {
+		return err
+	}
 
 	if err := s.invalidateSubscriptionCaches(sub.UserID, sub.GroupID); err != nil {
 		return err
@@ -655,6 +661,11 @@ func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subscripti
 
 	now := time.Now()
 	isExpired := !sub.ExpiresAt.After(now)
+	if isExpired {
+		if err := s.snapshotSubscriptionTerm(ctx, sub, subscriptionSettlementRenewed); err != nil {
+			return nil, err
+		}
+	}
 
 	// 如果订阅已过期，不允许负向调整
 	if isExpired && days < 0 {

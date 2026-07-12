@@ -103,6 +103,11 @@ func (s *SubscriptionExpiryService) runOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	if err := snapshotExpiredSubscriptionTerms(ctx, s.db); err != nil {
+		log.Printf("[SubscriptionExpiry] Snapshot expired subscription terms failed: %v", err)
+		return
+	}
+
 	updated, err := s.userSubRepo.BatchUpdateExpiredStatus(ctx)
 	if err != nil {
 		log.Printf("[SubscriptionExpiry] Update expired subscriptions failed: %v", err)
