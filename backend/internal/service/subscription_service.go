@@ -11,6 +11,8 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -806,8 +808,8 @@ type SubscriptionRetentionEstimate struct {
 }
 
 // GetRetentionEstimate calculates unused quota across all matching active
-// subscriptions. Daily cards use daily quota, cards up to seven days use weekly
-// quota, and longer subscriptions use monthly quota to avoid double counting.
+// subscriptions. Each term's capacity is constrained by its daily, weekly, and
+// monthly limits together, while usage is accumulated from logs for the full term.
 func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, groupID *int64, platform string) (*SubscriptionRetentionEstimate, error) {
 	const firstPageSize = 1
 	first, pag, err := s.List(ctx, 1, firstPageSize, userID, groupID, SubscriptionStatusActive, platform, "created_at", "desc")
@@ -823,6 +825,11 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 		}
 	}
 
+	termUsage, err := s.subscriptionTermUsage(ctx, subs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &SubscriptionRetentionEstimate{}
 	for i := range subs {
 		sub := &subs[i]
@@ -834,10 +841,11 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 			continue
 		}
 
-		limit, used, ok := retentionQuotaWindow(sub)
+		limit, ok := subscriptionTermQuotaCapacity(sub)
 		if !ok || limit <= 0 {
 			continue
 		}
+		used := math.Max(termUsage[sub.ID], currentSubscriptionUsageFloor(sub))
 		used = math.Max(0, math.Min(used, limit))
 		result.AllocatedQuotaUSD += limit
 		result.UsedQuotaUSD += used
@@ -847,27 +855,104 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 	return result, nil
 }
 
-func retentionQuotaWindow(sub *UserSubscription) (limit, used float64, ok bool) {
+func currentSubscriptionUsageFloor(sub *UserSubscription) float64 {
+	if sub == nil {
+		return 0
+	}
+	return math.Max(sub.DailyUsageUSD, math.Max(sub.WeeklyUsageUSD, sub.MonthlyUsageUSD))
+}
+
+func subscriptionTermQuotaCapacity(sub *UserSubscription) (float64, bool) {
 	if sub == nil || sub.Group == nil {
-		return 0, 0, false
+		return 0, false
 	}
-	duration := sub.ExpiresAt.Sub(sub.StartsAt)
-	if duration <= 24*time.Hour && sub.Group.DailyLimitUSD != nil {
-		return *sub.Group.DailyLimitUSD, sub.DailyUsageUSD, true
+	days := int(math.Ceil(sub.ExpiresAt.Sub(sub.StartsAt).Hours() / 24))
+	if days < 1 {
+		days = 1
 	}
-	if duration <= 7*24*time.Hour && sub.Group.WeeklyLimitUSD != nil {
-		return *sub.Group.WeeklyLimitUSD, sub.WeeklyUsageUSD, true
+	return quotaCapacityForDays(days, sub.Group.DailyLimitUSD, sub.Group.WeeklyLimitUSD, sub.Group.MonthlyLimitUSD)
+}
+
+func quotaCapacityForDays(days int, daily, weekly, monthly *float64) (float64, bool) {
+	if days <= 0 {
+		return 0, false
 	}
-	if sub.Group.MonthlyLimitUSD != nil {
-		return *sub.Group.MonthlyLimitUSD, sub.MonthlyUsageUSD, true
+
+	candidates := make([]float64, 0, 3)
+	if daily != nil && *daily > 0 {
+		candidates = append(candidates, float64(days)**daily)
 	}
-	if sub.Group.WeeklyLimitUSD != nil {
-		return *sub.Group.WeeklyLimitUSD, sub.WeeklyUsageUSD, true
+	if weekly != nil && *weekly > 0 {
+		candidates = append(candidates, quotaCapacityByWindow(days, 7, *weekly, daily, nil))
 	}
-	if sub.Group.DailyLimitUSD != nil {
-		return *sub.Group.DailyLimitUSD, sub.DailyUsageUSD, true
+	if monthly != nil && *monthly > 0 {
+		candidates = append(candidates, quotaCapacityByWindow(days, 30, *monthly, daily, weekly))
 	}
-	return 0, 0, false
+	if len(candidates) == 0 {
+		return 0, false
+	}
+
+	capacity := candidates[0]
+	for _, candidate := range candidates[1:] {
+		capacity = math.Min(capacity, candidate)
+	}
+	return capacity, true
+}
+
+func quotaCapacityByWindow(days, windowDays int, windowLimit float64, daily, weekly *float64) float64 {
+	fullWindows := days / windowDays
+	remainderDays := days % windowDays
+	capacity := float64(fullWindows) * windowLimit
+	if remainderDays == 0 {
+		return capacity
+	}
+
+	partial := windowLimit
+	if daily != nil && *daily > 0 {
+		partial = math.Min(partial, float64(remainderDays)**daily)
+	}
+	if weekly != nil && *weekly > 0 {
+		partial = math.Min(partial, quotaCapacityByWindow(remainderDays, 7, *weekly, daily, nil))
+	}
+	return capacity + partial
+}
+
+func (s *SubscriptionService) subscriptionTermUsage(ctx context.Context, subs []UserSubscription) (map[int64]float64, error) {
+	usage := make(map[int64]float64, len(subs))
+	if len(subs) == 0 || s.entClient == nil {
+		return usage, nil
+	}
+
+	now := time.Now()
+	predicates := make([]predicate.UsageLog, 0, len(subs))
+	for i := range subs {
+		sub := &subs[i]
+		end := sub.ExpiresAt
+		if end.After(now) {
+			end = now
+		}
+		predicates = append(predicates, usagelog.And(
+			usagelog.SubscriptionIDEQ(sub.ID),
+			usagelog.CreatedAtGTE(sub.StartsAt),
+			usagelog.CreatedAtLT(end),
+		))
+	}
+
+	var rows []struct {
+		SubscriptionID int64   `json:"subscription_id"`
+		ActualCost     float64 `json:"actual_cost"`
+	}
+	if err := s.entClient.UsageLog.Query().
+		Where(usagelog.Or(predicates...)).
+		GroupBy(usagelog.FieldSubscriptionID).
+		Aggregate(dbent.As(dbent.Sum(usagelog.FieldActualCost), "actual_cost")).
+		Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		usage[row.SubscriptionID] = row.ActualCost
+	}
+	return usage, nil
 }
 
 // normalizeExpiredWindows 将已过期窗口的数据清零（仅影响返回数据，不影响数据库）

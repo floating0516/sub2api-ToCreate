@@ -692,7 +692,7 @@ export default {
       failedToRestore: 'Failed to restore subscription',
       retentionEstimate: 'Current estimated unused quota',
       retentionEstimateSubscriptions: '{count} active subscriptions included',
-      retentionEstimateHint: 'Daily cards use daily quota, 7-day cards use weekly quota, and longer subscriptions use monthly quota; excludes "pro拼车"',
+      retentionEstimateHint: 'Applies daily, weekly, and monthly limits across the full term and uses the strictest result; excludes "pro拼车"',
       retentionAllocated: 'Period quota',
       retentionUsed: 'Period usage',
       retentionUsageRate: 'Usage rate',
