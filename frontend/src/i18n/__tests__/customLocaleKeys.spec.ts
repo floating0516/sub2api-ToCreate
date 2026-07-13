@@ -13,6 +13,8 @@ function getPath(obj: Record<string, any>, path: string): unknown {
 }
 
 const requiredCustomKeys = [
+  'userSubscriptions.addonPack',
+  'userSubscriptions.addonExpires',
   'userSubscriptions.usageTimeline',
   'userSubscriptions.timelineLoading',
   'userSubscriptions.timelineSummary',
