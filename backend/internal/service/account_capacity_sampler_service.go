@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	accountCapacitySamplerInterval = time.Minute
-	accountCapacitySamplerTimeout  = 8 * time.Second
+	accountCapacitySamplerInterval  = time.Minute
+	accountCapacitySamplerTimeout   = 8 * time.Second
 	accountCapacitySamplerBatchSize = 200
 )
 

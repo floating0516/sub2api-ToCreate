@@ -83,7 +83,7 @@ func TestResolveUsageAccessFallsBackToAddon(t *testing.T) {
 		Status:           SubscriptionStatusActive,
 		ExpiresAt:        now.Add(time.Hour),
 		DailyWindowStart: &now,
-		DailyUsageUSD:    limit,
+		DailyUsageUSD:    limit + 1,
 	}
 
 	resolved, err := svc.ResolveUsageAccess(context.Background(), sub, &Group{DailyLimitUSD: &limit})
@@ -102,7 +102,7 @@ func TestResolveUsageAccessKeepsQuotaErrorWithoutAddon(t *testing.T) {
 		Status:           SubscriptionStatusActive,
 		ExpiresAt:        now.Add(time.Hour),
 		DailyWindowStart: &now,
-		DailyUsageUSD:    limit,
+		DailyUsageUSD:    limit + 1,
 	}
 
 	_, err := svc.ResolveUsageAccess(context.Background(), sub, &Group{DailyLimitUSD: &limit})

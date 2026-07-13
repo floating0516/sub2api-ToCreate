@@ -85,7 +85,7 @@ func (r *subscriptionAddonRepository) ListBySubscriptionID(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make([]service.SubscriptionAddonPack, 0)
 	for rows.Next() {
@@ -124,7 +124,7 @@ func (r *subscriptionAddonRepository) GetActiveSummaries(ctx context.Context, su
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var subscriptionID int64
 		var summary service.SubscriptionAddonSummary

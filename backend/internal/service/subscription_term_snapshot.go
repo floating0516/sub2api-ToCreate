@@ -101,7 +101,7 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type expiredTerm struct {
 		sub       UserSubscription

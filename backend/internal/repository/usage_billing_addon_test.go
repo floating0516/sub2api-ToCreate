@@ -13,7 +13,9 @@ import (
 func TestIncrementUsageBillingSubscriptionAddon(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
 
 	mock.ExpectBegin()
 	tx, err := db.BeginTx(context.Background(), nil)
@@ -33,7 +35,7 @@ func TestIncrementUsageBillingSubscriptionAddon(t *testing.T) {
 		APIKeyID:       10,
 		UserID:         9,
 		SubscriptionID: &subscriptionID,
-		AddonPackID:     &addonID,
+		AddonPackID:    &addonID,
 		AddonCost:       3,
 	})
 	require.NoError(t, err)

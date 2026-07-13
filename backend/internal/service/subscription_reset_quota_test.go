@@ -171,7 +171,7 @@ func TestAdminResetQuota_ResetDailyUsageError(t *testing.T) {
 
 	require.ErrorIs(t, err, dbErr)
 	require.True(t, stub.resetDailyCalled)
-	require.True(t, stub.resetWeeklyCalled, "原子重置应在一次调用中提交所选窗口")
+	require.False(t, stub.resetWeeklyCalled, "日窗口重置失败后不应继续重置周窗口")
 }
 
 func TestAdminResetQuota_ResetWeeklyUsageError(t *testing.T) {

@@ -90,7 +90,6 @@ const loading = ref(false)
 const loadError = ref('')
 const notes = ref<CustomBuildNotes | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
-const tocItems = ref<TocItem[]>([])
 const activeHeadingId = ref('')
 let scrollRafId = 0
 
@@ -105,17 +104,18 @@ marked.setOptions({
   gfm: true,
 })
 
-const renderedHtml = computed(() => {
+const renderedContent = computed(() => {
   const content = notes.value?.content?.trim() || ''
-  tocItems.value = []
-  activeHeadingId.value = ''
   if (!content) {
-    return ''
+    return { html: '', toc: [] as TocItem[] }
   }
   const html = marked.parse(content) as string
   const sanitized = DOMPurify.sanitize(html)
   return injectHeadingIds(sanitized)
 })
+
+const renderedHtml = computed(() => renderedContent.value.html)
+const tocItems = computed(() => renderedContent.value.toc)
 
 function generateHeadingId(text: string, index: number): string {
   const base = text
@@ -125,7 +125,7 @@ function generateHeadingId(text: string, index: number): string {
   return base ? `${base}-${index}` : `heading-${index}`
 }
 
-function injectHeadingIds(html: string): string {
+function injectHeadingIds(html: string): { html: string; toc: TocItem[] } {
   const toc: TocItem[] = []
   let headingIndex = 0
   const withIds = html.replace(
@@ -139,8 +139,7 @@ function injectHeadingIds(html: string): string {
       return `<${tag} id="${id}">${content}</${tag}>`
     },
   )
-  tocItems.value = toc
-  return withIds
+  return { html: withIds, toc }
 }
 
 function scrollToHeading(id: string) {
