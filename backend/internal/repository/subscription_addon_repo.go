@@ -173,7 +173,7 @@ func (r *subscriptionAddonRepository) GetCurrentTermQuotaTotals(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var subscriptionID int64
 		var total service.SubscriptionAddonQuotaTotal

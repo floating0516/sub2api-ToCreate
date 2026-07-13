@@ -104,10 +104,10 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 	defer func() { _ = rows.Close() }()
 
 	type expiredTerm struct {
-		sub       UserSubscription
-		daily     sql.NullFloat64
-		weekly    sql.NullFloat64
-		monthly   sql.NullFloat64
+		sub        UserSubscription
+		daily      sql.NullFloat64
+		weekly     sql.NullFloat64
+		monthly    sql.NullFloat64
 		loggedUse  float64
 		addonQuota float64
 	}

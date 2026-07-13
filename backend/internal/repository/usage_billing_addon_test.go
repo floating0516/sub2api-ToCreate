@@ -15,6 +15,7 @@ func TestIncrementUsageBillingSubscriptionAddon(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
+		require.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	mock.ExpectBegin()
@@ -27,6 +28,7 @@ func TestIncrementUsageBillingSubscriptionAddon(t *testing.T) {
 		WithArgs(int64(7), int64(8), int64(9), int64(10), "req-1", 3.0).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectRollback()
+	mock.ExpectClose()
 
 	addonID := int64(7)
 	subscriptionID := int64(8)
@@ -36,10 +38,9 @@ func TestIncrementUsageBillingSubscriptionAddon(t *testing.T) {
 		UserID:         9,
 		SubscriptionID: &subscriptionID,
 		AddonPackID:    &addonID,
-		AddonCost:       3,
+		AddonCost:      3,
 	})
 	require.NoError(t, err)
 	require.True(t, exhausted)
 	require.NoError(t, tx.Rollback())
-	require.NoError(t, mock.ExpectationsWereMet())
 }

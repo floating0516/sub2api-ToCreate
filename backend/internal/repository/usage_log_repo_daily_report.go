@@ -47,7 +47,7 @@ func (r *usageLogRepository) scanDailyReportTrend(ctx context.Context, startTime
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var item usagestats.DailyReportTrendPoint
 		if err := rows.Scan(&item.Date, &item.ActiveUsers, &item.Requests, &item.ActualCost); err != nil {
@@ -64,7 +64,7 @@ func (r *usageLogRepository) scanDailyReportMultipliers(ctx context.Context, sta
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var item usagestats.DailyReportMultiplierStat
 		if err := rows.Scan(&item.RateMultiplier, &item.Requests, &item.ActiveUsers, &item.TotalTokens, &item.Cost, &item.ActualCost, &item.AccountCost); err != nil {
@@ -100,7 +100,7 @@ func (r *usageLogRepository) scanDailyReportGroups(ctx context.Context, startTim
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	groupIndex := map[int64]int{}
 	for rows.Next() {
 		var groupID int64
@@ -132,7 +132,7 @@ func (r *usageLogRepository) scanDailyReportUsers(ctx context.Context, startTime
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var item usagestats.DailyReportUserStat
 		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &item.Requests, &item.TotalTokens, &item.Cost, &item.ActualCost); err != nil {
