@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -57,6 +58,12 @@ type BulkAssignSubscriptionRequest struct {
 // AdjustSubscriptionRequest represents adjust subscription request (extend or shorten)
 type AdjustSubscriptionRequest struct {
 	Days int `json:"days" binding:"required,min=-36500,max=36500"` // negative to shorten, positive to extend
+}
+
+type GrantSubscriptionAddonRequest struct {
+	QuotaUSD  float64    `json:"quota_usd" binding:"required,gt=0,lte=1000000"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	Notes     string     `json:"notes" binding:"max=2000"`
 }
 
 // List handles listing all subscriptions with pagination and filters
@@ -271,6 +278,84 @@ func (h *SubscriptionHandler) ResetQuota(c *gin.Context) {
 		return
 	}
 	response.Success(c, dto.UserSubscriptionFromServiceAdmin(sub))
+}
+
+// ListAddons lists all add-on packs attached to a subscription.
+// GET /api/v1/admin/subscriptions/:id/addons
+func (h *SubscriptionHandler) ListAddons(c *gin.Context) {
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+	packs, err := h.subscriptionService.ListAddons(c.Request.Context(), subscriptionID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]dto.SubscriptionAddonPack, 0, len(packs))
+	for i := range packs {
+		out = append(out, *dto.SubscriptionAddonPackFromService(&packs[i]))
+	}
+	response.Success(c, out)
+}
+
+// GrantAddon grants a quota add-on pack to one active subscription.
+// POST /api/v1/admin/subscriptions/:id/addons
+func (h *SubscriptionHandler) GrantAddon(c *gin.Context) {
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+	var req GrantSubscriptionAddonRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	payload := struct {
+		SubscriptionID int64                         `json:"subscription_id"`
+		Body           GrantSubscriptionAddonRequest `json:"body"`
+	}{SubscriptionID: subscriptionID, Body: req}
+	adminID := getAdminIDFromContext(c)
+	executeAdminIdempotentJSON(c, "admin.subscriptions.addons.grant", payload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		pack, execErr := h.subscriptionService.GrantAddon(ctx, &service.GrantSubscriptionAddonInput{
+			SubscriptionID: subscriptionID,
+			QuotaUSD:       req.QuotaUSD,
+			ExpiresAt:      req.ExpiresAt,
+			AssignedBy:     adminID,
+			Notes:          req.Notes,
+		})
+		if execErr != nil {
+			return nil, execErr
+		}
+		return dto.SubscriptionAddonPackFromService(pack), nil
+	})
+}
+
+// RevokeAddon revokes an unused remainder without changing historical usage.
+// POST /api/v1/admin/subscriptions/:id/addons/:addon_id/revoke
+func (h *SubscriptionHandler) RevokeAddon(c *gin.Context) {
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+	addonID, err := strconv.ParseInt(c.Param("addon_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid add-on ID")
+		return
+	}
+	payload := struct {
+		SubscriptionID int64 `json:"subscription_id"`
+		AddonID        int64 `json:"addon_id"`
+	}{SubscriptionID: subscriptionID, AddonID: addonID}
+	executeAdminIdempotentJSON(c, "admin.subscriptions.addons.revoke", payload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		if execErr := h.subscriptionService.RevokeAddon(ctx, subscriptionID, addonID); execErr != nil {
+			return nil, execErr
+		}
+		return gin.H{"message": "Subscription add-on revoked successfully"}, nil
+	})
 }
 
 // Revoke handles revoking a subscription.

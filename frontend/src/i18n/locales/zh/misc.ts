@@ -8,6 +8,8 @@ export default {
     daily: '每日',
     weekly: '每周',
     monthly: '每月',
+    addonPack: '加油包',
+    addonExpires: '加油包将在 {date} 到期',
     daysRemaining: '剩余 {days} 天',
     expired: '已过期',
     expiresToday: '今天到期',

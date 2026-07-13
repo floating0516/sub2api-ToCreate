@@ -50,6 +50,7 @@ type SubscriptionService struct {
 	userSubRepo         UserSubscriptionRepository
 	billingCacheService *BillingCacheService
 	entClient           *dbent.Client
+	addonRepo           SubscriptionAddonRepository
 
 	// L1 缓存：加速中间件热路径的订阅查询
 	subCacheL1     *ristretto.Cache
@@ -71,6 +72,12 @@ func NewSubscriptionService(groupRepo GroupRepository, userSubRepo UserSubscript
 	svc.initSubCache(cfg)
 	svc.initMaintenanceQueue(cfg)
 	svc.StartSubCacheInvalidationSubscriber(context.Background())
+	return svc
+}
+
+func ProvideSubscriptionService(groupRepo GroupRepository, userSubRepo UserSubscriptionRepository, billingCacheService *BillingCacheService, entClient *dbent.Client, cfg *config.Config, addonRepo SubscriptionAddonRepository) *SubscriptionService {
+	svc := NewSubscriptionService(groupRepo, userSubRepo, billingCacheService, entClient, cfg)
+	svc.addonRepo = addonRepo
 	return svc
 }
 
@@ -769,6 +776,9 @@ func (s *SubscriptionService) ListUserSubscriptions(ctx context.Context, userID 
 	}
 	normalizeExpiredWindows(subs)
 	normalizeSubscriptionStatus(subs)
+	if err := s.attachAddonSummaries(ctx, subs); err != nil {
+		return nil, err
+	}
 	return subs, nil
 }
 
@@ -779,6 +789,9 @@ func (s *SubscriptionService) ListActiveUserSubscriptions(ctx context.Context, u
 		return nil, err
 	}
 	normalizeExpiredWindows(subs)
+	if err := s.attachAddonSummaries(ctx, subs); err != nil {
+		return nil, err
+	}
 	return subs, nil
 }
 
@@ -791,6 +804,9 @@ func (s *SubscriptionService) ListGroupSubscriptions(ctx context.Context, groupI
 	}
 	normalizeExpiredWindows(subs)
 	normalizeSubscriptionStatus(subs)
+	if err := s.attachAddonSummaries(ctx, subs); err != nil {
+		return nil, nil, err
+	}
 	return subs, pag, nil
 }
 
@@ -803,6 +819,9 @@ func (s *SubscriptionService) List(ctx context.Context, page, pageSize int, user
 	}
 	normalizeExpiredWindows(subs)
 	normalizeSubscriptionStatus(subs)
+	if err := s.attachAddonSummaries(ctx, subs); err != nil {
+		return nil, nil, err
+	}
 	return subs, pag, nil
 }
 
@@ -849,6 +868,17 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 	if err != nil {
 		return nil, err
 	}
+	addonQuotaTotals := make(map[int64]SubscriptionAddonQuotaTotal)
+	if s.addonRepo != nil && len(subs) > 0 {
+		ids := make([]int64, 0, len(subs))
+		for i := range subs {
+			ids = append(ids, subs[i].ID)
+		}
+		addonQuotaTotals, err = s.addonRepo.GetCurrentTermQuotaTotals(ctx, ids, time.Now())
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	result := &SubscriptionRetentionEstimate{}
 	for i := range subs {
@@ -869,6 +899,7 @@ func (s *SubscriptionService) GetRetentionEstimate(ctx context.Context, userID, 
 		if !ok || limit <= 0 {
 			continue
 		}
+		limit += addonQuotaTotals[sub.ID].EffectiveQuotaUSD
 		used, unused, overage := calculateSubscriptionQuotaOutcome(
 			limit,
 			math.Max(termUsage[sub.ID], currentSubscriptionUsageFloor(sub)),

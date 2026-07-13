@@ -8,6 +8,8 @@ export default {
     daily: 'Daily',
     weekly: 'Weekly',
     monthly: 'Monthly',
+    addonPack: 'Add-on quota',
+    addonExpires: 'Add-on expires on {date}',
     daysRemaining: '{days} days left',
     expired: 'Expired',
     expiresToday: 'Expires today',

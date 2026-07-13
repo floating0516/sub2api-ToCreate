@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -113,6 +114,7 @@ type BillingCacheService struct {
 	cfg                   *config.Config
 	circuitBreaker        *billingCircuitBreaker
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	addonRepo              SubscriptionAddonRepository
 
 	cacheWriteChan     chan cacheWriteTask
 	cacheWriteWg       sync.WaitGroup
@@ -138,6 +140,7 @@ func NewBillingCacheService(
 	userGroupRateRepo UserGroupRateRepository,
 	cfg *config.Config,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	addonRepos ...SubscriptionAddonRepository,
 ) *BillingCacheService {
 	svc := &BillingCacheService{
 		cache:                 cache,
@@ -148,6 +151,9 @@ func NewBillingCacheService(
 		userGroupRateRepo:     userGroupRateRepo,
 		cfg:                   cfg,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+	}
+	if len(addonRepos) > 0 {
+		svc.addonRepo = addonRepos[0]
 	}
 	svc.circuitBreaker = newBillingCircuitBreaker(cfg.Billing.CircuitBreaker)
 	svc.startCacheWriteWorkers()
@@ -940,19 +946,32 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 		}
 	}
 
+	var quotaErr error
 	if group.HasDailyLimit() && dailyUsage >= *group.DailyLimitUSD {
-		return ErrDailyLimitExceeded
+		quotaErr = ErrDailyLimitExceeded
+	} else if group.HasWeeklyLimit() && weeklyUsage >= *group.WeeklyLimitUSD {
+		quotaErr = ErrWeeklyLimitExceeded
+	} else if group.HasMonthlyLimit() && monthlyUsage >= *group.MonthlyLimitUSD {
+		quotaErr = ErrMonthlyLimitExceeded
 	}
-
-	if group.HasWeeklyLimit() && weeklyUsage >= *group.WeeklyLimitUSD {
-		return ErrWeeklyLimitExceeded
+	if quotaErr == nil {
+		return nil
 	}
-
-	if group.HasMonthlyLimit() && monthlyUsage >= *group.MonthlyLimitUSD {
-		return ErrMonthlyLimitExceeded
+	if subscription != nil && subscription.ActiveAddon != nil && subscription.ActiveAddon.IsUsableAt(time.Now()) {
+		return nil
 	}
-
-	return nil
+	if s.addonRepo == nil || subscription == nil {
+		return quotaErr
+	}
+	addon, addonErr := s.addonRepo.GetUsableForSubscription(ctx, subscription.ID, time.Now())
+	if addonErr == nil {
+		subscription.ActiveAddon = addon
+		return nil
+	}
+	if errors.Is(addonErr, ErrSubscriptionAddonNotFound) {
+		return quotaErr
+	}
+	return ErrBillingServiceUnavailable.WithCause(addonErr)
 }
 
 type billingCircuitBreakerState int

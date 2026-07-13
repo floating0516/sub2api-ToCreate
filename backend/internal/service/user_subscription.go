@@ -19,6 +19,8 @@ type UserSubscription struct {
 	WeeklyUsageUSD  float64
 	MonthlyUsageUSD float64
 	LastUsedAt      *time.Time
+	AddonSummary    *SubscriptionAddonSummary
+	ActiveAddon     *SubscriptionAddonPack
 
 	AssignedBy *int64
 	AssignedAt time.Time

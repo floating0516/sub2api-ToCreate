@@ -172,7 +172,13 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 }
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
-	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
+	if cmd.AddonCost > 0 && cmd.AddonPackID != nil && cmd.SubscriptionID != nil {
+		exhausted, err := incrementUsageBillingSubscriptionAddon(ctx, tx, cmd)
+		if err != nil {
+			return err
+		}
+		result.AddonExhausted = exhausted
+	} else if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
 		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
 			return err
 		}
@@ -210,6 +216,36 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	return nil
+}
+
+func incrementUsageBillingSubscriptionAddon(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) (bool, error) {
+	var quotaUSD, usedUSD float64
+	err := tx.QueryRowContext(ctx, `
+		UPDATE subscription_addon_packs
+		SET used_usd = used_usd + $1,
+			status = CASE
+				WHEN status = 'revoked' THEN status
+				WHEN used_usd + $1 >= quota_usd THEN 'exhausted'
+				ELSE status
+			END,
+			updated_at = NOW()
+		WHERE id = $2 AND subscription_id = $3
+		RETURNING quota_usd, used_usd
+	`, cmd.AddonCost, *cmd.AddonPackID, *cmd.SubscriptionID).Scan(&quotaUSD, &usedUSD)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, service.ErrSubscriptionAddonNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO subscription_addon_usage (
+			addon_pack_id, subscription_id, user_id, api_key_id, request_id, cost_usd
+		) VALUES ($1, $2, $3, $4, $5, $6)
+	`, *cmd.AddonPackID, *cmd.SubscriptionID, cmd.UserID, cmd.APIKeyID, cmd.RequestID, cmd.AddonCost); err != nil {
+		return false, err
+	}
+	return usedUSD >= quotaUSD, nil
 }
 
 func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscriptionID int64, costUSD float64) error {

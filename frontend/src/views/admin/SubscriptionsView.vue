@@ -380,6 +380,21 @@
                   {{ t('admin.subscriptions.unlimited') }}
                 </span>
               </div>
+
+              <div v-if="row.addon_summary?.remaining_usd" class="usage-row border-t border-gray-100 pt-2 dark:border-dark-600">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label text-emerald-700 dark:text-emerald-300">{{ t('admin.subscriptions.addonPack') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full bg-emerald-500 transition-all"
+                      :style="{ width: getProgressWidth(row.addon_summary.used_usd, row.addon_summary.total_quota_usd) }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    ${{ row.addon_summary.remaining_usd.toFixed(2) }}
+                  </span>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -428,6 +443,14 @@
               >
                 <Icon name="calendar" size="sm" />
                 <span class="text-xs">{{ t('admin.subscriptions.adjust') }}</span>
+              </button>
+              <button
+                v-if="row.status === 'active'"
+                @click="handleAddon(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              >
+                <Icon name="plus" size="sm" />
+                <span class="text-xs">{{ t('admin.subscriptions.addonPack') }}</span>
               </button>
               <button
                 v-if="row.status === 'active'"
@@ -779,6 +802,78 @@
       </template>
     </BaseDialog>
 
+    <BaseDialog
+      :show="showAddonModal"
+      :title="t('admin.subscriptions.addonTitle')"
+      width="normal"
+      @close="closeAddonModal"
+    >
+      <form v-if="addonSubscription" id="subscription-addon-form" class="space-y-5" @submit.prevent="grantAddon">
+        <div class="flex items-center justify-between border-b border-gray-200 pb-3 text-sm dark:border-dark-600">
+          <span class="text-gray-500 dark:text-gray-400">{{ addonSubscription.user?.email }}</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ addonSubscription.group?.name }}</span>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.subscriptions.addonQuota') }}</label>
+          <input v-model.number="addonForm.quota_usd" type="number" min="0.01" max="1000000" step="0.01" required class="input" />
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              v-for="amount in addonQuickAmounts"
+              :key="amount"
+              type="button"
+              class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-dark-600 dark:text-gray-300"
+              @click="addonForm.quota_usd = amount"
+            >
+              ${{ amount }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.subscriptions.addonExpires') }}</label>
+          <input v-model="addonForm.expires_at" type="datetime-local" required class="input" />
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.subscriptions.addonNotes') }}</label>
+          <textarea v-model="addonForm.notes" rows="2" maxlength="2000" class="input" />
+        </div>
+
+        <div v-if="addonPacks.length" class="overflow-hidden border-t border-gray-200 pt-4 dark:border-dark-600">
+          <div class="mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.subscriptions.addonHistory') }}</div>
+          <div class="max-h-52 overflow-y-auto">
+            <table class="w-full text-sm">
+              <tbody>
+                <tr v-for="pack in addonPacks" :key="pack.id" class="border-b border-gray-100 last:border-0 dark:border-dark-700">
+                  <td class="py-2 pr-3 tabular-nums text-gray-700 dark:text-gray-300">
+                    ${{ pack.remaining_usd.toFixed(2) }} / ${{ pack.quota_usd.toFixed(2) }}
+                  </td>
+                  <td class="py-2 pr-3 text-xs text-gray-500">{{ formatDateOnly(pack.expires_at) }}</td>
+                  <td class="py-2 text-right">
+                    <button
+                      v-if="canRevokeAddon(pack)"
+                      type="button"
+                      class="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400"
+                      @click="revokeAddon(pack.id)"
+                    >
+                      {{ t('admin.subscriptions.addonRevoke') }}
+                    </button>
+                    <span v-else class="text-xs text-gray-400">{{ t(`admin.subscriptions.addonStatus.${effectiveAddonStatus(pack)}`) }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button type="button" class="btn btn-secondary" @click="closeAddonModal">{{ t('common.cancel') }}</button>
+          <button type="submit" form="subscription-addon-form" class="btn btn-primary" :disabled="addonSubmitting">
+            {{ addonSubmitting ? t('admin.subscriptions.addonGranting') : t('admin.subscriptions.addonGrant') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
     <!-- Revoke Confirmation Dialog -->
     <ConfirmDialog
       :show="showRevokeDialog"
@@ -924,7 +1019,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import type { SubscriptionRetentionEstimate } from '@/api/admin/subscriptions'
-import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
+import type { UserSubscription, Group, GroupPlatform, SubscriptionType, SubscriptionAddonPack } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
 import { formatCurrency, formatDateOnly, formatRelativeTime } from '@/utils/format'
@@ -1151,12 +1246,23 @@ const showExtendModal = ref(false)
 const showRevokeDialog = ref(false)
 const showRestoreDialog = ref(false)
 const showResetQuotaConfirm = ref(false)
+const showAddonModal = ref(false)
 const submitting = ref(false)
 const resettingSubscription = ref<UserSubscription | null>(null)
 const resettingQuota = ref(false)
 const extendingSubscription = ref<UserSubscription | null>(null)
 const revokingSubscription = ref<UserSubscription | null>(null)
 const restoringSubscription = ref<UserSubscription | null>(null)
+const addonSubscription = ref<UserSubscription | null>(null)
+const addonPacks = ref<SubscriptionAddonPack[]>([])
+const addonSubmitting = ref(false)
+
+const addonQuickAmounts = [10, 20, 50, 100]
+const addonForm = reactive({
+  quota_usd: 20,
+  expires_at: '',
+  notes: ''
+})
 
 const resetQuotaForm = reactive<Record<ResetQuotaWindow, boolean>>({
   daily: true,
@@ -1625,6 +1731,78 @@ const handleResetQuota = (subscription: UserSubscription) => {
   resetQuotaForm.monthly = true
   showResetQuotaConfirm.value = true
 }
+
+const toDatetimeLocal = (value?: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const handleAddon = async (subscription: UserSubscription) => {
+  addonSubscription.value = subscription
+  addonForm.quota_usd = 20
+  addonForm.expires_at = toDatetimeLocal(subscription.expires_at)
+  addonForm.notes = ''
+  addonPacks.value = []
+  showAddonModal.value = true
+  try {
+    addonPacks.value = await adminAPI.subscriptions.listAddons(subscription.id)
+  } catch (error) {
+    console.error('Error loading subscription add-ons:', error)
+  }
+}
+
+const closeAddonModal = () => {
+  showAddonModal.value = false
+  addonSubscription.value = null
+  addonPacks.value = []
+}
+
+const grantAddon = async () => {
+  if (!addonSubscription.value || addonSubmitting.value) return
+  const quota = Number(addonForm.quota_usd)
+  const expires = new Date(addonForm.expires_at)
+  if (!Number.isFinite(quota) || quota <= 0 || Number.isNaN(expires.getTime())) {
+    appStore.showError(t('admin.subscriptions.addonInvalid'))
+    return
+  }
+  addonSubmitting.value = true
+  try {
+    await adminAPI.subscriptions.grantAddon(addonSubscription.value.id, {
+      quota_usd: quota,
+      expires_at: expires.toISOString(),
+      notes: addonForm.notes.trim()
+    })
+    appStore.showSuccess(t('admin.subscriptions.addonGranted'))
+    addonPacks.value = await adminAPI.subscriptions.listAddons(addonSubscription.value.id)
+    await loadSubscriptions()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.subscriptions.addonGrantFailed'))
+  } finally {
+    addonSubmitting.value = false
+  }
+}
+
+const revokeAddon = async (addonId: number) => {
+  if (!addonSubscription.value || !window.confirm(t('admin.subscriptions.addonRevokeConfirm'))) return
+  try {
+    await adminAPI.subscriptions.revokeAddon(addonSubscription.value.id, addonId)
+    addonPacks.value = await adminAPI.subscriptions.listAddons(addonSubscription.value.id)
+    await loadSubscriptions()
+    appStore.showSuccess(t('admin.subscriptions.addonRevoked'))
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.subscriptions.addonRevokeFailed'))
+  }
+}
+
+const effectiveAddonStatus = (pack: SubscriptionAddonPack): string => {
+  if (pack.status === 'active' && new Date(pack.expires_at) <= new Date()) return 'expired'
+  return pack.status
+}
+
+const canRevokeAddon = (pack: SubscriptionAddonPack): boolean =>
+  pack.status === 'active' && pack.remaining_usd > 0 && new Date(pack.expires_at) > new Date()
 
 const cancelResetQuota = () => {
   showResetQuotaConfirm.value = false

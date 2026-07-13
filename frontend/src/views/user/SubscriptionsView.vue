@@ -100,6 +100,24 @@
               }}</span>
             </div>
 
+            <div v-if="subscription.addon_summary?.remaining_usd" class="space-y-2 border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-emerald-700 dark:text-emerald-300">{{ t('userSubscriptions.addonPack') }}</span>
+                <span class="text-sm tabular-nums text-gray-500 dark:text-dark-400">
+                  ${{ subscription.addon_summary.remaining_usd.toFixed(2) }} / ${{ subscription.addon_summary.total_quota_usd.toFixed(2) }}
+                </span>
+              </div>
+              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div
+                  class="absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-all duration-300"
+                  :style="{ width: getProgressWidth(subscription.addon_summary.used_usd, subscription.addon_summary.total_quota_usd) }"
+                ></div>
+              </div>
+              <p v-if="subscription.addon_summary.nearest_expires_at" class="text-xs text-gray-500 dark:text-dark-400">
+                {{ t('userSubscriptions.addonExpires', { date: formatDateOnly(subscription.addon_summary.nearest_expires_at) }) }}
+              </p>
+            </div>
+
             <!-- Daily Usage -->
             <div v-if="subscription.group?.daily_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">

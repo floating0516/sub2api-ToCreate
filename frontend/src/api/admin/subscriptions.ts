@@ -10,6 +10,7 @@ import type {
   AssignSubscriptionRequest,
   BulkAssignSubscriptionRequest,
   ExtendSubscriptionRequest,
+  SubscriptionAddonPack,
   PaginatedResponse
 } from '@/types'
 
@@ -169,6 +170,31 @@ export async function resetQuota(
   return data
 }
 
+export async function listAddons(id: number): Promise<SubscriptionAddonPack[]> {
+  const { data } = await apiClient.get<SubscriptionAddonPack[]>(
+    `/admin/subscriptions/${id}/addons`
+  )
+  return data
+}
+
+export async function grantAddon(
+  id: number,
+  request: { quota_usd: number; expires_at?: string; notes?: string }
+): Promise<SubscriptionAddonPack> {
+  const { data } = await apiClient.post<SubscriptionAddonPack>(
+    `/admin/subscriptions/${id}/addons`,
+    request
+  )
+  return data
+}
+
+export async function revokeAddon(id: number, addonId: number): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    `/admin/subscriptions/${id}/addons/${addonId}/revoke`
+  )
+  return data
+}
+
 /**
  * List subscriptions by group
  * @param groupId - Group ID
@@ -222,6 +248,9 @@ export const subscriptionsAPI = {
   revoke,
   restore,
   resetQuota,
+  listAddons,
+  grantAddon,
+  revokeAddon,
   listByGroup,
   listByUser
 }

@@ -27,6 +27,13 @@ func (s *SubscriptionService) snapshotSubscriptionTerm(ctx context.Context, sub 
 	if !ok {
 		capacity = 0
 	}
+	if s.addonRepo != nil {
+		addonQuota, err := s.addonRepo.GetGrantedQuotaForTerm(ctx, sub.ID, sub.StartsAt, sub.ExpiresAt)
+		if err != nil {
+			return err
+		}
+		capacity += addonQuota
+	}
 	usageBySubscription, err := s.subscriptionTermUsage(ctx, []UserSubscription{*sub})
 	if err != nil {
 		return err
@@ -72,7 +79,14 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 			us.id, us.user_id, us.group_id, us.starts_at, us.expires_at,
 			us.daily_usage_usd, us.weekly_usage_usd, us.monthly_usage_usd,
 			g.daily_limit_usd, g.weekly_limit_usd, g.monthly_limit_usd,
-			COALESCE(SUM(ul.actual_cost), 0)
+			COALESCE(SUM(ul.actual_cost), 0),
+			COALESCE((
+				SELECT SUM(sap.quota_usd)
+				FROM subscription_addon_packs sap
+				WHERE sap.subscription_id = us.id
+					AND sap.starts_at >= us.starts_at
+					AND sap.starts_at < us.expires_at
+			), 0)
 		FROM user_subscriptions us
 		JOIN groups g ON g.id = us.group_id AND g.deleted_at IS NULL
 		LEFT JOIN usage_logs ul
@@ -94,7 +108,8 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 		daily     sql.NullFloat64
 		weekly    sql.NullFloat64
 		monthly   sql.NullFloat64
-		loggedUse float64
+		loggedUse  float64
+		addonQuota float64
 	}
 	terms := make([]expiredTerm, 0)
 	for rows.Next() {
@@ -102,7 +117,7 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 		if err := rows.Scan(
 			&term.sub.ID, &term.sub.UserID, &term.sub.GroupID, &term.sub.StartsAt, &term.sub.ExpiresAt,
 			&term.sub.DailyUsageUSD, &term.sub.WeeklyUsageUSD, &term.sub.MonthlyUsageUSD,
-			&term.daily, &term.weekly, &term.monthly, &term.loggedUse,
+			&term.daily, &term.weekly, &term.monthly, &term.loggedUse, &term.addonQuota,
 		); err != nil {
 			return err
 		}
@@ -125,6 +140,7 @@ func snapshotExpiredSubscriptionTerms(ctx context.Context, db *sql.DB) error {
 	for i := range terms {
 		term := &terms[i]
 		capacity, _ := subscriptionTermQuotaCapacity(&term.sub)
+		capacity += term.addonQuota
 		used, unused, overage := calculateSubscriptionQuotaOutcome(
 			capacity,
 			math.Max(term.loggedUse, currentSubscriptionUsageFloor(&term.sub)),

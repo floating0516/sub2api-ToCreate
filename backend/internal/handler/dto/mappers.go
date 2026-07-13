@@ -797,7 +797,7 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 }
 
 func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {
-	return UserSubscription{
+	out := UserSubscription{
 		ID:                 sub.ID,
 		UserID:             sub.UserID,
 		GroupID:            sub.GroupID,
@@ -815,6 +815,36 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		RevokedAt:          sub.DeletedAt,
 		User:               UserFromServiceShallow(sub.User),
 		Group:              GroupFromServiceShallow(sub.Group),
+	}
+	if sub.AddonSummary != nil {
+		out.AddonSummary = &SubscriptionAddonSummary{
+			TotalQuotaUSD:    sub.AddonSummary.TotalQuotaUSD,
+			UsedUSD:          sub.AddonSummary.UsedUSD,
+			RemainingUSD:     sub.AddonSummary.RemainingUSD,
+			ActivePackCount:  sub.AddonSummary.ActivePackCount,
+			NearestExpiresAt: sub.AddonSummary.NearestExpiresAt,
+		}
+	}
+	return out
+}
+
+func SubscriptionAddonPackFromService(pack *service.SubscriptionAddonPack) *SubscriptionAddonPack {
+	if pack == nil {
+		return nil
+	}
+	return &SubscriptionAddonPack{
+		ID:             pack.ID,
+		SubscriptionID: pack.SubscriptionID,
+		QuotaUSD:       pack.QuotaUSD,
+		UsedUSD:        pack.UsedUSD,
+		RemainingUSD:   pack.RemainingUSD(),
+		StartsAt:       pack.StartsAt,
+		ExpiresAt:      pack.ExpiresAt,
+		Status:         pack.Status,
+		AssignedBy:     pack.AssignedBy,
+		Notes:          pack.Notes,
+		RevokedAt:      pack.RevokedAt,
+		CreatedAt:      pack.CreatedAt,
 	}
 }
 

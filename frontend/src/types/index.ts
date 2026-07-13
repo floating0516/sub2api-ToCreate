@@ -1702,6 +1702,7 @@ export interface UserSubscription {
   daily_usage_usd: number
   weekly_usage_usd: number
   monthly_usage_usd: number
+  addon_summary?: SubscriptionAddonSummary | null
   daily_window_start: string | null
   weekly_window_start: string | null
   monthly_window_start: string | null
@@ -1712,6 +1713,29 @@ export interface UserSubscription {
   expires_at: string | null
   user?: User
   group?: Group
+}
+
+export interface SubscriptionAddonSummary {
+  total_quota_usd: number
+  used_usd: number
+  remaining_usd: number
+  active_pack_count: number
+  nearest_expires_at?: string | null
+}
+
+export interface SubscriptionAddonPack {
+  id: number
+  subscription_id: number
+  quota_usd: number
+  used_usd: number
+  remaining_usd: number
+  starts_at: string
+  expires_at: string
+  status: 'active' | 'exhausted' | 'revoked'
+  assigned_by?: number | null
+  notes: string
+  revoked_at?: string | null
+  created_at: string
 }
 
 export interface AccountConcurrencyDetail {

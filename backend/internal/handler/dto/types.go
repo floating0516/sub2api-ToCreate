@@ -640,9 +640,10 @@ type UserSubscription struct {
 	WeeklyWindowStart  *time.Time `json:"weekly_window_start"`
 	MonthlyWindowStart *time.Time `json:"monthly_window_start"`
 
-	DailyUsageUSD   float64 `json:"daily_usage_usd"`
-	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
-	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
+	DailyUsageUSD   float64                   `json:"daily_usage_usd"`
+	WeeklyUsageUSD  float64                   `json:"weekly_usage_usd"`
+	MonthlyUsageUSD float64                   `json:"monthly_usage_usd"`
+	AddonSummary    *SubscriptionAddonSummary `json:"addon_summary,omitempty"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -650,6 +651,29 @@ type UserSubscription struct {
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
+}
+
+type SubscriptionAddonSummary struct {
+	TotalQuotaUSD    float64    `json:"total_quota_usd"`
+	UsedUSD          float64    `json:"used_usd"`
+	RemainingUSD     float64    `json:"remaining_usd"`
+	ActivePackCount  int        `json:"active_pack_count"`
+	NearestExpiresAt *time.Time `json:"nearest_expires_at,omitempty"`
+}
+
+type SubscriptionAddonPack struct {
+	ID             int64      `json:"id"`
+	SubscriptionID int64      `json:"subscription_id"`
+	QuotaUSD       float64    `json:"quota_usd"`
+	UsedUSD        float64    `json:"used_usd"`
+	RemainingUSD   float64    `json:"remaining_usd"`
+	StartsAt       time.Time  `json:"starts_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	Status         string     `json:"status"`
+	AssignedBy     *int64     `json:"assigned_by,omitempty"`
+	Notes          string     `json:"notes"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。

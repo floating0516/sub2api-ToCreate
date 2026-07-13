@@ -140,19 +140,12 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				return
 			}
 
-			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			if needsMaintenance {
-				refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
-				if maintenanceErr != nil {
-					abortWithGoogleError(c, 500, "Failed to maintain subscription usage windows")
-					return
-				}
-				subscription = refreshed
-				_, err = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			}
+			resolved, err := subscriptionService.ResolveUsageAccess(c.Request.Context(), subscription, apiKey.Group)
 			if err != nil {
 				status := 403
-				if errors.Is(err, service.ErrDailyLimitExceeded) ||
+				if errors.Is(err, service.ErrBillingServiceUnavailable) {
+					status = 503
+				} else if errors.Is(err, service.ErrDailyLimitExceeded) ||
 					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
 					errors.Is(err, service.ErrMonthlyLimitExceeded) {
 					status = 429
@@ -160,6 +153,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				abortWithGoogleError(c, status, err.Error())
 				return
 			}
+			subscription = resolved
 
 			c.Set(string(ContextKeySubscription), subscription)
 		} else {
