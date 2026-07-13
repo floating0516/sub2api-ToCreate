@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,6 +175,34 @@ func TestGatewayHandleStreamingAwareError_MessagesStreamingKeepsLegacy(t *testin
 
 	body := w.Body.String()
 	assert.True(t, strings.HasPrefix(body, `data: {"type":"error"`), "got: %q", body)
+}
+
+func TestOpenAIAnthropicStreamingAwareError_PreHeaderKeepaliveEmitsSSEError(t *testing.T) {
+	c, w := newGinContextForEndpoint(t, EndpointMessages)
+	stop := service.StartOpenAIMessagesSSEKeepalive(c, 10*time.Millisecond)
+	defer stop()
+	time.Sleep(20 * time.Millisecond)
+
+	h := &OpenAIGatewayHandler{}
+	h.anthropicStreamingAwareError(c, http.StatusBadGateway, "api_error", "upstream failed", false)
+
+	body := w.Body.String()
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, body, "event: ping\n")
+	require.Contains(t, body, "event: error\n")
+	require.Contains(t, body, `"message":"upstream failed"`)
+}
+
+func TestOpenAIEnsureAnthropicErrorResponse_HeartbeatOnlyWritesTerminalError(t *testing.T) {
+	c, w := newGinContextForEndpoint(t, EndpointMessages)
+	stop := service.StartOpenAIMessagesSSEKeepalive(c, 10*time.Millisecond)
+	defer stop()
+	time.Sleep(20 * time.Millisecond)
+
+	h := &OpenAIGatewayHandler{}
+	require.True(t, h.ensureAnthropicErrorResponse(c, false))
+	require.Contains(t, w.Body.String(), "event: error\n")
+	require.Contains(t, w.Body.String(), "Upstream request failed")
 }
 
 // 项目里 /responses 注册在多组路由：/v1/responses（gateway）、裸 /responses（top-level）、

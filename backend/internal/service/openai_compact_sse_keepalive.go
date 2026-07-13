@@ -11,48 +11,100 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// openAICompactSSEKeepaliveKey 存放 body-signal compact 请求的下游 SSE 心跳器。
-const openAICompactSSEKeepaliveKey = "openai_compact_sse_keepalive"
+const (
+	// openAICompactSSEKeepaliveKey stores the Responses compact downstream
+	// keepalive state for the current request.
+	openAICompactSSEKeepaliveKey = "openai_compact_sse_keepalive"
+	// openAIMessagesSSEKeepaliveKey stores the Anthropic Messages downstream
+	// keepalive state across OpenAI account retries.
+	openAIMessagesSSEKeepaliveKey = "openai_messages_sse_keepalive"
+)
 
-// openAICompactSSEKeepalive 在 compact 上游 unary 等待期间向下游写 SSE 注释行
-// 心跳。上游 /responses/compact 在模型处理期间不发送任何字节（大上下文可长达
-// 数分钟），下游若经过反向代理（Nginx/Cloudflare Tunnel 等），零字节静默会触发
-// 代理的空闲/读超时并掐断连接，Codex 只会盲目重连并重复消耗上游 compact
-// 配额（#3887）。SSE 注释行在 eventsource 解析层被直接忽略，不会进入客户端
-// 事件流。
-//
-// 首拍延迟一个 interval：绝大多数硬错误（鉴权/参数/限流）在此之前返回，仍走
-// 原 JSON+状态码链路（Codex 按 HTTP 状态码重试）；首拍之后状态码固化为 200，
-// 后续错误由写回方降级为 response.failed 流内终止事件。
-type openAICompactSSEKeepalive struct {
-	mu      sync.Mutex
-	writer  gin.ResponseWriter
-	started bool
-	stopped bool
-	// bytes 是心跳已写出的注释字节数。心跳不构成语义响应，handler 的
-	// "Forward 期间是否已写响应"判定（failover 放弃换号的依据）必须扣除
-	// 这部分字节，见 OpenAICompactKeepaliveAdjustedWrittenSize。
-	bytes int
-	stop  chan struct{}
+var (
+	openAICompactKeepalivePayload  = []byte(": keepalive\n\n")
+	openAIMessagesKeepalivePayload = []byte("event: ping\ndata: {\"type\":\"ping\"}\n\n")
+)
+
+// openAISSEKeepaliveState survives individual upstream attempts so heartbeat
+// bytes remain excluded from failover's "response already written" check.
+type openAISSEKeepaliveState struct {
+	mu        sync.Mutex
+	writer    gin.ResponseWriter
+	active    *openAISSEKeepalive
+	committed bool
+	bytes     int
 }
 
-// StartOpenAICompactSSEKeepalive 为已标记 body-signal 客户端流式的 compact
-// 请求启动下游心跳，返回幂等的停止函数。interval<=0 或请求未标记时为 no-op。
-//
-// 同时把 c.Writer 替换为 openAICompactKeepaliveWriter：请求 goroutine 的任何
-// 响应构造都会先在心跳互斥锁下停拍，未被显式拦截的写回路径（如 Forward
-// 内部的本地拒绝）也不会与心跳 goroutine 产生数据竞争或字节交错。
+// openAISSEKeepalive writes protocol-safe downstream heartbeats while an
+// upstream request is waiting for response headers. A fresh instance is used
+// for each upstream attempt; the request-scoped state above is shared.
+type openAISSEKeepalive struct {
+	state   *openAISSEKeepaliveState
+	writer  gin.ResponseWriter
+	payload []byte
+	stopped bool
+	stop    chan struct{}
+}
+
+// Keep the existing internal names available for compact tests and callers.
+type openAICompactSSEKeepalive = openAISSEKeepalive
+type openAICompactKeepaliveWriter = openAISSEKeepaliveWriter
+
+// StartOpenAICompactSSEKeepalive starts SSE comment heartbeats while a
+// body-signal compact request waits for the unary upstream response.
 func StartOpenAICompactSSEKeepalive(c *gin.Context, interval time.Duration) func() {
-	if c == nil || c.Writer == nil || interval <= 0 || !openAICompactClientWantsStream(c) {
+	if !openAICompactClientWantsStream(c) {
 		return func() {}
 	}
-	originalWriter := c.Writer
-	k := &openAICompactSSEKeepalive{
-		writer: originalWriter,
-		stop:   make(chan struct{}),
+	return startOpenAISSEKeepalive(c, openAICompactSSEKeepaliveKey, interval, openAICompactKeepalivePayload)
+}
+
+// StartOpenAIMessagesSSEKeepalive starts Anthropic ping events while an OpenAI
+// /v1/messages bridge request waits for upstream response headers. The caller
+// must invoke the returned stop function before starting another attempt.
+func StartOpenAIMessagesSSEKeepalive(c *gin.Context, interval time.Duration) func() {
+	return startOpenAISSEKeepalive(c, openAIMessagesSSEKeepaliveKey, interval, openAIMessagesKeepalivePayload)
+}
+
+func startOpenAISSEKeepalive(c *gin.Context, key string, interval time.Duration, payload []byte) func() {
+	if c == nil || c.Writer == nil || interval <= 0 || len(payload) == 0 {
+		return func() {}
 	}
-	c.Set(openAICompactSSEKeepaliveKey, k)
-	wrappedWriter := &openAICompactKeepaliveWriter{ResponseWriter: originalWriter, k: k}
+
+	state := getOrCreateOpenAISSEKeepaliveState(c, key)
+	originalWriter := c.Writer
+	alreadyWritten := originalWriter.Written()
+	writtenSize := -1
+	if alreadyWritten {
+		writtenSize = originalWriter.Size()
+	}
+	k := &openAISSEKeepalive{
+		state:   state,
+		writer:  originalWriter,
+		payload: payload,
+		stop:    make(chan struct{}),
+	}
+
+	state.mu.Lock()
+	if state.active != nil {
+		state.active.markStoppedLocked()
+	}
+	state.writer = originalWriter
+	state.active = k
+	// A concurrency-wait keepalive may already have committed an SSE 200 before
+	// the upstream attempt starts. Preserve that response state.
+	if alreadyWritten && !state.committed {
+		state.committed = true
+		// Anything written before Forward starts is a scheduler/concurrency
+		// keepalive, not model output. Include it in the transport-only byte
+		// budget so failover and fallback checks remain accurate.
+		if writtenSize > 0 {
+			state.bytes += writtenSize
+		}
+	}
+	state.mu.Unlock()
+
+	wrappedWriter := &openAISSEKeepaliveWriter{ResponseWriter: originalWriter, k: k}
 	c.Writer = wrappedWriter
 
 	var reqDone <-chan struct{}
@@ -76,130 +128,170 @@ func StartOpenAICompactSSEKeepalive(c *gin.Context, interval time.Duration) func
 			timer.Reset(interval)
 		}
 	}()
+
 	return func() {
 		k.Stop()
-		// Do not leave a pooled middleware writer reachable through the compact
-		// wrapper after the request finishes.
-		if current, ok := c.Writer.(*openAICompactKeepaliveWriter); ok && current == wrappedWriter {
+		// Do not leave a pooled middleware writer reachable through the wrapper
+		// after this upstream attempt finishes.
+		if current, ok := c.Writer.(*openAISSEKeepaliveWriter); ok && current == wrappedWriter {
 			c.Writer = originalWriter
 		}
 	}
 }
 
-// beat 在锁内提交（首次）响应头并写出一条 SSE 注释行；返回 false 表示心跳已
-// 停止或下游写入失败，goroutine 应退出。
-func (k *openAICompactSSEKeepalive) beat() bool {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	if k.stopped {
+func getOrCreateOpenAISSEKeepaliveState(c *gin.Context, key string) *openAISSEKeepaliveState {
+	if value, ok := c.Get(key); ok {
+		if state, ok := value.(*openAISSEKeepaliveState); ok && state != nil {
+			return state
+		}
+	}
+	state := &openAISSEKeepaliveState{}
+	c.Set(key, state)
+	return state
+}
+
+// beat commits SSE headers on the first heartbeat and writes one protocol-safe
+// heartbeat block. It returns false when this attempt is no longer active.
+func (k *openAISSEKeepalive) beat() bool {
+	if k == nil || k.state == nil {
 		return false
 	}
-	if !k.started {
+	state := k.state
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if k.stopped || state.active != k || k.writer == nil {
+		return false
+	}
+	if !state.committed {
 		header := k.writer.Header()
 		header.Set("Content-Type", "text/event-stream")
 		header.Set("Cache-Control", "no-cache")
 		header.Set("Connection", "keep-alive")
 		header.Set("X-Accel-Buffering", "no")
 		k.writer.WriteHeader(http.StatusOK)
-		k.started = true
+		state.committed = true
 	}
-	n, err := k.writer.Write([]byte(": keepalive\n\n"))
-	k.bytes += n
+	n, err := k.writer.Write(k.payload)
+	state.bytes += n
 	if err != nil {
-		k.stopped = true
+		k.markStoppedLocked()
 		return false
 	}
 	k.writer.Flush()
 	return true
 }
 
-// Stop 停止心跳；幂等，可与写回路径并发调用。
-func (k *openAICompactSSEKeepalive) Stop() {
-	k.mu.Lock()
+// Stop stops this attempt's heartbeat. It is safe to call concurrently and is
+// idempotent.
+func (k *openAISSEKeepalive) Stop() {
+	if k == nil || k.state == nil {
+		return
+	}
+	k.state.mu.Lock()
 	k.markStoppedLocked()
-	k.mu.Unlock()
+	k.state.mu.Unlock()
 }
 
-func (k *openAICompactSSEKeepalive) markStoppedLocked() {
-	if k.stopped {
+// markStoppedLocked requires k.state.mu to be held.
+func (k *openAISSEKeepalive) markStoppedLocked() {
+	if k == nil || k.stopped {
 		return
 	}
 	k.stopped = true
+	if k.state != nil && k.state.active == k {
+		k.state.active = nil
+	}
 	close(k.stop)
 }
 
-// StopOpenAICompactSSEKeepaliveCommitted 停止当前请求的 compact 心跳（若有）
-// 并报告响应头是否已被心跳提交为 200。写回方以此决定继续走原 JSON/状态码
-// 链路，还是降级为流内终止事件。调用后不会再有心跳字节写出，且经由互斥锁
-// 与心跳 goroutine 建立 happens-before，调用方可安全接管 ResponseWriter。
+// StopOpenAICompactSSEKeepaliveCommitted stops compact heartbeats and reports
+// whether they committed HTTP 200.
 func StopOpenAICompactSSEKeepaliveCommitted(c *gin.Context) bool {
-	if c == nil {
+	return stopOpenAISSEKeepaliveCommitted(c, openAICompactSSEKeepaliveKey)
+}
+
+// StopOpenAIMessagesSSEKeepaliveCommitted stops the active Messages heartbeat
+// and reports whether any attempt committed HTTP 200.
+func StopOpenAIMessagesSSEKeepaliveCommitted(c *gin.Context) bool {
+	return stopOpenAISSEKeepaliveCommitted(c, openAIMessagesSSEKeepaliveKey)
+}
+
+func stopOpenAISSEKeepaliveCommitted(c *gin.Context, key string) bool {
+	state := openAISSEKeepaliveStateFromContext(c, key)
+	if state == nil {
 		return false
 	}
-	value, ok := c.Get(openAICompactSSEKeepaliveKey)
-	if !ok {
-		return false
+	state.mu.Lock()
+	if state.active != nil {
+		state.active.markStoppedLocked()
 	}
-	k, ok := value.(*openAICompactSSEKeepalive)
-	if !ok || k == nil {
-		return false
-	}
-	k.mu.Lock()
-	k.markStoppedLocked()
-	committed := k.started
-	k.mu.Unlock()
+	committed := state.committed
+	state.mu.Unlock()
 	return committed
 }
 
-// OpenAICompactKeepaliveAdjustedWrittenSize 返回排除 compact 心跳注释字节后
-// 的响应已写字节数；无心跳的请求等价于 c.Writer.Size()。心跳字节不构成语义
-// 响应——handler 以"Forward 前后 Size 是否变化"判定是否已向客户端写出响应
-// （变化则放弃 failover 换号），该判定不得被心跳污染，否则 compact 请求
-// 一旦在上游等待期间发过心跳，上游 429/5xx 就不再换号（#3887 加固审计）。
-// 仅心跳字节时归一化为 -1（gin 的"未写出"哨兵值），与提交前的快照可比。
+// OpenAICompactKeepaliveAdjustedWrittenSize returns the response size with
+// compact heartbeat bytes removed.
 func OpenAICompactKeepaliveAdjustedWrittenSize(c *gin.Context) int {
+	return openAISSEKeepaliveAdjustedWrittenSize(c, openAICompactSSEKeepaliveKey)
+}
+
+// OpenAIMessagesKeepaliveAdjustedWrittenSize returns the response size with
+// early Anthropic ping bytes removed. This keeps account failover available
+// while the client has only received heartbeats.
+func OpenAIMessagesKeepaliveAdjustedWrittenSize(c *gin.Context) int {
+	return openAISSEKeepaliveAdjustedWrittenSize(c, openAIMessagesSSEKeepaliveKey)
+}
+
+func openAISSEKeepaliveAdjustedWrittenSize(c *gin.Context, key string) int {
 	if c == nil || c.Writer == nil {
 		return -1
 	}
-	value, ok := c.Get(openAICompactSSEKeepaliveKey)
-	if !ok {
+	state := openAISSEKeepaliveStateFromContext(c, key)
+	if state == nil {
 		return c.Writer.Size()
 	}
-	k, ok := value.(*openAICompactSSEKeepalive)
-	if !ok || k == nil {
-		return c.Writer.Size()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.writer == nil {
+		return -1
 	}
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	size := k.writer.Size()
+	size := state.writer.Size()
 	if size < 0 {
 		return size
 	}
-	if real := size - k.bytes; real > 0 {
+	if real := size - state.bytes; real > 0 {
 		return real
 	}
 	return -1
 }
 
-// openAICompactKeepaliveWriter 包装 gin.ResponseWriter：写侧方法先停拍心跳
-// （互斥锁下建立 happens-before），读侧方法仅加锁不停拍——热路径的状态读取
-// （如 Forward 前的 Size 快照）不能误杀心跳。心跳 goroutine 直接写内层
-// writer（k.writer），不经过本包装器，不会递归。
-type openAICompactKeepaliveWriter struct {
-	gin.ResponseWriter
-	k *openAICompactSSEKeepalive
-}
-
-// suspend 停拍心跳；幂等。任何响应构造（含 Header 访问——写响应必先操作
-// 响应头）都视为请求侧接管 ResponseWriter。
-func (w *openAICompactKeepaliveWriter) suspend() {
-	if w.k == nil {
-		return
+func openAISSEKeepaliveStateFromContext(c *gin.Context, key string) *openAISSEKeepaliveState {
+	if c == nil {
+		return nil
 	}
-	w.k.Stop()
+	value, ok := c.Get(key)
+	if !ok {
+		return nil
+	}
+	state, _ := value.(*openAISSEKeepaliveState)
+	return state
 }
 
-func (w *openAICompactKeepaliveWriter) Header() http.Header {
+// openAISSEKeepaliveWriter serializes request-side response construction with
+// heartbeat writes. Read-only status methods do not suspend the heartbeat.
+type openAISSEKeepaliveWriter struct {
+	gin.ResponseWriter
+	k *openAISSEKeepalive
+}
+
+func (w *openAISSEKeepaliveWriter) suspend() {
+	if w.k != nil {
+		w.k.Stop()
+	}
+}
+
+func (w *openAISSEKeepaliveWriter) Header() http.Header {
 	w.suspend()
 	if w.ResponseWriter == nil {
 		return http.Header{}
@@ -207,7 +299,7 @@ func (w *openAICompactKeepaliveWriter) Header() http.Header {
 	return w.ResponseWriter.Header()
 }
 
-func (w *openAICompactKeepaliveWriter) Write(data []byte) (int, error) {
+func (w *openAISSEKeepaliveWriter) Write(data []byte) (int, error) {
 	w.suspend()
 	if w.ResponseWriter == nil {
 		return 0, nil
@@ -215,7 +307,7 @@ func (w *openAICompactKeepaliveWriter) Write(data []byte) (int, error) {
 	return w.ResponseWriter.Write(data)
 }
 
-func (w *openAICompactKeepaliveWriter) WriteString(s string) (int, error) {
+func (w *openAISSEKeepaliveWriter) WriteString(s string) (int, error) {
 	w.suspend()
 	if w.ResponseWriter == nil {
 		return 0, nil
@@ -223,38 +315,35 @@ func (w *openAICompactKeepaliveWriter) WriteString(s string) (int, error) {
 	return w.ResponseWriter.WriteString(s)
 }
 
-func (w *openAICompactKeepaliveWriter) WriteHeader(code int) {
+func (w *openAISSEKeepaliveWriter) WriteHeader(code int) {
 	w.suspend()
-	if w.ResponseWriter == nil {
-		return
+	if w.ResponseWriter != nil {
+		w.ResponseWriter.WriteHeader(code)
 	}
-	w.ResponseWriter.WriteHeader(code)
 }
 
-func (w *openAICompactKeepaliveWriter) WriteHeaderNow() {
+func (w *openAISSEKeepaliveWriter) WriteHeaderNow() {
 	w.suspend()
-	if w.ResponseWriter == nil {
-		return
+	if w.ResponseWriter != nil {
+		w.ResponseWriter.WriteHeaderNow()
 	}
-	w.ResponseWriter.WriteHeaderNow()
 }
 
-func (w *openAICompactKeepaliveWriter) Flush() {
+func (w *openAISSEKeepaliveWriter) Flush() {
 	w.suspend()
-	if w.ResponseWriter == nil {
-		return
+	if w.ResponseWriter != nil {
+		w.ResponseWriter.Flush()
 	}
-	w.ResponseWriter.Flush()
 }
 
-func (w *openAICompactKeepaliveWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (w *openAISSEKeepaliveWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if w.ResponseWriter == nil {
 		return nil, nil, errors.New("response writer released")
 	}
 	return w.ResponseWriter.Hijack()
 }
 
-func (w *openAICompactKeepaliveWriter) CloseNotify() <-chan bool {
+func (w *openAISSEKeepaliveWriter) CloseNotify() <-chan bool {
 	if w.ResponseWriter == nil {
 		ch := make(chan bool)
 		close(ch)
@@ -263,36 +352,36 @@ func (w *openAICompactKeepaliveWriter) CloseNotify() <-chan bool {
 	return w.ResponseWriter.CloseNotify()
 }
 
-func (w *openAICompactKeepaliveWriter) Pusher() http.Pusher {
+func (w *openAISSEKeepaliveWriter) Pusher() http.Pusher {
 	if w.ResponseWriter == nil {
 		return nil
 	}
 	return w.ResponseWriter.Pusher()
 }
 
-func (w *openAICompactKeepaliveWriter) Status() int {
-	if w.k == nil || w.ResponseWriter == nil {
+func (w *openAISSEKeepaliveWriter) Status() int {
+	if w.k == nil || w.k.state == nil || w.ResponseWriter == nil {
 		return 0
 	}
-	w.k.mu.Lock()
-	defer w.k.mu.Unlock()
+	w.k.state.mu.Lock()
+	defer w.k.state.mu.Unlock()
 	return w.ResponseWriter.Status()
 }
 
-func (w *openAICompactKeepaliveWriter) Size() int {
-	if w.k == nil || w.ResponseWriter == nil {
+func (w *openAISSEKeepaliveWriter) Size() int {
+	if w.k == nil || w.k.state == nil || w.ResponseWriter == nil {
 		return 0
 	}
-	w.k.mu.Lock()
-	defer w.k.mu.Unlock()
+	w.k.state.mu.Lock()
+	defer w.k.state.mu.Unlock()
 	return w.ResponseWriter.Size()
 }
 
-func (w *openAICompactKeepaliveWriter) Written() bool {
-	if w.k == nil || w.ResponseWriter == nil {
+func (w *openAISSEKeepaliveWriter) Written() bool {
+	if w.k == nil || w.k.state == nil || w.ResponseWriter == nil {
 		return false
 	}
-	w.k.mu.Lock()
-	defer w.k.mu.Unlock()
+	w.k.state.mu.Lock()
+	defer w.k.state.mu.Unlock()
 	return w.ResponseWriter.Written()
 }

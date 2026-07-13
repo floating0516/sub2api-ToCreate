@@ -901,8 +901,16 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		defaultMappedModel := strings.TrimSpace(effectiveMappedModel)
 		// 应用渠道模型映射到请求体
 		forwardBody := mappedBodyForMessages(channelMappingMsg.Mapped, channelMappingMsg.MappedModel)
-		writerSizeBeforeForward := c.Writer.Size()
+		stopMessagesKeepalive := func() {}
+		if reqStream {
+			// OpenAI may withhold response headers for several minutes while a
+			// high-reasoning request is running. Keep the Anthropic SSE downstream
+			// active before ForwardAsAnthropic receives its upstream response.
+			stopMessagesKeepalive = service.StartOpenAIMessagesSSEKeepalive(c, h.openAIStreamKeepaliveInterval())
+		}
+		writerSizeBeforeForward := service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c)
 		result, err := func() (*service.OpenAIForwardResult, error) {
+			defer stopMessagesKeepalive()
 			defer func() {
 				if accountReleaseFunc != nil {
 					accountReleaseFunc()
@@ -935,7 +943,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					if c.Writer.Size() != writerSizeBeforeForward {
+					if service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward {
 						h.handleAnthropicFailoverExhausted(c, failoverErr, true)
 						return
 					}
@@ -1061,6 +1069,10 @@ func resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel 
 
 // anthropicErrorResponse writes an error in Anthropic Messages API format.
 func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int, errType, message string) {
+	if service.StopOpenAIMessagesSSEKeepaliveCommitted(c) {
+		h.writeAnthropicStreamError(c, status, errType, message)
+		return
+	}
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{
@@ -1073,22 +1085,32 @@ func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int
 // anthropicStreamingAwareError handles errors that may occur during streaming,
 // using Anthropic SSE error format.
 func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
-	if streamStarted {
-		flusher, ok := c.Writer.(http.Flusher)
-		if ok {
-			errPayload, _ := json.Marshal(gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    errType,
-					"message": message,
-				},
-			})
-			fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errPayload) //nolint:errcheck
-			flusher.Flush()
-		}
+	if streamStarted || service.StopOpenAIMessagesSSEKeepaliveCommitted(c) {
+		h.writeAnthropicStreamError(c, status, errType, message)
 		return
 	}
 	h.anthropicErrorResponse(c, status, errType, message)
+}
+
+func (h *OpenAIGatewayHandler) writeAnthropicStreamError(c *gin.Context, status int, errType, message string) {
+	if c == nil || c.Writer == nil {
+		return
+	}
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		return
+	}
+	errPayload, _ := json.Marshal(gin.H{
+		"type": "error",
+		"error": gin.H{
+			"type":    errType,
+			"message": message,
+		},
+	})
+	service.MarkOpsStreamError(c, errType, message, status)
+	fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errPayload) //nolint:errcheck
+	flusher.Flush()
+	service.MarkResponseCommitted(c)
 }
 
 // handleAnthropicFailoverExhausted maps upstream failover errors to Anthropic format.
@@ -1099,7 +1121,13 @@ func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, 
 
 // ensureAnthropicErrorResponse writes a fallback Anthropic error if no response was written.
 func (h *OpenAIGatewayHandler) ensureAnthropicErrorResponse(c *gin.Context, streamStarted bool) bool {
-	if c == nil || c.Writer == nil || c.Writer.Written() {
+	if c == nil || c.Writer == nil {
+		return false
+	}
+	// A pre-header ping is transport-only and must not suppress the terminal
+	// Anthropic error event. Any non-heartbeat byte means a response already
+	// exists and the fallback must stay silent.
+	if service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) >= 0 {
 		return false
 	}
 	h.anthropicStreamingAwareError(c, http.StatusBadGateway, "api_error", "Upstream request failed", streamStarted)
@@ -1792,8 +1820,8 @@ func (h *OpenAIGatewayHandler) recoverAnthropicMessagesPanic(c *gin.Context, str
 		zap.Any("panic", recovered),
 		zap.ByteString("stack", debug.Stack()),
 	)
-	if !started {
-		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", "Internal server error")
+	if !started && service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) < 0 {
+		h.anthropicStreamingAwareError(c, http.StatusInternalServerError, "api_error", "Internal server error", false)
 	}
 }
 
@@ -2133,13 +2161,17 @@ func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType
 	})
 }
 
-// openAICompactKeepaliveInterval 复用流式 keepalive 配置作为 compact 下游
-// 心跳间隔；0 表示禁用（与流式路径语义一致）。
-func (h *OpenAIGatewayHandler) openAICompactKeepaliveInterval() time.Duration {
+// openAIStreamKeepaliveInterval returns the shared downstream keepalive
+// interval for streaming and pre-upstream wait paths. Zero disables it.
+func (h *OpenAIGatewayHandler) openAIStreamKeepaliveInterval() time.Duration {
 	if h.cfg == nil || h.cfg.Gateway.StreamKeepaliveInterval <= 0 {
 		return 0
 	}
 	return time.Duration(h.cfg.Gateway.StreamKeepaliveInterval) * time.Second
+}
+
+func (h *OpenAIGatewayHandler) openAICompactKeepaliveInterval() time.Duration {
+	return h.openAIStreamKeepaliveInterval()
 }
 
 func setOpenAIClientTransportHTTP(c *gin.Context) {
