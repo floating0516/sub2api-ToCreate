@@ -98,6 +98,13 @@ func RegisterPaymentRoutes(
 			plans.DELETE("/:id", adminPaymentHandler.DeletePlan)
 		}
 
+		// Subscription Add-on Products
+		addonProducts := adminGroup.Group("/addon-products")
+		{
+			addonProducts.GET("", adminPaymentHandler.ListAddonProducts)
+			addonProducts.PUT("/:id", adminPaymentHandler.UpdateAddonProduct)
+		}
+
 		// Provider Instances
 		providers := adminGroup.Group("/providers")
 		{

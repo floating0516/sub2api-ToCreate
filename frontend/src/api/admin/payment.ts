@@ -9,6 +9,7 @@ import type {
   PaymentOrder,
   PaymentChannel,
   SubscriptionPlan,
+  SubscriptionAddonProduct,
   ProviderInstance
 } from '@/types/payment'
 import type { BasePaginationResponse } from '@/types'
@@ -53,6 +54,15 @@ export interface UpdatePaymentConfigRequest {
   product_name_suffix?: string
   help_image_url?: string
   help_text?: string
+}
+
+export interface UpdateSubscriptionAddonProductRequest {
+  name: string
+  quota_usd: number
+  price: number
+  original_price: number | null
+  for_sale: boolean
+  sort_order: number
 }
 
 export interface RefundResult {
@@ -169,6 +179,18 @@ export const adminPaymentAPI = {
   /** Delete a subscription plan */
   deletePlan(id: number) {
     return apiClient.delete(`/admin/payment/plans/${id}`)
+  },
+
+  // ==================== Subscription Add-on Products ====================
+
+  /** Get all add-on products, including products that are not for sale */
+  getAddonProducts() {
+    return apiClient.get<SubscriptionAddonProduct[]>('/admin/payment/addon-products')
+  },
+
+  /** Update an add-on product without changing its immutable SKU */
+  updateAddonProduct(id: number, data: UpdateSubscriptionAddonProductRequest) {
+    return apiClient.put<SubscriptionAddonProduct>(`/admin/payment/addon-products/${id}`, data)
   },
 
   // ==================== Provider Instances ====================

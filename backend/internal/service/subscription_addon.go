@@ -33,6 +33,15 @@ type SubscriptionAddonProduct struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type UpdateSubscriptionAddonProductInput struct {
+	Name          string   `json:"name"`
+	QuotaUSD      float64  `json:"quota_usd"`
+	Price         float64  `json:"price"`
+	OriginalPrice *float64 `json:"original_price"`
+	ForSale       bool     `json:"for_sale"`
+	SortOrder     int      `json:"sort_order"`
+}
+
 type CreatePurchasedSubscriptionAddonInput struct {
 	OrderID        int64
 	SubscriptionID int64
@@ -107,6 +116,7 @@ type SubscriptionAddonRepository interface {
 	Revoke(ctx context.Context, id int64, revokedAt time.Time) error
 	ListProducts(ctx context.Context, forSaleOnly bool) ([]SubscriptionAddonProduct, error)
 	GetProductByID(ctx context.Context, id int64) (*SubscriptionAddonProduct, error)
+	UpdateProduct(ctx context.Context, id int64, input UpdateSubscriptionAddonProductInput) (*SubscriptionAddonProduct, error)
 	CreatePurchased(ctx context.Context, input CreatePurchasedSubscriptionAddonInput) (*SubscriptionAddonPack, error)
 	GetByPurchaseOrderID(ctx context.Context, orderID int64) (*SubscriptionAddonPack, error)
 }

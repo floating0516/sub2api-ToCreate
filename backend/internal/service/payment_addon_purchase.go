@@ -39,6 +39,33 @@ func (s *PaymentService) ListAddonProductsForSale(ctx context.Context) ([]Subscr
 	return s.subscriptionSvc.addonRepo.ListProducts(ctx, true)
 }
 
+func (s *PaymentService) ListAddonProductsForAdmin(ctx context.Context) ([]SubscriptionAddonProduct, error) {
+	if s == nil || s.subscriptionSvc == nil || s.subscriptionSvc.addonRepo == nil {
+		return nil, infraerrors.ServiceUnavailable("ADDON_PRODUCT_ADMIN_UNAVAILABLE", "subscription add-on product management is unavailable")
+	}
+	return s.subscriptionSvc.addonRepo.ListProducts(ctx, false)
+}
+
+func (s *PaymentService) UpdateAddonProduct(ctx context.Context, id int64, input UpdateSubscriptionAddonProductInput) (*SubscriptionAddonProduct, error) {
+	if s == nil || s.subscriptionSvc == nil || s.subscriptionSvc.addonRepo == nil {
+		return nil, infraerrors.ServiceUnavailable("ADDON_PRODUCT_ADMIN_UNAVAILABLE", "subscription add-on product management is unavailable")
+	}
+	input.Name = strings.TrimSpace(input.Name)
+	if id <= 0 || input.Name == "" || !isPositiveFinite(input.QuotaUSD) || !isPositiveFinite(input.Price) ||
+		input.SortOrder < 0 || (input.OriginalPrice != nil && !isNonNegativeFinite(*input.OriginalPrice)) {
+		return nil, infraerrors.BadRequest("ADDON_PRODUCT_INVALID", "subscription add-on product is invalid")
+	}
+	return s.subscriptionSvc.addonRepo.UpdateProduct(ctx, id, input)
+}
+
+func isPositiveFinite(value float64) bool {
+	return value > 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func isNonNegativeFinite(value float64) bool {
+	return value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
 func (s *PaymentService) validateAddonOrder(ctx context.Context, req CreateOrderRequest, cfg *PaymentConfig) (*addonOrderSelection, error) {
 	if cfg == nil || !cfg.AddonPurchaseEnabled {
 		return nil, infraerrors.Forbidden("ADDON_PURCHASE_DISABLED", "subscription add-on purchases are not available")

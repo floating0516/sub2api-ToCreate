@@ -5,8 +5,11 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/WechatCallbackView.spec.ts \
 	src/views/user/__tests__/PaymentView.spec.ts \
 	src/views/user/__tests__/PaymentResultView.spec.ts \
+	src/api/__tests__/admin.paymentAddonProducts.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/utils/__tests__/subscriptionColors.spec.ts \
+	src/views/admin/orders/__tests__/AddonProductEditDialog.spec.ts \
+	src/views/admin/orders/__tests__/AdminPaymentPlansView.spec.ts \
 	src/views/admin/__tests__/SettingsView.spec.ts
 
 # 一键编译前后端

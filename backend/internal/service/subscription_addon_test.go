@@ -15,6 +15,8 @@ type subscriptionAddonRepoStub struct {
 	created          *SubscriptionAddonPack
 	products         map[int64]*SubscriptionAddonProduct
 	productErr       error
+	listForSaleOnly  *bool
+	updatedProduct   *UpdateSubscriptionAddonProductInput
 	purchasedByOrder map[int64]*SubscriptionAddonPack
 	purchaseCalls    int
 	purchaseInTx     bool
@@ -62,9 +64,13 @@ func (s *subscriptionAddonRepoStub) GetGrantedQuotaForTerm(context.Context, int6
 
 func (s *subscriptionAddonRepoStub) Revoke(context.Context, int64, time.Time) error { return nil }
 
-func (s *subscriptionAddonRepoStub) ListProducts(context.Context, bool) ([]SubscriptionAddonProduct, error) {
+func (s *subscriptionAddonRepoStub) ListProducts(_ context.Context, forSaleOnly bool) ([]SubscriptionAddonProduct, error) {
+	s.listForSaleOnly = &forSaleOnly
 	result := make([]SubscriptionAddonProduct, 0, len(s.products))
 	for _, product := range s.products {
+		if forSaleOnly && !product.ForSale {
+			continue
+		}
 		copy := *product
 		result = append(result, copy)
 	}
@@ -79,6 +85,25 @@ func (s *subscriptionAddonRepoStub) GetProductByID(_ context.Context, id int64) 
 	if !ok {
 		return nil, ErrSubscriptionAddonProductNotFound
 	}
+	copy := *product
+	return &copy, nil
+}
+
+func (s *subscriptionAddonRepoStub) UpdateProduct(_ context.Context, id int64, input UpdateSubscriptionAddonProductInput) (*SubscriptionAddonProduct, error) {
+	if s.productErr != nil {
+		return nil, s.productErr
+	}
+	product, ok := s.products[id]
+	if !ok {
+		return nil, ErrSubscriptionAddonProductNotFound
+	}
+	s.updatedProduct = &input
+	product.Name = input.Name
+	product.QuotaUSD = input.QuotaUSD
+	product.Price = input.Price
+	product.OriginalPrice = input.OriginalPrice
+	product.ForSale = input.ForSale
+	product.SortOrder = input.SortOrder
 	copy := *product
 	return &copy, nil
 }

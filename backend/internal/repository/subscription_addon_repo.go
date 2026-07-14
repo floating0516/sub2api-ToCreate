@@ -287,6 +287,33 @@ func (r *subscriptionAddonRepository) GetProductByID(ctx context.Context, id int
 	return product, err
 }
 
+func (r *subscriptionAddonRepository) UpdateProduct(ctx context.Context, id int64, input service.UpdateSubscriptionAddonProductInput) (*service.SubscriptionAddonProduct, error) {
+	if r == nil || r.db == nil || id <= 0 {
+		return nil, service.ErrSubscriptionAddonProductNotFound
+	}
+	queryer, err := r.rowQueryer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	product, err := scanSubscriptionAddonProduct(queryer.QueryRowContext(ctx, `
+		UPDATE subscription_addon_products
+		SET name = $2,
+			quota_usd = $3,
+			price = $4,
+			original_price = $5,
+			for_sale = $6,
+			sort_order = $7,
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, sku, name, quota_usd, price, original_price, for_sale,
+			sort_order, created_at, updated_at
+	`, id, input.Name, input.QuotaUSD, input.Price, input.OriginalPrice, input.ForSale, input.SortOrder))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrSubscriptionAddonProductNotFound
+	}
+	return product, err
+}
+
 func (r *subscriptionAddonRepository) CreatePurchased(ctx context.Context, input service.CreatePurchasedSubscriptionAddonInput) (*service.SubscriptionAddonPack, error) {
 	if r == nil || r.db == nil || input.OrderID <= 0 || input.SubscriptionID <= 0 ||
 		input.UserID <= 0 || input.GroupID <= 0 || input.QuotaUSD <= 0 {

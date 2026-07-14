@@ -336,6 +336,37 @@ func (h *PaymentHandler) DeletePlan(c *gin.Context) {
 	response.Success(c, gin.H{"message": "deleted"})
 }
 
+// ListAddonProducts returns every add-on product, including products that are not for sale.
+// GET /api/v1/admin/payment/addon-products
+func (h *PaymentHandler) ListAddonProducts(c *gin.Context) {
+	products, err := h.paymentService.ListAddonProductsForAdmin(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, products)
+}
+
+// UpdateAddonProduct updates the mutable catalog fields of an add-on product.
+// PUT /api/v1/admin/payment/addon-products/:id
+func (h *PaymentHandler) UpdateAddonProduct(c *gin.Context) {
+	id, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var req service.UpdateSubscriptionAddonProductInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	product, err := h.paymentService.UpdateAddonProduct(c.Request.Context(), id, req)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, product)
+}
+
 // --- Provider Instances ---
 
 // ListProviders returns all payment provider instances.

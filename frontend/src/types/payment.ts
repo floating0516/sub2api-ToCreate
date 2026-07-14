@@ -141,7 +141,7 @@ export interface SubscriptionAddonProduct {
   name: string
   quota_usd: number
   price: number
-  original_price?: number
+  original_price?: number | null
   for_sale: boolean
   sort_order: number
 }
