@@ -57,11 +57,11 @@ func TestValidateAddonOrderUsesServerCatalogAndOwnedSubscription(t *testing.T) {
 	svc := newAddonPurchaseService(subscription, repo)
 
 	selection, err := svc.validateAddonOrder(context.Background(), CreateOrderRequest{
-		UserID:          subscription.UserID,
-		Amount:          0.01,
-		OrderType:       payment.OrderTypeAddon,
-		AddonProductID:  product.ID,
-		SubscriptionID:  subscription.ID,
+		UserID:         subscription.UserID,
+		Amount:         0.01,
+		OrderType:      payment.OrderTypeAddon,
+		AddonProductID: product.ID,
+		SubscriptionID: subscription.ID,
 	}, &PaymentConfig{AddonPurchaseEnabled: true, MinAmount: 0.01, MaxAmount: 500})
 	require.NoError(t, err)
 	require.Equal(t, product.Price, selection.product.Price)
@@ -95,9 +95,9 @@ func TestValidateAddonOrderRejectsAnotherUsersSubscription(t *testing.T) {
 	})
 
 	_, err := svc.validateAddonOrder(context.Background(), CreateOrderRequest{
-		UserID:          42,
-		AddonProductID:  product.ID,
-		SubscriptionID:  subscription.ID,
+		UserID:         42,
+		AddonProductID: product.ID,
+		SubscriptionID: subscription.ID,
 	}, &PaymentConfig{AddonPurchaseEnabled: true})
 	require.Error(t, err)
 	require.Equal(t, "FORBIDDEN", infraerrors.Reason(err))

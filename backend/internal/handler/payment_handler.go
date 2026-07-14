@@ -156,20 +156,20 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 }
 
 type checkoutInfoResponse struct {
-	Methods                   map[string]service.MethodLimits     `json:"methods"`
-	GlobalMin                 float64                             `json:"global_min"`
-	GlobalMax                 float64                             `json:"global_max"`
-	Plans                     []checkoutPlan                      `json:"plans"`
-	AddonPurchaseEnabled      bool                                `json:"addon_purchase_enabled"`
+	Methods                   map[string]service.MethodLimits    `json:"methods"`
+	GlobalMin                 float64                            `json:"global_min"`
+	GlobalMax                 float64                            `json:"global_max"`
+	Plans                     []checkoutPlan                     `json:"plans"`
+	AddonPurchaseEnabled      bool                               `json:"addon_purchase_enabled"`
 	AddonProducts             []service.SubscriptionAddonProduct `json:"addon_products"`
-	BalanceDisabled           bool                                `json:"balance_disabled"`
-	BalanceRechargeMultiplier float64                             `json:"balance_recharge_multiplier"`
-	SubscriptionUSDToCNYRate  float64                             `json:"subscription_usd_to_cny_rate"`
-	RechargeFeeRate           float64                             `json:"recharge_fee_rate"`
-	HelpText                  string                              `json:"help_text"`
-	HelpImageURL              string                              `json:"help_image_url"`
-	StripePublishableKey      string                              `json:"stripe_publishable_key"`
-	AlipayForceQRCode         bool                                `json:"alipay_force_qrcode"`
+	BalanceDisabled           bool                               `json:"balance_disabled"`
+	BalanceRechargeMultiplier float64                            `json:"balance_recharge_multiplier"`
+	SubscriptionUSDToCNYRate  float64                            `json:"subscription_usd_to_cny_rate"`
+	RechargeFeeRate           float64                            `json:"recharge_fee_rate"`
+	HelpText                  string                             `json:"help_text"`
+	HelpImageURL              string                             `json:"help_image_url"`
+	StripePublishableKey      string                             `json:"stripe_publishable_key"`
+	AlipayForceQRCode         bool                               `json:"alipay_force_qrcode"`
 }
 
 type checkoutPlan struct {
