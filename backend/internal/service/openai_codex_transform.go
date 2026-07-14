@@ -880,16 +880,6 @@ func ensureOpenAIResponsesImageGenerationTool(reqBody map[string]any) bool {
 		reqBody["tools"] = []any{tool}
 		return true
 	}
-	for _, rawTool := range tools {
-		toolMap, ok := rawTool.(map[string]any)
-		if !ok {
-			continue
-		}
-		if strings.TrimSpace(firstNonEmptyString(toolMap["type"])) == "image_generation" {
-			return false
-		}
-	}
-
 	reqBody["tools"] = append(tools, tool)
 	return true
 }
