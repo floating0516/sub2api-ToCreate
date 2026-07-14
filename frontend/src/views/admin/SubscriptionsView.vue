@@ -830,7 +830,37 @@
         </div>
         <div>
           <label class="input-label">{{ t('admin.subscriptions.addonExpires') }}</label>
-          <input v-model="addonForm.expires_at" type="datetime-local" required class="input" />
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              v-for="days in addonExpiryDayOptions"
+              :key="days"
+              type="button"
+              :aria-pressed="addonForm.expiry_days === days"
+              :disabled="isAddonExpiryDayDisabled(days)"
+              class="flex min-h-11 items-center justify-center rounded-md border px-2 py-2 text-sm font-medium leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              :class="addonForm.expiry_days === days
+                ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500 dark:bg-primary-900/20 dark:text-primary-300'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600'"
+              @click="addonForm.expiry_days = days"
+            >
+              {{ t('admin.subscriptions.addonExpiryDays', { days }) }}
+            </button>
+            <button
+              type="button"
+              :aria-pressed="addonForm.expiry_days === null"
+              class="flex min-h-11 items-center justify-center rounded-md border px-2 py-2 text-sm font-medium leading-4 transition-colors"
+              :class="addonForm.expiry_days === null
+                ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500 dark:bg-primary-900/20 dark:text-primary-300'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600'"
+              @click="addonForm.expiry_days = null"
+            >
+              {{ t('admin.subscriptions.addonFollowSubscription') }}
+            </button>
+          </div>
+          <div class="mt-2 flex items-baseline justify-between gap-3 text-xs">
+            <span class="text-gray-500 dark:text-gray-400">{{ t('admin.subscriptions.addonCalculatedExpires') }}</span>
+            <span class="text-right font-medium text-gray-700 dark:text-gray-200">{{ addonExpirationLabel }}</span>
+          </div>
         </div>
         <div>
           <label class="input-label">{{ t('admin.subscriptions.addonNotes') }}</label>
@@ -1022,7 +1052,7 @@ import type { SubscriptionRetentionEstimate } from '@/api/admin/subscriptions'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType, SubscriptionAddonPack } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
-import { formatCurrency, formatDateOnly, formatRelativeTime } from '@/utils/format'
+import { formatCurrency, formatDateOnly, formatDateTime, formatRelativeTime } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1051,6 +1081,7 @@ interface GroupOption {
 
 type ResetQuotaWindow = 'daily' | 'weekly' | 'monthly'
 type ExtendMode = 'extend' | 'shorten'
+type AddonExpiryDays = 1 | 3 | 7 | 15 | 30 | null
 
 // Guide modal state
 const showGuideModal = ref(false)
@@ -1258,10 +1289,40 @@ const addonPacks = ref<SubscriptionAddonPack[]>([])
 const addonSubmitting = ref(false)
 
 const addonQuickAmounts = [10, 20, 50, 100]
+const addonExpiryDayOptions: Exclude<AddonExpiryDays, null>[] = [1, 3, 7, 15, 30]
+const millisecondsPerDay = 24 * 60 * 60 * 1000
 const addonForm = reactive({
   quota_usd: 20,
-  expires_at: '',
+  expiry_days: null as AddonExpiryDays,
   notes: ''
+})
+
+const getAddonSubscriptionExpiration = (): Date | null => {
+  const value = addonSubscription.value?.expires_at
+  if (!value) return null
+  const expiration = new Date(value)
+  return Number.isNaN(expiration.getTime()) ? null : expiration
+}
+
+const resolveAddonExpiration = (now = new Date()): Date | null => {
+  const subscriptionExpiration = getAddonSubscriptionExpiration()
+  if (!subscriptionExpiration || subscriptionExpiration <= now) return null
+  if (addonForm.expiry_days === null) return subscriptionExpiration
+
+  const requestedExpiration = new Date(now.getTime() + addonForm.expiry_days * millisecondsPerDay)
+  return requestedExpiration <= subscriptionExpiration ? requestedExpiration : null
+}
+
+const isAddonExpiryDayDisabled = (days: Exclude<AddonExpiryDays, null>): boolean => {
+  const subscriptionExpiration = getAddonSubscriptionExpiration()
+  return !subscriptionExpiration || Date.now() + days * millisecondsPerDay > subscriptionExpiration.getTime()
+}
+
+const addonExpirationLabel = computed(() => {
+  const expiration = resolveAddonExpiration()
+  return expiration
+    ? formatDateTime(expiration)
+    : t('admin.subscriptions.addonExpiryUnavailable')
 })
 
 const resetQuotaForm = reactive<Record<ResetQuotaWindow, boolean>>({
@@ -1732,17 +1793,10 @@ const handleResetQuota = (subscription: UserSubscription) => {
   showResetQuotaConfirm.value = true
 }
 
-const toDatetimeLocal = (value?: string | null): string => {
-  if (!value) return ''
-  const date = new Date(value)
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
 const handleAddon = async (subscription: UserSubscription) => {
   addonSubscription.value = subscription
   addonForm.quota_usd = 20
-  addonForm.expires_at = toDatetimeLocal(subscription.expires_at)
+  addonForm.expiry_days = null
   addonForm.notes = ''
   addonPacks.value = []
   showAddonModal.value = true
@@ -1762,8 +1816,8 @@ const closeAddonModal = () => {
 const grantAddon = async () => {
   if (!addonSubscription.value || addonSubmitting.value) return
   const quota = Number(addonForm.quota_usd)
-  const expires = new Date(addonForm.expires_at)
-  if (!Number.isFinite(quota) || quota <= 0 || Number.isNaN(expires.getTime())) {
+  const expires = resolveAddonExpiration(new Date())
+  if (!Number.isFinite(quota) || quota <= 0 || !expires) {
     appStore.showError(t('admin.subscriptions.addonInvalid'))
     return
   }
