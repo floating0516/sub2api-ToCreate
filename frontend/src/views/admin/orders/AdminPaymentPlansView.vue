@@ -123,10 +123,16 @@
             <span class="tabular-nums">${{ formatNumber(value, 2) }}</span>
           </template>
           <template #cell-price="{ value }">
-            <span class="font-medium tabular-nums">${{ formatNumber(value, 2) }}</span>
+            <div class="flex flex-col">
+              <span class="font-medium tabular-nums">{{ formatPaymentAmount(addonCnyAmount(value), 'CNY') }}</span>
+              <span class="text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonBalanceAmount') }} ${{ formatNumber(value, 2) }}</span>
+            </div>
           </template>
           <template #cell-unit_price="{ row }">
-            <span class="tabular-nums text-gray-600 dark:text-gray-300">${{ formatNumber(row.price / row.quota_usd, 4) }}</span>
+            <div class="flex flex-col">
+              <span class="tabular-nums text-gray-700 dark:text-gray-200">¥{{ formatNumber(addonCnyAmount(row.price) / row.quota_usd, 4) }}</span>
+              <span class="text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonBalanceAmount') }} ${{ formatNumber(row.price / row.quota_usd, 4) }}</span>
+            </div>
           </template>
           <template #cell-original_price="{ value }">
             <span v-if="value != null" class="tabular-nums text-gray-500 line-through dark:text-gray-400">${{ formatNumber(value, 2) }}</span>
@@ -199,6 +205,7 @@ import { adminPaymentAPI } from '@/api/admin/payment'
 import type { AdminPaymentConfig, UpdateSubscriptionAddonProductRequest } from '@/api/admin/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import adminAPI from '@/api/admin'
+import { formatPaymentAmount } from '@/components/payment/currency'
 import type { SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
 import type { AdminGroup } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -420,6 +427,13 @@ function saleSwitchKnobClass(active: boolean, size: SwitchSize): string[] {
 
 function formatNumber(value: number, digits: number): string {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '-'
+}
+
+function addonCnyAmount(price: number): number {
+  const value = Number(price)
+  if (!Number.isFinite(value) || value <= 0) return 0
+  const rate = Number(paymentConfig.value?.subscription_usd_to_cny_rate) || 0
+  return Math.round(value * (rate > 0 ? rate : 1) * 100) / 100
 }
 
 onMounted(() => {

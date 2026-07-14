@@ -81,7 +81,7 @@ function mountView() {
 describe('AdminPaymentPlansView product catalog', () => {
   beforeEach(() => {
     getAllGroups.mockReset().mockResolvedValue([])
-    getConfig.mockReset().mockResolvedValue({ data: { addon_purchase_enabled: false } })
+    getConfig.mockReset().mockResolvedValue({ data: { addon_purchase_enabled: false, subscription_usd_to_cny_rate: 0 } })
     getPlans.mockReset().mockResolvedValue({ data: [] })
     getAddonProducts.mockReset().mockResolvedValue({
       data: [{
@@ -114,6 +114,7 @@ describe('AdminPaymentPlansView product catalog', () => {
     expect(getAddonProducts).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="addons-catalog"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="column-keys"]').text()).toContain('sku,name,quota_usd,price,unit_price')
+    expect(wrapper.text()).toContain('¥0.1990')
     expect(wrapper.text()).toContain('$0.1990')
   })
 })

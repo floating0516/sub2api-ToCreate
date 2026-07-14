@@ -41,12 +41,12 @@
 
       <div class="grid grid-cols-1 gap-2 rounded-md bg-gray-50 p-3 text-sm dark:bg-dark-800 sm:grid-cols-2">
         <div>
-          <span class="text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonUnitPrice') }}</span>
-          <span class="ml-2 font-semibold text-gray-900 dark:text-white">{{ unitPricePreview }}</span>
-        </div>
-        <div v-if="cnyPricePreview">
           <span class="text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonCnyPayPreview') }}</span>
           <span class="ml-2 font-semibold text-gray-900 dark:text-white">{{ cnyPricePreview }}</span>
+        </div>
+        <div>
+          <span class="text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonBalancePayPreview') }}</span>
+          <span class="ml-2 font-semibold text-gray-900 dark:text-white">{{ balancePricePreview }}</span>
         </div>
       </div>
 
@@ -128,13 +128,20 @@ const unitPrice = computed(() => {
   return price / quota
 })
 
-const unitPricePreview = computed(() => `$${unitPrice.value.toFixed(4)} / $1`)
-
 const cnyPricePreview = computed(() => {
   const price = Number(form.price)
   const rate = Number(props.paymentConfig?.subscription_usd_to_cny_rate) || 0
-  if (!Number.isFinite(price) || price <= 0 || rate <= 0) return ''
-  return formatPaymentAmount(Math.round(price * rate * 100) / 100, 'CNY')
+  const quota = Number(form.quota_usd)
+  if (!Number.isFinite(price) || price <= 0) return formatPaymentAmount(0, 'CNY')
+  const amount = Math.round(price * (rate > 0 ? rate : 1) * 100) / 100
+  const unit = Number.isFinite(quota) && quota > 0 ? amount / quota : 0
+  return `${formatPaymentAmount(amount, 'CNY')} (¥${unit.toFixed(4)} / $1)`
+})
+
+const balancePricePreview = computed(() => {
+  const price = Number(form.price)
+  const amount = Number.isFinite(price) && price > 0 ? price : 0
+  return `${formatPaymentAmount(amount, 'USD')} ($${unitPrice.value.toFixed(4)} / $1)`
 })
 
 watch([() => props.show, () => props.product], ([visible, product]) => {

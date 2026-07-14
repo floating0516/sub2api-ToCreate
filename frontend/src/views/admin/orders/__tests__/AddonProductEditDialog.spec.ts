@@ -48,7 +48,7 @@ function mountDialog() {
         balance_disabled: false,
         balance_recharge_multiplier: 1,
         addon_purchase_enabled: false,
-        subscription_usd_to_cny_rate: 1,
+        subscription_usd_to_cny_rate: 0,
         recharge_fee_rate: 0,
         load_balance_strategy: 'round_robin',
         product_name_prefix: '',
@@ -86,6 +86,8 @@ describe('AddonProductEditDialog', () => {
     await wrapper.get('[data-testid="addon-quota"]').setValue('10')
     await wrapper.get('[data-testid="addon-price"]').setValue('2')
 
+    expect(wrapper.text()).toContain('¥2.00')
+    expect(wrapper.text()).toContain('¥0.2000 / $1')
     expect(wrapper.text()).toContain('$0.2000 / $1')
   })
 
