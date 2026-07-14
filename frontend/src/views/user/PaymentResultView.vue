@@ -176,8 +176,9 @@ const isPending = computed(() => {
 
 const statusTitle = computed(() => {
   if (isSuccess.value) {
-    if (order.value?.order_type === 'subscription') return t('payment.result.subscriptionSuccess')
-    if (order.value?.order_type === 'addon') return t('payment.result.addonSuccess')
+    const orderType = resolvedOrderType(order.value)
+    if (orderType === 'subscription') return t('payment.result.subscriptionSuccess')
+    if (orderType === 'addon') return t('payment.result.addonSuccess')
     return t('payment.result.success')
   }
   if (isPending.value) {
@@ -185,6 +186,11 @@ const statusTitle = computed(() => {
   }
   return t('payment.result.failed')
 })
+
+function resolvedOrderType(nextOrder: ResolvedOrder | null): string {
+  if (!nextOrder || !('order_type' in nextOrder)) return ''
+  return typeof nextOrder.order_type === 'string' ? nextOrder.order_type : ''
+}
 
 function normalizedOrderPaymentType(paymentType: string): string {
   return normalizePaymentMethodForDisplay(paymentType || '') || paymentType || ''
