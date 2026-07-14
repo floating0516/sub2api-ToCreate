@@ -363,12 +363,12 @@ func TestBuildWeChatPaymentOAuthStartURLIncludesAddonContext(t *testing.T) {
 	t.Parallel()
 
 	got, err := buildWeChatPaymentOAuthStartURL(CreateOrderRequest{
-		Amount:          7.99,
-		PaymentType:     payment.TypeWxpay,
-		OrderType:       payment.OrderTypeAddon,
-		AddonProductID:  5,
-		SubscriptionID:  19,
-		SrcURL:          "https://merchant.example/purchase?from=wechat",
+		Amount:         7.99,
+		PaymentType:    payment.TypeWxpay,
+		OrderType:      payment.OrderTypeAddon,
+		AddonProductID: 5,
+		SubscriptionID: 19,
+		SrcURL:         "https://merchant.example/purchase?from=wechat",
 	}, "snsapi_base")
 	if err != nil {
 		t.Fatalf("buildWeChatPaymentOAuthStartURL returned error: %v", err)
