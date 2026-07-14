@@ -134,6 +134,30 @@ type BalanceSubscriptionPurchaseResponse struct {
 	SubscriptionID int64   `json:"subscription_id,omitempty"`
 }
 
+type BalanceAddonPurchaseRequest struct {
+	UserID         int64
+	AddonProductID int64
+	SubscriptionID int64
+	ClientIP       string
+	SrcHost        string
+	SrcURL         string
+	Locale         string
+}
+
+type BalanceAddonPurchaseResponse struct {
+	OrderID        int64     `json:"order_id"`
+	Amount         float64   `json:"amount"`
+	Status         string    `json:"status"`
+	PaymentType    string    `json:"payment_type"`
+	AddonID        int64     `json:"addon_id"`
+	AddonProductID int64     `json:"addon_product_id"`
+	SubscriptionID int64     `json:"subscription_id"`
+	QuotaUSD       float64   `json:"quota_usd"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	BalanceBefore  float64   `json:"balance_before"`
+	BalanceAfter   float64   `json:"balance_after"`
+}
+
 type OrderListParams struct {
 	Page        int
 	PageSize    int

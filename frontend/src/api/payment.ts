@@ -13,6 +13,8 @@ import type {
   CreateOrderResult,
   BalanceSubscriptionPurchaseRequest,
   BalanceSubscriptionPurchaseResult,
+  BalanceAddonPurchaseRequest,
+  BalanceAddonPurchaseResult,
   PaymentOrder
 } from '@/types/payment'
 import type { BasePaginationResponse } from '@/types'
@@ -54,6 +56,11 @@ export const paymentAPI = {
   /** Purchase a subscription with current account balance */
   purchaseSubscriptionWithBalance(data: BalanceSubscriptionPurchaseRequest) {
     return apiClient.post<BalanceSubscriptionPurchaseResult>('/payment/subscriptions/balance-purchase', data)
+  },
+
+  /** Purchase a subscription add-on with current account balance */
+  purchaseAddonWithBalance(data: BalanceAddonPurchaseRequest) {
+    return apiClient.post<BalanceAddonPurchaseResult>('/payment/addons/balance-purchase', data)
   },
 
   /** Get current user's orders */

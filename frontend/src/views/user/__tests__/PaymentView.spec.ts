@@ -15,15 +15,23 @@ const routerReplace = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const routerResolve = vi.hoisted(() => vi.fn(() => ({ href: '/payment/stripe?mock=1' })))
 const createOrder = vi.hoisted(() => vi.fn())
+const purchaseAddonWithBalance = vi.hoisted(() => vi.fn())
 const refreshUser = vi.hoisted(() => vi.fn())
 const fetchActiveSubscriptions = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
+const showSuccess = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
 const subscriptionState = vi.hoisted(() => ({
   activeSubscriptions: [] as UserSubscription[],
+}))
+const authState = vi.hoisted(() => ({
+  user: {
+    username: 'demo-user',
+    balance: 0,
+  },
 }))
 
 vi.mock('vue-router', async () => {
@@ -51,9 +59,8 @@ vi.mock('vue-i18n', async () => {
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
-    user: {
-      username: 'demo-user',
-      balance: 0,
+    get user() {
+      return authState.user
     },
     refreshUser,
   }),
@@ -62,6 +69,7 @@ vi.mock('@/stores/auth', () => ({
 vi.mock('@/stores/payment', () => ({
   usePaymentStore: () => ({
     createOrder,
+    purchaseAddonWithBalance,
   }),
 }))
 
@@ -78,6 +86,7 @@ vi.mock('@/stores', () => ({
   useAppStore: () => ({
     showError,
     showInfo,
+    showSuccess,
     showWarning,
   }),
 }))
@@ -352,14 +361,17 @@ describe('PaymentView add-on purchase', () => {
     routerPush.mockReset().mockResolvedValue(undefined)
     routerResolve.mockClear()
     createOrder.mockReset()
+    purchaseAddonWithBalance.mockReset()
     refreshUser.mockReset()
     fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
     showError.mockReset()
     showInfo.mockReset()
+    showSuccess.mockReset()
     showWarning.mockReset()
     getCheckoutInfo.mockReset()
     bridgeInvoke.mockReset()
     window.localStorage.clear()
+    authState.user.balance = 20
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
     subscriptionState.activeSubscriptions = [{
       id: 19,
@@ -442,6 +454,89 @@ describe('PaymentView add-on purchase', () => {
       addon_product_id: product.id,
       subscription_id: 19,
     }))
+  })
+
+  it('shows add-on guidance before purchase', async () => {
+    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: true,
+      addon_products: [{
+        id: 5,
+        sku: 'addon-usd-30',
+        name: '30 USD add-on',
+        quota_usd: 30,
+        price: 5.49,
+        for_sale: true,
+        sort_order: 20,
+      }],
+    }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
+    })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
+
+    const guidance = wrapper.find('[data-testid="addon-guidance"]')
+    expect(guidance.exists()).toBe(true)
+    expect(guidance.text()).toContain('payment.addon.guideTitle')
+    expect(guidance.text()).toContain('payment.addon.guideSubscription')
+    expect(guidance.text()).toContain('payment.addon.guideUsage')
+    expect(guidance.text()).toContain('payment.addon.guideExpiry')
+  })
+
+  it('purchases the selected add-on for the selected subscription with balance', async () => {
+    const product: SubscriptionAddonProduct = {
+      id: 5,
+      sku: 'addon-usd-30',
+      name: '30 USD add-on',
+      quota_usd: 30,
+      price: 5.49,
+      for_sale: true,
+      sort_order: 20,
+    }
+    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: true,
+      addon_products: [product],
+    }))
+    purchaseAddonWithBalance.mockResolvedValue({
+      order_id: 902,
+      amount: product.price,
+      status: 'COMPLETED',
+      payment_type: 'balance_wallet',
+      addon_id: 33,
+      addon_product_id: product.id,
+      subscription_id: 20,
+      quota_usd: product.quota_usd,
+      expires_at: '2099-01-01T00:00:00.000Z',
+      balance_before: 20,
+      balance_after: 14.51,
+    })
+    subscriptionState.activeSubscriptions = [
+      ...subscriptionState.activeSubscriptions,
+      {
+        ...subscriptionState.activeSubscriptions[0],
+        id: 20,
+        group_id: 8,
+      },
+    ]
+
+    const wrapper = shallowMount(PaymentView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
+    })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
+    await wrapper.find('[data-testid="addon-subscription-20"]').trigger('click')
+    await wrapper.find('[data-testid="addon-product-5"]').trigger('click')
+    await wrapper.find('[data-testid="addon-balance-buy-button"]').trigger('click')
+    await flushPromises()
+
+    expect(purchaseAddonWithBalance).toHaveBeenCalledWith({
+      addon_product_id: product.id,
+      subscription_id: 20,
+    })
+    expect(refreshUser).toHaveBeenCalledTimes(1)
+    expect(fetchActiveSubscriptions).toHaveBeenCalledWith(true)
+    expect(showSuccess).toHaveBeenCalledWith('payment.addon.balanceSuccess')
   })
 })
 

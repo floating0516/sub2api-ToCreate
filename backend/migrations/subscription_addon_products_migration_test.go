@@ -28,3 +28,17 @@ func TestSubscriptionAddonProductsMigrationSeedsCatalogAndIdempotencyIndex(t *te
 	require.Contains(t, sql, "200, 44.99, 50)")
 	require.Contains(t, sql, "ON CONFLICT (sku) DO NOTHING")
 }
+
+func TestSubscriptionAddonPriceMigrationAppliesDescendingUnitPrices(t *testing.T) {
+	content, err := FS.ReadFile("178_update_subscription_addon_prices.sql")
+	require.NoError(t, err)
+
+	sql := strings.Join(strings.Fields(string(content)), " ")
+	require.Contains(t, sql, "UPDATE subscription_addon_products AS product")
+	require.Contains(t, sql, "('addon-usd-10', 1.99::NUMERIC)")
+	require.Contains(t, sql, "('addon-usd-30', 5.49::NUMERIC)")
+	require.Contains(t, sql, "('addon-usd-50', 8.49::NUMERIC)")
+	require.Contains(t, sql, "('addon-usd-100', 14.99::NUMERIC)")
+	require.Contains(t, sql, "('addon-usd-200', 27.99::NUMERIC)")
+	require.Contains(t, sql, "WHERE product.sku = catalog.sku")
+}

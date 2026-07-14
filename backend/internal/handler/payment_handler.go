@@ -246,6 +246,11 @@ type BalanceSubscriptionPurchaseRequest struct {
 	PlanID int64 `json:"plan_id" binding:"required"`
 }
 
+type BalanceAddonPurchaseRequest struct {
+	AddonProductID int64 `json:"addon_product_id" binding:"required"`
+	SubscriptionID int64 `json:"subscription_id" binding:"required"`
+}
+
 // PurchaseSubscriptionWithBalance buys a subscription using account balance.
 // POST /api/v1/payment/subscriptions/balance-purchase
 func (h *PaymentHandler) PurchaseSubscriptionWithBalance(c *gin.Context) {
@@ -267,6 +272,36 @@ func (h *PaymentHandler) PurchaseSubscriptionWithBalance(c *gin.Context) {
 		SrcHost:  c.Request.Host,
 		SrcURL:   c.Request.Referer(),
 		Locale:   c.GetHeader("Accept-Language"),
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+// PurchaseAddonWithBalance buys a subscription add-on using account balance.
+// POST /api/v1/payment/addons/balance-purchase
+func (h *PaymentHandler) PurchaseAddonWithBalance(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+
+	var req BalanceAddonPurchaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.paymentService.PurchaseAddonWithBalance(c.Request.Context(), service.BalanceAddonPurchaseRequest{
+		UserID:         subject.UserID,
+		AddonProductID: req.AddonProductID,
+		SubscriptionID: req.SubscriptionID,
+		ClientIP:       c.ClientIP(),
+		SrcHost:        c.Request.Host,
+		SrcURL:         c.Request.Referer(),
+		Locale:         c.GetHeader("Accept-Language"),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

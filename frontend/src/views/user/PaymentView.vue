@@ -232,7 +232,7 @@
                 <div class="space-y-2">
                   <div v-for="sub in activeSubscriptions" :key="sub.id"
                     class="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2 dark:border-dark-700 dark:bg-dark-800">
-                    <div :class="['h-6 w-1 shrink-0 rounded-full', platformAccentBarClass(sub.group?.platform || '')]" />
+                    <div :class="['h-6 w-1 shrink-0 rounded-full', subscriptionAccentBarClass({ groupName: sub.group?.name, platform: sub.group?.platform })]" />
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-1.5">
                         <span class="truncate text-xs font-semibold text-gray-900 dark:text-white">{{ sub.group?.name || t('payment.groupFallback', { id: sub.group_id }) }}</span>
@@ -254,6 +254,28 @@
           </template>
           <!-- Add-on Tab -->
           <template v-else-if="activeTab === 'addon'">
+            <div data-testid="addon-guidance" class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div class="flex gap-3">
+                <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">{{ t('payment.addon.guideTitle') }}</p>
+                  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+                    <li class="flex gap-2">
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span>{{ t('payment.addon.guideSubscription') }}</span>
+                    </li>
+                    <li class="flex gap-2">
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span>{{ t('payment.addon.guideUsage') }}</span>
+                    </li>
+                    <li class="flex gap-2">
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span>{{ t('payment.addon.guideExpiry') }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
             <div v-if="activeSubscriptions.length === 0" class="card py-16 text-center">
               <Icon name="bolt" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
               <p class="font-medium text-gray-700 dark:text-gray-200">{{ t('payment.addon.noSubscription') }}</p>
@@ -267,6 +289,7 @@
                     v-for="sub in activeSubscriptions"
                     :key="sub.id"
                     type="button"
+                    :data-testid="`addon-subscription-${sub.id}`"
                     :aria-pressed="selectedAddonSubscriptionId === sub.id"
                     class="flex min-h-14 w-full items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors"
                     :class="selectedAddonSubscriptionId === sub.id
@@ -274,7 +297,7 @@
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700'"
                     @click="selectedAddonSubscriptionId = sub.id"
                   >
-                    <div :class="['h-8 w-1 shrink-0 rounded-full', platformAccentBarClass(sub.group?.platform || '')]" />
+                    <div :class="['h-8 w-1 shrink-0 rounded-full', subscriptionAccentBarClass({ groupName: sub.group?.name, platform: sub.group?.platform })]" />
                     <div class="min-w-0 flex-1">
                       <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ sub.group?.name || t('payment.groupFallback', { id: sub.group_id }) }}</div>
                       <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -330,6 +353,30 @@
                 </p>
               </div>
 
+              <div v-if="selectedAddonProduct && selectedAddonSubscription" class="card p-6">
+                <p class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.addon.balancePayment') }}</p>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.balancePurchase.currentBalance') }}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ formatBalanceAmount(userBalance) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.balancePurchase.deductAmount') }}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ formatBalanceAmount(selectedAddonProduct.price) }}</span>
+                  </div>
+                  <p v-if="addonBalanceShortfall > 0" class="border-t border-gray-200 pt-2 text-xs text-amber-600 dark:border-dark-600 dark:text-amber-300">
+                    {{ t('payment.balancePurchase.insufficient', { shortfall: formatBalanceAmount(addonBalanceShortfall) }) }}
+                  </p>
+                </div>
+                <button data-testid="addon-balance-buy-button" class="btn btn-primary mt-4 w-full py-3 text-base font-medium" :disabled="!canPurchaseAddonWithBalance || submitting || balanceSubmitting" @click="purchaseAddonWithBalance">
+                  <span v-if="balanceSubmitting" class="flex items-center justify-center gap-2">
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                    {{ t('common.processing') }}
+                  </span>
+                  <span v-else>{{ t('payment.balancePurchase.useBalance') }}</span>
+                </button>
+              </div>
+
               <div v-if="enabledMethods.length >= 1" class="card p-6">
                 <PaymentMethodSelector
                   :methods="addonMethodOptions"
@@ -353,7 +400,7 @@
                   </div>
                 </div>
               </div>
-              <button data-testid="addon-buy-button" :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmitAddon || submitting" @click="confirmAddonPurchase">
+              <button data-testid="addon-buy-button" :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmitAddon || submitting || balanceSubmitting" @click="confirmAddonPurchase">
                 <span v-if="submitting" class="flex items-center justify-center gap-2">
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   {{ t('common.processing') }}
@@ -429,7 +476,8 @@ import {
   type PaymentRecoverySnapshot,
   writePaymentRecoverySnapshot,
 } from '@/components/payment/paymentFlow'
-import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, platformTextClass, platformLabel } from '@/utils/platformColors'
+import { platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
+import { subscriptionAccentBarClass, subscriptionBadgeClass, subscriptionTextClass } from '@/utils/subscriptionColors'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -905,6 +953,11 @@ const balanceShortfall = computed(() => {
   return Math.max(0, Math.round((price - userBalance.value) * 100) / 100)
 })
 
+const addonBalanceShortfall = computed(() => {
+  const price = selectedAddonProduct.value?.price ?? 0
+  return Math.max(0, Math.round((price - userBalance.value) * 100) / 100)
+})
+
 const canSubmitSubscription = computed(() =>
   selectedPlan.value !== null
     && amountFitsMethod(subTotalAmount.value, selectedMethod.value)
@@ -913,6 +966,12 @@ const canSubmitSubscription = computed(() =>
 
 const canPurchaseSubscriptionWithBalance = computed(() =>
   selectedPlan.value !== null && balanceShortfall.value <= 0
+)
+
+const canPurchaseAddonWithBalance = computed(() =>
+  selectedAddonProduct.value !== null
+    && selectedAddonSubscription.value !== null
+    && addonBalanceShortfall.value <= 0
 )
 
 const canSubmitAddon = computed(() =>
@@ -941,8 +1000,13 @@ const paymentButtonClass = computed(() => {
 })
 
 // Subscription confirm: platform accent colors (clean card, no gradient)
-const planBadgeClass = computed(() => platformBadgeClass(selectedPlan.value?.group_platform || ''))
-const planTextClass = computed(() => platformTextClass(selectedPlan.value?.group_platform || ''))
+const selectedPlanColorContext = computed(() => ({
+  planName: selectedPlan.value?.name,
+  groupName: selectedPlan.value?.group_name,
+  platform: selectedPlan.value?.group_platform,
+}))
+const planBadgeClass = computed(() => subscriptionBadgeClass(selectedPlanColorContext.value))
+const planTextClass = computed(() => subscriptionTextClass(selectedPlanColorContext.value))
 
 // Renewal modal state
 const showRenewalModal = ref(false)
@@ -996,11 +1060,36 @@ async function confirmSubscribe() {
 }
 
 async function confirmAddonPurchase() {
-  if (!selectedAddonProduct.value || !selectedAddonSubscription.value || submitting.value) return
+  if (!selectedAddonProduct.value || !selectedAddonSubscription.value || submitting.value || balanceSubmitting.value) return
   await createOrder(selectedAddonProduct.value.price, 'addon', undefined, {
     addonProductId: selectedAddonProduct.value.id,
     subscriptionId: selectedAddonSubscription.value.id,
   })
+}
+
+async function purchaseAddonWithBalance() {
+  if (!selectedAddonProduct.value || !selectedAddonSubscription.value || !canPurchaseAddonWithBalance.value || submitting.value || balanceSubmitting.value) return
+  balanceSubmitting.value = true
+  errorMessage.value = ''
+  errorHintMessage.value = ''
+  try {
+    await paymentStore.purchaseAddonWithBalance({
+      addon_product_id: selectedAddonProduct.value.id,
+      subscription_id: selectedAddonSubscription.value.id,
+    })
+    await Promise.all([
+      authStore.refreshUser(),
+      subscriptionStore.fetchActiveSubscriptions(true),
+    ])
+    selectedAddonProduct.value = null
+    appStore.showSuccess(t('payment.addon.balanceSuccess'))
+  } catch (err: unknown) {
+    errorMessage.value = extractI18nErrorMessage(err, t, 'payment.errors', extractApiErrorMessage(err, t('common.error')))
+    errorHintMessage.value = ''
+    appStore.showError(errorMessage.value)
+  } finally {
+    balanceSubmitting.value = false
+  }
 }
 
 async function purchaseSubscriptionWithBalance() {

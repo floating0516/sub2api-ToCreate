@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,6 +17,7 @@ type subscriptionAddonRepoStub struct {
 	productErr       error
 	purchasedByOrder map[int64]*SubscriptionAddonPack
 	purchaseCalls    int
+	purchaseInTx     bool
 	purchaseErr      error
 }
 
@@ -81,8 +83,9 @@ func (s *subscriptionAddonRepoStub) GetProductByID(_ context.Context, id int64) 
 	return &copy, nil
 }
 
-func (s *subscriptionAddonRepoStub) CreatePurchased(_ context.Context, input CreatePurchasedSubscriptionAddonInput) (*SubscriptionAddonPack, error) {
+func (s *subscriptionAddonRepoStub) CreatePurchased(ctx context.Context, input CreatePurchasedSubscriptionAddonInput) (*SubscriptionAddonPack, error) {
 	s.purchaseCalls++
+	s.purchaseInTx = dbent.TxFromContext(ctx) != nil
 	if s.purchaseErr != nil {
 		return nil, s.purchaseErr
 	}

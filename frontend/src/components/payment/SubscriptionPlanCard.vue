@@ -27,7 +27,7 @@
         <div class="shrink-0 text-right">
           <div class="flex items-baseline gap-1">
             <span class="text-xs text-gray-400 dark:text-dark-500">$</span>
-            <span :class="['text-2xl font-extrabold tracking-tight', textClass]">{{ plan.price }}</span>
+            <span :class="['text-2xl font-extrabold', textClass]">{{ plan.price }}</span>
           </div>
           <span class="text-[11px] text-gray-400 dark:text-dark-500">/ {{ validitySuffix }}</span>
           <div v-if="plan.original_price" class="mt-0.5 flex items-center justify-end gap-1.5">
@@ -106,33 +106,41 @@ import type { UserSubscription } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { hasPeakRate as groupHasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import {
-  platformAccentBarClass,
-  platformBadgeLightClass,
-  platformBorderClass,
-  platformTextClass,
-  platformIconClass,
-  platformButtonClass,
-  platformDiscountClass,
   platformLabel,
 } from '@/utils/platformColors'
+import {
+  subscriptionAccentBarClass,
+  subscriptionBadgeLightClass,
+  subscriptionBorderClass,
+  subscriptionButtonClass,
+  subscriptionDiscountClass,
+  subscriptionIconClass,
+  subscriptionTextClass,
+  type SubscriptionColorContext,
+} from '@/utils/subscriptionColors'
 
 const props = defineProps<{ plan: SubscriptionPlan; activeSubscriptions?: UserSubscription[] }>()
 const emit = defineEmits<{ select: [plan: SubscriptionPlan] }>()
 const { t } = useI18n()
 
 const platform = computed(() => props.plan.group_platform || '')
+const colorContext = computed<SubscriptionColorContext>(() => ({
+  planName: props.plan.name,
+  groupName: props.plan.group_name,
+  platform: platform.value,
+}))
 const isRenewal = computed(() =>
   props.activeSubscriptions?.some(s => s.group_id === props.plan.group_id && s.status === 'active') ?? false
 )
 
 // Derived color classes from central config
-const accentClass = computed(() => platformAccentBarClass(platform.value))
-const borderClass = computed(() => platformBorderClass(platform.value))
-const badgeLightClass = computed(() => platformBadgeLightClass(platform.value))
-const textClass = computed(() => platformTextClass(platform.value))
-const iconClass = computed(() => platformIconClass(platform.value))
-const btnClass = computed(() => platformButtonClass(platform.value))
-const discountClass = computed(() => platformDiscountClass(platform.value))
+const accentClass = computed(() => subscriptionAccentBarClass(colorContext.value))
+const borderClass = computed(() => subscriptionBorderClass(colorContext.value))
+const badgeLightClass = computed(() => subscriptionBadgeLightClass(colorContext.value))
+const textClass = computed(() => subscriptionTextClass(colorContext.value))
+const iconClass = computed(() => subscriptionIconClass(colorContext.value))
+const btnClass = computed(() => subscriptionButtonClass(colorContext.value))
+const discountClass = computed(() => subscriptionDiscountClass(colorContext.value))
 const pLabel = computed(() => platformLabel(platform.value))
 
 const discountText = computed(() => {

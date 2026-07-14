@@ -37,4 +37,16 @@ describe('payment api', () => {
       resume_token: 'resume-token-123',
     })
   })
+
+  it('posts balance add-on purchases with the selected product and subscription', async () => {
+    await paymentAPI.purchaseAddonWithBalance({
+      addon_product_id: 5,
+      subscription_id: 19,
+    })
+
+    expect(post).toHaveBeenCalledWith('/payment/addons/balance-purchase', {
+      addon_product_id: 5,
+      subscription_id: 19,
+    })
+  })
 })

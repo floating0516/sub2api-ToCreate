@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 )
@@ -14,8 +15,22 @@ type subscriptionAddonRepository struct {
 	db *sql.DB
 }
 
+type subscriptionAddonRowQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 func NewSubscriptionAddonRepository(db *sql.DB) service.SubscriptionAddonRepository {
 	return &subscriptionAddonRepository{db: db}
+}
+
+func (r *subscriptionAddonRepository) rowQueryer(ctx context.Context) (subscriptionAddonRowQueryer, error) {
+	if r == nil || r.db == nil {
+		return nil, service.ErrSubscriptionAddonInvalid
+	}
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		return tx.SQLTx()
+	}
+	return r.db, nil
 }
 
 func (r *subscriptionAddonRepository) Create(ctx context.Context, pack *service.SubscriptionAddonPack) error {
@@ -256,7 +271,11 @@ func (r *subscriptionAddonRepository) GetProductByID(ctx context.Context, id int
 	if r == nil || r.db == nil || id <= 0 {
 		return nil, service.ErrSubscriptionAddonProductNotFound
 	}
-	product, err := scanSubscriptionAddonProduct(r.db.QueryRowContext(ctx, `
+	queryer, err := r.rowQueryer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	product, err := scanSubscriptionAddonProduct(queryer.QueryRowContext(ctx, `
 		SELECT id, sku, name, quota_usd, price, original_price, for_sale,
 			sort_order, created_at, updated_at
 		FROM subscription_addon_products
@@ -273,8 +292,12 @@ func (r *subscriptionAddonRepository) CreatePurchased(ctx context.Context, input
 		input.UserID <= 0 || input.GroupID <= 0 || input.QuotaUSD <= 0 {
 		return nil, service.ErrSubscriptionAddonInvalid
 	}
+	queryer, err := r.rowQueryer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now()
-	pack, err := scanSubscriptionAddon(r.db.QueryRowContext(ctx, `
+	pack, err := scanSubscriptionAddon(queryer.QueryRowContext(ctx, `
 		INSERT INTO subscription_addon_packs (
 			subscription_id, user_id, group_id, quota_usd, used_usd,
 			starts_at, expires_at, status, notes, purchase_order_id
@@ -298,7 +321,11 @@ func (r *subscriptionAddonRepository) GetByPurchaseOrderID(ctx context.Context, 
 	if r == nil || r.db == nil || orderID <= 0 {
 		return nil, service.ErrSubscriptionAddonNotFound
 	}
-	pack, err := scanSubscriptionAddon(r.db.QueryRowContext(ctx, `
+	queryer, err := r.rowQueryer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pack, err := scanSubscriptionAddon(queryer.QueryRowContext(ctx, `
 		SELECT id, subscription_id, user_id, group_id, quota_usd, used_usd,
 			starts_at, expires_at, status, assigned_by, notes, revoked_at, created_at, updated_at
 		FROM subscription_addon_packs

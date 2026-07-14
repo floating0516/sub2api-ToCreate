@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { paymentAPI } from '@/api/payment'
-import type { PaymentConfig, PaymentOrder, SubscriptionPlan, CreateOrderRequest, BalanceSubscriptionPurchaseRequest } from '@/types/payment'
+import type { PaymentConfig, PaymentOrder, SubscriptionPlan, CreateOrderRequest, BalanceSubscriptionPurchaseRequest, BalanceAddonPurchaseRequest } from '@/types/payment'
 
 export const usePaymentStore = defineStore('payment', () => {
   // ==================== State ====================
@@ -72,6 +72,12 @@ export const usePaymentStore = defineStore('payment', () => {
     return response.data
   }
 
+  /** Purchase a subscription add-on with account balance */
+  async function purchaseAddonWithBalance(params: BalanceAddonPurchaseRequest) {
+    const response = await paymentAPI.purchaseAddonWithBalance(params)
+    return response.data
+  }
+
   /** Poll order status by ID (read-only, no upstream check) */
   async function pollOrderStatus(orderId: number): Promise<PaymentOrder | null> {
     try {
@@ -102,6 +108,7 @@ export const usePaymentStore = defineStore('payment', () => {
     fetchPlans,
     createOrder,
     purchaseSubscriptionWithBalance,
+    purchaseAddonWithBalance,
     pollOrderStatus,
     clearCurrentOrder
   }

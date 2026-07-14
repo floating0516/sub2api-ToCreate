@@ -248,6 +248,25 @@ export interface BalanceSubscriptionPurchaseResult {
   subscription_id?: number
 }
 
+export interface BalanceAddonPurchaseRequest {
+  addon_product_id: number
+  subscription_id: number
+}
+
+export interface BalanceAddonPurchaseResult {
+  order_id: number
+  amount: number
+  status: OrderStatus
+  payment_type: string
+  addon_id: number
+  addon_product_id: number
+  subscription_id: number
+  quota_usd: number
+  expires_at: string
+  balance_before: number
+  balance_after: number
+}
+
 export interface DashboardStats {
   today_amount: number
   total_amount: number

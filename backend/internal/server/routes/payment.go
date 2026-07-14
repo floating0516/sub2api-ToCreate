@@ -30,6 +30,7 @@ func RegisterPaymentRoutes(
 		authenticated.GET("/plans", paymentHandler.GetPlans)
 		authenticated.GET("/limits", paymentHandler.GetLimits)
 		authenticated.POST("/subscriptions/balance-purchase", paymentHandler.PurchaseSubscriptionWithBalance)
+		authenticated.POST("/addons/balance-purchase", paymentHandler.PurchaseAddonWithBalance)
 
 		orders := authenticated.Group("/orders")
 		{
