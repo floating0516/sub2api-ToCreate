@@ -13,9 +13,9 @@ func (tx *Tx) SQLTx() (*stdsql.Tx, error) {
 	if tx == nil {
 		return nil, fmt.Errorf("ent: nil transaction")
 	}
-	txDriver, ok := tx.config.driver.(*txDriver)
+	txDriver, ok := tx.driver.(*txDriver)
 	if !ok {
-		return nil, fmt.Errorf("ent: unexpected transaction driver %T", tx.config.driver)
+		return nil, fmt.Errorf("ent: unexpected transaction driver %T", tx.driver)
 	}
 	dialectTx, ok := txDriver.tx.(*entsql.Tx)
 	if !ok {
