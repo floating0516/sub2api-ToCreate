@@ -252,8 +252,118 @@
               </div>
             </template>
           </template>
+          <!-- Add-on Tab -->
+          <template v-else-if="activeTab === 'addon'">
+            <div v-if="activeSubscriptions.length === 0" class="card py-16 text-center">
+              <Icon name="bolt" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
+              <p class="font-medium text-gray-700 dark:text-gray-200">{{ t('payment.addon.noSubscription') }}</p>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('payment.addon.noSubscriptionHint') }}</p>
+            </div>
+            <template v-else>
+              <div class="card p-5">
+                <p class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.addon.targetSubscription') }}</p>
+                <div class="space-y-2">
+                  <button
+                    v-for="sub in activeSubscriptions"
+                    :key="sub.id"
+                    type="button"
+                    :aria-pressed="selectedAddonSubscriptionId === sub.id"
+                    class="flex min-h-14 w-full items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors"
+                    :class="selectedAddonSubscriptionId === sub.id
+                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:bg-primary-900/20'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700'"
+                    @click="selectedAddonSubscriptionId = sub.id"
+                  >
+                    <div :class="['h-8 w-1 shrink-0 rounded-full', platformAccentBarClass(sub.group?.platform || '')]" />
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ sub.group?.name || t('payment.groupFallback', { id: sub.group_id }) }}</div>
+                      <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('payment.addon.expiresAt', { time: formatDateTime(sub.expires_at) }) }}
+                      </div>
+                    </div>
+                    <Icon v-if="selectedAddonSubscriptionId === sub.id" name="check" size="sm" class="shrink-0 text-primary-600 dark:text-primary-300" />
+                  </button>
+                </div>
+              </div>
+
+              <div class="card p-5">
+                <p class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.addon.selectPack') }}</p>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <button
+                    v-for="product in checkout.addon_products"
+                    :key="product.id"
+                    type="button"
+                    :data-testid="`addon-product-${product.id}`"
+                    :aria-pressed="selectedAddonProduct?.id === product.id"
+                    class="flex min-h-28 flex-col items-center justify-center rounded-md border px-3 py-3 text-center transition-colors"
+                    :class="selectedAddonProduct?.id === product.id
+                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:bg-primary-900/20'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700'"
+                    @click="selectedAddonProduct = product"
+                  >
+                    <span class="text-xl font-bold tabular-nums text-gray-900 dark:text-white">${{ formatQuota(product.quota_usd) }}</span>
+                    <span class="mt-1 text-sm font-semibold text-primary-600 dark:text-primary-300">{{ formatSelectedSubscriptionPaymentAmount(product.price) }}</span>
+                    <span class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {{ t('payment.addon.unitPrice', { price: formatSelectedSubscriptionPaymentAmount(product.price / product.quota_usd) }) }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="selectedAddonProduct && selectedAddonSubscription" class="card p-5">
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between gap-4">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.addon.quota') }}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">${{ formatQuota(selectedAddonProduct.quota_usd) }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.addon.targetSubscription') }}</span>
+                    <span class="text-right font-medium text-gray-900 dark:text-white">{{ selectedAddonSubscription.group?.name || t('payment.groupFallback', { id: selectedAddonSubscription.group_id }) }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.addon.validUntil') }}</span>
+                    <span class="text-right font-medium text-gray-900 dark:text-white">{{ formatDateTime(selectedAddonSubscription.expires_at) }}</span>
+                  </div>
+                </div>
+                <p class="mt-3 border-t border-gray-200 pt-3 text-xs leading-relaxed text-gray-500 dark:border-dark-600 dark:text-gray-400">
+                  {{ t('payment.addon.expiryPolicy') }}
+                </p>
+              </div>
+
+              <div v-if="enabledMethods.length >= 1" class="card p-6">
+                <PaymentMethodSelector
+                  :methods="addonMethodOptions"
+                  :selected="selectedMethod"
+                  @select="selectedMethod = $event"
+                />
+              </div>
+              <div v-if="feeRate > 0 && addonPaymentAmount > 0" class="card p-6">
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(addonPaymentAmount) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
+                    <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(addonFeeAmount) }}</span>
+                  </div>
+                  <div class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
+                    <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
+                    <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(addonTotalAmount) }}</span>
+                  </div>
+                </div>
+              </div>
+              <button data-testid="addon-buy-button" :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmitAddon || submitting" @click="confirmAddonPurchase">
+                <span v-if="submitting" class="flex items-center justify-center gap-2">
+                  <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  {{ t('common.processing') }}
+                </span>
+                <span v-else>{{ t('payment.addon.buyNow') }} {{ formatSelectedPaymentAmount(addonTotalAmount) }}</span>
+              </button>
+            </template>
+          </template>
         </template>
-        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan" class="card p-4">
+        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan && activeTab !== 'addon'" class="card p-4">
           <div class="flex flex-col items-center gap-3">
             <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
               class="h-40 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80"
@@ -303,7 +413,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
-import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
+import type { SubscriptionPlan, SubscriptionAddonProduct, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
@@ -324,6 +434,7 @@ import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { DEFAULT_PAYMENT_CURRENCY, formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import { formatDateTime } from '@/utils/format'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
@@ -358,11 +469,23 @@ const submitting = ref(false)
 const balanceSubmitting = ref(false)
 const errorMessage = ref('')
 const errorHintMessage = ref('')
-const activeTab = ref<'recharge' | 'subscription'>('recharge')
+const activeTab = ref<'recharge' | 'subscription' | 'addon'>('recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
+const selectedAddonProduct = ref<SubscriptionAddonProduct | null>(null)
+const selectedAddonSubscriptionId = ref<number | null>(null)
 const previewImage = ref('')
+
+const selectedAddonSubscription = computed(() =>
+  activeSubscriptions.value.find(sub => sub.id === selectedAddonSubscriptionId.value) ?? null
+)
+
+watch(activeSubscriptions, (subscriptions) => {
+  if (!subscriptions.some(sub => sub.id === selectedAddonSubscriptionId.value)) {
+    selectedAddonSubscriptionId.value = subscriptions[0]?.id ?? null
+  }
+}, { immediate: true })
 
 const paymentPhase = ref<'select' | 'paying'>('select')
 
@@ -372,6 +495,8 @@ interface CreateOrderOptions {
   paymentType?: string
   isResume?: boolean
   mobileQrFallbackAttempted?: boolean
+  addonProductId?: number
+  subscriptionId?: number
 }
 
 interface WeixinJSBridgeLike {
@@ -476,7 +601,7 @@ async function redirectToPaymentResult(state: PaymentRecoverySnapshot): Promise<
 
 function buildWechatOAuthAuthorizeUrl(
   authorizeUrl: string,
-  context: { paymentType: string; orderType: OrderType; planId?: number; orderAmount: number },
+  context: { paymentType: string; orderType: OrderType; planId?: number; addonProductId?: number; subscriptionId?: number; orderAmount: number },
 ): string {
   const normalizedUrl = authorizeUrl.trim()
   if (!normalizedUrl || typeof window === 'undefined') {
@@ -498,6 +623,17 @@ function buildWechatOAuthAuthorizeUrl(
       redirectUrl.searchParams.delete('plan_id')
     }
 
+    if (context.addonProductId) {
+      redirectUrl.searchParams.set('addon_product_id', String(context.addonProductId))
+    } else {
+      redirectUrl.searchParams.delete('addon_product_id')
+    }
+    if (context.subscriptionId) {
+      redirectUrl.searchParams.set('subscription_id', String(context.subscriptionId))
+    } else {
+      redirectUrl.searchParams.delete('subscription_id')
+    }
+
     if (context.orderAmount > 0) {
       redirectUrl.searchParams.set('amount', String(context.orderAmount))
     } else {
@@ -513,9 +649,11 @@ function buildWechatOAuthAuthorizeUrl(
 
 function onPaymentDone() {
   const wasSubscription = paymentState.value.orderType === 'subscription'
+  const wasAddon = paymentState.value.orderType === 'addon'
   resetPayment()
   selectedPlan.value = null
-  if (wasSubscription) {
+  selectedAddonProduct.value = null
+  if (wasSubscription || wasAddon) {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
   }
 }
@@ -523,7 +661,7 @@ function onPaymentDone() {
 function onPaymentSuccess() {
   removeRecoverySnapshot()
   authStore.refreshUser()
-  if (paymentState.value.orderType === 'subscription') {
+  if (paymentState.value.orderType === 'subscription' || paymentState.value.orderType === 'addon') {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
   }
 }
@@ -535,15 +673,22 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], addon_purchase_enabled: false, addon_products: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
-  const result: { key: 'recharge' | 'subscription'; label: string }[] = []
+  const result: { key: 'recharge' | 'subscription' | 'addon'; label: string }[] = []
   if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
   result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
+  if (checkout.value.addon_purchase_enabled && checkout.value.addon_products.length > 0) {
+    result.push({ key: 'addon', label: t('payment.tabAddon') })
+  }
   return result
 })
+
+function formatQuota(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
@@ -725,6 +870,35 @@ const subMethodOptions = computed<PaymentMethodOption[]>(() => {
   })
 })
 
+const addonPaymentAmount = computed(() => {
+  const price = selectedAddonProduct.value?.price ?? 0
+  return subscriptionPaymentAmountForCurrency(price, selectedCurrency.value)
+})
+
+const addonFeeAmount = computed(() => {
+  if (feeRate.value <= 0 || addonPaymentAmount.value <= 0) return 0
+  return ceilPaymentAmount((addonPaymentAmount.value * feeRate.value) / 100, selectedCurrency.value)
+})
+
+const addonTotalAmount = computed(() => {
+  if (feeRate.value <= 0 || addonPaymentAmount.value <= 0) return addonPaymentAmount.value
+  return roundPaymentAmount(addonPaymentAmount.value + addonFeeAmount.value, selectedCurrency.value)
+})
+
+const addonMethodOptions = computed<PaymentMethodOption[]>(() => {
+  const price = selectedAddonProduct.value?.price ?? 0
+  return enabledMethods.value.map((type) => {
+    const ml = visibleMethods.value[type]
+    const currency = normalizePaymentCurrency(ml?.currency)
+    return {
+      type,
+      display_name: ml?.display_name,
+      fee_rate: ml?.fee_rate ?? 0,
+      available: ml?.available !== false && amountFitsMethod(subscriptionTotalAmountForCurrency(price, currency), type),
+    }
+  })
+})
+
 const userBalance = computed(() => user.value?.balance ?? 0)
 const balanceShortfall = computed(() => {
   const price = selectedPlan.value?.price ?? 0
@@ -739,6 +913,13 @@ const canSubmitSubscription = computed(() =>
 
 const canPurchaseSubscriptionWithBalance = computed(() =>
   selectedPlan.value !== null && balanceShortfall.value <= 0
+)
+
+const canSubmitAddon = computed(() =>
+  selectedAddonProduct.value !== null
+    && selectedAddonSubscription.value !== null
+    && amountFitsMethod(addonTotalAmount.value, selectedMethod.value)
+    && selectedLimit.value?.available !== false
 )
 
 // Auto-switch to first available method when current selection can't handle the amount
@@ -814,6 +995,14 @@ async function confirmSubscribe() {
   await createOrder(selectedPlan.value.price, 'subscription', selectedPlan.value.id)
 }
 
+async function confirmAddonPurchase() {
+  if (!selectedAddonProduct.value || !selectedAddonSubscription.value || submitting.value) return
+  await createOrder(selectedAddonProduct.value.price, 'addon', undefined, {
+    addonProductId: selectedAddonProduct.value.id,
+    subscriptionId: selectedAddonSubscription.value.id,
+  })
+}
+
 async function purchaseSubscriptionWithBalance() {
   if (!selectedPlan.value || !canPurchaseSubscriptionWithBalance.value || submitting.value || balanceSubmitting.value) return
   balanceSubmitting.value = true
@@ -847,6 +1036,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       paymentType: requestType,
       orderType,
       planId,
+      addonProductId: options.addonProductId,
+      subscriptionId: options.subscriptionId,
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: isMobileDevice(),
       isWechatBrowser: typeof window !== 'undefined' && /MicroMessenger/i.test(window.navigator.userAgent),
@@ -909,6 +1100,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
         paymentType: visibleMethod,
         orderType,
         planId,
+        addonProductId: options.addonProductId,
+        subscriptionId: options.subscriptionId,
         orderAmount,
       })
       return
@@ -950,6 +1143,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
               orderAmount,
               orderType,
               planId,
+              addonProductId: options.addonProductId,
+              subscriptionId: options.subscriptionId,
               paymentType: visibleMethod,
               attempted: options.mobileQrFallbackAttempted === true,
             },
@@ -968,6 +1163,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
           orderAmount,
           orderType,
           planId,
+          addonProductId: options.addonProductId,
+          subscriptionId: options.subscriptionId,
           paymentType: visibleMethod,
           attempted: options.mobileQrFallbackAttempted === true,
         })
@@ -997,6 +1194,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       orderAmount,
       orderType,
       planId,
+      addonProductId: options.addonProductId,
+      subscriptionId: options.subscriptionId,
       paymentType: requestType,
       attempted: options.mobileQrFallbackAttempted === true,
     })) {
@@ -1024,6 +1223,8 @@ interface MobileQrFallbackContext {
   orderAmount: number
   orderType: OrderType
   planId?: number
+  addonProductId?: number
+  subscriptionId?: number
   paymentType: string
   attempted: boolean
 }
@@ -1073,6 +1274,8 @@ async function attemptMobileQrFallback(err: unknown, context: MobileQrFallbackCo
       paymentType: visibleMethod,
       orderType: context.orderType,
       planId: context.planId,
+      addonProductId: context.addonProductId,
+      subscriptionId: context.subscriptionId,
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: false,
       isWechatBrowser: false,
@@ -1133,7 +1336,7 @@ function applyScenarioError(err: unknown, paymentMethod: string): boolean {
 }
 
 async function resumeWechatPaymentFromQuery() {
-  const resume = parseWechatResumeRoute(route.query, checkout.value.plans, validAmount.value)
+  const resume = parseWechatResumeRoute(route.query, checkout.value.plans, checkout.value.addon_products, validAmount.value)
   if (!resume) {
     return
   }
@@ -1145,6 +1348,10 @@ async function resumeWechatPaymentFromQuery() {
   if (resume.orderType === 'subscription' && resume.planId) {
     selectedPlan.value = checkout.value.plans.find(plan => plan.id === resume.planId) ?? null
   }
+  if (resume.orderType === 'addon') {
+    selectedAddonProduct.value = checkout.value.addon_products.find(product => product.id === resume.addonProductId) ?? null
+    selectedAddonSubscriptionId.value = resume.subscriptionId ?? selectedAddonSubscriptionId.value
+  }
 
   await router.replace({ path: route.path, query: stripWechatResumeQuery(route.query) })
 
@@ -1152,6 +1359,8 @@ async function resumeWechatPaymentFromQuery() {
     await createOrder(0, resume.orderType, resume.planId, {
       wechatResumeToken: resume.wechatResumeToken,
       paymentType: resume.paymentType,
+      addonProductId: resume.addonProductId,
+      subscriptionId: resume.subscriptionId,
       isResume: true,
     })
     return
@@ -1161,6 +1370,8 @@ async function resumeWechatPaymentFromQuery() {
     await createOrder(resume.orderAmount, resume.orderType, resume.planId, {
       openid: resume.openid,
       paymentType: resume.paymentType,
+      addonProductId: resume.addonProductId,
+      subscriptionId: resume.subscriptionId,
       isResume: true,
     })
   }

@@ -2,11 +2,35 @@
   <AppLayout>
     <div class="space-y-4">
       <!-- Actions -->
-      <div class="flex items-center justify-end gap-2">
-        <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
-          <Icon name="refresh" size="md" :class="plansLoading ? 'animate-spin' : ''" />
-        </button>
-        <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-dark-600">
+        <div class="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="paymentConfig?.addon_purchase_enabled === true"
+            :disabled="configSaving || !paymentConfig"
+            :class="[
+              'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+              paymentConfig?.addon_purchase_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600'
+            ]"
+            @click="toggleAddonSales"
+          >
+            <span :class="[
+              'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform',
+              paymentConfig?.addon_purchase_enabled ? 'translate-x-5' : 'translate-x-0'
+            ]" />
+          </button>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ t('payment.admin.addonSales') }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.admin.addonSalesHint') }}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
+            <Icon name="refresh" size="md" :class="plansLoading ? 'animate-spin' : ''" />
+          </button>
+          <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
+        </div>
       </div>
 
       <!-- Plans Table -->
@@ -99,6 +123,7 @@ const appStore = useAppStore()
 
 const groups = ref<AdminGroup[]>([])
 const paymentConfig = ref<AdminPaymentConfig | null>(null)
+const configSaving = ref(false)
 
 async function loadGroups() {
   try {
@@ -111,6 +136,20 @@ async function loadPaymentConfig() {
     const res = await adminPaymentAPI.getConfig()
     paymentConfig.value = res.data
   } catch { /* preview only */ }
+}
+
+async function toggleAddonSales() {
+  if (!paymentConfig.value || configSaving.value) return
+  const next = !paymentConfig.value.addon_purchase_enabled
+  configSaving.value = true
+  try {
+    await adminPaymentAPI.updateConfig({ ...paymentConfig.value, addon_purchase_enabled: next })
+    paymentConfig.value.addon_purchase_enabled = next
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    configSaving.value = false
+  }
 }
 
 function getGroup(id: number): AdminGroup | undefined {

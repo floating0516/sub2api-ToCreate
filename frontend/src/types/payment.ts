@@ -21,7 +21,7 @@ export type OrderStatus =
 
 export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'airwallex'
 
-export type OrderType = 'balance' | 'subscription'
+export type OrderType = 'balance' | 'subscription' | 'addon'
 
 // ==================== Configuration ====================
 
@@ -34,6 +34,7 @@ export interface PaymentConfig {
   order_timeout_minutes: number
   balance_disabled: boolean
   balance_recharge_multiplier: number
+  addon_purchase_enabled: boolean
   subscription_usd_to_cny_rate: number
   enabled_payment_types: PaymentType[]
   help_image_url: string
@@ -66,6 +67,8 @@ export interface CheckoutInfoResponse {
   global_min: number
   global_max: number
   plans: SubscriptionPlan[]
+  addon_purchase_enabled: boolean
+  addon_products: SubscriptionAddonProduct[]
   balance_disabled: boolean
   balance_recharge_multiplier: number
   /** Subscription CNY conversion rate (1 USD = X CNY); 0 = disabled, plan price is charged as-is */
@@ -132,6 +135,17 @@ export interface SubscriptionPlan {
   sort_order: number
 }
 
+export interface SubscriptionAddonProduct {
+  id: number
+  sku: string
+  name: string
+  quota_usd: number
+  price: number
+  original_price?: number
+  for_sale: boolean
+  sort_order: number
+}
+
 export interface PaymentChannel {
   id: number
   group_id?: number
@@ -167,6 +181,8 @@ export interface CreateOrderRequest {
   payment_type: string
   order_type: string
   plan_id?: number
+  addon_product_id?: number
+  subscription_id?: number
   return_url?: string
   payment_source?: string
   openid?: string

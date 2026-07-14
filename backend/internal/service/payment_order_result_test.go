@@ -291,7 +291,7 @@ func TestBuildPaymentSubjectAppliesAffixToSubscriptionPlanProductName(t *testing
 		ProductName: "Claude Pro",
 	}
 
-	got := svc.buildPaymentSubject(plan, 0, cfg, nil)
+	got := svc.buildPaymentSubject(plan, nil, 0, cfg, nil)
 	if got != "PRE Claude Pro SUF" {
 		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE Claude Pro SUF")
 	}
@@ -307,7 +307,7 @@ func TestBuildPaymentSubjectAppliesAffixToSubscriptionPlanDefaultName(t *testing
 	}
 	plan := &dbent.SubscriptionPlan{Name: "Team Monthly"}
 
-	got := svc.buildPaymentSubject(plan, 0, cfg, nil)
+	got := svc.buildPaymentSubject(plan, nil, 0, cfg, nil)
 	if got != "PRE Sub2API Subscription Team Monthly SUF" {
 		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE Sub2API Subscription Team Monthly SUF")
 	}
@@ -356,6 +356,26 @@ func TestMaybeBuildWeChatOAuthRequiredResponse(t *testing.T) {
 	}
 	if resp.OAuth.AuthorizeURL != "/api/v1/auth/oauth/wechat/payment/start?amount=12.5&order_type=balance&payment_type=wxpay&redirect=%2Fpurchase%3Ffrom%3Dwechat&scope=snsapi_base" {
 		t.Fatalf("authorize_url = %q", resp.OAuth.AuthorizeURL)
+	}
+}
+
+func TestBuildWeChatPaymentOAuthStartURLIncludesAddonContext(t *testing.T) {
+	t.Parallel()
+
+	got, err := buildWeChatPaymentOAuthStartURL(CreateOrderRequest{
+		Amount:          7.99,
+		PaymentType:     payment.TypeWxpay,
+		OrderType:       payment.OrderTypeAddon,
+		AddonProductID:  5,
+		SubscriptionID:  19,
+		SrcURL:          "https://merchant.example/purchase?from=wechat",
+	}, "snsapi_base")
+	if err != nil {
+		t.Fatalf("buildWeChatPaymentOAuthStartURL returned error: %v", err)
+	}
+	want := "/api/v1/auth/oauth/wechat/payment/start?addon_product_id=5&amount=7.99&order_type=addon&payment_type=wxpay&redirect=%2Fpurchase%3Ffrom%3Dwechat&scope=snsapi_base&subscription_id=19"
+	if got != want {
+		t.Fatalf("buildWeChatPaymentOAuthStartURL() = %q, want %q", got, want)
 	}
 }
 

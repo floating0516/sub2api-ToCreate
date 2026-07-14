@@ -196,6 +196,28 @@ describe('PaymentResultView', () => {
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBeNull()
   })
 
+  it('shows the add-on success title for completed add-on orders', async () => {
+    routeState.query = { order_id: '42' }
+    pollOrderStatus.mockResolvedValue({
+      ...orderFactory('COMPLETED'),
+      order_type: 'addon',
+      amount: 7.99,
+      pay_amount: 8.04,
+    })
+
+    const wrapper = mount(PaymentResultView, {
+      global: {
+        stubs: {
+          OrderStatusBadge: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.result.addonSuccess')
+    expect(wrapper.text()).not.toContain('payment.result.subscriptionSuccess')
+  })
+
   it('refreshes a pending resume-token result until the order becomes paid', async () => {
     vi.useFakeTimers()
     routeState.query = {

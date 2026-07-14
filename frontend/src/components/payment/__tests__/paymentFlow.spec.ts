@@ -303,6 +303,28 @@ describe('buildCreateOrderPayload', () => {
     })
   })
 
+  it('includes the trusted catalog and target subscription identifiers for add-ons', () => {
+    expect(buildCreateOrderPayload({
+      amount: 7.99,
+      paymentType: 'wxpay',
+      orderType: 'addon',
+      addonProductId: 5,
+      subscriptionId: 19,
+      origin: 'https://app.example.com',
+      isMobile: true,
+      isWechatBrowser: false,
+    })).toEqual({
+      amount: 7.99,
+      payment_type: 'wxpay',
+      order_type: 'addon',
+      addon_product_id: 5,
+      subscription_id: 19,
+      return_url: 'https://app.example.com/payment/result',
+      is_mobile: true,
+      payment_source: 'hosted_redirect',
+    })
+  })
+
   it('passes is_mobile: false when forceQRCode is enabled for alipay', () => {
     expect(buildCreateOrderPayload({
       amount: 50,

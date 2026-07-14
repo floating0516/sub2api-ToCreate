@@ -3,7 +3,8 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
-import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
+import type { CheckoutInfoResponse, MethodLimit, SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
+import type { UserSubscription } from '@/types'
 
 const routeState = vi.hoisted(() => ({
   path: '/purchase',
@@ -21,6 +22,9 @@ const showInfo = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
+const subscriptionState = vi.hoisted(() => ({
+  activeSubscriptions: [] as UserSubscription[],
+}))
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -63,7 +67,9 @@ vi.mock('@/stores/payment', () => ({
 
 vi.mock('@/stores/subscriptions', () => ({
   useSubscriptionStore: () => ({
-    activeSubscriptions: [],
+    get activeSubscriptions() {
+      return subscriptionState.activeSubscriptions
+    },
     fetchActiveSubscriptions,
   }),
 }))
@@ -103,6 +109,8 @@ function checkoutInfoFixture(overrides: Partial<CheckoutInfoResponse> = {}) {
     global_min: 0,
     global_max: 0,
     plans: [],
+    addon_purchase_enabled: false,
+    addon_products: [],
     balance_disabled: false,
     balance_recharge_multiplier: 1,
     subscription_usd_to_cny_rate: 0,
@@ -217,6 +225,7 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
   showWarning.mockReset()
   getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoWithPlansFixture(options))
   bridgeInvoke.mockReset()
+  subscriptionState.activeSubscriptions = []
   window.localStorage.clear()
   ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
 
@@ -334,6 +343,108 @@ describe('PaymentView subscription confirmation amounts', () => {
   })
 })
 
+describe('PaymentView add-on purchase', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    routeState.path = '/purchase'
+    routeState.query = {}
+    routerReplace.mockReset().mockResolvedValue(undefined)
+    routerPush.mockReset().mockResolvedValue(undefined)
+    routerResolve.mockClear()
+    createOrder.mockReset()
+    refreshUser.mockReset()
+    fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+    showError.mockReset()
+    showInfo.mockReset()
+    showWarning.mockReset()
+    getCheckoutInfo.mockReset()
+    bridgeInvoke.mockReset()
+    window.localStorage.clear()
+    ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
+    subscriptionState.activeSubscriptions = [{
+      id: 19,
+      user_id: 42,
+      group_id: 7,
+      status: 'active',
+      starts_at: '2098-12-01T00:00:00.000Z',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      daily_usage_usd: 50,
+      weekly_usage_usd: 150,
+      monthly_usage_usd: 600,
+      daily_window_start: '2098-12-31T00:00:00.000Z',
+      weekly_window_start: '2098-12-25T00:00:00.000Z',
+      monthly_window_start: '2098-12-01T00:00:00.000Z',
+      created_at: '2098-12-01T00:00:00.000Z',
+      updated_at: '2098-12-01T00:00:00.000Z',
+    }]
+  })
+
+  it('hides the add-on tab while sales are disabled', async () => {
+    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: false,
+      addon_products: [{
+        id: 5,
+        sku: 'addon-usd-30',
+        name: '30 USD add-on',
+        quota_usd: 30,
+        price: 7.99,
+        for_sale: true,
+        sort_order: 20,
+      }],
+    }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('payment.tabAddon')
+  })
+
+  it('submits the selected catalog product and subscription IDs', async () => {
+    const product: SubscriptionAddonProduct = {
+      id: 5,
+      sku: 'addon-usd-30',
+      name: '30 USD add-on',
+      quota_usd: 30,
+      price: 7.99,
+      for_sale: true,
+      sort_order: 20,
+    }
+    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: true,
+      addon_products: [product],
+    }))
+    createOrder.mockResolvedValue({
+      order_id: 901,
+      amount: product.price,
+      pay_amount: product.price,
+      fee_rate: 0,
+      expires_at: '2099-01-01T00:10:00.000Z',
+      payment_type: 'wxpay',
+      qr_code: 'weixin://wxpay/bizpayurl?pr=addon',
+      out_trade_no: 'sub2_addon_901',
+    })
+
+    const wrapper = shallowMount(PaymentView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
+    })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
+    await wrapper.find('[data-testid="addon-product-5"]').trigger('click')
+    await wrapper.find('[data-testid="addon-buy-button"]').trigger('click')
+    await flushPromises()
+
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({
+      amount: product.price,
+      payment_type: 'wxpay',
+      order_type: 'addon',
+      addon_product_id: product.id,
+      subscription_id: 19,
+    }))
+  })
+})
+
 describe('PaymentView payment recovery', () => {
   beforeEach(() => {
     vi.useRealTimers()
@@ -349,6 +460,7 @@ describe('PaymentView payment recovery', () => {
     showInfo.mockReset()
     showWarning.mockReset()
     bridgeInvoke.mockReset()
+    subscriptionState.activeSubscriptions = []
     window.localStorage.clear()
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
   })
@@ -434,6 +546,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     showWarning.mockReset()
     getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture())
     bridgeInvoke.mockReset()
+    subscriptionState.activeSubscriptions = []
     window.localStorage.clear()
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = {
       invoke: bridgeInvoke,

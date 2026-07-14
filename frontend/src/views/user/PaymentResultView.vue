@@ -176,6 +176,8 @@ const isPending = computed(() => {
 
 const statusTitle = computed(() => {
   if (isSuccess.value) {
+    if (order.value?.order_type === 'subscription') return t('payment.result.subscriptionSuccess')
+    if (order.value?.order_type === 'addon') return t('payment.result.addonSuccess')
     return t('payment.result.success')
   }
   if (isPending.value) {

@@ -15,9 +15,33 @@ const (
 )
 
 var (
-	ErrSubscriptionAddonNotFound = infraerrors.NotFound("SUBSCRIPTION_ADDON_NOT_FOUND", "subscription add-on pack not found")
-	ErrSubscriptionAddonInvalid  = infraerrors.BadRequest("SUBSCRIPTION_ADDON_INVALID", "subscription add-on pack is invalid")
+	ErrSubscriptionAddonNotFound        = infraerrors.NotFound("SUBSCRIPTION_ADDON_NOT_FOUND", "subscription add-on pack not found")
+	ErrSubscriptionAddonInvalid         = infraerrors.BadRequest("SUBSCRIPTION_ADDON_INVALID", "subscription add-on pack is invalid")
+	ErrSubscriptionAddonProductNotFound = infraerrors.NotFound("SUBSCRIPTION_ADDON_PRODUCT_NOT_FOUND", "subscription add-on product not found")
 )
+
+type SubscriptionAddonProduct struct {
+	ID            int64     `json:"id"`
+	SKU           string    `json:"sku"`
+	Name          string    `json:"name"`
+	QuotaUSD      float64   `json:"quota_usd"`
+	Price         float64   `json:"price"`
+	OriginalPrice *float64  `json:"original_price,omitempty"`
+	ForSale       bool      `json:"for_sale"`
+	SortOrder     int       `json:"sort_order"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type CreatePurchasedSubscriptionAddonInput struct {
+	OrderID        int64
+	SubscriptionID int64
+	UserID         int64
+	GroupID        int64
+	QuotaUSD       float64
+	ExpiresAt      time.Time
+	Notes          string
+}
 
 type SubscriptionAddonPack struct {
 	ID             int64
@@ -81,6 +105,10 @@ type SubscriptionAddonRepository interface {
 	GetCurrentTermQuotaTotals(ctx context.Context, subscriptionIDs []int64, now time.Time) (map[int64]SubscriptionAddonQuotaTotal, error)
 	GetGrantedQuotaForTerm(ctx context.Context, subscriptionID int64, startsAt, expiresAt time.Time) (float64, error)
 	Revoke(ctx context.Context, id int64, revokedAt time.Time) error
+	ListProducts(ctx context.Context, forSaleOnly bool) ([]SubscriptionAddonProduct, error)
+	GetProductByID(ctx context.Context, id int64) (*SubscriptionAddonProduct, error)
+	CreatePurchased(ctx context.Context, input CreatePurchasedSubscriptionAddonInput) (*SubscriptionAddonPack, error)
+	GetByPurchaseOrderID(ctx context.Context, orderID int64) (*SubscriptionAddonPack, error)
 }
 
 func (s *SubscriptionService) GrantAddon(ctx context.Context, input *GrantSubscriptionAddonInput) (*SubscriptionAddonPack, error) {

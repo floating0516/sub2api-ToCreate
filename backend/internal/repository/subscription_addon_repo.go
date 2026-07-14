@@ -222,8 +222,119 @@ func (r *subscriptionAddonRepository) Revoke(ctx context.Context, id int64, revo
 	return nil
 }
 
+func (r *subscriptionAddonRepository) ListProducts(ctx context.Context, forSaleOnly bool) ([]service.SubscriptionAddonProduct, error) {
+	if r == nil || r.db == nil {
+		return nil, service.ErrSubscriptionAddonInvalid
+	}
+	query := `
+		SELECT id, sku, name, quota_usd, price, original_price, for_sale,
+			sort_order, created_at, updated_at
+		FROM subscription_addon_products`
+	if forSaleOnly {
+		query += ` WHERE for_sale = TRUE`
+	}
+	query += ` ORDER BY sort_order ASC, id ASC`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	products := make([]service.SubscriptionAddonProduct, 0)
+	for rows.Next() {
+		product, scanErr := scanSubscriptionAddonProduct(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		products = append(products, *product)
+	}
+	return products, rows.Err()
+}
+
+func (r *subscriptionAddonRepository) GetProductByID(ctx context.Context, id int64) (*service.SubscriptionAddonProduct, error) {
+	if r == nil || r.db == nil || id <= 0 {
+		return nil, service.ErrSubscriptionAddonProductNotFound
+	}
+	product, err := scanSubscriptionAddonProduct(r.db.QueryRowContext(ctx, `
+		SELECT id, sku, name, quota_usd, price, original_price, for_sale,
+			sort_order, created_at, updated_at
+		FROM subscription_addon_products
+		WHERE id = $1
+	`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrSubscriptionAddonProductNotFound
+	}
+	return product, err
+}
+
+func (r *subscriptionAddonRepository) CreatePurchased(ctx context.Context, input service.CreatePurchasedSubscriptionAddonInput) (*service.SubscriptionAddonPack, error) {
+	if r == nil || r.db == nil || input.OrderID <= 0 || input.SubscriptionID <= 0 ||
+		input.UserID <= 0 || input.GroupID <= 0 || input.QuotaUSD <= 0 {
+		return nil, service.ErrSubscriptionAddonInvalid
+	}
+	now := time.Now()
+	pack, err := scanSubscriptionAddon(r.db.QueryRowContext(ctx, `
+		INSERT INTO subscription_addon_packs (
+			subscription_id, user_id, group_id, quota_usd, used_usd,
+			starts_at, expires_at, status, notes, purchase_order_id
+		) VALUES ($1, $2, $3, $4, 0, $5, $6, 'active', $7, $8)
+		ON CONFLICT (purchase_order_id) WHERE purchase_order_id IS NOT NULL
+		DO UPDATE SET
+			expires_at = LEAST(subscription_addon_packs.expires_at, EXCLUDED.expires_at),
+			updated_at = NOW()
+		RETURNING id, subscription_id, user_id, group_id, quota_usd, used_usd,
+			starts_at, expires_at, status, assigned_by, notes, revoked_at, created_at, updated_at
+	`, input.SubscriptionID, input.UserID, input.GroupID, input.QuotaUSD,
+		now, input.ExpiresAt, input.Notes, input.OrderID,
+	))
+	if err != nil {
+		return nil, err
+	}
+	return pack, nil
+}
+
+func (r *subscriptionAddonRepository) GetByPurchaseOrderID(ctx context.Context, orderID int64) (*service.SubscriptionAddonPack, error) {
+	if r == nil || r.db == nil || orderID <= 0 {
+		return nil, service.ErrSubscriptionAddonNotFound
+	}
+	pack, err := scanSubscriptionAddon(r.db.QueryRowContext(ctx, `
+		SELECT id, subscription_id, user_id, group_id, quota_usd, used_usd,
+			starts_at, expires_at, status, assigned_by, notes, revoked_at, created_at, updated_at
+		FROM subscription_addon_packs
+		WHERE purchase_order_id = $1
+	`, orderID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrSubscriptionAddonNotFound
+	}
+	return pack, err
+}
+
 type subscriptionAddonScanner interface {
 	Scan(dest ...any) error
+}
+
+func scanSubscriptionAddonProduct(scanner subscriptionAddonScanner) (*service.SubscriptionAddonProduct, error) {
+	var product service.SubscriptionAddonProduct
+	var originalPrice sql.NullFloat64
+	if err := scanner.Scan(
+		&product.ID,
+		&product.SKU,
+		&product.Name,
+		&product.QuotaUSD,
+		&product.Price,
+		&originalPrice,
+		&product.ForSale,
+		&product.SortOrder,
+		&product.CreatedAt,
+		&product.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	if originalPrice.Valid {
+		product.OriginalPrice = &originalPrice.Float64
+	}
+	return &product, nil
 }
 
 func scanSubscriptionAddon(scanner subscriptionAddonScanner) (*service.SubscriptionAddonPack, error) {

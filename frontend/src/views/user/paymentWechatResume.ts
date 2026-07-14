@@ -1,12 +1,14 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
-import type { SubscriptionPlan } from '@/types/payment'
+import type { SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
 import { normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 
 export interface ParsedWechatResumeRoute {
   orderAmount: number
-  orderType: 'balance' | 'subscription'
+  orderType: 'balance' | 'subscription' | 'addon'
   paymentType: string
   planId?: number
+  addonProductId?: number
+  subscriptionId?: number
   openid?: string
   wechatResumeToken?: string
 }
@@ -30,6 +32,7 @@ export function hasWechatResumeQuery(query: LocationQuery): boolean {
 export function parseWechatResumeRoute(
   query: LocationQuery,
   plans: SubscriptionPlan[],
+  addonProducts: SubscriptionAddonProduct[],
   fallbackBalanceAmount: number,
 ): ParsedWechatResumeRoute | null {
   if (!hasWechatResumeQuery(query)) {
@@ -40,9 +43,16 @@ export function parseWechatResumeRoute(
   const paymentType = normalizeVisibleMethod(readQueryString(query, 'payment_type')) || 'wxpay'
   const planId = Number.parseInt(readQueryString(query, 'plan_id'), 10)
   const hasPlanId = Number.isFinite(planId) && planId > 0
-  const orderType = readQueryString(query, 'order_type') === 'subscription' || hasPlanId
-    ? 'subscription'
-    : 'balance'
+  const addonProductId = Number.parseInt(readQueryString(query, 'addon_product_id'), 10)
+  const subscriptionId = Number.parseInt(readQueryString(query, 'subscription_id'), 10)
+  const hasAddonProductId = Number.isFinite(addonProductId) && addonProductId > 0
+  const hasSubscriptionId = Number.isFinite(subscriptionId) && subscriptionId > 0
+  const rawOrderType = readQueryString(query, 'order_type')
+  const orderType = rawOrderType === 'addon' || (hasAddonProductId && hasSubscriptionId)
+    ? 'addon'
+    : rawOrderType === 'subscription' || hasPlanId
+      ? 'subscription'
+      : 'balance'
 
   if (wechatResumeToken) {
     return {
@@ -51,6 +61,8 @@ export function parseWechatResumeRoute(
       orderType,
       orderAmount: 0,
       planId: hasPlanId ? planId : undefined,
+      addonProductId: hasAddonProductId ? addonProductId : undefined,
+      subscriptionId: hasSubscriptionId ? subscriptionId : undefined,
     }
   }
 
@@ -64,7 +76,9 @@ export function parseWechatResumeRoute(
     ? rawAmount
     : (orderType === 'subscription'
       ? (plans.find(plan => plan.id === planId)?.price ?? 0)
-      : fallbackBalanceAmount)
+      : orderType === 'addon'
+        ? (addonProducts.find(product => product.id === addonProductId)?.price ?? 0)
+        : fallbackBalanceAmount)
 
   return {
     openid,
@@ -72,6 +86,8 @@ export function parseWechatResumeRoute(
     orderType,
     orderAmount,
     planId: hasPlanId ? planId : undefined,
+    addonProductId: hasAddonProductId ? addonProductId : undefined,
+    subscriptionId: hasSubscriptionId ? subscriptionId : undefined,
   }
 }
 
@@ -86,5 +102,7 @@ export function stripWechatResumeQuery(query: LocationQuery): LocationQueryRaw {
   delete nextQuery.amount
   delete nextQuery.order_type
   delete nextQuery.plan_id
+  delete nextQuery.addon_product_id
+  delete nextQuery.subscription_id
   return nextQuery
 }

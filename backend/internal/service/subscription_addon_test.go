@@ -9,9 +9,14 @@ import (
 )
 
 type subscriptionAddonRepoStub struct {
-	usable  *SubscriptionAddonPack
-	getErr  error
-	created *SubscriptionAddonPack
+	usable           *SubscriptionAddonPack
+	getErr           error
+	created          *SubscriptionAddonPack
+	products         map[int64]*SubscriptionAddonProduct
+	productErr       error
+	purchasedByOrder map[int64]*SubscriptionAddonPack
+	purchaseCalls    int
+	purchaseErr      error
 }
 
 func (s *subscriptionAddonRepoStub) Create(_ context.Context, pack *SubscriptionAddonPack) error {
@@ -54,6 +59,67 @@ func (s *subscriptionAddonRepoStub) GetGrantedQuotaForTerm(context.Context, int6
 }
 
 func (s *subscriptionAddonRepoStub) Revoke(context.Context, int64, time.Time) error { return nil }
+
+func (s *subscriptionAddonRepoStub) ListProducts(context.Context, bool) ([]SubscriptionAddonProduct, error) {
+	result := make([]SubscriptionAddonProduct, 0, len(s.products))
+	for _, product := range s.products {
+		copy := *product
+		result = append(result, copy)
+	}
+	return result, s.productErr
+}
+
+func (s *subscriptionAddonRepoStub) GetProductByID(_ context.Context, id int64) (*SubscriptionAddonProduct, error) {
+	if s.productErr != nil {
+		return nil, s.productErr
+	}
+	product, ok := s.products[id]
+	if !ok {
+		return nil, ErrSubscriptionAddonProductNotFound
+	}
+	copy := *product
+	return &copy, nil
+}
+
+func (s *subscriptionAddonRepoStub) CreatePurchased(_ context.Context, input CreatePurchasedSubscriptionAddonInput) (*SubscriptionAddonPack, error) {
+	s.purchaseCalls++
+	if s.purchaseErr != nil {
+		return nil, s.purchaseErr
+	}
+	if s.purchasedByOrder == nil {
+		s.purchasedByOrder = make(map[int64]*SubscriptionAddonPack)
+	}
+	if existing, ok := s.purchasedByOrder[input.OrderID]; ok {
+		if input.ExpiresAt.Before(existing.ExpiresAt) {
+			existing.ExpiresAt = input.ExpiresAt
+		}
+		copy := *existing
+		return &copy, nil
+	}
+	pack := &SubscriptionAddonPack{
+		ID:             int64(len(s.purchasedByOrder) + 1),
+		SubscriptionID: input.SubscriptionID,
+		UserID:         input.UserID,
+		GroupID:        input.GroupID,
+		QuotaUSD:       input.QuotaUSD,
+		StartsAt:       time.Now(),
+		ExpiresAt:      input.ExpiresAt,
+		Status:         SubscriptionAddonStatusActive,
+		Notes:          input.Notes,
+	}
+	s.purchasedByOrder[input.OrderID] = pack
+	copy := *pack
+	return &copy, nil
+}
+
+func (s *subscriptionAddonRepoStub) GetByPurchaseOrderID(_ context.Context, orderID int64) (*SubscriptionAddonPack, error) {
+	pack, ok := s.purchasedByOrder[orderID]
+	if !ok {
+		return nil, ErrSubscriptionAddonNotFound
+	}
+	copy := *pack
+	return &copy, nil
+}
 
 type addonGrantSubscriptionRepo struct {
 	userSubRepoNoop

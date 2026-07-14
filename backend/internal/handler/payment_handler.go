@@ -128,12 +128,22 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 			ProductName: p.ProductName,
 		})
 	}
+	addonProducts := []service.SubscriptionAddonProduct{}
+	if cfg.AddonPurchaseEnabled {
+		addonProducts, err = h.paymentService.ListAddonProductsForSale(ctx)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 
 	response.Success(c, checkoutInfoResponse{
 		Methods:                   limitsResp.Methods,
 		GlobalMin:                 limitsResp.GlobalMin,
 		GlobalMax:                 limitsResp.GlobalMax,
 		Plans:                     planList,
+		AddonPurchaseEnabled:      cfg.AddonPurchaseEnabled,
+		AddonProducts:             addonProducts,
 		BalanceDisabled:           cfg.BalanceDisabled,
 		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
 		SubscriptionUSDToCNYRate:  cfg.SubscriptionUSDToCNYRate,
@@ -146,18 +156,20 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 }
 
 type checkoutInfoResponse struct {
-	Methods                   map[string]service.MethodLimits `json:"methods"`
-	GlobalMin                 float64                         `json:"global_min"`
-	GlobalMax                 float64                         `json:"global_max"`
-	Plans                     []checkoutPlan                  `json:"plans"`
-	BalanceDisabled           bool                            `json:"balance_disabled"`
-	BalanceRechargeMultiplier float64                         `json:"balance_recharge_multiplier"`
-	SubscriptionUSDToCNYRate  float64                         `json:"subscription_usd_to_cny_rate"`
-	RechargeFeeRate           float64                         `json:"recharge_fee_rate"`
-	HelpText                  string                          `json:"help_text"`
-	HelpImageURL              string                          `json:"help_image_url"`
-	StripePublishableKey      string                          `json:"stripe_publishable_key"`
-	AlipayForceQRCode         bool                            `json:"alipay_force_qrcode"`
+	Methods                   map[string]service.MethodLimits     `json:"methods"`
+	GlobalMin                 float64                             `json:"global_min"`
+	GlobalMax                 float64                             `json:"global_max"`
+	Plans                     []checkoutPlan                      `json:"plans"`
+	AddonPurchaseEnabled      bool                                `json:"addon_purchase_enabled"`
+	AddonProducts             []service.SubscriptionAddonProduct `json:"addon_products"`
+	BalanceDisabled           bool                                `json:"balance_disabled"`
+	BalanceRechargeMultiplier float64                             `json:"balance_recharge_multiplier"`
+	SubscriptionUSDToCNYRate  float64                             `json:"subscription_usd_to_cny_rate"`
+	RechargeFeeRate           float64                             `json:"recharge_fee_rate"`
+	HelpText                  string                              `json:"help_text"`
+	HelpImageURL              string                              `json:"help_image_url"`
+	StripePublishableKey      string                              `json:"stripe_publishable_key"`
+	AlipayForceQRCode         bool                                `json:"alipay_force_qrcode"`
 }
 
 type checkoutPlan struct {
@@ -222,6 +234,8 @@ type CreateOrderRequest struct {
 	PaymentSource     string  `json:"payment_source"`
 	OrderType         string  `json:"order_type"`
 	PlanID            int64   `json:"plan_id"`
+	AddonProductID    int64   `json:"addon_product_id"`
+	SubscriptionID    int64   `json:"subscription_id"`
 	// IsMobile lets the frontend declare its mobile status directly. When
 	// nil we fall back to User-Agent heuristics (which miss iPadOS / some
 	// embedded browsers that strip the "Mobile" keyword).
@@ -304,6 +318,8 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		PaymentSource:   req.PaymentSource,
 		OrderType:       req.OrderType,
 		PlanID:          req.PlanID,
+		AddonProductID:  req.AddonProductID,
+		SubscriptionID:  req.SubscriptionID,
 		Locale:          c.GetHeader("Accept-Language"),
 	})
 	if err != nil {
@@ -347,6 +363,12 @@ func applyWeChatPaymentResumeClaims(req *CreateOrderRequest, claims *service.WeC
 	}
 	if claims.PlanID > 0 {
 		req.PlanID = claims.PlanID
+	}
+	if claims.AddonProductID > 0 {
+		req.AddonProductID = claims.AddonProductID
+	}
+	if claims.SubscriptionID > 0 {
+		req.SubscriptionID = claims.SubscriptionID
 	}
 	return nil
 }

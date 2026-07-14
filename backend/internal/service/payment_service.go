@@ -85,6 +85,8 @@ type CreateOrderRequest struct {
 	PaymentSource   string
 	OrderType       string
 	PlanID          int64
+	AddonProductID  int64
+	SubscriptionID  int64
 	Locale          string
 }
 

@@ -115,6 +115,7 @@ func TestParsePaymentConfig(t *testing.T) {
 			SettingMaxPendingOrders:    "5",
 			SettingEnabledPaymentTypes: "alipay,wxpay,stripe",
 			SettingBalancePayDisabled:  "true",
+			SettingAddonPurchaseEnabled: "true",
 			SettingLoadBalanceStrategy: "least_amount",
 			SettingProductNamePrefix:   "PRE",
 			SettingProductNameSuffix:   "SUF",
@@ -147,6 +148,9 @@ func TestParsePaymentConfig(t *testing.T) {
 		}
 		if !cfg.BalanceDisabled {
 			t.Fatal("expected BalanceDisabled=true")
+		}
+		if !cfg.AddonPurchaseEnabled {
+			t.Fatal("expected AddonPurchaseEnabled=true")
 		}
 		if cfg.LoadBalanceStrategy != "least_amount" {
 			t.Fatalf("LoadBalanceStrategy = %q, want %q", cfg.LoadBalanceStrategy, "least_amount")
@@ -446,6 +450,42 @@ func TestUpdatePaymentConfig_PersistsVisibleMethodRouting(t *testing.T) {
 	}
 	if repo.values[SettingPaymentVisibleMethodWxpaySource] != VisibleMethodSourceOfficialWechat {
 		t.Fatalf("wxpay source = %q, want %q", repo.values[SettingPaymentVisibleMethodWxpaySource], VisibleMethodSourceOfficialWechat)
+	}
+}
+
+func TestUpdatePaymentConfigPreservesAddonGateWhenOmitted(t *testing.T) {
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{
+		SettingAddonPurchaseEnabled: "true",
+	}}
+	svc := &PaymentConfigService{settingRepo: repo}
+
+	err := svc.UpdatePaymentConfig(context.Background(), UpdatePaymentConfigRequest{
+		HelpText: paymentConfigStrPtr("updated help text"),
+	})
+	if err != nil {
+		t.Fatalf("UpdatePaymentConfig returned error: %v", err)
+	}
+	if _, ok := repo.updates[SettingAddonPurchaseEnabled]; ok {
+		t.Fatal("omitted add-on gate must not be overwritten")
+	}
+	if repo.values[SettingAddonPurchaseEnabled] != "true" {
+		t.Fatalf("add-on gate = %q, want true", repo.values[SettingAddonPurchaseEnabled])
+	}
+}
+
+func TestUpdatePaymentConfigPersistsExplicitAddonGate(t *testing.T) {
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{}}
+	svc := &PaymentConfigService{settingRepo: repo}
+	disabled := false
+
+	err := svc.UpdatePaymentConfig(context.Background(), UpdatePaymentConfigRequest{
+		AddonPurchaseEnabled: &disabled,
+	})
+	if err != nil {
+		t.Fatalf("UpdatePaymentConfig returned error: %v", err)
+	}
+	if repo.values[SettingAddonPurchaseEnabled] != "false" {
+		t.Fatalf("add-on gate = %q, want false", repo.values[SettingAddonPurchaseEnabled])
 	}
 }
 
