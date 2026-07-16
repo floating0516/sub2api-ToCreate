@@ -400,12 +400,12 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 	groupID := int64(101)
 	repo := &liheOAuthTestAPIKeyRepo{
 		resolved: &LiheResolvedAccess{
-			TokenID:       7,
-			TokenUserID:   11,
-			Scopes:        liheOAuthScopeList(),
-			BindingFound:  true,
+			TokenID:        7,
+			TokenUserID:    11,
+			Scopes:         liheOAuthScopeList(),
+			BindingFound:   true,
 			BindingGroupID: groupID,
-			APIKey: &APIKey{
+			APIKey:         &APIKey{
 				ID:      9,
 				UserID:  12,
 				GroupID: &groupID,
@@ -428,12 +428,12 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 
 func TestLiheOAuthRejectsChangedOrDeletedBoundAPIKey(t *testing.T) {
 	repo := &liheOAuthTestAPIKeyRepo{resolved: &LiheResolvedAccess{
-		TokenID:       7,
-		TokenUserID:   11,
-		Scopes:        liheOAuthScopeList(),
-		BindingFound:  true,
+		TokenID:        7,
+		TokenUserID:    11,
+		Scopes:         liheOAuthScopeList(),
+		BindingFound:   true,
 		BindingGroupID: 101,
-		APIKey:        nil,
+		APIKey:         nil,
 	}}
 	svc := newLiheOAuthTestService(repo)
 
