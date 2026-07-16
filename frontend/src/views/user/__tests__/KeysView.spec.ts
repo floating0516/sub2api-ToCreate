@@ -8,6 +8,7 @@ import KeysView from '../KeysView.vue'
 const {
   listKeys,
   getPublicSettings,
+  getLiheIntegration,
   getDashboardApiKeysUsage,
   getAvailableGroups,
   getUserGroupRates,
@@ -19,6 +20,7 @@ const {
 } = vi.hoisted(() => ({
   listKeys: vi.fn(),
   getPublicSettings: vi.fn(),
+  getLiheIntegration: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
   getUserGroupRates: vi.fn(),
@@ -53,6 +55,7 @@ const messages: Record<string, string> = {
   'keys.status.inactive': 'Inactive',
   'keys.status.quota_exhausted': 'Quota exhausted',
   'keys.usage': 'Usage',
+  'liheOAuth.importChat': 'Import to chat site',
 }
 
 vi.mock('@/api', () => ({
@@ -73,6 +76,10 @@ vi.mock('@/api', () => ({
     getAvailable: getAvailableGroups,
     getUserGroupRates,
   },
+}))
+
+vi.mock('@/api/liheOAuth', () => ({
+  getLiheIntegration,
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -262,6 +269,7 @@ describe('user KeysView column settings', () => {
 
     listKeys.mockReset()
     getPublicSettings.mockReset()
+    getLiheIntegration.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
     getUserGroupRates.mockReset()
@@ -279,6 +287,11 @@ describe('user KeysView column settings', () => {
       pages: 1,
     })
     getPublicSettings.mockResolvedValue({})
+    getLiheIntegration.mockResolvedValue({
+      enabled: true,
+      connect_url: 'https://chat.lihe.chat/connect/lihe',
+      tokens: [],
+    })
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
@@ -303,6 +316,23 @@ describe('user KeysView column settings', () => {
     expect(visibleColumnKeys(wrapper)).not.toContain('last_used_at')
     expect(visibleColumnKeys(wrapper)).not.toContain('last_used_ip')
     expect(visibleColumnKeys(wrapper)).not.toContain('id')
+  })
+
+  it('shows the fixed Lihe Chat import action only when the integration is enabled', async () => {
+    getPublicSettings.mockResolvedValueOnce({ lihe_oauth_enabled: true })
+    const wrapper = await mountView()
+
+    const importAction = wrapper.get('[data-test="lihe-import-button"]')
+    expect(importAction.text()).toContain('Import to chat site')
+    expect(importAction.attributes('href')).toBe('https://chat.lihe.chat/connect/lihe')
+    expect(getLiheIntegration).toHaveBeenCalledOnce()
+  })
+
+  it('does not load or show the Lihe Chat import action while disabled', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-test="lihe-import-button"]').exists()).toBe(false)
+    expect(getLiheIntegration).not.toHaveBeenCalled()
   })
 
   it('shows a hidden column when toggled and persists the preference', async () => {

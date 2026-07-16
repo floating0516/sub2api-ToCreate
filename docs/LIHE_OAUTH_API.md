@@ -19,6 +19,12 @@ from an import result:
 
 The OAuth feature is disabled unless all server-side settings are valid.
 
+When enabled, the user-facing `API Keys` page shows a fixed `Import to chat
+site` action next to the normal key actions. The action URL is loaded from the
+authenticated API response and cannot be supplied by an import result. The
+separate Lihe Chat integration page remains the place to inspect and revoke
+existing connections.
+
 ## Authorization request
 
 The browser opens:

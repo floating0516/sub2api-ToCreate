@@ -32,7 +32,7 @@
       </template>
 
       <template #actions>
-        <div class="flex justify-end gap-3">
+        <div class="flex flex-wrap justify-end gap-3">
           <button
             @click="loadApiKeys"
             :disabled="loading"
@@ -73,6 +73,15 @@
               </button>
             </div>
           </div>
+          <a
+            v-if="liheIntegration?.enabled && liheIntegration.connect_url"
+            :href="liheIntegration.connect_url"
+            class="btn btn-secondary inline-flex items-center"
+            data-test="lihe-import-button"
+          >
+            <Icon name="externalLink" size="md" class="mr-2" />
+            {{ t('liheOAuth.importChat') }}
+          </a>
           <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
@@ -1123,6 +1132,7 @@
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { getLiheIntegration, type LiheIntegration } from '@/api/liheOAuth'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
@@ -1307,6 +1317,7 @@ const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
+const liheIntegration = ref<LiheIntegration | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const columnDropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
@@ -1522,10 +1533,19 @@ const loadUserGroupRates = async () => {
 }
 
 const loadPublicSettings = async () => {
+  let settings: PublicSettings
   try {
-    publicSettings.value = await authAPI.getPublicSettings()
+    settings = await authAPI.getPublicSettings()
+    publicSettings.value = settings
   } catch (error) {
     console.error('Failed to load public settings:', error)
+    return
+  }
+  if (!settings.lihe_oauth_enabled) return
+  try {
+    liheIntegration.value = await getLiheIntegration()
+  } catch (error) {
+    console.error('Failed to load Lihe Chat integration:', error)
   }
 }
 
