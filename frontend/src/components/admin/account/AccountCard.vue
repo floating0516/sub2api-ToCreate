@@ -222,6 +222,25 @@
               {{ (account.rate_multiplier ?? 1).toFixed(2) }}x
             </dd>
           </div>
+          <div
+            v-if="isFieldVisible('upstream_billing_rate')"
+            data-test="upstream-billing-header"
+            class="account-card-detail-row"
+          >
+            <dt class="flex items-center">
+              <span class="account-card-field-label">{{ t('admin.accounts.columns.upstreamBillingRate') }}</span>
+              <HelpTooltip :content="t('admin.accounts.upstreamBilling.trustWarning')" width-class="w-80" />
+            </dt>
+            <dd class="min-w-0">
+              <UpstreamBillingRateCell
+                :account="account"
+                :interval-minutes="upstreamBillingIntervalMinutes"
+                :now="upstreamBillingNow"
+                :probing="probingUpstreamBilling"
+                @probe="emit('probe-upstream-billing')"
+              />
+            </dd>
+          </div>
           <div v-if="isFieldVisible('scheduler_score')" class="account-card-detail-row">
             <dt class="flex items-center">
               <span class="account-card-field-label">{{ t('admin.accounts.columns.schedulerScore') }}</span>
@@ -300,6 +319,7 @@ import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
+import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -317,6 +337,9 @@ const props = withDefaults(defineProps<{
   todayStatsLoading?: boolean
   todayStatsError?: string | null
   usageManualRefreshToken?: number
+  upstreamBillingIntervalMinutes?: number
+  upstreamBillingNow?: number
+  probingUpstreamBilling?: boolean
 }>(), {
   selected: false,
   hiddenFields: () => [],
@@ -325,7 +348,10 @@ const props = withDefaults(defineProps<{
   todayStats: null,
   todayStatsLoading: false,
   todayStatsError: null,
-  usageManualRefreshToken: 0
+  usageManualRefreshToken: 0,
+  upstreamBillingIntervalMinutes: 30,
+  upstreamBillingNow: 0,
+  probingUpstreamBilling: false
 })
 
 const emit = defineEmits<{
@@ -336,6 +362,7 @@ const emit = defineEmits<{
   (event: 'toggle-schedulable'): void
   (event: 'show-temp-unsched'): void
   (event: 'revert-fallback'): void
+  (event: 'probe-upstream-billing'): void
 }>()
 
 const { t } = useI18n()
@@ -344,7 +371,7 @@ const isFieldVisible = (key: string) => !hiddenFieldSet.value.has(key)
 
 const hasVisibleRoutingFields = computed(() =>
   (!props.simpleMode && isFieldVisible('groups')) ||
-  ['proxy', 'priority', 'scheduler_score', 'rate_multiplier'].some(isFieldVisible)
+  ['proxy', 'priority', 'scheduler_score', 'rate_multiplier', 'upstream_billing_rate'].some(isFieldVisible)
 )
 const hasVisibleDetailFields = computed(() =>
   ['last_used_at', 'created_at', 'expires_at', 'notes'].some(isFieldVisible)
