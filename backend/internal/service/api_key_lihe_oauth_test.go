@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -25,7 +26,25 @@ type liheOAuthTestAPIKeyRepo struct {
 	revokedTokenHash  string
 	revokedClientID   string
 	listTokens        []LiheAccessToken
+	apiKeys           map[int64]*APIKey
 	forceExchangeUsed bool
+}
+
+func (r *liheOAuthTestAPIKeyRepo) GetByID(_ context.Context, id int64) (*APIKey, error) {
+	apiKey, ok := r.apiKeys[id]
+	if !ok {
+		return nil, ErrAPIKeyNotFound
+	}
+	copyKey := *apiKey
+	if apiKey.User != nil {
+		copyUser := *apiKey.User
+		copyKey.User = &copyUser
+	}
+	if apiKey.Group != nil {
+		copyGroup := *apiKey.Group
+		copyKey.Group = &copyGroup
+	}
+	return &copyKey, nil
 }
 
 func (r *liheOAuthTestAPIKeyRepo) CreateLiheAuthorizationCode(_ context.Context, code *LiheAuthorizationCode) error {
@@ -52,7 +71,20 @@ func (r *liheOAuthTestAPIKeyRepo) ExchangeLiheAuthorizationCode(_ context.Contex
 	r.exchangeInput = &copyInput
 	r.code.Used = true
 	now := time.Now().UTC()
-	return &LiheAccessToken{ID: 7, UserID: input.UserID, CreatedAt: now}, nil
+	binding := input.Bindings[0]
+	apiKeyID := binding.APIKeyID
+	apiKeyName := ""
+	if apiKey := r.apiKeys[binding.APIKeyID]; apiKey != nil {
+		apiKeyName = apiKey.Name
+	}
+	return &LiheAccessToken{
+		ID:         7,
+		UserID:     input.UserID,
+		Providers:  []string{binding.Provider},
+		APIKeyID:   &apiKeyID,
+		APIKeyName: apiKeyName,
+		CreatedAt:  now,
+	}, nil
 }
 
 func (r *liheOAuthTestAPIKeyRepo) ListLiheAccessTokens(_ context.Context, _ int64) ([]LiheAccessToken, error) {
@@ -112,6 +144,26 @@ func (r *liheOAuthTestSubscriptionRepo) ListActiveByUserID(context.Context, int6
 }
 
 func newLiheOAuthTestService(repo *liheOAuthTestAPIKeyRepo) *APIKeyService {
+	if repo.apiKeys == nil {
+		groupID := int64(101)
+		repo.apiKeys = map[int64]*APIKey{
+			501: {
+				ID:      501,
+				UserID:  11,
+				Key:     "sk-selected-key",
+				Name:    "Selected key",
+				GroupID: &groupID,
+				Status:  StatusAPIKeyActive,
+				User:    &User{ID: 11, Email: "user@example.com", Status: StatusActive},
+				Group: &Group{
+					ID:                 groupID,
+					Platform:           PlatformOpenAI,
+					Status:             StatusActive,
+					ActiveAccountCount: 1,
+				},
+			},
+		}
+	}
 	cfg := &config.Config{
 		LiheOAuth: config.LiheOAuthConfig{
 			Enabled:      true,
@@ -148,6 +200,7 @@ func liheOAuthTestChallenge(verifier string) string {
 
 func liheOAuthTestAuthorizeRequest(verifier string) LiheAuthorizeRequest {
 	return LiheAuthorizeRequest{
+		APIKeyID:            501,
 		ResponseType:        "code",
 		ClientID:            "lihe-chat",
 		RedirectURI:         "https://lihe.chat/api/integrations/lihe/callback",
@@ -182,6 +235,7 @@ func TestLiheOAuthAuthorizationCodeIsHashedAndExpiresIn60Seconds(t *testing.T) {
 	require.NotNil(t, repo.code)
 	require.NotEqual(t, plainCode, repo.code.CodeHash)
 	require.Equal(t, hashLiheCredential(plainCode), repo.code.CodeHash)
+	require.Equal(t, int64(501), repo.code.APIKeyID)
 	require.WithinDuration(t, before.Add(60*time.Second), repo.code.ExpiresAt, time.Second)
 }
 
@@ -209,13 +263,22 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, repo.code.Used)
 	require.True(t, strings.HasPrefix(result.AccessToken, LiheAccessTokenPrefix))
-	require.Equal(t, []string{PlatformOpenAI, PlatformAnthropic}, result.Providers)
+	require.Equal(t, []string{PlatformOpenAI}, result.Providers)
+	require.Equal(t, int64(501), result.APIKeyID)
+	require.Equal(t, "Selected key", result.APIKeyName)
 	require.NotNil(t, repo.exchangeInput)
 	require.Equal(t, hashLiheCredential(result.AccessToken), repo.exchangeInput.TokenHash)
 	require.NotEqual(t, result.AccessToken, repo.exchangeInput.TokenHash)
-	for _, binding := range repo.exchangeInput.Bindings {
-		require.True(t, strings.HasPrefix(binding.APIKey, LiheInternalAPIKeyPrefix))
-	}
+	require.Len(t, repo.exchangeInput.Bindings, 1)
+	require.Equal(t, int64(501), repo.exchangeInput.Bindings[0].APIKeyID)
+	require.Equal(t, int64(101), repo.exchangeInput.Bindings[0].GroupID)
+	require.Equal(t, PlatformOpenAI, repo.exchangeInput.Bindings[0].Provider)
+	encodedResult, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.NotContains(t, string(encodedResult), "sk-selected-key")
+	encodedInput, err := json.Marshal(repo.exchangeInput)
+	require.NoError(t, err)
+	require.NotContains(t, string(encodedInput), "sk-selected-key")
 
 	_, err = svc.ExchangeLiheAuthorizationCode(
 		context.Background(),
@@ -224,6 +287,25 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 		verifier,
 	)
 	require.ErrorIs(t, err, ErrLiheInvalidGrant)
+}
+
+func TestLiheOAuthExchangeRejectsKeyDisabledAfterAuthorization(t *testing.T) {
+	repo := &liheOAuthTestAPIKeyRepo{}
+	svc := newLiheOAuthTestService(repo)
+	verifier := liheOAuthTestVerifier()
+	plainCode := issueLiheOAuthTestCode(t, svc, verifier)
+	repo.apiKeys[501].Status = StatusAPIKeyDisabled
+
+	_, err := svc.ExchangeLiheAuthorizationCode(
+		context.Background(),
+		plainCode,
+		"https://lihe.chat/api/integrations/lihe/callback",
+		verifier,
+	)
+
+	require.ErrorIs(t, err, ErrLiheAPIKeyUnavailable)
+	require.False(t, repo.code.Used)
+	require.Nil(t, repo.exchangeInput)
 }
 
 func TestLiheOAuthExchangeRejectsExpiredCode(t *testing.T) {
@@ -243,16 +325,92 @@ func TestLiheOAuthExchangeRejectsExpiredCode(t *testing.T) {
 	require.False(t, repo.code.Used)
 }
 
+func TestLiheOAuthAuthorizationRejectsAPIKeyOwnedByAnotherUser(t *testing.T) {
+	groupID := int64(101)
+	repo := &liheOAuthTestAPIKeyRepo{apiKeys: map[int64]*APIKey{
+		502: {
+			ID:      502,
+			UserID:  12,
+			Name:    "Another user's key",
+			GroupID: &groupID,
+			Status:  StatusAPIKeyActive,
+			Group: &Group{
+				ID:                 groupID,
+				Platform:           PlatformOpenAI,
+				Status:             StatusActive,
+				ActiveAccountCount: 1,
+			},
+		},
+	}}
+	svc := newLiheOAuthTestService(repo)
+	request := liheOAuthTestAuthorizeRequest(liheOAuthTestVerifier())
+	request.APIKeyID = 502
+
+	_, err := svc.CreateLiheAuthorizationCode(context.Background(), 11, request)
+
+	require.ErrorIs(t, err, ErrLiheAPIKeyUnavailable)
+	require.Nil(t, repo.code)
+}
+
+func TestLiheOAuthAuthorizationRejectsUnavailableAPIKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*APIKey)
+	}{
+		{
+			name: "disabled",
+			mutate: func(key *APIKey) {
+				key.Status = StatusAPIKeyDisabled
+			},
+		},
+		{
+			name: "without group",
+			mutate: func(key *APIKey) {
+				key.GroupID = nil
+				key.Group = nil
+			},
+		},
+		{
+			name: "unsupported provider",
+			mutate: func(key *APIKey) {
+				key.Group.Platform = "unsupported"
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &liheOAuthTestAPIKeyRepo{}
+			svc := newLiheOAuthTestService(repo)
+			test.mutate(repo.apiKeys[501])
+
+			_, err := svc.CreateLiheAuthorizationCode(
+				context.Background(),
+				11,
+				liheOAuthTestAuthorizeRequest(liheOAuthTestVerifier()),
+			)
+
+			require.Error(t, err)
+			require.Nil(t, repo.code)
+		})
+	}
+}
+
 func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
+	groupID := int64(101)
 	repo := &liheOAuthTestAPIKeyRepo{
 		resolved: &LiheResolvedAccess{
-			TokenID:     7,
-			TokenUserID: 11,
-			Scopes:      liheOAuthScopeList(),
+			TokenID:       7,
+			TokenUserID:   11,
+			Scopes:        liheOAuthScopeList(),
+			BindingFound:  true,
+			BindingGroupID: groupID,
 			APIKey: &APIKey{
-				ID:     9,
-				UserID: 12,
-				User:   &User{ID: 12, Status: StatusActive},
+				ID:      9,
+				UserID:  12,
+				GroupID: &groupID,
+				User:    &User{ID: 12, Status: StatusActive},
+				Group:   &Group{ID: groupID, Platform: PlatformOpenAI, Status: StatusActive},
 			},
 		},
 	}
@@ -266,6 +424,47 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 		"/v1/models",
 	)
 	require.ErrorIs(t, err, ErrLiheInvalidToken)
+}
+
+func TestLiheOAuthRejectsChangedOrDeletedBoundAPIKey(t *testing.T) {
+	repo := &liheOAuthTestAPIKeyRepo{resolved: &LiheResolvedAccess{
+		TokenID:       7,
+		TokenUserID:   11,
+		Scopes:        liheOAuthScopeList(),
+		BindingFound:  true,
+		BindingGroupID: 101,
+		APIKey:        nil,
+	}}
+	svc := newLiheOAuthTestService(repo)
+
+	_, err := svc.ResolveLiheAccessToken(
+		context.Background(),
+		LiheAccessTokenPrefix+"token",
+		PlatformOpenAI,
+		http.MethodGet,
+		"/v1/models",
+	)
+
+	require.ErrorIs(t, err, ErrLiheInvalidToken)
+}
+
+func TestLiheOAuthRejectsProviderNotBoundToSelectedKey(t *testing.T) {
+	repo := &liheOAuthTestAPIKeyRepo{resolved: &LiheResolvedAccess{
+		TokenID:     7,
+		TokenUserID: 11,
+		Scopes:      liheOAuthScopeList(),
+	}}
+	svc := newLiheOAuthTestService(repo)
+
+	_, err := svc.ResolveLiheAccessToken(
+		context.Background(),
+		LiheAccessTokenPrefix+"token",
+		PlatformAnthropic,
+		http.MethodGet,
+		"/v1/models",
+	)
+
+	require.ErrorIs(t, err, ErrLiheProviderNotAllowed)
 }
 
 func TestLiheOAuthGatewayScopeAllowlist(t *testing.T) {

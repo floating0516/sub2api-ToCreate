@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -126,6 +127,90 @@ func (s *APIKeyRepoSuite) TestLiheInternalKeysAreHiddenFromUserOperations() {
 	cacheKeys, err := s.repo.ListKeysByUserID(s.ctx, user.ID)
 	s.Require().NoError(err)
 	s.Require().ElementsMatch([]string{normal.Key, internal.Key}, cacheKeys)
+}
+
+func (s *APIKeyRepoSuite) TestLiheOAuthRevokeLeavesSelectedAPIKeyActive() {
+	user := s.mustCreateUser("lihe-revoke-source@test.com")
+	group := s.mustCreateGroup("g-lihe-revoke-source")
+	key := s.mustCreateApiKey(user.ID, "sk-lihe-revoke-source", "Source key", &group.ID)
+	tokenID := s.mustCreateLiheTokenBinding(strings.Repeat("a", 64), user.ID, key.ID, group.ID, group.Platform)
+	tokens, err := s.repo.ListLiheAccessTokens(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().NotNil(tokens[0].APIKeyID)
+	s.Require().Equal(key.ID, *tokens[0].APIKeyID)
+	s.Require().Equal(key.Name, tokens[0].APIKeyName)
+	s.Require().Equal([]string{group.Platform}, tokens[0].Providers)
+
+	revoked, err := s.repo.RevokeLiheAccessTokenByID(s.ctx, tokenID, user.ID)
+	s.Require().NoError(err)
+	s.Require().True(revoked)
+
+	var keyStatus string
+	s.Require().NoError(scanSingleRow(
+		s.ctx,
+		s.repo.sql,
+		`SELECT status FROM api_keys WHERE id = $1`,
+		[]any{key.ID},
+		&keyStatus,
+	))
+	s.Require().Equal(service.StatusAPIKeyActive, keyStatus)
+}
+
+func (s *APIKeyRepoSuite) TestLiheOAuthResolveRejectsChangedAPIKeyGroup() {
+	user := s.mustCreateUser("lihe-changed-group@test.com")
+	originalGroup := s.mustCreateGroup("g-lihe-original")
+	newGroup := s.mustCreateGroup("g-lihe-new")
+	key := s.mustCreateApiKey(user.ID, "sk-lihe-changed-group", "Source key", &originalGroup.ID)
+	tokenHash := strings.Repeat("b", 64)
+	s.mustCreateLiheTokenBinding(tokenHash, user.ID, key.ID, originalGroup.ID, originalGroup.Platform)
+
+	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", originalGroup.Platform)
+	s.Require().NoError(err)
+	s.Require().True(resolved.BindingFound)
+	s.Require().NotNil(resolved.APIKey)
+	s.Require().Equal(key.ID, resolved.APIKey.ID)
+
+	_, err = s.client.APIKey.UpdateOneID(key.ID).SetGroupID(newGroup.ID).Save(s.ctx)
+	s.Require().NoError(err)
+
+	resolved, err = s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", originalGroup.Platform)
+	s.Require().NoError(err)
+	s.Require().True(resolved.BindingFound)
+	s.Require().Nil(resolved.APIKey)
+}
+
+func (s *APIKeyRepoSuite) TestLiheOAuthLegacyInternalBindingRemainsCompatible() {
+	user := s.mustCreateUser("lihe-legacy-binding@test.com")
+	group := s.mustCreateGroup("g-lihe-legacy-binding")
+	key := s.mustCreateApiKey(
+		user.ID,
+		service.LiheInternalAPIKeyPrefix+"legacy-binding-test",
+		"Legacy Lihe key",
+		&group.ID,
+	)
+	tokenHash := strings.Repeat("c", 64)
+	tokenID := s.mustCreateLegacyLiheTokenBinding(tokenHash, user.ID, key.ID, group.ID, group.Platform)
+
+	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", group.Platform)
+	s.Require().NoError(err)
+	s.Require().True(resolved.BindingFound)
+	s.Require().NotNil(resolved.APIKey)
+	s.Require().Equal(key.ID, resolved.APIKey.ID)
+
+	revoked, err := s.repo.RevokeLiheAccessTokenByID(s.ctx, tokenID, user.ID)
+	s.Require().NoError(err)
+	s.Require().True(revoked)
+
+	var keyStatus string
+	s.Require().NoError(scanSingleRow(
+		s.ctx,
+		s.repo.sql,
+		`SELECT status FROM api_keys WHERE id = $1`,
+		[]any{key.ID},
+		&keyStatus,
+	))
+	s.Require().Equal(service.StatusAPIKeyDisabled, keyStatus)
 }
 
 func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConfig() {
@@ -491,6 +576,62 @@ func (s *APIKeyRepoSuite) mustCreateApiKey(userID int64, key, name string, group
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, k), "create api key")
 	return k
+}
+
+func (s *APIKeyRepoSuite) mustCreateLiheTokenBinding(
+	tokenHash string,
+	userID, apiKeyID, groupID int64,
+	provider string,
+) int64 {
+	s.T().Helper()
+	tokenID := s.mustCreateLiheAccessToken(tokenHash, userID)
+	_, err := s.repo.sql.ExecContext(
+		s.ctx,
+		`INSERT INTO lihe_oauth_token_bindings (token_id, provider, group_id, source_api_key_id)
+		 VALUES ($1, $2, $3, $4)`,
+		tokenID,
+		provider,
+		groupID,
+		apiKeyID,
+	)
+	s.Require().NoError(err)
+	return tokenID
+}
+
+func (s *APIKeyRepoSuite) mustCreateLegacyLiheTokenBinding(
+	tokenHash string,
+	userID, apiKeyID, groupID int64,
+	provider string,
+) int64 {
+	s.T().Helper()
+	tokenID := s.mustCreateLiheAccessToken(tokenHash, userID)
+	_, err := s.repo.sql.ExecContext(
+		s.ctx,
+		`INSERT INTO lihe_oauth_token_bindings (token_id, provider, group_id, api_key_id)
+		 VALUES ($1, $2, $3, $4)`,
+		tokenID,
+		provider,
+		groupID,
+		apiKeyID,
+	)
+	s.Require().NoError(err)
+	return tokenID
+}
+
+func (s *APIKeyRepoSuite) mustCreateLiheAccessToken(tokenHash string, userID int64) int64 {
+	s.T().Helper()
+	var tokenID int64
+	err := scanSingleRow(
+		s.ctx,
+		s.repo.sql,
+		`INSERT INTO lihe_oauth_access_tokens (user_id, token_hash, name, client_id, scopes)
+		 VALUES ($1, $2, 'lihe.chat', 'lihe-chat', ARRAY['models:read', 'chat:write'])
+		 RETURNING id`,
+		[]any{userID, tokenHash},
+		&tokenID,
+	)
+	s.Require().NoError(err)
+	return tokenID
 }
 
 // --- IncrementQuotaUsed ---

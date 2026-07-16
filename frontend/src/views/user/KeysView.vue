@@ -73,15 +73,6 @@
               </button>
             </div>
           </div>
-          <a
-            v-if="liheIntegration?.enabled && liheIntegration.connect_url"
-            :href="liheIntegration.connect_url"
-            class="btn btn-secondary inline-flex items-center"
-            data-test="lihe-import-button"
-          >
-            <Icon name="externalLink" size="md" class="mr-2" />
-            {{ t('liheOAuth.importChat') }}
-          </a>
           <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
@@ -397,6 +388,17 @@
                 <Icon name="upload" size="sm" />
                 <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
               </button>
+              <!-- Import this API key to Lihe Chat -->
+              <a
+                v-if="liheIntegration?.enabled && liheIntegration.connect_url"
+                :href="buildLiheConnectUrl(row.id)"
+                :data-api-key-id="row.id"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                data-test="lihe-import-button"
+              >
+                <Icon name="externalLink" size="sm" />
+                <span class="text-xs">{{ t('liheOAuth.importChat') }}</span>
+              </a>
               <!-- Toggle Status Button -->
               <button
                 @click="toggleKeyStatus(row)"
@@ -1546,6 +1548,18 @@ const loadPublicSettings = async () => {
     liheIntegration.value = await getLiheIntegration()
   } catch (error) {
     console.error('Failed to load Lihe Chat integration:', error)
+  }
+}
+
+const buildLiheConnectUrl = (apiKeyId: number): string => {
+  const connectUrl = liheIntegration.value?.connect_url
+  if (!connectUrl) return ''
+  try {
+    const target = new URL(connectUrl)
+    target.searchParams.set('api_key_id', String(apiKeyId))
+    return target.toString()
+  } catch {
+    return ''
   }
 }
 

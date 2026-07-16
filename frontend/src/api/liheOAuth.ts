@@ -5,6 +5,8 @@ export interface LiheAccessTokenRecord {
   name: string
   scopes: string[]
   providers: string[]
+  api_key_id: number | null
+  api_key_name: string
   last_used_at: string | null
   created_at: string
 }

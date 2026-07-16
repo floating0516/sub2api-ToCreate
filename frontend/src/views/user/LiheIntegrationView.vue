@@ -20,15 +20,14 @@
             </div>
           </div>
 
-          <button
-            type="button"
+          <router-link
+            v-if="integration?.enabled"
+            to="/keys"
             class="btn btn-primary inline-flex shrink-0 items-center justify-center"
-            :disabled="loading || !integration?.enabled || !integration.connect_url"
-            @click="openLiheChat"
           >
-            <Icon name="externalLink" size="sm" class="mr-2" />
-            {{ t('liheOAuth.importChat') }}
-          </button>
+            <Icon name="key" size="sm" class="mr-2" />
+            {{ t('liheOAuth.selectKey') }}
+          </router-link>
         </div>
       </section>
 
@@ -60,6 +59,7 @@
             <thead class="bg-gray-50 dark:bg-dark-800/70">
               <tr>
                 <th class="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-dark-400">{{ t('liheOAuth.name') }}</th>
+                <th class="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-dark-400">{{ t('liheOAuth.sourceKey') }}</th>
                 <th class="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-dark-400">{{ t('liheOAuth.providers') }}</th>
                 <th class="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-dark-400">{{ t('liheOAuth.createdAt') }}</th>
                 <th class="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-dark-400">{{ t('liheOAuth.lastUsedAt') }}</th>
@@ -69,6 +69,10 @@
             <tbody class="divide-y divide-gray-100 dark:divide-dark-800">
               <tr v-for="token in tokens" :key="token.id">
                 <td class="whitespace-nowrap px-5 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ token.name }}</td>
+                <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-600 dark:text-dark-300">
+                  <span>{{ token.api_key_name || '-' }}</span>
+                  <span v-if="token.api_key_id" class="ml-1 text-xs text-gray-400">#{{ token.api_key_id }}</span>
+                </td>
                 <td class="px-5 py-4">
                   <div class="flex min-w-52 flex-wrap gap-1.5">
                     <span
@@ -146,11 +150,6 @@ async function loadIntegration() {
   } finally {
     loading.value = false
   }
-}
-
-function openLiheChat() {
-  const target = integration.value?.connect_url
-  if (target) window.location.assign(target)
 }
 
 function requestRevoke(token: LiheAccessTokenRecord) {

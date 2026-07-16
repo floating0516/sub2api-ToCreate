@@ -19,11 +19,18 @@ from an import result:
 
 The OAuth feature is disabled unless all server-side settings are valid.
 
-When enabled, the user-facing `API Keys` page shows a fixed `Import to chat
-site` action next to the normal key actions. The action URL is loaded from the
-authenticated API response and cannot be supplied by an import result. The
-separate Lihe Chat integration page remains the place to inspect and revoke
-existing connections.
+When enabled, every row on the user-facing `API Keys` page shows an `Import to
+chat site` action immediately after `Import to CCS`. Its URL is the configured
+connect URL with only the non-secret numeric key ID appended:
+
+```text
+https://lihe.chat/connect/lihe?api_key_id=123
+```
+
+The API key plaintext is never placed in the URL. LibreChat must preserve this
+ID through login and include it in the authorization request. The separate
+Lihe Chat integration page remains the place to inspect and revoke existing
+connections.
 
 ## Authorization request
 
@@ -31,6 +38,7 @@ The browser opens:
 
 ```text
 GET /oauth/authorize?response_type=code
+  &api_key_id=123
   &client_id=lihe-chat
   &redirect_uri=https%3A%2F%2Flihe.chat%2Fapi%2Fintegrations%2Flihe%2Fcallback
   &scope=models%3Aread%20chat%3Awrite
@@ -63,7 +71,11 @@ On success it returns the only URL the browser may navigate to:
 
 The authorization code contains 32 random bytes, is stored only as a SHA-256
 hash, expires after 60 seconds, and can be consumed once. `state` is never
-stored and is returned unchanged to the fixed callback URI.
+stored and is returned unchanged to the fixed callback URI. `api_key_id` is
+mandatory. The server verifies that the selected key belongs to the logged-in
+API user, is active, has a supported active provider group, and currently has
+an available account. The selected ID is stored with the authorization code
+and checked again during the exchange transaction.
 
 ## Token exchange
 
@@ -83,15 +95,17 @@ Success:
   "access_token": "lihe_...",
   "token_type": "Bearer",
   "scope": "models:read chat:write",
-  "providers": ["openai", "anthropic"],
+  "providers": ["openai"],
+  "api_key_id": 123,
+  "api_key_name": "My OpenAI key",
   "created_at": "2026-07-16T12:00:00Z"
 }
 ```
 
 There is deliberately no `expires_in`: the token remains valid until revoked.
 The plaintext access token is returned once and only its SHA-256 hash is
-stored. Code consumption, token creation, and all provider bindings are one
-database transaction.
+stored. Code consumption, token creation, and the selected API-key binding are
+one database transaction. The exchange never creates or copies an API key.
 
 Errors use the OAuth shape and never include a code, verifier, secret, or token:
 
@@ -104,17 +118,17 @@ Errors use the OAuth shape and never include a code, verifier, secret, or token:
 
 ## Resource requests
 
-LibreChat sends the long-lived token only in an authorization header and
-selects one of the `providers` returned by the token exchange:
+LibreChat sends the long-lived token only in an authorization header and uses
+the single provider returned by the token exchange:
 
 ```http
 Authorization: Bearer lihe_...
 X-Lihe-Provider: openai
 ```
 
-For each provider, LibreChat verifies and loads models with `GET /v1/models`.
-The provider header is required because one Lihe token can map to several
-isolated provider groups.
+LibreChat verifies and loads models with `GET /v1/models`. The provider header
+is required so the gateway can verify that it still matches the selected
+key's bound group.
 
 The token is accepted only on these resource routes:
 
@@ -161,8 +175,11 @@ GET    /api/v1/admin/oauth/lihe/tokens?user_id={user_id}
 DELETE /api/v1/admin/oauth/lihe/tokens/{id}
 ```
 
-Token list entries expose only ID, fixed name, scopes, providers, creation
-time, and last-use time. No credential or credential prefix is returned.
+Token list entries expose only ID, fixed name, scopes, the source API key ID
+and display name, provider, creation time, and last-use time. No credential or
+credential prefix is returned. Revoking a Lihe token never disables or deletes
+the user's source API key. It only disables legacy hidden `lihe-internal-*`
+keys created by earlier integration versions.
 
 ## Security invariants
 
@@ -172,7 +189,12 @@ time, and last-use time. No credential or credential prefix is returned.
 - OAuth responses use `Cache-Control: no-store` and `Pragma: no-cache`.
 - Long-lived tokens are never placed in URLs, browser storage, redirects, or
   application logs.
-- Internal provider keys cannot be authenticated directly and are hidden from
-  ordinary API-key list, detail, search, update, delete, and count operations.
-- A token can resolve only to API keys owned by the same user recorded on the
-  token, preventing cross-user binding.
+- A token can resolve only to the selected API key owned by the same user
+  recorded on both the authorization code and token, preventing cross-user
+  binding.
+- The selected key must not be deleted, and its current group ID and provider
+  must still match the binding captured at issuance. Disabling the key is
+  rejected by the normal API-key authorization checks.
+- Legacy internal provider keys cannot be authenticated directly and remain
+  hidden from ordinary API-key list, detail, search, update, delete, and count
+  operations.

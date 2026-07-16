@@ -62,10 +62,16 @@ func (h *APIKeyHandler) AuthorizeLiheOAuth(c *gin.Context) {
 		response.Unauthorized(c, "User not authenticated")
 		return
 	}
+	apiKeyID, err := strconv.ParseInt(strings.TrimSpace(c.Query("api_key_id")), 10, 64)
+	if err != nil || apiKeyID <= 0 {
+		response.BadRequest(c, "Valid api_key_id is required")
+		return
+	}
 	result, err := h.apiKeyService.CreateLiheAuthorizationCode(
 		c.Request.Context(),
 		subject.UserID,
 		service.LiheAuthorizeRequest{
+			APIKeyID:            apiKeyID,
 			ResponseType:        c.Query("response_type"),
 			ClientID:            c.Query("client_id"),
 			RedirectURI:         c.Query("redirect_uri"),
@@ -111,8 +117,8 @@ func (h *APIKeyHandler) writeLiheTokenExchangeError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrLiheInvalidGrant):
 		writeLiheOAuthError(c, http.StatusBadRequest, "invalid_grant", "authorization code is invalid or expired")
-	case errors.Is(err, service.ErrLiheNoProviders):
-		writeLiheOAuthError(c, http.StatusForbidden, "access_denied", "this account has no available model providers")
+	case errors.Is(err, service.ErrLiheNoProviders), errors.Is(err, service.ErrLiheAPIKeyUnavailable):
+		writeLiheOAuthError(c, http.StatusForbidden, "access_denied", "selected API key is unavailable")
 	case infraerrors.Reason(err) == "LIHE_USER_INACTIVE":
 		writeLiheOAuthError(c, http.StatusForbidden, "access_denied", "user account is not active")
 	case errors.Is(err, service.ErrLiheOAuthDisabled):

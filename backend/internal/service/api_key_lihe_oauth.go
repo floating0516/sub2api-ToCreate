@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -60,6 +61,10 @@ var (
 		"LIHE_NO_PROVIDERS",
 		"this account has no available model providers",
 	)
+	ErrLiheAPIKeyUnavailable = infraerrors.Forbidden(
+		"LIHE_API_KEY_UNAVAILABLE",
+		"selected API key is unavailable",
+	)
 	ErrLiheTokenNotFound = infraerrors.NotFound(
 		"LIHE_TOKEN_NOT_FOUND",
 		"Lihe connection not found",
@@ -83,6 +88,7 @@ var (
 type LiheAuthorizationCode struct {
 	ID                  int64
 	UserID              int64
+	APIKeyID            int64
 	CodeHash            string
 	ClientID            string
 	RedirectURI         string
@@ -96,6 +102,7 @@ type LiheAuthorizationCode struct {
 }
 
 type LiheAuthorizeRequest struct {
+	APIKeyID            int64
 	ResponseType        string
 	ClientID            string
 	RedirectURI         string
@@ -113,7 +120,7 @@ type LiheAuthorizeResult struct {
 type LiheTokenBindingInput struct {
 	Provider string
 	GroupID  int64
-	APIKey   string
+	APIKeyID int64
 }
 
 type LiheTokenExchangeInput struct {
@@ -132,6 +139,8 @@ type LiheTokenExchangeResult struct {
 	TokenType   string    `json:"token_type"`
 	Scope       string    `json:"scope"`
 	Providers   []string  `json:"providers"`
+	APIKeyID    int64     `json:"api_key_id"`
+	APIKeyName  string    `json:"api_key_name"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -142,16 +151,20 @@ type LiheAccessToken struct {
 	ClientID   string     `json:"-"`
 	Scopes     []string   `json:"scopes"`
 	Providers  []string   `json:"providers"`
+	APIKeyID   *int64     `json:"api_key_id"`
+	APIKeyName string     `json:"api_key_name"`
 	LastUsedAt *time.Time `json:"last_used_at"`
 	RevokedAt  *time.Time `json:"-"`
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type LiheResolvedAccess struct {
-	TokenID     int64
-	TokenUserID int64
-	Scopes      []string
-	APIKey      *APIKey
+	TokenID        int64
+	TokenUserID    int64
+	Scopes         []string
+	BindingFound   bool
+	BindingGroupID int64
+	APIKey         *APIKey
 }
 
 // LiheOAuthRepository is implemented by the concrete API-key repository. It
@@ -226,6 +239,7 @@ func (s *APIKeyService) CreateLiheAuthorizationCode(
 	now := time.Now().UTC()
 	record := &LiheAuthorizationCode{
 		UserID:              userID,
+		APIKeyID:            req.APIKeyID,
 		CodeHash:            hashLiheCredential(plainCode),
 		ClientID:            s.cfg.LiheOAuth.ClientID,
 		RedirectURI:         s.cfg.LiheOAuth.RedirectURI,
@@ -234,6 +248,10 @@ func (s *APIKeyService) CreateLiheAuthorizationCode(
 		CodeChallengeMethod: lihePKCEChallengeMethod,
 		ExpiresAt:           now.Add(liheAuthorizationCodeTTL),
 	}
+	if _, err := s.buildLiheTokenBinding(ctx, userID, req.APIKeyID); err != nil {
+		return nil, err
+	}
+
 	repo, err := s.liheOAuthRepository()
 	if err != nil {
 		return nil, err
@@ -257,7 +275,8 @@ func (s *APIKeyService) CreateLiheAuthorizationCode(
 }
 
 func (s *APIKeyService) validateLiheAuthorizeRequest(req LiheAuthorizeRequest) error {
-	if req.ResponseType != "code" ||
+	if req.APIKeyID <= 0 ||
+		req.ResponseType != "code" ||
 		req.ClientID != s.cfg.LiheOAuth.ClientID ||
 		req.RedirectURI != s.cfg.LiheOAuth.RedirectURI ||
 		req.CodeChallengeMethod != lihePKCEChallengeMethod ||
@@ -290,7 +309,7 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 	if err != nil {
 		return nil, fmt.Errorf("get Lihe authorization code: %w", err)
 	}
-	if record == nil || record.Used || !record.ExpiresAt.After(time.Now()) ||
+	if record == nil || record.APIKeyID <= 0 || record.Used || !record.ExpiresAt.After(time.Now()) ||
 		record.ClientID != s.cfg.LiheOAuth.ClientID || record.RedirectURI != redirectURI ||
 		record.CodeChallengeMethod != lihePKCEChallengeMethod || !equalLiheScopeSlices(record.Scopes) {
 		return nil, ErrLiheInvalidGrant
@@ -308,12 +327,9 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 	if user == nil || !user.IsActive() {
 		return nil, infraerrors.Forbidden("LIHE_USER_INACTIVE", "user account is not active")
 	}
-	bindings, err := s.buildLiheTokenBindings(ctx, record.UserID)
+	binding, err := s.buildLiheTokenBinding(ctx, record.UserID, record.APIKeyID)
 	if err != nil {
 		return nil, err
-	}
-	if len(bindings) == 0 {
-		return nil, ErrLiheNoProviders
 	}
 
 	plainToken, err := generateLiheCredential(LiheAccessTokenPrefix)
@@ -328,7 +344,7 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 		CodeChallenge: record.CodeChallenge,
 		TokenHash:     hashLiheCredential(plainToken),
 		Scopes:        liheOAuthScopeList(),
-		Bindings:      bindings,
+		Bindings:      []LiheTokenBindingInput{binding},
 	}
 	issued, err := repo.ExchangeLiheAuthorizationCode(ctx, input)
 	if err != nil {
@@ -337,54 +353,57 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 		}
 		return nil, fmt.Errorf("exchange Lihe authorization code: %w", err)
 	}
-	providers := make([]string, 0, len(bindings))
-	for _, binding := range bindings {
-		providers = append(providers, binding.Provider)
+	issuedAPIKeyID := binding.APIKeyID
+	if issued.APIKeyID != nil {
+		issuedAPIKeyID = *issued.APIKeyID
 	}
 	return &LiheTokenExchangeResult{
 		AccessToken: plainToken,
 		TokenType:   "Bearer",
 		Scope:       LiheOAuthScopes,
-		Providers:   providers,
+		Providers:   append([]string(nil), issued.Providers...),
+		APIKeyID:    issuedAPIKeyID,
+		APIKeyName:  issued.APIKeyName,
 		CreatedAt:   issued.CreatedAt,
 	}, nil
 }
 
-func (s *APIKeyService) buildLiheTokenBindings(ctx context.Context, userID int64) ([]LiheTokenBindingInput, error) {
+func (s *APIKeyService) buildLiheTokenBinding(
+	ctx context.Context,
+	userID, apiKeyID int64,
+) (LiheTokenBindingInput, error) {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, apiKeyID)
+	if err != nil {
+		if errors.Is(err, ErrAPIKeyNotFound) {
+			return LiheTokenBindingInput{}, ErrLiheAPIKeyUnavailable
+		}
+		return LiheTokenBindingInput{}, fmt.Errorf("get selected Lihe API key: %w", err)
+	}
+	if apiKey == nil || apiKey.UserID != userID || apiKey.Status != StatusAPIKeyActive ||
+		apiKey.GroupID == nil || apiKey.Group == nil || apiKey.Group.ID != *apiKey.GroupID ||
+		!apiKey.Group.IsActive() {
+		return LiheTokenBindingInput{}, ErrLiheAPIKeyUnavailable
+	}
+	provider := strings.ToLower(strings.TrimSpace(apiKey.Group.Platform))
+	if !isLiheProvider(provider) {
+		return LiheTokenBindingInput{}, ErrLiheAPIKeyUnavailable
+	}
+
 	groups, err := s.GetAvailableGroups(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("get Lihe provider groups: %w", err)
+		return LiheTokenBindingInput{}, fmt.Errorf("get Lihe provider groups: %w", err)
 	}
-	firstGroupByProvider := make(map[string]int64, len(liheProviderOrder))
 	for i := range groups {
-		if groups[i].ActiveAccountCount <= 0 {
-			continue
-		}
-		provider := strings.ToLower(strings.TrimSpace(groups[i].Platform))
-		if !isLiheProvider(provider) {
-			continue
-		}
-		if _, exists := firstGroupByProvider[provider]; !exists {
-			firstGroupByProvider[provider] = groups[i].ID
+		groupProvider := strings.ToLower(strings.TrimSpace(groups[i].Platform))
+		if groups[i].ID == *apiKey.GroupID && groups[i].ActiveAccountCount > 0 && groupProvider == provider {
+			return LiheTokenBindingInput{
+				Provider: provider,
+				GroupID:  groups[i].ID,
+				APIKeyID: apiKey.ID,
+			}, nil
 		}
 	}
-	bindings := make([]LiheTokenBindingInput, 0, len(firstGroupByProvider))
-	for _, provider := range liheProviderOrder {
-		groupID, ok := firstGroupByProvider[provider]
-		if !ok {
-			continue
-		}
-		internalKey, err := generateLiheCredential(LiheInternalAPIKeyPrefix)
-		if err != nil {
-			return nil, fmt.Errorf("generate internal Lihe provider key: %w", err)
-		}
-		bindings = append(bindings, LiheTokenBindingInput{
-			Provider: provider,
-			GroupID:  groupID,
-			APIKey:   internalKey,
-		})
-	}
-	return bindings, nil
+	return LiheTokenBindingInput{}, ErrLiheNoProviders
 }
 
 func (s *APIKeyService) ListLiheAccessTokens(ctx context.Context, userID int64) ([]LiheAccessToken, error) {
@@ -492,11 +511,16 @@ func (s *APIKeyService) ResolveLiheAccessToken(
 	if resolved == nil {
 		return nil, ErrLiheInvalidToken
 	}
-	if resolved.APIKey == nil {
+	if !resolved.BindingFound {
 		return nil, ErrLiheProviderNotAllowed
 	}
+	if resolved.APIKey == nil {
+		return nil, ErrLiheInvalidToken
+	}
 	if resolved.TokenUserID != resolved.APIKey.UserID || resolved.APIKey.User == nil ||
-		resolved.APIKey.User.ID != resolved.TokenUserID {
+		resolved.APIKey.User.ID != resolved.TokenUserID || resolved.APIKey.GroupID == nil ||
+		*resolved.APIKey.GroupID != resolved.BindingGroupID || resolved.APIKey.Group == nil ||
+		strings.ToLower(strings.TrimSpace(resolved.APIKey.Group.Platform)) != provider {
 		return nil, ErrLiheInvalidToken
 	}
 	if !containsLiheScope(resolved.Scopes, requiredScope) {

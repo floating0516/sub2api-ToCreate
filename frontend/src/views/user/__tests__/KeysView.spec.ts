@@ -177,6 +177,7 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <slot name="cell-actions" :value="row" :row="row" />
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -318,14 +319,37 @@ describe('user KeysView column settings', () => {
     expect(visibleColumnKeys(wrapper)).not.toContain('id')
   })
 
-  it('shows the fixed Lihe Chat import action only when the integration is enabled', async () => {
+  it('shows a per-key Lihe Chat import action only when the integration is enabled', async () => {
     getPublicSettings.mockResolvedValueOnce({ lihe_oauth_enabled: true })
     const wrapper = await mountView()
 
     const importAction = wrapper.get('[data-test="lihe-import-button"]')
     expect(importAction.text()).toContain('Import to chat site')
-    expect(importAction.attributes('href')).toBe('https://chat.lihe.chat/connect/lihe')
+    expect(importAction.attributes('href')).toBe('https://chat.lihe.chat/connect/lihe?api_key_id=1')
+    expect(importAction.attributes('data-api-key-id')).toBe('1')
+    expect(importAction.attributes('href')).not.toContain('sk-test-key')
     expect(getLiheIntegration).toHaveBeenCalledOnce()
+  })
+
+  it('builds an isolated Lihe Chat import URL for every API key row', async () => {
+    getPublicSettings.mockResolvedValueOnce({ lihe_oauth_enabled: true })
+    listKeys.mockResolvedValueOnce({
+      items: [createApiKey(), { ...createApiKey(), id: 2, key: 'sk-second-key', name: 'second' }],
+      total: 2,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+
+    const wrapper = await mountView()
+    const actions = wrapper.findAll('[data-test="lihe-import-button"]')
+
+    expect(actions).toHaveLength(2)
+    expect(actions.map((action) => action.attributes('href'))).toEqual([
+      'https://chat.lihe.chat/connect/lihe?api_key_id=1',
+      'https://chat.lihe.chat/connect/lihe?api_key_id=2',
+    ])
+    expect(actions.map((action) => action.attributes('href')).join(' ')).not.toContain('sk-')
   })
 
   it('does not load or show the Lihe Chat import action while disabled', async () => {
