@@ -77,6 +77,7 @@ type Config struct {
 	DingTalk                DingTalkConnectConfig         `mapstructure:"dingtalk_connect"`
 	GitHubOAuth             EmailOAuthProviderConfig      `mapstructure:"github_oauth"`
 	GoogleOAuth             EmailOAuthProviderConfig      `mapstructure:"google_oauth"`
+	LiheOAuth               LiheOAuthConfig               `mapstructure:"lihe_oauth"`
 	Default                 DefaultConfig                 `mapstructure:"default"`
 	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
@@ -144,6 +145,17 @@ type GeminiOAuthConfig struct {
 type GeminiQuotaConfig struct {
 	Tiers  map[string]GeminiTierQuotaConfig `mapstructure:"tiers"`
 	Policy string                           `mapstructure:"policy"`
+}
+
+// LiheOAuthConfig configures the single confidential lihe.chat OAuth client.
+// Every URL is server-owned so an authorization request cannot introduce an
+// arbitrary callback or API destination.
+type LiheOAuthConfig struct {
+	Enabled      bool   `mapstructure:"enabled"`
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
+	RedirectURI  string `mapstructure:"redirect_uri"`
+	ConnectURL   string `mapstructure:"connect_url"`
 }
 
 type GeminiTierQuotaConfig struct {
@@ -1604,6 +1616,10 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.OIDC.UserInfoEmailPath = strings.TrimSpace(cfg.OIDC.UserInfoEmailPath)
 	cfg.OIDC.UserInfoIDPath = strings.TrimSpace(cfg.OIDC.UserInfoIDPath)
 	cfg.OIDC.UserInfoUsernamePath = strings.TrimSpace(cfg.OIDC.UserInfoUsernamePath)
+	cfg.LiheOAuth.ClientID = strings.TrimSpace(cfg.LiheOAuth.ClientID)
+	cfg.LiheOAuth.ClientSecret = strings.TrimSpace(cfg.LiheOAuth.ClientSecret)
+	cfg.LiheOAuth.RedirectURI = strings.TrimSpace(cfg.LiheOAuth.RedirectURI)
+	cfg.LiheOAuth.ConnectURL = strings.TrimSpace(cfg.LiheOAuth.ConnectURL)
 	cfg.OIDC.UsePKCEExplicit = hasExplicitConfigOrEnv("oidc_connect.use_pkce", "OIDC_CONNECT_USE_PKCE")
 	cfg.OIDC.ValidateIDTokenExplicit = hasExplicitConfigOrEnv("oidc_connect.validate_id_token", "OIDC_CONNECT_VALIDATE_ID_TOKEN")
 	cfg.Dashboard.KeyPrefix = strings.TrimSpace(cfg.Dashboard.KeyPrefix)
@@ -1844,6 +1860,13 @@ func setDefaults() {
 	viper.SetDefault("dingtalk_connect.corp_restriction_policy", "none")
 	viper.SetDefault("dingtalk_connect.require_email", true)
 	viper.SetDefault("dingtalk_connect.username_overwrite_policy", "if_empty")
+
+	// Lihe Chat confidential OAuth client (disabled until explicitly configured).
+	viper.SetDefault("lihe_oauth.enabled", false)
+	viper.SetDefault("lihe_oauth.client_id", "lihe-chat")
+	viper.SetDefault("lihe_oauth.client_secret", "")
+	viper.SetDefault("lihe_oauth.redirect_uri", "https://lihe.chat/api/integrations/lihe/callback")
+	viper.SetDefault("lihe_oauth.connect_url", "https://lihe.chat/connect/lihe")
 
 	// Database
 	viper.SetDefault("database.host", "localhost")
@@ -2208,6 +2231,10 @@ func setDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.Default.APIKeyPrefix)), "lihe_") ||
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.Default.APIKeyPrefix)), "lihe-internal-") {
+		return fmt.Errorf("default.api_key_prefix uses the reserved Lihe OAuth prefix")
+	}
 	jwtSecret := strings.TrimSpace(c.JWT.Secret)
 	if jwtSecret == "" {
 		return fmt.Errorf("jwt.secret is required")
@@ -2376,6 +2403,22 @@ func (c *Config) Validate() error {
 		warnIfInsecureURL("linuxdo_connect.userinfo_url", c.LinuxDo.UserInfoURL)
 		warnIfInsecureURL("linuxdo_connect.redirect_url", c.LinuxDo.RedirectURL)
 		warnIfInsecureURL("linuxdo_connect.frontend_redirect_url", c.LinuxDo.FrontendRedirectURL)
+	}
+	if c.LiheOAuth.Enabled {
+		if c.LiheOAuth.ClientID == "" {
+			return fmt.Errorf("lihe_oauth.client_id is required when lihe_oauth.enabled=true")
+		}
+		if len(c.LiheOAuth.ClientSecret) < 32 {
+			return fmt.Errorf("lihe_oauth.client_secret must be at least 32 characters when lihe_oauth.enabled=true")
+		}
+		for name, raw := range map[string]string{
+			"redirect_uri": c.LiheOAuth.RedirectURI,
+			"connect_url":  c.LiheOAuth.ConnectURL,
+		} {
+			if err := validateLiheOAuthHTTPSURL(raw); err != nil {
+				return fmt.Errorf("lihe_oauth.%s invalid: %w", name, err)
+			}
+		}
 	}
 	if c.WeChat.Enabled {
 		weChat := c.WeChat
@@ -3226,6 +3269,26 @@ func ValidateAbsoluteHTTPURL(raw string) error {
 	}
 	if u.Fragment != "" {
 		return fmt.Errorf("must not include fragment")
+	}
+	return nil
+}
+
+func validateLiheOAuthHTTPSURL(raw string) error {
+	if err := ValidateAbsoluteHTTPURL(raw); err != nil {
+		return err
+	}
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return fmt.Errorf("must use https")
+	}
+	if u.User != nil {
+		return fmt.Errorf("must not include userinfo")
+	}
+	if u.RawQuery != "" || u.ForceQuery {
+		return fmt.Errorf("must not include query")
 	}
 	return nil
 }

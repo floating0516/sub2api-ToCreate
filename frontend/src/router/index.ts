@@ -167,6 +167,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/oauth/authorize',
+    name: 'LiheOAuthAuthorize',
+    component: () => import('@/views/auth/LiheOAuthAuthorizeView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Connect Lihe Chat',
+      titleKey: 'liheOAuth.connecting'
+    }
+  },
+  {
     path: '/legal/:documentId',
     name: 'LegalDocument',
     component: () => import('@/views/public/LegalDocumentView.vue'),
@@ -203,6 +214,18 @@ const routes: RouteRecordRaw[] = [
       title: 'API Keys',
       titleKey: 'keys.title',
       descriptionKey: 'keys.description'
+    }
+  },
+  {
+    path: '/integrations/lihe',
+    name: 'LiheIntegration',
+    component: () => import('@/views/user/LiheIntegrationView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Lihe Chat',
+      titleKey: 'liheOAuth.title',
+      descriptionKey: 'liheOAuth.description'
     }
   },
   {

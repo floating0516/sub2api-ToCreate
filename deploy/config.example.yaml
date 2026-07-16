@@ -996,6 +996,20 @@ oidc_connect:
   userinfo_username_path: ""
 
 # =============================================================================
+# Lihe Chat OAuth Client Integration
+# Lihe Chat 对话站导入（API 平台作为授权服务器）
+# =============================================================================
+lihe_oauth:
+  # Keep disabled until both API and LibreChat staging have passed acceptance.
+  enabled: false
+  client_id: "lihe-chat"
+  # Confidential client secret, at least 32 random characters.
+  # Generate with: openssl rand -hex 32
+  client_secret: ""
+  redirect_uri: "https://lihe.chat/api/integrations/lihe/callback"
+  connect_url: "https://lihe.chat/connect/lihe"
+
+# =============================================================================
 # Default Settings
 # 默认设置
 # =============================================================================

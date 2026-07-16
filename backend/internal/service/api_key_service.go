@@ -27,6 +27,7 @@ var (
 	ErrAPIKeyExists       = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
 	ErrAPIKeyTooShort     = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
 	ErrAPIKeyInvalidChars = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
+	ErrAPIKeyReserved     = infraerrors.BadRequest("API_KEY_RESERVED_PREFIX", "api key uses a reserved prefix")
 	ErrAPIKeyRateLimited  = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrInvalidIPPattern   = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 	// ErrAPIKeyExpired        = infraerrors.Forbidden("API_KEY_EXPIRED", "api key has expired")
@@ -279,6 +280,9 @@ func (s *APIKeyService) GenerateKey() (string, error) {
 
 // ValidateCustomKey 验证自定义API Key格式
 func (s *APIKeyService) ValidateCustomKey(key string) error {
+	if strings.HasPrefix(key, LiheAccessTokenPrefix) || strings.HasPrefix(key, LiheInternalAPIKeyPrefix) {
+		return ErrAPIKeyReserved
+	}
 	// 检查长度
 	if len(key) < 16 {
 		return ErrAPIKeyTooShort

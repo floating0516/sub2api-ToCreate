@@ -46,6 +46,7 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     oidc_oauth_provider_name: 'OIDC',
     github_oauth_enabled: false,
     google_oauth_enabled: false,
+    lihe_oauth_enabled: false,
     backend_mode_enabled: false,
     version: '1.0.0',
     balance_low_notify_enabled: false,

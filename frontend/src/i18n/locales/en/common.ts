@@ -150,6 +150,7 @@ export default {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
+    liheChat: 'Lihe Chat',
     batchImage: 'Batch Images',
     usage: 'Usage',
     dailyReport: 'Daily Report',

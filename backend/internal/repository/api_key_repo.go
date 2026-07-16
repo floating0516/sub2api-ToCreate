@@ -40,6 +40,10 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 	return r.client.APIKey.Query().Where(apikey.DeletedAtIsNil())
 }
 
+func (r *apiKeyRepository) userVisibleQuery() *dbent.APIKeyQuery {
+	return r.activeQuery().Where(apikey.Not(apikey.KeyHasPrefix(service.LiheInternalAPIKeyPrefix)))
+}
+
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
@@ -73,7 +77,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 }
 
 func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
-	m, err := r.activeQuery().
+	m, err := r.userVisibleQuery().
 		Where(apikey.IDEQ(id)).
 		WithUser().
 		WithGroup().
@@ -93,7 +97,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 //   - 不加载完整的 API Key 实体及其关联数据（User、Group 等）
 //   - 适用于删除等只需 key 与用户 ID 的场景
 func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
-	m, err := r.activeQuery().
+	m, err := r.userVisibleQuery().
 		Where(apikey.IDEQ(id)).
 		Select(apikey.FieldKey, apikey.FieldUserID).
 		Only(ctx)
@@ -107,7 +111,7 @@ func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (stri
 }
 
 func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
-	m, err := r.activeQuery().
+	m, err := r.userVisibleQuery().
 		Where(apikey.KeyEQ(key)).
 		WithUser(func(q *dbent.UserQuery) {
 			q.WithAllowedGroups(func(gq *dbent.GroupQuery) {
@@ -126,7 +130,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
-	m, err := r.activeQuery().
+	m, err := r.userVisibleQuery().
 		Where(apikey.KeyEQ(key)).
 		Select(
 			apikey.FieldID,
@@ -397,7 +401,7 @@ func (r *apiKeyRepository) deleteWithAudit(ctx context.Context, exec *dbent.Clie
 }
 
 func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service.APIKeyListFilters) *dbent.APIKeyQuery {
-	q := r.activeQuery().Where(apikey.UserIDEQ(userID))
+	q := r.userVisibleQuery().Where(apikey.UserIDEQ(userID))
 
 	if filters.Search != "" {
 		q = q.Where(apikey.Or(
@@ -565,7 +569,12 @@ func (r *apiKeyRepository) VerifyOwnership(ctx context.Context, userID int64, ap
 	}
 
 	ids, err := r.client.APIKey.Query().
-		Where(apikey.UserIDEQ(userID), apikey.IDIn(apiKeyIDs...), apikey.DeletedAtIsNil()).
+		Where(
+			apikey.UserIDEQ(userID),
+			apikey.IDIn(apiKeyIDs...),
+			apikey.DeletedAtIsNil(),
+			apikey.Not(apikey.KeyHasPrefix(service.LiheInternalAPIKeyPrefix)),
+		).
 		IDs(ctx)
 	if err != nil {
 		return nil, err
@@ -574,7 +583,7 @@ func (r *apiKeyRepository) VerifyOwnership(ctx context.Context, userID int64, ap
 }
 
 func (r *apiKeyRepository) CountByUserID(ctx context.Context, userID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apikey.UserIDEQ(userID)).Count(ctx)
+	count, err := r.userVisibleQuery().Where(apikey.UserIDEQ(userID)).Count(ctx)
 	return int64(count), err
 }
 
@@ -584,7 +593,7 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 }
 
 func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apikey.GroupIDEQ(groupID))
+	q := r.userVisibleQuery().Where(apikey.GroupIDEQ(groupID))
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -650,7 +659,7 @@ func apiKeyListOrder(params pagination.PaginationParams) []func(*entsql.Selector
 
 // SearchAPIKeys searches API keys by user ID and/or keyword (name)
 func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]service.APIKey, error) {
-	q := r.activeQuery()
+	q := r.userVisibleQuery()
 	if userID > 0 {
 		q = q.Where(apikey.UserIDEQ(userID))
 	}
@@ -692,7 +701,7 @@ func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, user
 
 // CountByGroupID 获取分组的 API Key 数量
 func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apikey.GroupIDEQ(groupID)).Count(ctx)
+	count, err := r.userVisibleQuery().Where(apikey.GroupIDEQ(groupID)).Count(ctx)
 	return int64(count), err
 }
 

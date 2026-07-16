@@ -322,6 +322,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		OIDCOAuthProviderName:            oidcProviderName,
 		GitHubOAuthEnabled:               gitHubEnabled,
 		GoogleOAuthEnabled:               googleEnabled,
+		LiheOAuthEnabled:                 s.cfg != nil && s.cfg.LiheOAuth.Enabled,
 		BalanceLowNotifyEnabled:          settings[SettingKeyBalanceLowNotifyEnabled] == "true",
 		AccountQuotaNotifyEnabled:        settings[SettingKeyAccountQuotaNotifyEnabled] == "true",
 		BalanceLowNotifyThreshold:        balanceLowNotifyThreshold,
@@ -477,6 +478,7 @@ type PublicSettingsInjectionPayload struct {
 	OIDCOAuthProviderName            string                   `json:"oidc_oauth_provider_name"`
 	GitHubOAuthEnabled               bool                     `json:"github_oauth_enabled"`
 	GoogleOAuthEnabled               bool                     `json:"google_oauth_enabled"`
+	LiheOAuthEnabled                 bool                     `json:"lihe_oauth_enabled"`
 	BackendModeEnabled               bool                     `json:"backend_mode_enabled"`
 	PaymentEnabled                   bool                     `json:"payment_enabled"`
 	Version                          string                   `json:"version"`
@@ -546,6 +548,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthProviderName:            settings.OIDCOAuthProviderName,
 		GitHubOAuthEnabled:               settings.GitHubOAuthEnabled,
 		GoogleOAuthEnabled:               settings.GoogleOAuthEnabled,
+		LiheOAuthEnabled:                 settings.LiheOAuthEnabled,
 		BackendModeEnabled:               settings.BackendModeEnabled,
 		PaymentEnabled:                   settings.PaymentEnabled,
 		Version:                          s.version,

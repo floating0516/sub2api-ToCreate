@@ -523,6 +523,32 @@ export default {
     }
   },
 
+  liheOAuth: {
+    title: 'Lihe Chat',
+    description: '管理对话站连接',
+    connecting: '正在连接',
+    authorizationFailed: '连接失败',
+    authorizationExpired: '授权已失效，请返回后重新导入',
+    returnToIntegration: '返回连接管理',
+    connected: '已连接 Lihe API',
+    notConnected: '尚未连接对话站',
+    activeConnections: '{count} 个有效连接',
+    importChat: '导入对话站',
+    connections: '连接记录',
+    noConnections: '暂无有效连接',
+    name: '名称',
+    providers: 'Provider',
+    createdAt: '创建时间',
+    lastUsedAt: '最后使用时间',
+    neverUsed: '尚未使用',
+    revoke: '解除绑定',
+    revokeTitle: '解除对话站绑定',
+    revokeConfirm: '解除后，对话站将立即无法继续使用此连接。',
+    revoked: '已解除绑定',
+    loadFailed: '加载连接失败',
+    revokeFailed: '解除绑定失败'
+  },
+
   affiliate: {
     title: '邀请返利',
     description: '邀请新用户注册，并将返利额度转入账户余额',

@@ -150,6 +150,7 @@ export default {
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
+    liheChat: '导入对话站',
     batchImage: '批量生图',
     usage: '使用记录',
     dailyReport: '数据日报',

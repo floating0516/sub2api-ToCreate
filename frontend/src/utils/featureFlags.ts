@@ -119,6 +119,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Affiliate',
   }),
+  liheOAuth: defineFlag({
+    key: 'lihe_oauth_enabled',
+    mode: 'opt-in',
+    label: 'Lihe Chat Integration',
+  }),
 } as const
 
 export type RegisteredFeatureFlag = keyof typeof FeatureFlags

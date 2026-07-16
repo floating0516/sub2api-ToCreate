@@ -33,6 +33,11 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "API key is required")
 			return
 		}
+		if strings.HasPrefix(apiKeyString, service.LiheAccessTokenPrefix) ||
+			strings.HasPrefix(apiKeyString, service.LiheInternalAPIKeyPrefix) {
+			abortWithGoogleError(c, 401, "Invalid API key")
+			return
+		}
 
 		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
 		if err != nil {

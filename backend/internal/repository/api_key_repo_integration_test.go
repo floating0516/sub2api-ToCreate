@@ -86,6 +86,48 @@ func (s *APIKeyRepoSuite) TestGetByKey_NotFound() {
 	s.Require().Error(err, "expected error for non-existent key")
 }
 
+func (s *APIKeyRepoSuite) TestLiheInternalKeysAreHiddenFromUserOperations() {
+	user := s.mustCreateUser("lihe-hidden@test.com")
+	group := s.mustCreateGroup("g-lihe-hidden")
+	normal := s.mustCreateApiKey(user.ID, "sk-visible-lihe-test", "Visible", &group.ID)
+	internal := s.mustCreateApiKey(
+		user.ID,
+		service.LiheInternalAPIKeyPrefix+"hidden-test-value",
+		"lihe.chat / openai",
+		&group.ID,
+	)
+
+	keys, page, err := s.repo.ListByUserID(
+		s.ctx,
+		user.ID,
+		pagination.PaginationParams{Page: 1, PageSize: 20},
+		service.APIKeyListFilters{},
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), page.Total)
+	s.Require().Len(keys, 1)
+	s.Require().Equal(normal.ID, keys[0].ID)
+
+	count, err := s.repo.CountByUserID(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), count)
+
+	_, err = s.repo.GetByID(s.ctx, internal.ID)
+	s.Require().ErrorIs(err, service.ErrAPIKeyNotFound)
+	_, err = s.repo.GetByKey(s.ctx, internal.Key)
+	s.Require().ErrorIs(err, service.ErrAPIKeyNotFound)
+	_, err = s.repo.GetByKeyForAuth(s.ctx, internal.Key)
+	s.Require().ErrorIs(err, service.ErrAPIKeyNotFound)
+
+	owned, err := s.repo.VerifyOwnership(s.ctx, user.ID, []int64{normal.ID, internal.ID})
+	s.Require().NoError(err)
+	s.Require().Equal([]int64{normal.ID}, owned)
+
+	cacheKeys, err := s.repo.ListKeysByUserID(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{normal.Key, internal.Key}, cacheKeys)
+}
+
 func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConfig() {
 	user := s.mustCreateUser("getbykey-auth-dispatch@test.com")
 	group, err := s.client.Group.Create().

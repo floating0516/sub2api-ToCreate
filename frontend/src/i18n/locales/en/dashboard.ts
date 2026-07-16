@@ -518,6 +518,32 @@ export default {
     }
   },
 
+  liheOAuth: {
+    title: 'Lihe Chat',
+    description: 'Manage chat-site connections',
+    connecting: 'Connecting',
+    authorizationFailed: 'Connection failed',
+    authorizationExpired: 'Authorization is no longer valid. Return and import again.',
+    returnToIntegration: 'Return to connections',
+    connected: 'Connected to Lihe API',
+    notConnected: 'Chat site not connected',
+    activeConnections: '{count} active connection | {count} active connections',
+    importChat: 'Import to chat site',
+    connections: 'Connections',
+    noConnections: 'No active connections',
+    name: 'Name',
+    providers: 'Providers',
+    createdAt: 'Created',
+    lastUsedAt: 'Last used',
+    neverUsed: 'Never',
+    revoke: 'Disconnect',
+    revokeTitle: 'Disconnect Lihe Chat',
+    revokeConfirm: 'The chat site will immediately lose access through this connection.',
+    revoked: 'Connection revoked',
+    loadFailed: 'Failed to load connections',
+    revokeFailed: 'Failed to revoke connection'
+  },
+
   affiliate: {
     title: 'Affiliate Rebates',
     description: 'Invite new users and convert your rebate quota into account balance',

@@ -70,7 +70,43 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 2. 验证 Key 存在 ─────────────────────────────────────────
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		var apiKey *service.APIKey
+		var err error
+		isLiheAccessToken := false
+		if strings.HasPrefix(apiKeyString, service.LiheAccessTokenPrefix) {
+			isLiheAccessToken = true
+			apiKey, err = apiKeyService.ResolveLiheAccessToken(
+				c.Request.Context(),
+				apiKeyString,
+				c.GetHeader("X-Lihe-Provider"),
+				c.Request.Method,
+				c.Request.URL.Path,
+			)
+			// This routing selector is meaningful only to the API gateway and
+			// must not be forwarded to an upstream provider.
+			c.Request.Header.Del("X-Lihe-Provider")
+			if err != nil {
+				switch {
+				case errors.Is(err, service.ErrLiheProviderRequired):
+					AbortWithError(c, 400, "LIHE_PROVIDER_REQUIRED", "X-Lihe-Provider is required for Lihe access tokens")
+				case errors.Is(err, service.ErrLiheProviderNotAllowed):
+					AbortWithError(c, 403, "LIHE_PROVIDER_NOT_ALLOWED", "The requested provider is not available for this Lihe connection")
+				case errors.Is(err, service.ErrLiheScopeNotAllowed):
+					AbortWithError(c, 403, "LIHE_SCOPE_NOT_ALLOWED", "Lihe access tokens cannot access this endpoint")
+				case errors.Is(err, service.ErrLiheInvalidToken):
+					AbortWithError(c, 401, "INVALID_API_KEY", "Invalid or revoked Lihe access token")
+				default:
+					AbortWithError(c, 500, "INTERNAL_ERROR", "Failed to validate Lihe access token")
+				}
+				return
+			}
+		} else {
+			if strings.HasPrefix(apiKeyString, service.LiheInternalAPIKeyPrefix) {
+				AbortWithError(c, 401, "INVALID_API_KEY", "Invalid API key")
+				return
+			}
+			apiKey, err = apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		}
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				AbortWithError(c, 401, "INVALID_API_KEY", "Invalid API key")
@@ -136,7 +172,10 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		skipBilling := c.Request.URL.Path == "/v1/usage" ||
+			billingInfoRequest ||
+			isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path) ||
+			(isLiheAccessToken && c.Request.Method == http.MethodGet && c.Request.URL.Path == "/v1/models")
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 

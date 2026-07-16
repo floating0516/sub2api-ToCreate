@@ -317,6 +317,7 @@ type PublicSettings struct {
 	OIDCOAuthProviderName    string
 	GitHubOAuthEnabled       bool
 	GoogleOAuthEnabled       bool
+	LiheOAuthEnabled         bool
 	Version                  string
 
 	BalanceLowNotifyEnabled     bool
