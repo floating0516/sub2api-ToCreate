@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	ErrLiheOAuthDisabled = infraerrors.NotFound("LIHE_OAUTH_DISABLED", "Lihe Chat integration is not enabled")
+	ErrLiheOAuthDisabled  = infraerrors.NotFound("LIHE_OAUTH_DISABLED", "Lihe Chat integration is not enabled")
 	ErrLiheInvalidRequest = infraerrors.BadRequest(
 		"LIHE_OAUTH_INVALID_REQUEST",
 		"invalid Lihe OAuth request",
