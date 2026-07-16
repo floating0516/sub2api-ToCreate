@@ -29,9 +29,13 @@ export interface SwipeSelectAdapter {
   batchUpdate?: (updater: (draft: Set<number>) => void) => void
 }
 
+type SwipeSelectVirtualizer =
+  | Virtualizer<HTMLElement, Element>
+  | Virtualizer<Window, Element>
+
 export interface SwipeSelectVirtualContext {
   /** Get the virtualizer instance */
-  getVirtualizer: () => Virtualizer<HTMLElement, Element> | null
+  getVirtualizer: () => SwipeSelectVirtualizer | null
   /** Get all sorted data */
   getSortedData: () => any[]
   /** Get row ID from data row */
@@ -108,6 +112,10 @@ export function useSwipeSelect(
   const SCROLL_ZONE = 60
   const SCROLL_SPEED = 8
 
+  function isWindowScrollElement(value: unknown): value is Window {
+    return typeof window !== 'undefined' && value === window
+  }
+
   function getActivationRoot(): HTMLElement | null {
     const container = containerRef.value
     if (!container) return null
@@ -162,10 +170,15 @@ export function useSwipeSelect(
     const scrollEl = virt.scrollElement
     if (!scrollEl) return -1
 
-    const scrollRect = scrollEl.getBoundingClientRect()
-    const thead = scrollEl.querySelector('thead')
-    const theadHeight = thead ? thead.getBoundingClientRect().height : 0
-    const contentY = clientY - scrollRect.top - theadHeight + scrollEl.scrollTop
+    let contentY: number
+    if (isWindowScrollElement(scrollEl)) {
+      contentY = clientY + scrollEl.scrollY
+    } else {
+      const scrollRect = scrollEl.getBoundingClientRect()
+      const thead = scrollEl.querySelector('thead')
+      const theadHeight = thead ? thead.getBoundingClientRect().height : 0
+      contentY = clientY - scrollRect.top - theadHeight + scrollEl.scrollTop
+    }
 
     // Search in rendered virtualItems first
     const items = virt.getVirtualItems()
@@ -176,7 +189,10 @@ export function useSwipeSelect(
     // Virtualization disabled (small list rendered in full): the window is empty, so
     // locate the row via real DOM rows instead of the (now-misleading) height estimate.
     if (items.length === 0) {
-      const domIdx = findRowIndexByDomPosition(scrollEl, clientY, indexedRowSelector)
+      const domRoot = isWindowScrollElement(scrollEl) ? containerRef.value : scrollEl
+      const domIdx = domRoot
+        ? findRowIndexByDomPosition(domRoot, clientY, indexedRowSelector)
+        : -1
       if (domIdx >= 0) return domIdx
     }
 
@@ -184,7 +200,8 @@ export function useSwipeSelect(
     const totalCount = virtualContext!.getSortedData().length
     if (totalCount === 0) return -1
     const est = virt.options.estimateSize(0)
-    const guess = Math.floor(contentY / est)
+    const relativeY = contentY - virt.options.scrollMargin - virt.options.paddingStart
+    const guess = Math.floor(relativeY / Math.max(1, est + virt.options.gap))
     return Math.max(0, Math.min(totalCount - 1, guess))
   }
 
@@ -487,13 +504,17 @@ export function useSwipeSelect(
     // In virtual mode, scroll parent is the virtualizer's scroll element
     const virt = virtualContext!.getVirtualizer()
     const virtualScrollEl = virt?.scrollElement
-    const virtualScrollStyle = virtualScrollEl ? getComputedStyle(virtualScrollEl) : null
-    const virtualScrolls = !!virtualScrollEl &&
-      virtualScrollEl.scrollHeight > virtualScrollEl.clientHeight &&
-      /(auto|scroll)/.test(`${virtualScrollStyle?.overflow ?? ''}${virtualScrollStyle?.overflowY ?? ''}`)
-    cachedScrollParent = virtualScrolls && virtualScrollEl
-      ? virtualScrollEl
-      : (containerRef.value ? getScrollParent(containerRef.value) : null)
+    if (isWindowScrollElement(virtualScrollEl)) {
+      cachedScrollParent = document.documentElement
+    } else {
+      const virtualScrollStyle = virtualScrollEl ? getComputedStyle(virtualScrollEl) : null
+      const virtualScrolls = !!virtualScrollEl &&
+        virtualScrollEl.scrollHeight > virtualScrollEl.clientHeight &&
+        /(auto|scroll)/.test(`${virtualScrollStyle?.overflow ?? ''}${virtualScrollStyle?.overflowY ?? ''}`)
+      cachedScrollParent = virtualScrolls && virtualScrollEl
+        ? virtualScrollEl
+        : (containerRef.value ? getScrollParent(containerRef.value) : null)
+    }
 
     createMarquee()
     updateMarquee(clientY)

@@ -296,7 +296,7 @@
           @toggle-visible="toggleVisible"
           @toggle-schedulable="handleBulkToggleSchedulable"
         />
-        <div ref="accountTableRef" class="flex min-h-0 flex-none flex-col overflow-visible lg:flex-1 lg:overflow-hidden">
+        <div ref="accountTableRef" class="flex min-h-0 min-w-0 scroll-mt-20 flex-none flex-col overflow-visible">
           <AccountCardList
             ref="accountCardListRef"
             :data="accounts"
@@ -848,6 +848,7 @@ const handlePageChange = (page: number) => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
   baseHandlePageChange(page)
+  nextTick(() => accountTableRef.value?.scrollIntoView({ block: 'start' }))
 }
 
 const handlePageSizeChange = (size: number) => {
@@ -856,6 +857,7 @@ const handlePageSizeChange = (size: number) => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
   baseHandlePageSizeChange(size)
+  nextTick(() => accountTableRef.value?.scrollIntoView({ block: 'start' }))
 }
 
 const handleSort = (key: string, order: AccountSortOrder) => {

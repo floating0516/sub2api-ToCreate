@@ -16,7 +16,7 @@
       <slot name="filters" />
     </div>
 
-    <!-- 滚动区域：表格或卡片列表 -->
+    <!-- 内容区域：表格内部滚动，卡片跟随页面滚动 -->
     <div class="layout-section-scrollable">
       <div
         :class="contentVariant === 'cards' ? 'card-list-scroll-container' : 'card table-scroll-container'"
@@ -78,7 +78,20 @@ onUnmounted(() => {
 }
 
 .card-list-scroll-container {
-  @apply flex h-full min-h-0 flex-col;
+  @apply flex min-h-0 flex-col;
+}
+
+/* 卡片页使用浏览器页面作为唯一滚动容器。 */
+.table-page-layout.content-variant-cards {
+  height: auto;
+}
+
+.table-page-layout.content-variant-cards .layout-section-scrollable {
+  @apply flex-none min-h-fit;
+}
+
+.table-page-layout.content-variant-cards .card-list-scroll-container {
+  @apply h-auto overflow-visible;
 }
 
 .table-scroll-container :deep(.table-wrapper) {

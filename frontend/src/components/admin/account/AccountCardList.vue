@@ -49,8 +49,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { observeElementRect as observeElementRectDefault, useVirtualizer } from '@tanstack/vue-virtual'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { Account } from '@/types'
@@ -70,12 +70,28 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 const scrollRef = ref<HTMLElement | null>(null)
+const listOffset = ref(0)
 const isDesktopViewport = ref(
   typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1024px)').matches,
 )
 
 let desktopMediaQuery: MediaQueryList | null = null
 let desktopMediaListener: ((event: MediaQueryListEvent) => void) | null = null
+let layoutObserver: ResizeObserver | null = null
+let offsetFrame = 0
+
+const updateListOffset = () => {
+  if (!scrollRef.value || typeof window === 'undefined') return
+  const nextOffset = Math.round(scrollRef.value.getBoundingClientRect().top + window.scrollY)
+  if (nextOffset === listOffset.value) return
+  listOffset.value = nextOffset
+}
+
+const scheduleListOffsetUpdate = () => {
+  if (typeof window === 'undefined') return
+  window.cancelAnimationFrame(offsetFrame)
+  offsetFrame = window.requestAnimationFrame(updateListOffset)
+}
 
 onMounted(() => {
   desktopMediaQuery = window.matchMedia('(min-width: 1024px)')
@@ -84,6 +100,15 @@ onMounted(() => {
     isDesktopViewport.value = event.matches
   }
   desktopMediaQuery.addEventListener?.('change', desktopMediaListener)
+
+  window.addEventListener('resize', scheduleListOffsetUpdate)
+  if (typeof ResizeObserver !== 'undefined' && scrollRef.value) {
+    layoutObserver = new ResizeObserver(scheduleListOffsetUpdate)
+    layoutObserver.observe(scrollRef.value)
+    const pageLayout = scrollRef.value.closest('.table-page-layout')
+    if (pageLayout) layoutObserver.observe(pageLayout)
+  }
+  nextTick(scheduleListOffsetUpdate)
 })
 
 onUnmounted(() => {
@@ -92,6 +117,10 @@ onUnmounted(() => {
   }
   desktopMediaQuery = null
   desktopMediaListener = null
+  window.removeEventListener('resize', scheduleListOffsetUpdate)
+  window.cancelAnimationFrame(offsetFrame)
+  layoutObserver?.disconnect()
+  layoutObserver = null
 })
 
 const sortedData = computed(() => props.data)
@@ -104,33 +133,26 @@ const estimatedViewportHeight = () => {
   return Math.max(window.innerHeight - 320, 400)
 }
 
-const observeElementRectNonZero = (
-  instance: any,
-  callback: (rect: { width: number; height: number }) => void,
-) => observeElementRectDefault(instance, rect => {
-  if (rect.height > 0) callback(rect)
-})
-
-const virtualizer = useVirtualizer(computed(() => ({
+const virtualizer = useWindowVirtualizer(computed(() => ({
   count: shouldVirtualize.value ? sortedData.value.length : 0,
-  getScrollElement: () => scrollRef.value,
   getItemKey: (index: number) => sortedData.value[index]?.id ?? index,
   estimateSize: () => props.estimateCardHeight,
   overscan: props.overscan,
+  scrollMargin: listOffset.value,
   initialRect: { width: 0, height: estimatedViewportHeight() },
-  observeElementRect: observeElementRectNonZero,
   useAnimationFrameWithResizeObserver: true,
 })))
 
 const virtualItems = computed(() => virtualizer.value.getVirtualItems())
 const virtualPaddingTop = computed(() => {
   const items = virtualItems.value
-  return items.length ? items[0].start : 0
+  return items.length ? Math.max(0, items[0].start - listOffset.value) : 0
 })
 const virtualPaddingBottom = computed(() => {
   const items = virtualItems.value
   if (!items.length) return 0
-  return Math.max(0, virtualizer.value.getTotalSize() - items[items.length - 1].end)
+  const lastItemEnd = items[items.length - 1].end - listOffset.value
+  return Math.max(0, virtualizer.value.getTotalSize() - lastItemEnd)
 })
 
 const renderRows = computed<Array<{ index: number; row: Account; measure: boolean }>>(() => {
@@ -152,8 +174,11 @@ watch(
   () => sortedData.value.map(row => row.id),
   (current, previous) => {
     if (current.length === previous.length && current.every((id, index) => id === previous[index])) return
-    virtualizer.value.measureElement(null)
-    virtualizer.value.measure()
+    nextTick(() => {
+      updateListOffset()
+      virtualizer.value.measureElement(null)
+      virtualizer.value.measure()
+    })
   },
   { flush: 'post' },
 )
@@ -169,11 +194,10 @@ defineExpose({
 <style scoped>
 .account-card-list {
   min-height: 0;
-  flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 2px 4px 4px;
-  scrollbar-gutter: stable;
+  min-width: 0;
+  flex: none;
+  overflow: visible;
+  padding: 2px 0 4px;
 }
 
 .account-card-row,
@@ -191,13 +215,5 @@ defineExpose({
 :global(.dark) .account-card-skeleton {
   border-color: rgb(55 65 81);
   background: rgb(31 41 55);
-}
-
-@media (max-width: 1023px) {
-  .account-card-list {
-    flex: none;
-    overflow: visible;
-    padding-inline: 0;
-  }
 }
 </style>
