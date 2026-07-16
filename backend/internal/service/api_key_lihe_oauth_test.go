@@ -405,7 +405,7 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 			Scopes:         liheOAuthScopeList(),
 			BindingFound:   true,
 			BindingGroupID: groupID,
-			APIKey:         &APIKey{
+			APIKey: &APIKey{
 				ID:      9,
 				UserID:  12,
 				GroupID: &groupID,
