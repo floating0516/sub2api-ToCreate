@@ -64,6 +64,11 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
+const AccountCardListStub = {
+  props: ['data'],
+  template: '<div><slot v-for="row in data" :key="row.id" :row="row" /></div>'
+}
+
 const mountView = () =>
   mount(AccountsView, {
     global: {
@@ -72,7 +77,7 @@ const mountView = () =>
         TablePageLayout: {
           template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
         },
-        DataTable: true,
+        AccountCardList: AccountCardListStub,
         Pagination: true,
         ConfirmDialog: true,
         AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
@@ -215,16 +220,7 @@ const mountViewWithRow = () =>
         TablePageLayout: {
           template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
         },
-        // 使用能透传 row 数据的自定义 DataTable stub，以便渲染 cell 插槽
-        DataTable: {
-          props: ['data', 'columns', 'loading'],
-          template: `<div>
-            <div v-for="(row, idx) in (data || [])" :key="idx">
-              <slot name="cell-name" :row="row" :value="row.name" />
-              <slot name="cell-platform_type" :row="row" />
-            </div>
-          </div>`
-        },
+        AccountCardList: AccountCardListStub,
         Pagination: true,
         ConfirmDialog: true,
         AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },

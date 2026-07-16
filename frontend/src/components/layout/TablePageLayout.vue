@@ -1,5 +1,11 @@
 <template>
-  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+  <div
+    class="table-page-layout"
+    :class="[
+      { 'mobile-mode': isMobile },
+      `content-variant-${contentVariant}`
+    ]"
+  >
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed">
       <slot name="actions" />
@@ -10,9 +16,11 @@
       <slot name="filters" />
     </div>
 
-    <!-- 滚动区域：表格 -->
+    <!-- 滚动区域：表格或卡片列表 -->
     <div class="layout-section-scrollable">
-      <div class="card table-scroll-container">
+      <div
+        :class="contentVariant === 'cards' ? 'card-list-scroll-container' : 'card table-scroll-container'"
+      >
         <slot name="table" />
       </div>
     </div>
@@ -26,6 +34,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+
+withDefaults(defineProps<{
+  contentVariant?: 'table' | 'cards'
+}>(), {
+  contentVariant: 'table'
+})
 
 const isMobile = ref(false)
 
@@ -63,6 +77,10 @@ onUnmounted(() => {
   @apply flex flex-col overflow-hidden h-full bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 shadow-sm;
 }
 
+.card-list-scroll-container {
+  @apply flex h-full min-h-0 flex-col;
+}
+
 .table-scroll-container :deep(.table-wrapper) {
   @apply flex-1 overflow-x-auto overflow-y-auto;
   /* 确保横向滚动条显示在最底部 */
@@ -92,8 +110,16 @@ onUnmounted(() => {
 }
 
 /* 移动端：恢复正常滚动 */
+.table-page-layout.mobile-mode {
+  height: auto;
+}
+
 .table-page-layout.mobile-mode .table-scroll-container {
   @apply h-auto overflow-visible border-none shadow-none bg-transparent;
+}
+
+.table-page-layout.mobile-mode .card-list-scroll-container {
+  @apply h-auto overflow-visible;
 }
 
 .table-page-layout.mobile-mode .layout-section-scrollable {

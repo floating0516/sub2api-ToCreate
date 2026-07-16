@@ -8,7 +8,10 @@ import { findRowIndexByDomPosition } from '../useSwipeSelect'
  * `index` is the value placed in the row's data-index attribute (its absolute
  * position in the sorted data), which need not equal the array position.
  */
-function makeScrollEl(rows: Array<{ index: number; top: number; bottom: number }>): Element {
+function makeScrollEl(
+  rows: Array<{ index: number; top: number; bottom: number }>,
+  expectedSelector = 'tbody tr[data-index]'
+): Element {
   const trs = rows.map((r) => ({
     getAttribute: (name: string) => (name === 'data-index' ? String(r.index) : null),
     getBoundingClientRect: () => ({
@@ -26,7 +29,7 @@ function makeScrollEl(rows: Array<{ index: number; top: number; bottom: number }
 
   return {
     querySelectorAll: (sel: string) =>
-      (sel === 'tbody tr[data-index]' ? trs : []) as unknown as NodeListOf<Element>
+      (sel === expectedSelector ? trs : []) as unknown as NodeListOf<Element>
   } as unknown as Element
 }
 
@@ -70,5 +73,13 @@ describe('findRowIndexByDomPosition (swipe-select full-render fallback)', () => 
     ])
     expect(findRowIndexByDomPosition(remapped, 150)).toBe(5)
     expect(findRowIndexByDomPosition(remapped, 250)).toBe(9)
+  })
+
+  it('supports account-card selectors without changing the DataTable default', () => {
+    const selector = '[data-account-card-row][data-index]'
+    const cards = makeScrollEl(rows, selector)
+
+    expect(findRowIndexByDomPosition(cards, 250, selector)).toBe(1)
+    expect(findRowIndexByDomPosition(cards, 400, selector)).toBe(2)
   })
 })

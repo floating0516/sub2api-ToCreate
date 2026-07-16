@@ -1,6 +1,14 @@
 <template>
-  <div class="mb-4 flex items-center justify-between rounded-lg bg-primary-50 p-3 dark:bg-primary-900/20">
+  <div class="mb-4 flex flex-col gap-3 rounded-lg bg-primary-50 p-3 dark:bg-primary-900/20 sm:flex-row sm:items-center sm:justify-between">
     <div class="flex flex-wrap items-center gap-2">
+      <input
+        type="checkbox"
+        class="h-4 w-4 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+        :checked="allVisibleSelected"
+        :indeterminate="selectedIds.length > 0 && !allVisibleSelected"
+        :aria-label="t('admin.accounts.bulkActions.selectCurrentPage')"
+        @change="handleToggleVisible"
+      />
       <span v-if="selectedIds.length > 0" class="text-sm font-medium text-primary-900 dark:text-primary-100">
         {{ t('admin.accounts.bulkActions.selected', { count: selectedIds.length }) }}
       </span>
@@ -23,7 +31,7 @@
       </button>
       </template>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap justify-end gap-2">
       <template v-if="selectedIds.length > 0">
         <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
@@ -41,5 +49,10 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-defineProps(['selectedIds']); defineEmits(['delete', 'edit-selected', 'edit-filtered', 'clear', 'select-page', 'toggle-schedulable', 'reset-status', 'refresh-token']); const { t } = useI18n()
+defineProps(['selectedIds', 'allVisibleSelected'])
+const emit = defineEmits(['delete', 'edit-selected', 'edit-filtered', 'clear', 'select-page', 'toggle-visible', 'toggle-schedulable', 'reset-status', 'refresh-token'])
+const { t } = useI18n()
+const handleToggleVisible = (event: Event) => {
+  emit('toggle-visible', (event.target as HTMLInputElement).checked)
+}
 </script>

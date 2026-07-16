@@ -61,16 +61,11 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-// Render the per-column header slots so we can assert the usage-window header hint.
-const DataTableStub = {
-  props: ['columns', 'data'],
+const AccountCardListStub = {
+  props: ['data'],
   template: `
-    <div data-test="data-table">
-      <template v-for="column in columns" :key="column.key">
-        <div v-if="column.key === 'usage'" data-test="usage-header">
-          <slot :name="'header-' + column.key" :column="column" />
-        </div>
-      </template>
+    <div data-test="account-card-list">
+      <slot v-for="row in data" :key="row.id" :row="row" />
     </div>
   `
 }
@@ -89,7 +84,7 @@ function mountView() {
         TablePageLayout: {
           template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
         },
-        DataTable: DataTableStub,
+        AccountCardList: AccountCardListStub,
         HelpTooltip: HelpTooltipStub,
         Pagination: true,
         ConfirmDialog: true,
@@ -132,11 +127,26 @@ describe('admin AccountsView usage windows hint', () => {
     getAllGroups.mockReset()
 
     listAccounts.mockResolvedValue({
-      items: [],
-      total: 0,
+      items: [{
+        id: 1,
+        name: 'usage-account',
+        platform: 'anthropic',
+        type: 'oauth',
+        status: 'active',
+        schedulable: true,
+        concurrency: 1,
+        priority: 0,
+        error_message: null,
+        last_used_at: null,
+        expires_at: null,
+        auto_pause_on_expired: false,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z'
+      }],
+      total: 1,
       page: 1,
       page_size: 20,
-      pages: 0
+      pages: 1
     })
     listWithEtag.mockResolvedValue({
       notModified: true,
@@ -148,13 +158,13 @@ describe('admin AccountsView usage windows hint', () => {
     getAllGroups.mockResolvedValue([])
   })
 
-  it('renders an explanatory tooltip next to the usage windows column header', async () => {
+  it('renders an explanatory tooltip next to the usage windows card section', async () => {
     const wrapper = mountView()
     await flushPromises()
 
     const header = wrapper.find('[data-test="usage-header"]')
     expect(header.exists()).toBe(true)
-    // Column label is still shown alongside the help icon.
+    // Section label is still shown alongside the help icon.
     expect(header.text()).toContain('admin.accounts.columns.usageWindows')
 
     const hint = wrapper.find('[data-test="usage-windows-hint"]')

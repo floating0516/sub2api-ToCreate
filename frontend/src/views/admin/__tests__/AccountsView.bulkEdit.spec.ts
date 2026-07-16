@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import AccountsView from '../AccountsView.vue'
+import AccountCard from '@/components/admin/account/AccountCard.vue'
 
 const {
   listAccounts,
@@ -61,14 +62,11 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-const DataTableStub = {
-  props: ['columns', 'data'],
+const AccountCardListStub = {
+  props: ['data'],
   template: `
-    <div data-test="data-table">
-      <span v-for="column in columns" :key="column.key" data-test="column-key">{{ column.key }}</span>
-      <div v-for="row in data" :key="row.id">
-        <slot name="cell-created_at" :value="row.created_at" :row="row" />
-      </div>
+    <div data-test="account-card-list">
+      <slot v-for="row in data" :key="row.id" :row="row" />
     </div>
   `
 }
@@ -119,7 +117,7 @@ describe('admin AccountsView bulk edit scope', () => {
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
-          DataTable: DataTableStub,
+          AccountCardList: AccountCardListStub,
           Pagination: true,
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
@@ -184,7 +182,7 @@ describe('admin AccountsView bulk edit scope', () => {
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
-          DataTable: DataTableStub,
+          AccountCardList: AccountCardListStub,
           Pagination: true,
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
@@ -216,12 +214,10 @@ describe('admin AccountsView bulk edit scope', () => {
 
     await flushPromises()
 
-    const columnKeys = wrapper.findAll('[data-test="column-key"]').map(node => node.text())
-    expect(columnKeys).toContain('created_at')
-    const columns = wrapper.getComponent(DataTableStub).props('columns') as Array<{ key: string; label: string; sortable: boolean }>
-    expect(columns.find(column => column.key === 'created_at')).toMatchObject({
-      label: 'admin.accounts.columns.createdAt',
-      sortable: true
-    })
+    const card = wrapper.getComponent(AccountCard)
+    expect(card.props('hiddenFields')).not.toContain('created_at')
+
+    await wrapper.get('button[title="admin.accounts.sortBy"]').trigger('click')
+    expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.columns.createdAt')).toBe(true)
   })
 })

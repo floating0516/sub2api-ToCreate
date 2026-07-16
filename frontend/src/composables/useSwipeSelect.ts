@@ -36,6 +36,12 @@ export interface SwipeSelectVirtualContext {
   getSortedData: () => any[]
   /** Get row ID from data row */
   getRowId: (row: any, index: number) => number
+  /** Selector for rendered rows. Defaults to DataTable rows. */
+  rowSelector?: string
+  /** Selector for rendered rows carrying an absolute data-index. */
+  indexedRowSelector?: string
+  /** Selector for the row content area where native text selection is preferred. */
+  contentSelector?: string
 }
 
 /**
@@ -46,8 +52,12 @@ export interface SwipeSelectVirtualContext {
  * returns each row's `data-index` (its absolute index in the sorted data), or -1
  * when no rows are rendered. Exported for unit testing.
  */
-export function findRowIndexByDomPosition(scrollEl: Element, clientY: number): number {
-  const domRows = Array.from(scrollEl.querySelectorAll('tbody tr[data-index]')) as HTMLElement[]
+export function findRowIndexByDomPosition(
+  scrollEl: Element,
+  clientY: number,
+  rowSelector = 'tbody tr[data-index]'
+): number {
+  const domRows = Array.from(scrollEl.querySelectorAll(rowSelector)) as HTMLElement[]
   const len = domRows.length
   if (len === 0) return -1
   const idxOf = (el: HTMLElement) => Number(el.getAttribute('data-index'))
@@ -79,6 +89,9 @@ export function useSwipeSelect(
   virtualContext?: SwipeSelectVirtualContext
 ) {
   const isDragging = ref(false)
+  const rowSelector = virtualContext?.rowSelector ?? 'tbody tr[data-row-id]'
+  const indexedRowSelector = virtualContext?.indexedRowSelector ?? 'tbody tr[data-index]'
+  const contentSelector = virtualContext?.contentSelector ?? 'td, th'
 
   let dragMode: 'select' | 'deselect' = 'select'
   let startRowIndex = -1
@@ -104,7 +117,7 @@ export function useSwipeSelect(
   function getDataRows(): HTMLElement[] {
     const container = containerRef.value
     if (!container) return []
-    return Array.from(container.querySelectorAll('tbody tr[data-row-id]'))
+    return Array.from(container.querySelectorAll(rowSelector))
   }
 
   function getRowId(el: HTMLElement): number | null {
@@ -163,7 +176,7 @@ export function useSwipeSelect(
     // Virtualization disabled (small list rendered in full): the window is empty, so
     // locate the row via real DOM rows instead of the (now-misleading) height estimate.
     if (items.length === 0) {
-      const domIdx = findRowIndexByDomPosition(scrollEl, clientY)
+      const domIdx = findRowIndexByDomPosition(scrollEl, clientY, indexedRowSelector)
       if (domIdx >= 0) return domIdx
     }
 
@@ -324,13 +337,13 @@ export function useSwipeSelect(
    * prefer the browser's native text selection so users can copy text normally.
    */
   function shouldPreferNativeTextSelection(target: HTMLElement): boolean {
-    const row = target.closest('tbody tr[data-row-id]')
+    const row = target.closest(rowSelector)
     if (!row) return false
 
-    const cell = target.closest('td, th')
-    if (!cell) return false
+    const content = target.closest(contentSelector)
+    if (!content || !row.contains(content)) return false
 
-    return target !== cell && !target.closest('[data-swipe-select-handle]')
+    return target !== content && !target.closest('[data-swipe-select-handle]')
   }
 
   function hasDirectTextContent(target: HTMLElement): boolean {
@@ -343,7 +356,7 @@ export function useSwipeSelect(
     const activationRoot = getActivationRoot()
     if (!activationRoot) return false
     if (!activationRoot.contains(target)) return false
-    if (target.closest('tbody tr[data-row-id]')) return false
+    if (target.closest(rowSelector)) return false
 
     return hasDirectTextContent(target)
   }
@@ -473,7 +486,14 @@ export function useSwipeSelect(
 
     // In virtual mode, scroll parent is the virtualizer's scroll element
     const virt = virtualContext!.getVirtualizer()
-    cachedScrollParent = virt?.scrollElement ?? (containerRef.value ? getScrollParent(containerRef.value) : null)
+    const virtualScrollEl = virt?.scrollElement
+    const virtualScrollStyle = virtualScrollEl ? getComputedStyle(virtualScrollEl) : null
+    const virtualScrolls = !!virtualScrollEl &&
+      virtualScrollEl.scrollHeight > virtualScrollEl.clientHeight &&
+      /(auto|scroll)/.test(`${virtualScrollStyle?.overflow ?? ''}${virtualScrollStyle?.overflowY ?? ''}`)
+    cachedScrollParent = virtualScrolls && virtualScrollEl
+      ? virtualScrollEl
+      : (containerRef.value ? getScrollParent(containerRef.value) : null)
 
     createMarquee()
     updateMarquee(clientY)

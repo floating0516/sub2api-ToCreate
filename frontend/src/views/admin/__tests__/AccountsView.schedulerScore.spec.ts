@@ -61,14 +61,11 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-// Render the scheduler-score cell slot for every row so the fallback logic is observable.
-const DataTableStub = {
-  props: ['columns', 'data'],
+const AccountCardListStub = {
+  props: ['data'],
   template: `
-    <div data-test="data-table">
-      <div v-for="row in data" :key="row.id" :data-test="'scheduler-score-' + row.id">
-        <slot name="cell-scheduler_score" :row="row" />
-      </div>
+    <div data-test="account-card-list">
+      <slot v-for="row in data" :key="row.id" :row="row" />
     </div>
   `
 }
@@ -81,7 +78,7 @@ function mountView() {
         TablePageLayout: {
           template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
         },
-        DataTable: DataTableStub,
+        AccountCardList: AccountCardListStub,
         HelpTooltip: true,
         Pagination: true,
         ConfirmDialog: true,
@@ -126,6 +123,11 @@ const baseAccount = {
   auto_pause_on_expired: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z'
+}
+
+const showSchedulerScore = () => {
+  localStorage.setItem('account-hidden-columns', JSON.stringify(['today_stats']))
+  localStorage.setItem('account-hidden-columns-version', 'scheduler-score-hidden-by-default')
 }
 
 describe('admin AccountsView scheduler score column', () => {
@@ -193,11 +195,12 @@ describe('admin AccountsView scheduler score column', () => {
   })
 
   it('falls back to the base score for ungrouped accounts instead of showing a dash', async () => {
+    showSchedulerScore()
     const wrapper = mountView()
     await flushPromises()
 
     expect(listAccounts.mock.calls[0]?.[2]).toEqual(expect.objectContaining({
-      include_scheduler_score: '0'
+      include_scheduler_score: '1'
     }))
 
     const ungroupedCell = wrapper.find('[data-test="scheduler-score-1"]')
@@ -208,6 +211,7 @@ describe('admin AccountsView scheduler score column', () => {
   })
 
   it('renders per-group scores for grouped accounts', async () => {
+    showSchedulerScore()
     const wrapper = mountView()
     await flushPromises()
 
@@ -242,6 +246,7 @@ describe('admin AccountsView scheduler score column', () => {
   })
 
   it('still shows a dash when no scheduler score is available', async () => {
+    showSchedulerScore()
     const wrapper = mountView()
     await flushPromises()
 
