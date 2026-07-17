@@ -28,7 +28,7 @@ const (
 )
 
 var (
-	ErrProviderDisabled      = errors.New("Lihe OIDC provider is disabled")
+	ErrProviderDisabled      = errors.New("lihe OIDC provider is disabled")
 	ErrInvalidRequest        = errors.New("invalid OIDC authorization request")
 	ErrInvalidBrowserBinding = errors.New("invalid OIDC browser binding")
 
