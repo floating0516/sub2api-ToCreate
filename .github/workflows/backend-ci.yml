@@ -90,3 +90,16 @@ jobs:
           version: v2.9
           args: --timeout=30m
           working-directory: backend
+      - name: Generate gofmt patch
+        if: failure()
+        working-directory: backend
+        run: |
+          find . -type f -name '*.go' -print0 | xargs -0 gofmt -w
+          git diff --binary -- . > ../gofmt.patch
+      - name: Upload gofmt patch
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gofmt-patch-${{ github.sha }}
+          path: gofmt.patch
+          retention-days: 1
