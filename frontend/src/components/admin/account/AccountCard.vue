@@ -20,7 +20,19 @@
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           <h2 class="min-w-0 break-words text-sm font-semibold text-gray-900 dark:text-white">
-            {{ account.name }}
+            <a
+              v-if="accountHomepageUrl(account)"
+              :href="accountHomepageUrl(account)"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-test="account-homepage-link"
+              class="border-b border-dotted border-gray-300 hover:text-primary-600 dark:border-gray-600 dark:hover:text-primary-400"
+              :title="accountHomepageUrl(account)"
+              @click.stop
+            >
+              {{ account.name }}
+            </a>
+            <span v-else>{{ account.name }}</span>
           </h2>
           <span v-if="isFieldVisible('id')" class="font-mono text-xs text-gray-400 dark:text-dark-400">
             #{{ account.id }}
@@ -325,6 +337,7 @@ import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
+import { sanitizeUrl } from '@/utils/url'
 import type { Account, AccountSchedulerGroupScore, Proxy as AccountProxy, WindowStats } from '@/types'
 
 const props = withDefaults(defineProps<{
@@ -444,6 +457,12 @@ const accountDisplayEmail = (row: any): string =>
 const accountDisplayTitle = (row: any): string => {
   const email = accountDisplayEmail(row)
   return row.parent_chatgpt_account_id ? `${email} / ${row.parent_chatgpt_account_id}` : email
+}
+
+const accountHomepageUrl = (row: Account): string => {
+  if (row.type !== 'apikey' || typeof row.credentials?.base_url !== 'string') return ''
+  const baseUrl = sanitizeUrl(row.credentials.base_url)
+  return baseUrl ? new URL(baseUrl).origin : ''
 }
 
 type OpenAICompactBadgeState = 'active' | 'blocked' | 'auto'
