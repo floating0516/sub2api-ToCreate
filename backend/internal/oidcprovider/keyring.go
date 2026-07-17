@@ -56,7 +56,7 @@ func NewKeyRing(directory string, rotationDays int) (*KeyRing, error) {
 }
 
 // CurrentPrivateKey is the key getter used by Fosite's RS256 strategy.
-func (r *KeyRing) CurrentPrivateKey(_ context.Context) (interface{}, error) {
+func (r *KeyRing) CurrentPrivateKey(_ context.Context) (any, error) {
 	if err := r.ensure(time.Now().UTC(), false); err != nil {
 		return nil, err
 	}

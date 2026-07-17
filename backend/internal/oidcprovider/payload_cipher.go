@@ -13,8 +13,8 @@ import (
 
 const (
 	encryptedPayloadVersion = 1
-	payloadKeyDomain         = "lihe-oidc-storage-key-v1\x00"
-	payloadAAD               = "lihe-oidc-storage-payload-v1"
+	payloadKeyDomain        = "lihe-oidc-storage-key-v1\x00"
+	payloadAAD              = "lihe-oidc-storage-payload-v1"
 )
 
 type encryptedPayload struct {

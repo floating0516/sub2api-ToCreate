@@ -23,7 +23,7 @@ func TestLoadLiheOIDCRequiresIndependentSecrets(t *testing.T) {
 		name        string
 		client      string
 		hmac        string
-		liheOAuth  string
+		liheOAuth   string
 		errorSubstr string
 	}{
 		{"short client secret", "short", strings.Repeat("h", 32), "", "client_secret must be at least 32"},
