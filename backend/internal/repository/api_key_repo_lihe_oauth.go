@@ -347,22 +347,33 @@ func (r *apiKeyRepository) revokeLiheAccessToken(ctx context.Context, predicate 
 
 func (r *apiKeyRepository) ResolveLiheAccessToken(
 	ctx context.Context,
-	tokenHash, clientID, provider string,
+	tokenHash, clientID string,
 ) (*service.LiheResolvedAccess, error) {
 	if r.sql == nil {
 		return nil, service.ErrLiheOAuthRepositoryUnavailable
 	}
 	resolved := &service.LiheResolvedAccess{}
 	var bindingID sql.NullInt64
+	var bindingProvider sql.NullString
 	var bindingGroupID sql.NullInt64
 	var apiKeyID sql.NullInt64
 	err := scanSingleRow(ctx, r.sql, `
 		WITH resolved AS (
 			SELECT t.id AS token_id, t.user_id, t.scopes,
-				b.id AS binding_id, b.group_id AS binding_group_id, k.id AS api_key_id
+				b.id AS binding_id, b.provider AS binding_provider,
+				b.group_id AS binding_group_id, k.id AS api_key_id
 			FROM lihe_oauth_access_tokens t
-			LEFT JOIN lihe_oauth_token_bindings b
-				ON b.token_id = t.id AND b.provider = $3
+			LEFT JOIN LATERAL (
+				SELECT candidate.id, candidate.provider, candidate.group_id,
+					candidate.source_api_key_id, candidate.api_key_id
+				FROM lihe_oauth_token_bindings candidate
+				WHERE candidate.token_id = t.id
+					AND (
+						SELECT COUNT(*)
+						FROM lihe_oauth_token_bindings counted
+						WHERE counted.token_id = t.id
+					) = 1
+			) b ON TRUE
 			LEFT JOIN groups g
 				ON g.id = b.group_id AND LOWER(TRIM(g.platform)) = b.provider
 			LEFT JOIN api_keys k
@@ -381,13 +392,14 @@ func (r *apiKeyRepository) ResolveLiheAccessToken(
 				AND (t.last_used_at IS NULL OR t.last_used_at < NOW() - INTERVAL '30 seconds')
 			RETURNING t.id
 		)
-		SELECT token_id, user_id, scopes, binding_id, binding_group_id, api_key_id
+		SELECT token_id, user_id, scopes, binding_id, binding_provider, binding_group_id, api_key_id
 		FROM resolved
-	`, []any{tokenHash, clientID, provider},
+	`, []any{tokenHash, clientID},
 		&resolved.TokenID,
 		&resolved.TokenUserID,
 		pq.Array(&resolved.Scopes),
 		&bindingID,
+		&bindingProvider,
 		&bindingGroupID,
 		&apiKeyID,
 	)
@@ -397,8 +409,9 @@ func (r *apiKeyRepository) ResolveLiheAccessToken(
 	if err != nil {
 		return nil, err
 	}
-	if bindingID.Valid && bindingGroupID.Valid {
+	if bindingID.Valid && bindingProvider.Valid && bindingGroupID.Valid {
 		resolved.BindingFound = true
+		resolved.BindingProvider = bindingProvider.String
 		resolved.BindingGroupID = bindingGroupID.Int64
 	}
 	if !apiKeyID.Valid {

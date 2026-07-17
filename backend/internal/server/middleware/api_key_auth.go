@@ -87,8 +87,6 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			c.Request.Header.Del("X-Lihe-Provider")
 			if err != nil {
 				switch {
-				case errors.Is(err, service.ErrLiheProviderRequired):
-					AbortWithError(c, 400, "LIHE_PROVIDER_REQUIRED", "X-Lihe-Provider is required for Lihe access tokens")
 				case errors.Is(err, service.ErrLiheProviderNotAllowed):
 					AbortWithError(c, 403, "LIHE_PROVIDER_NOT_ALLOWED", "The requested provider is not available for this Lihe connection")
 				case errors.Is(err, service.ErrLiheScopeNotAllowed):

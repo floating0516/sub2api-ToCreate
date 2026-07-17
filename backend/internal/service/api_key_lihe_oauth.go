@@ -24,6 +24,9 @@ const (
 	LiheOAuthScopeModelsRead     = "models:read"
 	LiheOAuthScopeChatWrite      = "chat:write"
 	LiheOAuthScopes              = LiheOAuthScopeModelsRead + " " + LiheOAuthScopeChatWrite
+	LiheOAuthProviderOpenAI      = "openAI"
+	LiheOAuthProviderAnthropic   = "anthropic"
+	LiheOAuthProviderGoogle      = "google"
 	LiheAccessTokenPrefix        = "lihe_"
 	LiheInternalAPIKeyPrefix     = "lihe-internal-"
 	liheAuthorizationCodeTTL     = 60 * time.Second
@@ -44,10 +47,6 @@ var (
 	ErrLiheInvalidToken = infraerrors.Unauthorized(
 		"LIHE_OAUTH_INVALID_TOKEN",
 		"Lihe access token is invalid or revoked",
-	)
-	ErrLiheProviderRequired = infraerrors.BadRequest(
-		"LIHE_PROVIDER_REQUIRED",
-		"X-Lihe-Provider is required for Lihe access tokens",
 	)
 	ErrLiheProviderNotAllowed = infraerrors.Forbidden(
 		"LIHE_PROVIDER_NOT_ALLOWED",
@@ -76,12 +75,13 @@ var (
 	)
 
 	lihePKCEValuePattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{43,128}$`)
-	liheProviderOrder    = []string{
-		PlatformOpenAI,
-		PlatformAnthropic,
-		PlatformGemini,
-		PlatformAntigravity,
-		PlatformGrok,
+	liheProviderMappings = []struct {
+		Internal string
+		Public   string
+	}{
+		{Internal: PlatformOpenAI, Public: LiheOAuthProviderOpenAI},
+		{Internal: PlatformAnthropic, Public: LiheOAuthProviderAnthropic},
+		{Internal: PlatformGemini, Public: LiheOAuthProviderGoogle},
 	}
 )
 
@@ -159,12 +159,13 @@ type LiheAccessToken struct {
 }
 
 type LiheResolvedAccess struct {
-	TokenID        int64
-	TokenUserID    int64
-	Scopes         []string
-	BindingFound   bool
-	BindingGroupID int64
-	APIKey         *APIKey
+	TokenID         int64
+	TokenUserID     int64
+	Scopes          []string
+	BindingFound    bool
+	BindingProvider string
+	BindingGroupID  int64
+	APIKey          *APIKey
 }
 
 // LiheOAuthRepository is implemented by the concrete API-key repository. It
@@ -178,7 +179,7 @@ type LiheOAuthRepository interface {
 	RevokeLiheAccessTokenByID(ctx context.Context, tokenID, userID int64) (bool, error)
 	RevokeLiheAccessTokenByIDAsAdmin(ctx context.Context, tokenID int64) (bool, error)
 	RevokeLiheAccessTokenByHash(ctx context.Context, tokenHash, clientID string) (bool, error)
-	ResolveLiheAccessToken(ctx context.Context, tokenHash, clientID, provider string) (*LiheResolvedAccess, error)
+	ResolveLiheAccessToken(ctx context.Context, tokenHash, clientID string) (*LiheResolvedAccess, error)
 }
 
 func (s *APIKeyService) liheOAuthRepository() (LiheOAuthRepository, error) {
@@ -331,6 +332,10 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 	if err != nil {
 		return nil, err
 	}
+	publicProvider, ok := lihePublicProvider(binding.Provider)
+	if !ok {
+		return nil, ErrLiheNoProviders
+	}
 
 	plainToken, err := generateLiheCredential(LiheAccessTokenPrefix)
 	if err != nil {
@@ -361,7 +366,7 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 		AccessToken: plainToken,
 		TokenType:   "Bearer",
 		Scope:       LiheOAuthScopes,
-		Providers:   append([]string(nil), issued.Providers...),
+		Providers:   []string{publicProvider},
 		APIKeyID:    issuedAPIKeyID,
 		APIKeyName:  issued.APIKeyName,
 		CreatedAt:   issued.CreatedAt,
@@ -385,7 +390,7 @@ func (s *APIKeyService) buildLiheTokenBinding(
 		return LiheTokenBindingInput{}, ErrLiheAPIKeyUnavailable
 	}
 	provider := strings.ToLower(strings.TrimSpace(apiKey.Group.Platform))
-	if !isLiheProvider(provider) {
+	if _, ok := lihePublicProvider(provider); !ok {
 		return LiheTokenBindingInput{}, ErrLiheAPIKeyUnavailable
 	}
 
@@ -419,8 +424,15 @@ func (s *APIKeyService) ListLiheAccessTokens(ctx context.Context, userID int64) 
 		return nil, fmt.Errorf("list Lihe access tokens: %w", err)
 	}
 	for i := range tokens {
+		publicProviders := make([]string, 0, len(tokens[i].Providers))
+		for _, provider := range tokens[i].Providers {
+			if publicProvider, ok := lihePublicProvider(provider); ok {
+				publicProviders = append(publicProviders, publicProvider)
+			}
+		}
+		tokens[i].Providers = publicProviders
 		sort.SliceStable(tokens[i].Providers, func(a, b int) bool {
-			return liheProviderRank(tokens[i].Providers[a]) < liheProviderRank(tokens[i].Providers[b])
+			return lihePublicProviderRank(tokens[i].Providers[a]) < lihePublicProviderRank(tokens[i].Providers[b])
 		})
 	}
 	return tokens, nil
@@ -479,7 +491,7 @@ func (s *APIKeyService) RevokeLiheAccessToken(ctx context.Context, token string)
 
 func (s *APIKeyService) ResolveLiheAccessToken(
 	ctx context.Context,
-	token, provider, method, path string,
+	token, requestedProvider, method, path string,
 ) (*APIKey, error) {
 	if !s.liheOAuthEnabled() || !strings.HasPrefix(token, LiheAccessTokenPrefix) {
 		return nil, ErrLiheInvalidToken
@@ -487,13 +499,6 @@ func (s *APIKeyService) ResolveLiheAccessToken(
 	requiredScope, allowed := LiheRequiredScope(method, path)
 	if !allowed {
 		return nil, ErrLiheScopeNotAllowed
-	}
-	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider == "" {
-		return nil, ErrLiheProviderRequired
-	}
-	if !isLiheProvider(provider) {
-		return nil, ErrLiheProviderNotAllowed
 	}
 	repo, err := s.liheOAuthRepository()
 	if err != nil {
@@ -503,7 +508,6 @@ func (s *APIKeyService) ResolveLiheAccessToken(
 		ctx,
 		hashLiheCredential(token),
 		s.cfg.LiheOAuth.ClientID,
-		provider,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Lihe access token: %w", err)
@@ -511,8 +515,15 @@ func (s *APIKeyService) ResolveLiheAccessToken(
 	if resolved == nil {
 		return nil, ErrLiheInvalidToken
 	}
-	if !resolved.BindingFound {
-		return nil, ErrLiheProviderNotAllowed
+	bindingProvider := strings.ToLower(strings.TrimSpace(resolved.BindingProvider))
+	if !resolved.BindingFound || !isLiheProvider(bindingProvider) {
+		return nil, ErrLiheInvalidToken
+	}
+	if strings.TrimSpace(requestedProvider) != "" {
+		provider, ok := liheInternalProvider(requestedProvider)
+		if !ok || provider != bindingProvider {
+			return nil, ErrLiheProviderNotAllowed
+		}
 	}
 	if resolved.APIKey == nil {
 		return nil, ErrLiheInvalidToken
@@ -520,7 +531,7 @@ func (s *APIKeyService) ResolveLiheAccessToken(
 	if resolved.TokenUserID != resolved.APIKey.UserID || resolved.APIKey.User == nil ||
 		resolved.APIKey.User.ID != resolved.TokenUserID || resolved.APIKey.GroupID == nil ||
 		*resolved.APIKey.GroupID != resolved.BindingGroupID || resolved.APIKey.Group == nil ||
-		strings.ToLower(strings.TrimSpace(resolved.APIKey.Group.Platform)) != provider {
+		strings.ToLower(strings.TrimSpace(resolved.APIKey.Group.Platform)) != bindingProvider {
 		return nil, ErrLiheInvalidToken
 	}
 	if !containsLiheScope(resolved.Scopes, requiredScope) {
@@ -591,14 +602,35 @@ func containsLiheScope(scopes []string, expected string) bool {
 }
 
 func isLiheProvider(provider string) bool {
-	return liheProviderRank(provider) < len(liheProviderOrder)
+	_, ok := lihePublicProvider(provider)
+	return ok
 }
 
-func liheProviderRank(provider string) int {
-	for i, candidate := range liheProviderOrder {
-		if provider == candidate {
+func lihePublicProvider(provider string) (string, bool) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	for _, mapping := range liheProviderMappings {
+		if provider == mapping.Internal {
+			return mapping.Public, true
+		}
+	}
+	return "", false
+}
+
+func liheInternalProvider(provider string) (string, bool) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	for _, mapping := range liheProviderMappings {
+		if provider == strings.ToLower(mapping.Public) {
+			return mapping.Internal, true
+		}
+	}
+	return "", false
+}
+
+func lihePublicProviderRank(provider string) int {
+	for i, mapping := range liheProviderMappings {
+		if provider == mapping.Public {
 			return i
 		}
 	}
-	return len(liheProviderOrder)
+	return len(liheProviderMappings)
 }

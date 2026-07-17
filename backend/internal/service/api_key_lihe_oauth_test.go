@@ -108,7 +108,7 @@ func (r *liheOAuthTestAPIKeyRepo) RevokeLiheAccessTokenByHash(_ context.Context,
 	return true, nil
 }
 
-func (r *liheOAuthTestAPIKeyRepo) ResolveLiheAccessToken(_ context.Context, _, _, _ string) (*LiheResolvedAccess, error) {
+func (r *liheOAuthTestAPIKeyRepo) ResolveLiheAccessToken(_ context.Context, _, _ string) (*LiheResolvedAccess, error) {
 	return r.resolved, nil
 }
 
@@ -263,7 +263,7 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, repo.code.Used)
 	require.True(t, strings.HasPrefix(result.AccessToken, LiheAccessTokenPrefix))
-	require.Equal(t, []string{PlatformOpenAI}, result.Providers)
+	require.Equal(t, []string{LiheOAuthProviderOpenAI}, result.Providers)
 	require.Equal(t, int64(501), result.APIKeyID)
 	require.Equal(t, "Selected key", result.APIKeyName)
 	require.NotNil(t, repo.exchangeInput)
@@ -287,6 +287,52 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 		verifier,
 	)
 	require.ErrorIs(t, err, ErrLiheInvalidGrant)
+}
+
+func TestLiheOAuthProviderNamesMatchLibreChatSchema(t *testing.T) {
+	tests := []struct {
+		internal string
+		public   string
+	}{
+		{internal: PlatformOpenAI, public: LiheOAuthProviderOpenAI},
+		{internal: PlatformAnthropic, public: LiheOAuthProviderAnthropic},
+		{internal: PlatformGemini, public: LiheOAuthProviderGoogle},
+	}
+
+	for _, test := range tests {
+		t.Run(test.internal, func(t *testing.T) {
+			public, ok := lihePublicProvider(test.internal)
+			require.True(t, ok)
+			require.Equal(t, test.public, public)
+
+			internal, ok := liheInternalProvider(test.public)
+			require.True(t, ok)
+			require.Equal(t, test.internal, internal)
+		})
+	}
+
+	for _, unsupported := range []string{PlatformGrok, PlatformAntigravity, "unsupported"} {
+		_, ok := lihePublicProvider(unsupported)
+		require.False(t, ok, unsupported)
+	}
+}
+
+func TestLiheOAuthTokenListUsesPublicProviderNames(t *testing.T) {
+	repo := &liheOAuthTestAPIKeyRepo{listTokens: []LiheAccessToken{
+		{ID: 1, Providers: []string{PlatformOpenAI}},
+		{ID: 2, Providers: []string{PlatformAnthropic}},
+		{ID: 3, Providers: []string{PlatformGemini}},
+		{ID: 4, Providers: []string{PlatformGrok, PlatformAntigravity}},
+	}}
+	svc := newLiheOAuthTestService(repo)
+
+	tokens, err := svc.ListLiheAccessTokens(context.Background(), 11)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{LiheOAuthProviderOpenAI}, tokens[0].Providers)
+	require.Equal(t, []string{LiheOAuthProviderAnthropic}, tokens[1].Providers)
+	require.Equal(t, []string{LiheOAuthProviderGoogle}, tokens[2].Providers)
+	require.Empty(t, tokens[3].Providers)
 }
 
 func TestLiheOAuthExchangeRejectsKeyDisabledAfterAuthorization(t *testing.T) {
@@ -371,9 +417,21 @@ func TestLiheOAuthAuthorizationRejectsUnavailableAPIKey(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported provider",
+			name: "unknown provider",
 			mutate: func(key *APIKey) {
 				key.Group.Platform = "unsupported"
+			},
+		},
+		{
+			name: "grok is not supported by LibreChat",
+			mutate: func(key *APIKey) {
+				key.Group.Platform = PlatformGrok
+			},
+		},
+		{
+			name: "antigravity is not supported by LibreChat",
+			mutate: func(key *APIKey) {
+				key.Group.Platform = PlatformAntigravity
 			},
 		},
 	}
@@ -400,11 +458,12 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 	groupID := int64(101)
 	repo := &liheOAuthTestAPIKeyRepo{
 		resolved: &LiheResolvedAccess{
-			TokenID:        7,
-			TokenUserID:    11,
-			Scopes:         liheOAuthScopeList(),
-			BindingFound:   true,
-			BindingGroupID: groupID,
+			TokenID:         7,
+			TokenUserID:     11,
+			Scopes:          liheOAuthScopeList(),
+			BindingFound:    true,
+			BindingProvider: PlatformOpenAI,
+			BindingGroupID:  groupID,
 			APIKey: &APIKey{
 				ID:      9,
 				UserID:  12,
@@ -428,12 +487,13 @@ func TestLiheOAuthRejectsCrossUserBinding(t *testing.T) {
 
 func TestLiheOAuthRejectsChangedOrDeletedBoundAPIKey(t *testing.T) {
 	repo := &liheOAuthTestAPIKeyRepo{resolved: &LiheResolvedAccess{
-		TokenID:        7,
-		TokenUserID:    11,
-		Scopes:         liheOAuthScopeList(),
-		BindingFound:   true,
-		BindingGroupID: 101,
-		APIKey:         nil,
+		TokenID:         7,
+		TokenUserID:     11,
+		Scopes:          liheOAuthScopeList(),
+		BindingFound:    true,
+		BindingProvider: PlatformOpenAI,
+		BindingGroupID:  101,
+		APIKey:          nil,
 	}}
 	svc := newLiheOAuthTestService(repo)
 
@@ -448,18 +508,49 @@ func TestLiheOAuthRejectsChangedOrDeletedBoundAPIKey(t *testing.T) {
 	require.ErrorIs(t, err, ErrLiheInvalidToken)
 }
 
-func TestLiheOAuthRejectsProviderNotBoundToSelectedKey(t *testing.T) {
+func TestLiheOAuthProviderHeaderIsOptionalConsistencyCheck(t *testing.T) {
+	groupID := int64(101)
 	repo := &liheOAuthTestAPIKeyRepo{resolved: &LiheResolvedAccess{
-		TokenID:     7,
-		TokenUserID: 11,
-		Scopes:      liheOAuthScopeList(),
+		TokenID:         7,
+		TokenUserID:     11,
+		Scopes:          liheOAuthScopeList(),
+		BindingFound:    true,
+		BindingProvider: PlatformOpenAI,
+		BindingGroupID:  groupID,
+		APIKey: &APIKey{
+			ID:      9,
+			UserID:  11,
+			GroupID: &groupID,
+			Status:  StatusAPIKeyActive,
+			User:    &User{ID: 11, Status: StatusActive},
+			Group:   &Group{ID: groupID, Platform: PlatformOpenAI, Status: StatusActive},
+		},
 	}}
 	svc := newLiheOAuthTestService(repo)
 
-	_, err := svc.ResolveLiheAccessToken(
+	apiKey, err := svc.ResolveLiheAccessToken(
 		context.Background(),
 		LiheAccessTokenPrefix+"token",
-		PlatformAnthropic,
+		"",
+		http.MethodGet,
+		"/v1/models",
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(9), apiKey.ID)
+
+	_, err = svc.ResolveLiheAccessToken(
+		context.Background(),
+		LiheAccessTokenPrefix+"token",
+		LiheOAuthProviderOpenAI,
+		http.MethodGet,
+		"/v1/models",
+	)
+	require.NoError(t, err)
+
+	_, err = svc.ResolveLiheAccessToken(
+		context.Background(),
+		LiheAccessTokenPrefix+"token",
+		LiheOAuthProviderAnthropic,
 		http.MethodGet,
 		"/v1/models",
 	)

@@ -165,16 +165,17 @@ func (s *APIKeyRepoSuite) TestLiheOAuthResolveRejectsChangedAPIKeyGroup() {
 	tokenHash := strings.Repeat("b", 64)
 	s.mustCreateLiheTokenBinding(tokenHash, user.ID, key.ID, originalGroup.ID, originalGroup.Platform)
 
-	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", originalGroup.Platform)
+	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat")
 	s.Require().NoError(err)
 	s.Require().True(resolved.BindingFound)
+	s.Require().Equal(originalGroup.Platform, resolved.BindingProvider)
 	s.Require().NotNil(resolved.APIKey)
 	s.Require().Equal(key.ID, resolved.APIKey.ID)
 
 	_, err = s.client.APIKey.UpdateOneID(key.ID).SetGroupID(newGroup.ID).Save(s.ctx)
 	s.Require().NoError(err)
 
-	resolved, err = s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", originalGroup.Platform)
+	resolved, err = s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat")
 	s.Require().NoError(err)
 	s.Require().True(resolved.BindingFound)
 	s.Require().Nil(resolved.APIKey)
@@ -192,9 +193,10 @@ func (s *APIKeyRepoSuite) TestLiheOAuthLegacyInternalBindingRemainsCompatible() 
 	tokenHash := strings.Repeat("c", 64)
 	tokenID := s.mustCreateLegacyLiheTokenBinding(tokenHash, user.ID, key.ID, group.ID, group.Platform)
 
-	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat", group.Platform)
+	resolved, err := s.repo.ResolveLiheAccessToken(s.ctx, tokenHash, "lihe-chat")
 	s.Require().NoError(err)
 	s.Require().True(resolved.BindingFound)
+	s.Require().Equal(group.Platform, resolved.BindingProvider)
 	s.Require().NotNil(resolved.APIKey)
 	s.Require().Equal(key.ID, resolved.APIKey.ID)
 

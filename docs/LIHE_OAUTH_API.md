@@ -95,7 +95,7 @@ Success:
   "access_token": "lihe_...",
   "token_type": "Bearer",
   "scope": "models:read chat:write",
-  "providers": ["openai"],
+  "providers": ["openAI"],
   "api_key_id": 123,
   "api_key_name": "My OpenAI key",
   "created_at": "2026-07-16T12:00:00Z"
@@ -106,6 +106,18 @@ There is deliberately no `expires_in`: the token remains valid until revoked.
 The plaintext access token is returned once and only its SHA-256 hash is
 stored. Code consumption, token creation, and the selected API-key binding are
 one database transaction. The exchange never creates or copies an API key.
+
+Provider names in OAuth responses use the LibreChat schema, independently of
+the API platform's internal names:
+
+| Internal platform | OAuth provider |
+| --- | --- |
+| `openai` | `openAI` |
+| `anthropic` | `anthropic` |
+| `gemini` | `google` |
+
+Other platforms, including `grok` and `antigravity`, cannot be authorized for
+Lihe Chat until the client supports them.
 
 Errors use the OAuth shape and never include a code, verifier, secret, or token:
 
@@ -118,17 +130,17 @@ Errors use the OAuth shape and never include a code, verifier, secret, or token:
 
 ## Resource requests
 
-LibreChat sends the long-lived token only in an authorization header and uses
-the single provider returned by the token exchange:
+LibreChat sends the long-lived token in an authorization header:
 
 ```http
 Authorization: Bearer lihe_...
-X-Lihe-Provider: openai
 ```
 
-LibreChat verifies and loads models with `GET /v1/models`. The provider header
-is required so the gateway can verify that it still matches the selected
-key's bound group.
+LibreChat verifies and loads models with `GET /v1/models`. The resource server
+resolves the unique API key and internal provider from the token binding.
+`X-Lihe-Provider` is optional; when supplied, it must use the public OAuth
+provider name and is checked for consistency with the binding. The header is
+never used to select a provider and is never forwarded upstream.
 
 The token is accepted only on these resource routes:
 
@@ -195,6 +207,8 @@ keys created by earlier integration versions.
 - The selected key must not be deleted, and its current group ID and provider
   must still match the binding captured at issuance. Disabling the key is
   rejected by the normal API-key authorization checks.
+- Resource authorization derives its API key and provider from the token's
+  single binding; client headers cannot change routing.
 - Legacy internal provider keys cannot be authenticated directly and remain
   hidden from ordinary API-key list, detail, search, update, delete, and count
   operations.
