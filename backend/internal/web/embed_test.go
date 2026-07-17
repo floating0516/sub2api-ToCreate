@@ -655,6 +655,62 @@ func TestEmbeddedFrontendBypassesBareVideoAPIRoutes(t *testing.T) {
 	}
 }
 
+func TestEmbeddedFrontendOIDCRouting(t *testing.T) {
+	protocolRoutes := []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodGet, path: "/.well-known/openid-configuration"},
+		{method: http.MethodGet, path: "/oidc/jwks"},
+		{method: http.MethodPost, path: "/oidc/token"},
+		{method: http.MethodGet, path: "/oidc/userinfo"},
+	}
+
+	for _, route := range protocolRoutes {
+		t.Run(route.path, func(t *testing.T) {
+			require.True(t, shouldBypassEmbeddedFrontend(route.path))
+
+			nextCalled := false
+			router := gin.New()
+			router.Use(ServeEmbeddedFrontend())
+			router.Handle(route.method, route.path, func(c *gin.Context) {
+				nextCalled = true
+				c.String(http.StatusOK, "oidc-handler")
+			})
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(route.method, route.path, nil)
+			router.ServeHTTP(w, req)
+
+			require.True(t, nextCalled)
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, "oidc-handler", w.Body.String())
+		})
+	}
+
+	t.Run("authorize_remains_a_spa_route", func(t *testing.T) {
+		const path = "/oidc/authorize"
+		require.False(t, shouldBypassEmbeddedFrontend(path))
+
+		nextCalled := false
+		router := gin.New()
+		router.Use(ServeEmbeddedFrontend())
+		router.GET(path, func(c *gin.Context) {
+			nextCalled = true
+			c.String(http.StatusOK, "unexpected-handler")
+		})
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		router.ServeHTTP(w, req)
+
+		assert.False(t, nextCalled)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
+		assert.Contains(t, w.Body.String(), "<!doctype html>")
+	})
+}
+
 func TestNewFrontendServer(t *testing.T) {
 	t.Run("creates_server_successfully", func(t *testing.T) {
 		provider := &mockSettingsProvider{

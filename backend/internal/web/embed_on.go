@@ -310,6 +310,10 @@ func shouldBypassEmbeddedFrontend(path string) bool {
 		strings.HasPrefix(trimmed, "/download/") ||
 		trimmed == "/oauth/token" ||
 		trimmed == "/oauth/revoke" ||
+		trimmed == "/.well-known/openid-configuration" ||
+		trimmed == "/oidc/jwks" ||
+		trimmed == "/oidc/token" ||
+		trimmed == "/oidc/userinfo" ||
 		trimmed == "/health" ||
 		trimmed == "/models" ||
 		trimmed == "/responses" ||
