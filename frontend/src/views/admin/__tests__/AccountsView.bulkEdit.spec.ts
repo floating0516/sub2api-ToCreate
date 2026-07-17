@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import AccountsView from '../AccountsView.vue'
-import AccountCard from '@/components/admin/account/AccountCard.vue'
 
 const {
   listAccounts,
@@ -66,11 +65,15 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-const AccountCardListStub = {
-  props: ['data'],
+const DataTableStub = {
+  props: ['columns', 'data'],
   template: `
-    <div data-test="account-card-list">
-      <slot v-for="row in data" :key="row.id" :row="row" />
+    <div data-test="data-table">
+      <span v-for="column in columns" :key="column.key" data-test="column-key">{{ column.key }}</span>
+      <div v-for="row in data" :key="row.id">
+        <div data-test="select-row"><slot name="cell-select" :row="row" /></div>
+        <slot name="cell-created_at" :value="row.created_at" :row="row" />
+      </div>
     </div>
   `
 }
@@ -133,7 +136,7 @@ describe('admin AccountsView bulk edit scope', () => {
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
-          AccountCardList: AccountCardListStub,
+          DataTable: DataTableStub,
           Pagination: true,
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
@@ -198,7 +201,7 @@ describe('admin AccountsView bulk edit scope', () => {
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
-          AccountCardList: AccountCardListStub,
+          DataTable: DataTableStub,
           Pagination: true,
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
@@ -230,11 +233,13 @@ describe('admin AccountsView bulk edit scope', () => {
 
     await flushPromises()
 
-    const card = wrapper.getComponent(AccountCard)
-    expect(card.props('hiddenFields')).not.toContain('created_at')
-
-    await wrapper.get('button[title="admin.accounts.sortBy"]').trigger('click')
-    expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.columns.createdAt')).toBe(true)
+    const columnKeys = wrapper.findAll('[data-test="column-key"]').map(node => node.text())
+    expect(columnKeys).toContain('created_at')
+    const columns = wrapper.getComponent(DataTableStub).props('columns') as Array<{ key: string; label: string; sortable: boolean }>
+    expect(columns.find(column => column.key === 'created_at')).toMatchObject({
+      label: 'admin.accounts.columns.createdAt',
+      sortable: true
+    })
   })
 
   it('submits selected account IDs from every page for backend eligibility checks', async () => {
@@ -257,7 +262,7 @@ describe('admin AccountsView bulk edit scope', () => {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
           TablePageLayout: { template: '<div><slot name="table" /><slot name="pagination" /></div>' },
-          AccountCardList: AccountCardListStub,
+          DataTable: DataTableStub,
           Pagination: PaginationStub,
           ConfirmDialog: true,
           AccountTableActions: true,
@@ -288,10 +293,10 @@ describe('admin AccountsView bulk edit scope', () => {
     })
 
     await flushPromises()
-    await wrapper.get('[data-test="account-card-list"] input[type="checkbox"]').trigger('change')
+    await wrapper.get('[data-test="select-row"] input').trigger('change')
     await wrapper.get('[data-test="next-page"]').trigger('click')
     await flushPromises()
-    await wrapper.get('[data-test="account-card-list"] input[type="checkbox"]').trigger('change')
+    await wrapper.get('[data-test="select-row"] input').trigger('change')
     await wrapper.get('[data-test="probe-upstream-billing"]').trigger('click')
     await flushPromises()
 
