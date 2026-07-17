@@ -28,43 +28,43 @@ const (
 )
 
 var (
-	ErrProviderDisabled      = errors.New("Lihe OIDC Provider is disabled")
+	ErrProviderDisabled      = errors.New("Lihe OIDC provider is disabled")
 	ErrInvalidRequest        = errors.New("invalid OIDC authorization request")
 	ErrInvalidBrowserBinding = errors.New("invalid OIDC browser binding")
 
 	pkceChallengePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43,128}$`)
-	opaqueHandlePattern   = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	opaqueHandlePattern  = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 
-	oidcScopes = fosite.Arguments{"openid", "profile", "email"}
+	oidcScopes                     = fosite.Arguments{"openid", "profile", "email"}
 	allowedAuthorizationParameters = map[string]struct{}{
-		"response_type": {},
-		"client_id": {},
-		"redirect_uri": {},
-		"scope": {},
-		"state": {},
-		"nonce": {},
-		"code_challenge": {},
+		"response_type":         {},
+		"client_id":             {},
+		"redirect_uri":          {},
+		"scope":                 {},
+		"state":                 {},
+		"nonce":                 {},
+		"code_challenge":        {},
 		"code_challenge_method": {},
-		"response_mode": {},
-		"prompt": {},
+		"response_mode":         {},
+		"prompt":                {},
 	}
 )
 
 type DiscoveryDocument struct {
-	Issuer                           string   `json:"issuer"`
-	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
-	TokenEndpoint                    string   `json:"token_endpoint"`
-	UserInfoEndpoint                 string   `json:"userinfo_endpoint"`
-	JWKSURI                          string   `json:"jwks_uri"`
-	ScopesSupported                  []string `json:"scopes_supported"`
-	ResponseTypesSupported           []string `json:"response_types_supported"`
-	ResponseModesSupported           []string `json:"response_modes_supported"`
-	GrantTypesSupported              []string `json:"grant_types_supported"`
-	SubjectTypesSupported            []string `json:"subject_types_supported"`
-	IDTokenSigningAlgsSupported      []string `json:"id_token_signing_alg_values_supported"`
+	Issuer                            string   `json:"issuer"`
+	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
+	TokenEndpoint                     string   `json:"token_endpoint"`
+	UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
+	JWKSURI                           string   `json:"jwks_uri"`
+	ScopesSupported                   []string `json:"scopes_supported"`
+	ResponseTypesSupported            []string `json:"response_types_supported"`
+	ResponseModesSupported            []string `json:"response_modes_supported"`
+	GrantTypesSupported               []string `json:"grant_types_supported"`
+	SubjectTypesSupported             []string `json:"subject_types_supported"`
+	IDTokenSigningAlgsSupported       []string `json:"id_token_signing_alg_values_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
-	CodeChallengeMethodsSupported    []string `json:"code_challenge_methods_supported"`
-	ClaimsSupported                  []string `json:"claims_supported"`
+	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
+	ClaimsSupported                   []string `json:"claims_supported"`
 }
 
 type PreparedAuthorization struct {
@@ -131,14 +131,14 @@ func NewProvider(db *sql.DB, cfg *config.Config) (*Provider, error) {
 	}
 	client := &fosite.DefaultOpenIDConnectClient{
 		DefaultClient: &fosite.DefaultClient{
-			ID:             cfg.LiheOIDC.ClientID,
-			Secret:         hashedSecret,
-			RedirectURIs:   []string{cfg.LiheOIDC.RedirectURI},
-			GrantTypes:     []string{"authorization_code"},
-			ResponseTypes:  []string{"code"},
-			Scopes:         []string(oidcScopes),
-			Audience:       []string{cfg.LiheOIDC.ClientID},
-			Public:         false,
+			ID:            cfg.LiheOIDC.ClientID,
+			Secret:        hashedSecret,
+			RedirectURIs:  []string{cfg.LiheOIDC.RedirectURI},
+			GrantTypes:    []string{"authorization_code"},
+			ResponseTypes: []string{"code"},
+			Scopes:        []string(oidcScopes),
+			Audience:      []string{cfg.LiheOIDC.ClientID},
+			Public:        false,
 		},
 		TokenEndpointAuthMethod: "client_secret_basic",
 	}
