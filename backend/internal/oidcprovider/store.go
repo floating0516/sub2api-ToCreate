@@ -610,10 +610,10 @@ func emailLocalPart(email string) string {
 }
 
 var (
-	_ fosite.Storage                         = (*Store)(nil)
-	_ oauth2.CoreStorage                     = (*Store)(nil)
-	_ oauth2.TokenRevocationStorage          = (*Store)(nil)
-	_ openid.OpenIDConnectRequestStorage     = (*Store)(nil)
-	_ pkce.PKCERequestStorage                = (*Store)(nil)
-	_ fositestorage.Transactional            = (*Store)(nil)
+	_ fosite.Storage                     = (*Store)(nil)
+	_ oauth2.CoreStorage                 = (*Store)(nil)
+	_ oauth2.TokenRevocationStorage      = (*Store)(nil)
+	_ openid.OpenIDConnectRequestStorage = (*Store)(nil)
+	_ pkce.PKCERequestStorage            = (*Store)(nil)
+	_ fositestorage.Transactional        = (*Store)(nil)
 )

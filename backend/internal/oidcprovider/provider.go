@@ -28,8 +28,8 @@ const (
 )
 
 var (
-	ErrProviderDisabled     = errors.New("Lihe OIDC Provider is disabled")
-	ErrInvalidRequest       = errors.New("invalid OIDC authorization request")
+	ErrProviderDisabled      = errors.New("Lihe OIDC Provider is disabled")
+	ErrInvalidRequest        = errors.New("invalid OIDC authorization request")
 	ErrInvalidBrowserBinding = errors.New("invalid OIDC browser binding")
 
 	pkceChallengePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43,128}$`)
