@@ -53,3 +53,10 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar Lihe Chat entry', () => {
+  it('keeps API keys as the only sidebar entry point for Lihe imports', () => {
+    expect(componentSource).not.toContain("{ path: '/integrations/lihe'")
+    expect(componentSource).not.toContain("t('nav.liheChat')")
+  })
+})
