@@ -322,4 +322,3 @@ func liheContractHash(value string) string {
 }
 
 var _ service.LiheOAuthRepository = (*liheContractRepository)(nil)
-
