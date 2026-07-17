@@ -30,6 +30,11 @@ jobs:
       - name: Verify Go version
         run: |
           go version | grep -q 'go1.26.5'
+      - name: Verify Go module metadata
+        working-directory: backend
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
       - name: Unit tests
         working-directory: backend
         run: make test-unit

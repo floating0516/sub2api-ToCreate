@@ -30,6 +30,10 @@ type liheOAuthTestAPIKeyRepo struct {
 	forceExchangeUsed bool
 }
 
+func (r *liheOAuthTestAPIKeyRepo) GetLiheOIDCSubject(context.Context, int64) (string, error) {
+	return "11111111-1111-4111-8111-111111111111", nil
+}
+
 func (r *liheOAuthTestAPIKeyRepo) GetByID(_ context.Context, id int64) (*APIKey, error) {
 	apiKey, ok := r.apiKeys[id]
 	if !ok {
@@ -263,6 +267,7 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, repo.code.Used)
 	require.True(t, strings.HasPrefix(result.AccessToken, LiheAccessTokenPrefix))
+	require.Equal(t, "11111111-1111-4111-8111-111111111111", result.AccountID)
 	require.Equal(t, []string{LiheOAuthProviderOpenAI}, result.Providers)
 	require.Equal(t, int64(501), result.APIKeyID)
 	require.Equal(t, "Selected key", result.APIKeyName)

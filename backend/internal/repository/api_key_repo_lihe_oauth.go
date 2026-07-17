@@ -20,6 +20,25 @@ type sqlTxBeginner interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
+func (r *apiKeyRepository) GetLiheOIDCSubject(ctx context.Context, userID int64) (string, error) {
+	if r.sql == nil {
+		return "", service.ErrLiheOAuthRepositoryUnavailable
+	}
+	var subject string
+	err := scanSingleRow(ctx, r.sql, `
+		SELECT oidc_subject::text
+		FROM users
+		WHERE id = $1 AND deleted_at IS NULL AND status = $2
+	`, []any{userID, service.StatusActive}, &subject)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", service.ErrLiheInvalidGrant
+	}
+	if err != nil {
+		return "", err
+	}
+	return subject, nil
+}
+
 func (r *apiKeyRepository) CreateLiheAuthorizationCode(ctx context.Context, code *service.LiheAuthorizationCode) error {
 	if code == nil || r.sql == nil {
 		return service.ErrLiheOAuthRepositoryUnavailable

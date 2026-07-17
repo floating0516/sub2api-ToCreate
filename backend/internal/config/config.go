@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -78,6 +79,7 @@ type Config struct {
 	GitHubOAuth             EmailOAuthProviderConfig      `mapstructure:"github_oauth"`
 	GoogleOAuth             EmailOAuthProviderConfig      `mapstructure:"google_oauth"`
 	LiheOAuth               LiheOAuthConfig               `mapstructure:"lihe_oauth"`
+	LiheOIDC                LiheOIDCConfig                `mapstructure:"lihe_oidc"`
 	Default                 DefaultConfig                 `mapstructure:"default"`
 	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
@@ -156,6 +158,20 @@ type LiheOAuthConfig struct {
 	ClientSecret string `mapstructure:"client_secret"`
 	RedirectURI  string `mapstructure:"redirect_uri"`
 	ConnectURL   string `mapstructure:"connect_url"`
+}
+
+// LiheOIDCConfig configures the independent lihe.chat login client. It must
+// never reuse the credentials for the long-lived Lihe API Key OAuth client.
+type LiheOIDCConfig struct {
+	Enabled                  bool   `mapstructure:"enabled"`
+	Issuer                   string `mapstructure:"issuer"`
+	ClientID                 string `mapstructure:"client_id"`
+	ClientSecret             string `mapstructure:"client_secret"`
+	RedirectURI              string `mapstructure:"redirect_uri"`
+	HMACSecret               string `mapstructure:"hmac_secret"`
+	KeyDirectory             string `mapstructure:"key_directory"`
+	KeyRotationDays          int    `mapstructure:"key_rotation_days"`
+	PendingRequestTTLSeconds int    `mapstructure:"pending_request_ttl_seconds"`
 }
 
 type GeminiTierQuotaConfig struct {
@@ -1620,6 +1636,12 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.LiheOAuth.ClientSecret = strings.TrimSpace(cfg.LiheOAuth.ClientSecret)
 	cfg.LiheOAuth.RedirectURI = strings.TrimSpace(cfg.LiheOAuth.RedirectURI)
 	cfg.LiheOAuth.ConnectURL = strings.TrimSpace(cfg.LiheOAuth.ConnectURL)
+	cfg.LiheOIDC.Issuer = strings.TrimRight(strings.TrimSpace(cfg.LiheOIDC.Issuer), "/")
+	cfg.LiheOIDC.ClientID = strings.TrimSpace(cfg.LiheOIDC.ClientID)
+	cfg.LiheOIDC.ClientSecret = strings.TrimSpace(cfg.LiheOIDC.ClientSecret)
+	cfg.LiheOIDC.RedirectURI = strings.TrimSpace(cfg.LiheOIDC.RedirectURI)
+	cfg.LiheOIDC.HMACSecret = strings.TrimSpace(cfg.LiheOIDC.HMACSecret)
+	cfg.LiheOIDC.KeyDirectory = strings.TrimSpace(cfg.LiheOIDC.KeyDirectory)
 	cfg.OIDC.UsePKCEExplicit = hasExplicitConfigOrEnv("oidc_connect.use_pkce", "OIDC_CONNECT_USE_PKCE")
 	cfg.OIDC.ValidateIDTokenExplicit = hasExplicitConfigOrEnv("oidc_connect.validate_id_token", "OIDC_CONNECT_VALIDATE_ID_TOKEN")
 	cfg.Dashboard.KeyPrefix = strings.TrimSpace(cfg.Dashboard.KeyPrefix)
@@ -1867,6 +1889,17 @@ func setDefaults() {
 	viper.SetDefault("lihe_oauth.client_secret", "")
 	viper.SetDefault("lihe_oauth.redirect_uri", "https://lihe.chat/api/integrations/lihe/callback")
 	viper.SetDefault("lihe_oauth.connect_url", "https://lihe.chat/connect/lihe")
+
+	// Lihe unified-account OIDC Provider (independent from lihe_oauth).
+	viper.SetDefault("lihe_oidc.enabled", false)
+	viper.SetDefault("lihe_oidc.issuer", "https://api.lihe.chat")
+	viper.SetDefault("lihe_oidc.client_id", "lihe-chat-login")
+	viper.SetDefault("lihe_oidc.client_secret", "")
+	viper.SetDefault("lihe_oidc.redirect_uri", "https://lihe.chat/oauth/openid/callback")
+	viper.SetDefault("lihe_oidc.hmac_secret", "")
+	viper.SetDefault("lihe_oidc.key_directory", "/app/data/oidc-keys")
+	viper.SetDefault("lihe_oidc.key_rotation_days", 30)
+	viper.SetDefault("lihe_oidc.pending_request_ttl_seconds", 300)
 
 	// Database
 	viper.SetDefault("database.host", "localhost")
@@ -2418,6 +2451,11 @@ func (c *Config) Validate() error {
 			if err := validateLiheOAuthHTTPSURL(raw); err != nil {
 				return fmt.Errorf("lihe_oauth.%s invalid: %w", name, err)
 			}
+		}
+	}
+	if c.LiheOIDC.Enabled {
+		if err := validateLiheOIDCConfig(c); err != nil {
+			return err
 		}
 	}
 	if c.WeChat.Enabled {
@@ -3289,6 +3327,59 @@ func validateLiheOAuthHTTPSURL(raw string) error {
 	}
 	if u.RawQuery != "" || u.ForceQuery {
 		return fmt.Errorf("must not include query")
+	}
+	return nil
+}
+
+func validateLiheOIDCConfig(c *Config) error {
+	if c == nil {
+		return fmt.Errorf("lihe_oidc config is required")
+	}
+	oidc := c.LiheOIDC
+	if oidc.ClientID == "" {
+		return fmt.Errorf("lihe_oidc.client_id is required when lihe_oidc.enabled=true")
+	}
+	if len(oidc.ClientSecret) < 32 {
+		return fmt.Errorf("lihe_oidc.client_secret must be at least 32 characters when lihe_oidc.enabled=true")
+	}
+	if len(oidc.HMACSecret) < 32 {
+		return fmt.Errorf("lihe_oidc.hmac_secret must be at least 32 characters when lihe_oidc.enabled=true")
+	}
+	if oidc.ClientSecret == oidc.HMACSecret {
+		return fmt.Errorf("lihe_oidc.hmac_secret must be independent from lihe_oidc.client_secret")
+	}
+	if c.LiheOAuth.ClientSecret != "" && oidc.ClientSecret == c.LiheOAuth.ClientSecret {
+		return fmt.Errorf("lihe_oidc.client_secret must be independent from lihe_oauth.client_secret")
+	}
+	if c.LiheOAuth.ClientSecret != "" && oidc.HMACSecret == c.LiheOAuth.ClientSecret {
+		return fmt.Errorf("lihe_oidc.hmac_secret must be independent from lihe_oauth.client_secret")
+	}
+	if c.JWT.Secret != "" && (oidc.ClientSecret == c.JWT.Secret || oidc.HMACSecret == c.JWT.Secret) {
+		return fmt.Errorf("lihe_oidc secrets must be independent from jwt.secret")
+	}
+	for name, raw := range map[string]string{
+		"issuer":       oidc.Issuer,
+		"redirect_uri": oidc.RedirectURI,
+	} {
+		if err := validateLiheOAuthHTTPSURL(raw); err != nil {
+			return fmt.Errorf("lihe_oidc.%s invalid: %w", name, err)
+		}
+	}
+	issuer, err := url.Parse(oidc.Issuer)
+	if err != nil {
+		return fmt.Errorf("lihe_oidc.issuer invalid: %w", err)
+	}
+	if issuer.Path != "" && issuer.Path != "/" {
+		return fmt.Errorf("lihe_oidc.issuer must not include a path")
+	}
+	if !filepath.IsAbs(oidc.KeyDirectory) {
+		return fmt.Errorf("lihe_oidc.key_directory must be an absolute path")
+	}
+	if oidc.KeyRotationDays < 1 || oidc.KeyRotationDays > 365 {
+		return fmt.Errorf("lihe_oidc.key_rotation_days must be between 1 and 365")
+	}
+	if oidc.PendingRequestTTLSeconds < 60 || oidc.PendingRequestTTLSeconds > 600 {
+		return fmt.Errorf("lihe_oidc.pending_request_ttl_seconds must be between 60 and 600")
 	}
 	return nil
 }

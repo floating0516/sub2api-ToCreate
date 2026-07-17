@@ -10,6 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetLiheOIDCSubjectRequiresActiveCurrentUser(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	repo := newAPIKeyRepositoryWithSQL(nil, db)
+
+	want := "11111111-1111-4111-8111-111111111111"
+	mock.ExpectQuery(`(?s)SELECT oidc_subject::text.*deleted_at IS NULL.*status = \$2`).
+		WithArgs(int64(42), service.StatusActive).
+		WillReturnRows(sqlmock.NewRows([]string{"oidc_subject"}).AddRow(want))
+
+	got, err := repo.GetLiheOIDCSubject(t.Context(), 42)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestExchangeLiheAuthorizationCodeBindsExistingAPIKey(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

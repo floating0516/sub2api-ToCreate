@@ -173,6 +173,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	}
 
 	// 检查是否需要邮件验证
+	emailVerified := false
 	if s.settingService != nil && s.settingService.IsEmailVerifyEnabled(ctx) {
 		// 如果邮件验证已开启但邮件服务未配置，拒绝注册
 		// 这是一个配置错误，不应该允许绕过验证
@@ -187,6 +188,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		if err := s.emailService.VerifyCode(ctx, email, verifyCode); err != nil {
 			return "", nil, fmt.Errorf("verify code: %w", err)
 		}
+		emailVerified = true
 	}
 
 	// 检查邮箱是否已存在
@@ -231,6 +233,14 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		}
 		logger.LegacyPrintf("service.auth", "[Auth] Database error creating user: %v", err)
 		return "", nil, ErrServiceUnavailable
+	}
+	if emailVerified {
+		if err := s.markReliableEmailVerification(ctx, user.ID, "registration_email_code"); err != nil {
+			// Fail closed for the OIDC claim without orphaning an account that was
+			// already created successfully. A later password reset can re-establish
+			// reliable evidence.
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to persist email verification evidence: user_id=%d err=%v", user.ID, err)
+		}
 	}
 	s.postAuthUserBootstrap(ctx, user, "email", true)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
@@ -1439,6 +1449,9 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, token, newPasswo
 		logger.LegacyPrintf("service.auth", "[Auth] Database error updating password for user %d: %v", user.ID, err)
 		return ErrServiceUnavailable
 	}
+	if err := s.markReliableEmailVerification(ctx, user.ID, "password_reset_email"); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to persist password-reset email evidence: user_id=%d err=%v", user.ID, err)
+	}
 
 	// Also revoke all refresh tokens for this user
 	if err := s.RevokeAllUserSessions(ctx, user.ID); err != nil {
@@ -1448,6 +1461,27 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, token, newPasswo
 
 	logger.LegacyPrintf("service.auth", "[Auth] Password reset successful for user: %s", email)
 	return nil
+}
+
+func (s *AuthService) markReliableEmailVerification(ctx context.Context, userID int64, source string) error {
+	if s == nil || s.entClient == nil || userID <= 0 || strings.TrimSpace(source) == "" {
+		return errors.New("email verification evidence is incomplete")
+	}
+	return markReliableEmailVerificationWithClient(ctx, s.entClient, userID, source)
+}
+
+func markReliableEmailVerificationWithClient(ctx context.Context, client *dbent.Client, userID int64, source string) error {
+	if client == nil || userID <= 0 || strings.TrimSpace(source) == "" {
+		return errors.New("email verification evidence is incomplete")
+	}
+	_, err := client.ExecContext(ctx, `
+		UPDATE users
+		SET email_verified_at = CURRENT_TIMESTAMP,
+			email_verification_source = $2,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL
+	`, userID, strings.TrimSpace(source))
+	return err
 }
 
 // ==================== Refresh Token Methods ====================

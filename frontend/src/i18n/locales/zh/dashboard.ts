@@ -552,6 +552,13 @@ export default {
     revokeFailed: '解除绑定失败'
   },
 
+  liheOIDC: {
+    connecting: '正在使用 Lihe 账号登录',
+    authorizationFailed: '登录授权失败',
+    authorizationExpired: '登录请求无效或已过期，请重新发起登录。',
+    returnToLogin: '返回登录'
+  },
+
   affiliate: {
     title: '邀请返利',
     description: '邀请新用户注册，并将返利额度转入账户余额',

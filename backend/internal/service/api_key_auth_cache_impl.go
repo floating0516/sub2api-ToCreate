@@ -79,7 +79,7 @@ func (s *APIKeyService) initAuthCache(cfg *config.Config) {
 	if !s.authCfg.l1Enabled() {
 		return
 	}
-	cache, err := ristretto.NewCache(&ristretto.Config{
+	cache, err := ristretto.NewCache(&ristretto.Config[string, *APIKeyAuthCacheEntry]{
 		NumCounters: int64(s.authCfg.l1Size) * 10,
 		MaxCost:     int64(s.authCfg.l1Size),
 		BufferItems: 64,
@@ -111,10 +111,8 @@ func (s *APIKeyService) authCacheKey(key string) string {
 
 func (s *APIKeyService) getAuthCacheEntry(ctx context.Context, cacheKey string) (*APIKeyAuthCacheEntry, bool) {
 	if s.authCacheL1 != nil {
-		if val, ok := s.authCacheL1.Get(cacheKey); ok {
-			if entry, ok := val.(*APIKeyAuthCacheEntry); ok {
-				return entry, true
-			}
+		if entry, ok := s.authCacheL1.Get(cacheKey); ok && entry != nil {
+			return entry, true
 		}
 	}
 	if s.cache == nil || !s.authCfg.l2Enabled() {

@@ -30,7 +30,7 @@ func TestWithSubscriptionUpdateTx_ReusesExistingTransaction(t *testing.T) {
 }
 
 func TestMaybeInvalidateAssignmentCaches_DefersForOuterTransactionOwner(t *testing.T) {
-	cache, err := ristretto.NewCache(&ristretto.Config{NumCounters: 1_000, MaxCost: 100, BufferItems: 64})
+	cache, err := ristretto.NewCache(&ristretto.Config[string, *UserSubscription]{NumCounters: 1_000, MaxCost: 100, BufferItems: 64})
 	require.NoError(t, err)
 	t.Cleanup(cache.Close)
 

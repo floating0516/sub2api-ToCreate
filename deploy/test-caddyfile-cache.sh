@@ -15,4 +15,11 @@ if ! printf '%s\n' "$active_config" | grep -Eq '^[[:space:]]*reverse_proxy[[:spa
 	exit 1
 fi
 
-echo "Caddyfile preserves backend Cache-Control policy and reverse_proxy routing"
+for sensitive_query_key in code state nonce code_verifier code_challenge id_token access_token client_secret token; do
+	if ! printf '%s\n' "$active_config" | grep -Eq "replace[[:space:]]+$sensitive_query_key[[:space:]]+REDACTED"; then
+		echo "Caddyfile must redact query key: $sensitive_query_key" >&2
+		exit 1
+	fi
+done
+
+echo "Caddyfile preserves backend cache policy, routing, and OIDC query redaction"

@@ -202,6 +202,9 @@ func (s *AuthService) updateBoundEmailIdentityWithClient(
 		}
 		return ErrServiceUnavailable
 	}
+	if err := markReliableEmailVerificationWithClient(ctx, client, currentUser.ID, "email_identity_bind_code"); err != nil {
+		return ErrServiceUnavailable
+	}
 
 	if err := replaceBoundEmailAuthIdentityWithClient(ctx, client, currentUser.ID, oldEmail, email, "auth_service_email_bind"); err != nil {
 		if errors.Is(err, ErrEmailExists) {

@@ -84,7 +84,24 @@ api.sub2api.com {
 			roll_keep 10
 			roll_keep_for 720h
 		}
-		format json
+		# OIDC/OAuth query values are protocol-transient. Keep the parameter
+		# names for diagnostics while preventing credentials from entering logs.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace code REDACTED
+					replace state REDACTED
+					replace nonce REDACTED
+					replace code_verifier REDACTED
+					replace code_challenge REDACTED
+					replace id_token REDACTED
+					replace access_token REDACTED
+					replace client_secret REDACTED
+					replace token REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 

@@ -50,6 +50,7 @@ type Handlers struct {
 	User             *UserHandler
 	Checkin          *CheckinHandler
 	APIKey           *APIKeyHandler
+	LiheOIDC         *LiheOIDCHandler
 	Usage            *UsageHandler
 	Redeem           *RedeemHandler
 	Subscription     *SubscriptionHandler

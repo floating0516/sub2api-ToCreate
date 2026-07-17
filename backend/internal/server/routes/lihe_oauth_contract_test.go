@@ -28,6 +28,10 @@ type liheContractRepository struct {
 	tokenHash string
 }
 
+func (r *liheContractRepository) GetLiheOIDCSubject(context.Context, int64) (string, error) {
+	return "22222222-2222-4222-8222-222222222222", nil
+}
+
 func (r *liheContractRepository) GetByID(_ context.Context, id int64) (*service.APIKey, error) {
 	if r.apiKey == nil || r.apiKey.ID != id {
 		return nil, service.ErrAPIKeyNotFound
@@ -145,6 +149,7 @@ func (r *liheContractAccountRepository) ListSchedulableByGroupID(context.Context
 
 type libreChatTokenResponseSchema struct {
 	AccessToken string    `json:"access_token"`
+	AccountID   string    `json:"account_id"`
 	TokenType   string    `json:"token_type"`
 	Scope       string    `json:"scope"`
 	Providers   []string  `json:"providers"`
@@ -292,6 +297,7 @@ func requireLibreChatTokenResponse(t *testing.T, recorder *httptest.ResponseReco
 	decoder.DisallowUnknownFields()
 	require.NoError(t, decoder.Decode(&response))
 	require.True(t, strings.HasPrefix(response.AccessToken, service.LiheAccessTokenPrefix))
+	require.Equal(t, "22222222-2222-4222-8222-222222222222", response.AccountID)
 	require.Equal(t, "Bearer", response.TokenType)
 	require.Equal(t, service.LiheOAuthScopes, response.Scope)
 	require.Len(t, response.Providers, 1)

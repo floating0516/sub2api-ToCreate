@@ -89,6 +89,10 @@ CREATE TABLE IF NOT EXISTS user_provider_default_grants (
 	drv := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
 	t.Cleanup(func() { _ = client.Close() })
+	_, err = db.Exec("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP")
+	require.NoError(t, err)
+	_, err = db.Exec("ALTER TABLE users ADD COLUMN email_verification_source TEXT")
+	require.NoError(t, err)
 
 	repo := repository.NewUserRepository(client, db)
 	cfg := &config.Config{

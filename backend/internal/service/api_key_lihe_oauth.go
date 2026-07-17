@@ -136,6 +136,7 @@ type LiheTokenExchangeInput struct {
 
 type LiheTokenExchangeResult struct {
 	AccessToken string    `json:"access_token"`
+	AccountID   string    `json:"account_id"`
 	TokenType   string    `json:"token_type"`
 	Scope       string    `json:"scope"`
 	Providers   []string  `json:"providers"`
@@ -172,6 +173,7 @@ type LiheResolvedAccess struct {
 // stays separate from APIKeyRepository so existing service and handler stubs do
 // not need to implement integration-only persistence methods.
 type LiheOAuthRepository interface {
+	GetLiheOIDCSubject(ctx context.Context, userID int64) (string, error)
 	CreateLiheAuthorizationCode(ctx context.Context, code *LiheAuthorizationCode) error
 	GetLiheAuthorizationCode(ctx context.Context, codeHash string) (*LiheAuthorizationCode, error)
 	ExchangeLiheAuthorizationCode(ctx context.Context, input LiheTokenExchangeInput) (*LiheAccessToken, error)
@@ -328,6 +330,10 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 	if user == nil || !user.IsActive() {
 		return nil, infraerrors.Forbidden("LIHE_USER_INACTIVE", "user account is not active")
 	}
+	accountID, err := repo.GetLiheOIDCSubject(ctx, record.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("get Lihe OIDC account ID: %w", err)
+	}
 	binding, err := s.buildLiheTokenBinding(ctx, record.UserID, record.APIKeyID)
 	if err != nil {
 		return nil, err
@@ -364,6 +370,7 @@ func (s *APIKeyService) ExchangeLiheAuthorizationCode(
 	}
 	return &LiheTokenExchangeResult{
 		AccessToken: plainToken,
+		AccountID:   accountID,
 		TokenType:   "Bearer",
 		Scope:       LiheOAuthScopes,
 		Providers:   []string{publicProvider},

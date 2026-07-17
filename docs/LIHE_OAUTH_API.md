@@ -93,6 +93,7 @@ Success:
 ```json
 {
   "access_token": "lihe_...",
+  "account_id": "11111111-1111-4111-8111-111111111111",
   "token_type": "Bearer",
   "scope": "models:read chat:write",
   "providers": ["openAI"],
@@ -101,6 +102,10 @@ Success:
   "created_at": "2026-07-16T12:00:00Z"
 }
 ```
+
+`account_id` is the same immutable OIDC `sub` issued by the API site's Lihe
+OIDC Provider. LibreChat must compare it with the currently logged-in user's
+`openidId` and revoke the Lihe token immediately if they differ.
 
 There is deliberately no `expires_in`: the token remains valid until revoked.
 The plaintext access token is returned once and only its SHA-256 hash is

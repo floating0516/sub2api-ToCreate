@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMaskAuditCredential(t *testing.T) {
@@ -134,6 +136,33 @@ func TestRedactAuditBody_NonJSONOmitted(t *testing.T) {
 func TestRedactAuditBody_Empty(t *testing.T) {
 	if got := RedactAuditBody(nil, "application/json"); got != "" {
 		t.Fatalf("expected empty for nil body, got %q", got)
+	}
+}
+
+func TestOIDCAuditFieldsAreAlwaysRedacted(t *testing.T) {
+	raw := []byte(`{
+		"code": "authorization-code",
+		"state": "state-value",
+		"nonce": "nonce-value",
+		"code_verifier": "verifier-value",
+		"code_challenge": "challenge-value",
+		"id_token": "id-token-value",
+		"access_token": "access-token-value",
+		"client_secret": "client-secret-value"
+	}`)
+	body := RedactAuditBody(raw, "application/json")
+	query := RedactAuditQuery(
+		"code=authorization-code&state=state-value&nonce=nonce-value" +
+			"&code_verifier=verifier-value&code_challenge=challenge-value" +
+			"&id_token=id-token-value&access_token=access-token-value" +
+			"&client_secret=client-secret-value",
+	)
+	for _, secret := range []string{
+		"authorization-code", "state-value", "nonce-value", "verifier-value",
+		"challenge-value", "id-token-value", "access-token-value", "client-secret-value",
+	} {
+		require.NotContains(t, body, secret)
+		require.NotContains(t, query, secret)
 	}
 }
 

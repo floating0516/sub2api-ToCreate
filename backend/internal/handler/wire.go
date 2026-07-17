@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
+	"github.com/Wei-Shaw/sub2api/internal/oidcprovider"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -167,6 +168,7 @@ func ProvideHandlers(
 	userHandler *UserHandler,
 	checkinHandler *CheckinHandler,
 	apiKeyHandler *APIKeyHandler,
+	liheOIDCHandler *LiheOIDCHandler,
 	usageHandler *UsageHandler,
 	redeemHandler *RedeemHandler,
 	subscriptionHandler *SubscriptionHandler,
@@ -190,6 +192,7 @@ func ProvideHandlers(
 		User:             userHandler,
 		Checkin:          checkinHandler,
 		APIKey:           apiKeyHandler,
+		LiheOIDC:         liheOIDCHandler,
 		Usage:            usageHandler,
 		Redeem:           redeemHandler,
 		Subscription:     subscriptionHandler,
@@ -215,6 +218,8 @@ var ProviderSet = wire.NewSet(
 	NewUserHandler,
 	NewCheckinHandler,
 	NewAPIKeyHandler,
+	oidcprovider.NewProvider,
+	NewLiheOIDCHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
 	NewSubscriptionHandler,

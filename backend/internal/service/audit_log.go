@@ -124,7 +124,8 @@ func auditNormalizeBodyKey(key string) string {
 //   - providerSensitiveConfigFields：支付渠道密钥字段（pkey / privatekey / apiv3key 等）
 var auditBodySensitiveExactKeys = func() map[string]struct{} {
 	builtin := []string{
-		"code", "codes", "pin", "cvv",
+		"code", "codes", "state", "nonce", "code_verifier", "code_challenge",
+		"id_token", "access_token", "client_secret", "pin", "cvv",
 		"authorization", "cookie", "x-api-key",
 		"key",
 		// 字符串值内嵌完整凭证的字段：
@@ -252,5 +253,10 @@ func RedactAuditQuery(rawQuery string) string {
 	if rawQuery == "" {
 		return ""
 	}
-	return logredact.RedactText(rawQuery, "api_key", "apikey", "token", "secret", "key")
+	return logredact.RedactText(
+		rawQuery,
+		"api_key", "apikey", "token", "secret", "key",
+		"code", "state", "nonce", "code_verifier", "code_challenge",
+		"id_token", "access_token", "client_secret",
+	)
 }

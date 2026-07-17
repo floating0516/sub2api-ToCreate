@@ -212,7 +212,7 @@ type APIKeyService struct {
 	rateLimitCacheInvalid RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService    *ConcurrencyService
 	cfg                   *config.Config
-	authCacheL1           *ristretto.Cache
+	authCacheL1           *ristretto.Cache[string, *APIKeyAuthCacheEntry]
 	authCfg               apiKeyAuthCacheConfig
 	authGroup             singleflight.Group
 	lastUsedTouchL1       sync.Map // keyID -> nextAllowedAt(time.Time)

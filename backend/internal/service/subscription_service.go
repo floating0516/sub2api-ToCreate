@@ -53,7 +53,7 @@ type SubscriptionService struct {
 	addonRepo           SubscriptionAddonRepository
 
 	// L1 缓存：加速中间件热路径的订阅查询
-	subCacheL1     *ristretto.Cache
+	subCacheL1     *ristretto.Cache[string, *UserSubscription]
 	subCacheGroup  singleflight.Group
 	subCacheTTL    time.Duration
 	subCacheJitter int // 抖动百分比
@@ -111,7 +111,7 @@ func (s *SubscriptionService) initSubCache(cfg *config.Config) {
 	if sc.L1Size <= 0 || sc.L1TTLSeconds <= 0 {
 		return
 	}
-	cache, err := ristretto.NewCache(&ristretto.Config{
+	cache, err := ristretto.NewCache(&ristretto.Config[string, *UserSubscription]{
 		NumCounters: int64(sc.L1Size) * 10,
 		MaxCost:     int64(sc.L1Size),
 		BufferItems: 64,
@@ -736,11 +736,9 @@ func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID,
 
 	// L1 缓存命中：返回浅拷贝
 	if s.subCacheL1 != nil {
-		if v, ok := s.subCacheL1.Get(key); ok {
-			if sub, ok := v.(*UserSubscription); ok {
-				cp := *sub
-				return &cp, nil
-			}
+		if sub, ok := s.subCacheL1.Get(key); ok && sub != nil {
+			cp := *sub
+			return &cp, nil
 		}
 	}
 

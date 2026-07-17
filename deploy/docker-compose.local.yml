@@ -95,6 +95,17 @@ services:
       - JWT_SECRET=${JWT_SECRET:-}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
 
+      # Lihe unified-account OIDC Provider (disabled by default)
+      - LIHE_OIDC_ENABLED=${LIHE_OIDC_ENABLED:-false}
+      - LIHE_OIDC_ISSUER=${LIHE_OIDC_ISSUER:-https://api.lihe.chat}
+      - LIHE_OIDC_CLIENT_ID=${LIHE_OIDC_CLIENT_ID:-lihe-chat-login}
+      - LIHE_OIDC_CLIENT_SECRET=${LIHE_OIDC_CLIENT_SECRET:-}
+      - LIHE_OIDC_HMAC_SECRET=${LIHE_OIDC_HMAC_SECRET:-}
+      - LIHE_OIDC_REDIRECT_URI=${LIHE_OIDC_REDIRECT_URI:-https://lihe.chat/oauth/openid/callback}
+      - LIHE_OIDC_KEY_DIRECTORY=${LIHE_OIDC_KEY_DIRECTORY:-/app/data/oidc-keys}
+      - LIHE_OIDC_KEY_ROTATION_DAYS=${LIHE_OIDC_KEY_ROTATION_DAYS:-30}
+      - LIHE_OIDC_PENDING_REQUEST_TTL_SECONDS=${LIHE_OIDC_PENDING_REQUEST_TTL_SECONDS:-300}
+
       # =======================================================================
       # Setup Configuration
       # =======================================================================

@@ -547,6 +547,13 @@ export default {
     revokeFailed: 'Failed to revoke connection'
   },
 
+  liheOIDC: {
+    connecting: 'Signing in with Lihe',
+    authorizationFailed: 'Sign-in failed',
+    authorizationExpired: 'The sign-in request is invalid or has expired.',
+    returnToLogin: 'Return to sign in'
+  },
+
   affiliate: {
     title: 'Affiliate Rebates',
     description: 'Invite new users and convert your rebate quota into account balance',

@@ -178,6 +178,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/oidc/authorize',
+    name: 'LiheOIDCAuthorize',
+    component: () => import('@/views/auth/LiheOIDCAuthorizeView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Lihe Account Login',
+      titleKey: 'liheOIDC.connecting'
+    }
+  },
+  {
     path: '/legal/:documentId',
     name: 'LegalDocument',
     component: () => import('@/views/public/LegalDocumentView.vue'),
@@ -785,7 +795,7 @@ let authInitialized = false
 const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
-const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
+const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal', '/oidc/authorize']
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',

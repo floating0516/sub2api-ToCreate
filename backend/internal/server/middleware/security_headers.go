@@ -93,7 +93,13 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
-		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		if c.Request != nil && c.Request.URL != nil && strings.HasPrefix(c.Request.URL.Path, "/oidc/") {
+			// OIDC query parameters are protocol-transient and must not be copied
+			// into same-origin asset requests or a subsequent Referer header.
+			c.Header("Referrer-Policy", "no-referrer")
+		} else {
+			c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		}
 		if isAPIRoutePath(c) {
 			c.Next()
 			return

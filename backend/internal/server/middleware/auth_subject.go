@@ -1,12 +1,17 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
 
 // AuthSubject is the minimal authenticated identity stored in gin context.
-// Decision: {UserID int64, Concurrency int}
+// AuthenticatedAt is the API JWT issue time used by interactive OIDC prompts.
 type AuthSubject struct {
-	UserID      int64
-	Concurrency int
+	UserID          int64
+	Concurrency     int
+	AuthenticatedAt time.Time
 }
 
 func GetAuthSubjectFromContext(c *gin.Context) (AuthSubject, bool) {

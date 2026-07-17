@@ -1010,6 +1010,23 @@ lihe_oauth:
   connect_url: "https://lihe.chat/connect/lihe"
 
 # =============================================================================
+# Lihe Unified Account OIDC Provider
+# Login-only OIDC credentials must not reuse lihe_oauth or JWT secrets.
+# =============================================================================
+lihe_oidc:
+  enabled: false
+  issuer: "https://api.lihe.chat"
+  client_id: "lihe-chat-login"
+  # Generate independently with: openssl rand -hex 32
+  client_secret: ""
+  hmac_secret: ""
+  redirect_uri: "https://lihe.chat/oauth/openid/callback"
+  # /app/data is persistent in every supported Docker deployment.
+  key_directory: "/app/data/oidc-keys"
+  key_rotation_days: 30
+  pending_request_ttl_seconds: 300
+
+# =============================================================================
 # Default Settings
 # 默认设置
 # =============================================================================
