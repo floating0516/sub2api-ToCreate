@@ -2359,6 +2359,9 @@ func (r *accountRepository) RecordOpenAIQuotaManualReset(ctx context.Context, ac
 	}
 
 	tx, err := r.client.Tx(ctx)
+	if errors.Is(err, dbent.ErrTxStarted) {
+		return recordOpenAIQuotaManualReset(ctx, r.client, accountID, observedAt)
+	}
 	if err != nil {
 		return err
 	}
