@@ -143,7 +143,10 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
           const timestamp = items[0]?.parsed.x
           return typeof timestamp === 'number' ? formatDateTime(new Date(timestamp).toISOString()) : ''
         },
-        label: (context) => `${t('admin.accounts.openaiQuotaHistory.usageLegend')}: ${formatPercent(context.parsed.y)}`
+        label: (context) => {
+          const usedPercent = context.parsed.y
+          return `${t('admin.accounts.openaiQuotaHistory.usageLegend')}: ${typeof usedPercent === 'number' ? formatPercent(usedPercent) : '-'}`
+        }
       }
     }
   },
