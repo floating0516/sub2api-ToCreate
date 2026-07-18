@@ -47,7 +47,8 @@ const mountModal = () => mount(OpenAIQuotaHistoryModal, {
   global: {
     stubs: {
       Teleport: true,
-      Transition: false
+      Transition: false,
+      OpenAIQuotaUsageChart: true
     }
   }
 })
@@ -79,6 +80,18 @@ describe('OpenAIQuotaHistoryModal', () => {
           detection_reason: 'usage_drop'
         }
       ],
+      samples: [
+        {
+          cycle_id: 1,
+          observed_at: '2026-07-17T07:06:46Z',
+          used_percent: 28
+        },
+        {
+          cycle_id: 2,
+          observed_at: '2026-07-18T03:25:00Z',
+          used_percent: 0
+        }
+      ],
       has_more: false
     })
 
@@ -97,6 +110,7 @@ describe('OpenAIQuotaHistoryModal', () => {
   it('shows stable empty states before the first reset', async () => {
     vi.mocked(getOpenAIQuotaHistory).mockResolvedValue({
       history: [],
+      samples: [],
       has_more: false
     })
 

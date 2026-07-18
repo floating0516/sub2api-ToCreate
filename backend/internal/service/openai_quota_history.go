@@ -26,10 +26,18 @@ type OpenAIQuotaCycle struct {
 	DetectionReason string     `json:"detection_reason,omitempty"`
 }
 
+// OpenAIQuotaSample is one downsampled point in the seven-day usage timeline.
+type OpenAIQuotaSample struct {
+	CycleID     int64     `json:"cycle_id"`
+	ObservedAt  time.Time `json:"observed_at"`
+	UsedPercent float64   `json:"used_percent"`
+}
+
 type OpenAIQuotaHistoryResponse struct {
-	Current *OpenAIQuotaCycle  `json:"current,omitempty"`
-	History []OpenAIQuotaCycle `json:"history"`
-	HasMore bool               `json:"has_more"`
+	Current *OpenAIQuotaCycle   `json:"current,omitempty"`
+	History []OpenAIQuotaCycle  `json:"history"`
+	Samples []OpenAIQuotaSample `json:"samples"`
+	HasMore bool                `json:"has_more"`
 }
 
 // OpenAIQuotaHistoryRepository is deliberately narrower than AccountRepository

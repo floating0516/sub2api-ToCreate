@@ -1521,7 +1521,7 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 		Extra:    map[string]any{},
 	})
 
-	firstObserved := time.Date(2026, 7, 14, 16, 0, 0, 0, time.UTC)
+	firstObserved := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Minute)
 	firstReset := firstObserved.Add(6 * 24 * time.Hour)
 	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
 		"codex_7d_used_percent":  26.0,
@@ -1556,6 +1556,12 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 	s.Require().Equal(9.0, *history.History[0].ResetToPercent)
 	s.Require().Equal("usage_drop", history.History[0].DetectionReason)
 	s.Require().False(history.HasMore)
+	s.Require().Len(history.Samples, 3)
+	s.Require().Equal(26.0, history.Samples[0].UsedPercent)
+	s.Require().Equal(36.0, history.Samples[1].UsedPercent)
+	s.Require().Equal(9.0, history.Samples[2].UsedPercent)
+	s.Require().Equal(history.History[0].ID, history.Samples[0].CycleID)
+	s.Require().Equal(history.Current.ID, history.Samples[2].CycleID)
 
 	// An older async response may still update accounts.extra, but it must not
 	// rewind or split the ordered quota history.
@@ -1568,6 +1574,7 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 	s.Require().NoError(err)
 	s.Require().Equal(9.0, history.Current.LastUsedPercent)
 	s.Require().Len(history.History, 1)
+	s.Require().Len(history.Samples, 3)
 }
 
 func (s *AccountRepoSuite) TestUpdateExtra_ConcurrentQuotaSnapshotsKeepOneActiveCycle() {
@@ -1583,7 +1590,7 @@ func (s *AccountRepoSuite) TestUpdateExtra_ConcurrentQuotaSnapshotsKeepOneActive
 		_, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM accounts WHERE id = $1", account.ID)
 	})
 
-	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	base := time.Now().UTC().Add(-time.Hour).Truncate(openAIQuotaSampleBucket)
 	updates := []map[string]any{
 		{
 			"codex_7d_used_percent":  20.0,
@@ -1618,6 +1625,8 @@ func (s *AccountRepoSuite) TestUpdateExtra_ConcurrentQuotaSnapshotsKeepOneActive
 	s.Require().NotNil(history.Current)
 	s.Require().Equal(21.0, history.Current.LastUsedPercent)
 	s.Require().Empty(history.History)
+	s.Require().Len(history.Samples, 1)
+	s.Require().Equal(21.0, history.Samples[0].UsedPercent)
 
 	var activeCount int
 	s.Require().NoError(scanSingleRow(

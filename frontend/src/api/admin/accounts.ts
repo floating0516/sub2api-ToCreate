@@ -840,9 +840,16 @@ export interface OpenAIQuotaCycle {
   detection_reason?: string
 }
 
+export interface OpenAIQuotaSample {
+  cycle_id: number
+  observed_at: string
+  used_percent: number
+}
+
 export interface OpenAIQuotaHistoryResponse {
   current?: OpenAIQuotaCycle
   history: OpenAIQuotaCycle[]
+  samples: OpenAIQuotaSample[]
   has_more: boolean
 }
 

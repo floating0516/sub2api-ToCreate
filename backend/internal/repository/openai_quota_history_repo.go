@@ -20,6 +20,8 @@ const (
 	openAIQuotaResetStrongDrop      = 5.0
 	openAIQuotaResetForecastAdvance = time.Hour
 	openAIQuotaResetBoundaryGrace   = 5 * time.Minute
+	openAIQuotaSampleBucket         = 5 * time.Minute
+	openAIQuotaSampleRetention      = 90 * 24 * time.Hour
 )
 
 type openAIQuotaSnapshot struct {
@@ -156,13 +158,18 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 
 	active, err := getOpenAIQuotaActiveCycleForUpdate(ctx, q, accountID)
 	if errors.Is(err, sql.ErrNoRows) {
-		_, err = q.ExecContext(ctx, `
+		var cycleID int64
+		err = scanSingleRow(ctx, q, `
 			INSERT INTO openai_quota_cycles (
 				account_id, window_type, cycle_started_at, last_observed_at,
 				last_used_percent, peak_used_percent, provider_reset_at
 			) VALUES ($1, $2, $3, $3, $4, $4, $5)
-		`, accountID, openAIQuotaWindow7d, snapshot.ObservedAt, snapshot.Used, snapshot.ResetAt)
-		return err
+			RETURNING id
+		`, []any{accountID, openAIQuotaWindow7d, snapshot.ObservedAt, snapshot.Used, snapshot.ResetAt}, &cycleID)
+		if err != nil {
+			return err
+		}
+		return recordOpenAIQuotaSample(ctx, q, accountID, cycleID, snapshot)
 	}
 	if err != nil {
 		return err
@@ -182,13 +189,18 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 		`, snapshot.ObservedAt, snapshot.Used, reason, active.ID); err != nil {
 			return err
 		}
-		_, err = q.ExecContext(ctx, `
+		var cycleID int64
+		err = scanSingleRow(ctx, q, `
 			INSERT INTO openai_quota_cycles (
 				account_id, window_type, cycle_started_at, last_observed_at,
 				last_used_percent, peak_used_percent, provider_reset_at
 			) VALUES ($1, $2, $3, $3, $4, $4, $5)
-		`, accountID, openAIQuotaWindow7d, snapshot.ObservedAt, snapshot.Used, snapshot.ResetAt)
-		return err
+			RETURNING id
+		`, []any{accountID, openAIQuotaWindow7d, snapshot.ObservedAt, snapshot.Used, snapshot.ResetAt}, &cycleID)
+		if err != nil {
+			return err
+		}
+		return recordOpenAIQuotaSample(ctx, q, accountID, cycleID, snapshot)
 	}
 
 	_, err = q.ExecContext(ctx, `
@@ -200,6 +212,53 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 			updated_at = NOW()
 		WHERE id = $4 AND reset_observed_at IS NULL
 	`, snapshot.ObservedAt, snapshot.Used, snapshot.ResetAt, active.ID)
+	if err != nil {
+		return err
+	}
+	return recordOpenAIQuotaSample(ctx, q, accountID, active.ID, snapshot)
+}
+
+func recordOpenAIQuotaSample(
+	ctx context.Context,
+	q sqlExecutor,
+	accountID, cycleID int64,
+	snapshot *openAIQuotaSnapshot,
+) error {
+	if q == nil || snapshot == nil || accountID <= 0 || cycleID <= 0 {
+		return nil
+	}
+
+	bucketStartedAt := snapshot.ObservedAt.UTC().Truncate(openAIQuotaSampleBucket)
+	result, err := q.ExecContext(ctx, `
+		INSERT INTO openai_quota_samples (
+			account_id, cycle_id, bucket_started_at, observed_at, used_percent
+		) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (cycle_id, bucket_started_at) DO NOTHING
+	`, accountID, cycleID, bucketStartedAt, snapshot.ObservedAt, snapshot.Used)
+	if err != nil {
+		return err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if inserted == 0 {
+		_, err = q.ExecContext(ctx, `
+			UPDATE openai_quota_samples
+			SET observed_at = $1,
+				used_percent = $2,
+				updated_at = NOW()
+			WHERE cycle_id = $3
+				AND bucket_started_at = $4
+				AND observed_at < $1
+		`, snapshot.ObservedAt, snapshot.Used, cycleID, bucketStartedAt)
+		return err
+	}
+
+	_, err = q.ExecContext(ctx, `
+		DELETE FROM openai_quota_samples
+		WHERE account_id = $1 AND observed_at < $2
+	`, accountID, snapshot.ObservedAt.Add(-openAIQuotaSampleRetention))
 	return err
 }
 
@@ -236,7 +295,10 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 		limit = 20
 	}
 
-	result := &service.OpenAIQuotaHistoryResponse{History: []service.OpenAIQuotaCycle{}}
+	result := &service.OpenAIQuotaHistoryResponse{
+		History: []service.OpenAIQuotaCycle{},
+		Samples: []service.OpenAIQuotaSample{},
+	}
 	current, err := scanOpenAIQuotaCycle(ctx, r.sql, `
 		SELECT id, cycle_started_at, last_observed_at, last_used_percent,
 			peak_used_percent, provider_reset_at, reset_observed_at,
@@ -277,6 +339,41 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 		result.History = append(result.History, *cycle)
 	}
 	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	sampleRows, err := r.sql.QueryContext(ctx, `
+		SELECT cycle_id, observed_at, used_percent
+		FROM (
+			SELECT DISTINCT ON (
+				cycle_id,
+				date_bin('15 minutes', observed_at, TIMESTAMPTZ '1970-01-01 00:00:00+00')
+			)
+				id, cycle_id, observed_at, used_percent
+			FROM openai_quota_samples
+			WHERE account_id = $1
+				AND observed_at >= NOW() - INTERVAL '30 days'
+			ORDER BY
+				cycle_id,
+				date_bin('15 minutes', observed_at, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
+				observed_at DESC,
+				id DESC
+		) AS chart_samples
+		ORDER BY observed_at ASC, id ASC
+	`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = sampleRows.Close() }()
+
+	for sampleRows.Next() {
+		var sample service.OpenAIQuotaSample
+		if err = sampleRows.Scan(&sample.CycleID, &sample.ObservedAt, &sample.UsedPercent); err != nil {
+			return nil, err
+		}
+		result.Samples = append(result.Samples, sample)
+	}
+	if err = sampleRows.Err(); err != nil {
 		return nil, err
 	}
 	return result, nil

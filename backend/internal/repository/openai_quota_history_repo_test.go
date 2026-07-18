@@ -32,6 +32,11 @@ func TestExtractOpenAIQuotaSnapshotRejectsInvalidPercent(t *testing.T) {
 	}
 }
 
+func TestOpenAIQuotaSampleBucketStart(t *testing.T) {
+	observedAt := time.Date(2026, 7, 18, 11, 43, 25, 0, time.UTC)
+	require.Equal(t, time.Date(2026, 7, 18, 11, 40, 0, 0, time.UTC), observedAt.Truncate(openAIQuotaSampleBucket))
+}
+
 func TestDetectOpenAIQuotaReset(t *testing.T) {
 	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	previousReset := base.Add(2 * time.Hour)

@@ -83,6 +83,11 @@
           {{ t('admin.accounts.openaiQuotaHistory.noCurrent') }}
         </div>
 
+        <OpenAIQuotaUsageChart
+          :samples="data?.samples ?? []"
+          :reset-times="resetTimes"
+        />
+
         <section>
           <h4 class="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('admin.accounts.openaiQuotaHistory.historyTitle') }}
@@ -145,10 +150,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import OpenAIQuotaUsageChart from './OpenAIQuotaUsageChart.vue'
 import { getOpenAIQuotaHistory, type OpenAIQuotaHistoryResponse } from '@/api/admin/accounts'
 import type { Account } from '@/types'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -168,6 +174,12 @@ const loading = ref(false)
 const error = ref('')
 const data = ref<OpenAIQuotaHistoryResponse | null>(null)
 let requestID = 0
+
+const resetTimes = computed(() =>
+  data.value?.history
+    .map((cycle) => cycle.reset_observed_at)
+    .filter((value): value is string => Boolean(value)) ?? []
+)
 
 const formatPercent = (value: number): string => {
   const rounded = Math.round(value * 10) / 10
