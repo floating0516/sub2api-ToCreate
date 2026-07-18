@@ -428,6 +428,34 @@ func (h *OpenAIOAuthHandler) QueryQuota(c *gin.Context) {
 	response.Success(c, usage)
 }
 
+// QueryQuotaHistory returns locally observed seven-day quota cycles.
+// GET /api/v1/admin/openai/accounts/:id/quota-history
+func (h *OpenAIOAuthHandler) QueryQuotaHistory(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	limit := 20
+	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+		limit, err = strconv.Atoi(rawLimit)
+		if err != nil || limit <= 0 {
+			response.BadRequest(c, "Invalid history limit")
+			return
+		}
+	}
+	if h.quotaService == nil {
+		response.BadRequest(c, "openai quota service is not enabled")
+		return
+	}
+	history, err := h.quotaService.GetQuotaHistory(c.Request.Context(), accountID, limit)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, history)
+}
+
 // QueryResetCredits queries available OpenAI/Codex reset credits and their expiration metadata.
 // GET /api/v1/admin/openai/accounts/:id/reset-credits
 func (h *OpenAIOAuthHandler) QueryResetCredits(c *gin.Context) {

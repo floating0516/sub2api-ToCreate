@@ -61,6 +61,17 @@
         </svg>
         {{ t('admin.accounts.openaiQuotaReset.reset') }}
       </button>
+
+      <button
+        v-if="!isShadow"
+        type="button"
+        class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+        :aria-label="t('admin.accounts.openaiQuotaHistory.buttonTooltip')"
+        :title="t('admin.accounts.openaiQuotaHistory.buttonTooltip')"
+        @click="showQuotaHistory = true"
+      >
+        <Icon name="clock" size="xs" />
+      </button>
     </div>
 
     <div v-if="primaryResetCreditExpiry" class="space-y-1">
@@ -128,6 +139,12 @@
       @confirm="confirmReset"
       @cancel="showResetConfirm = false"
     />
+
+    <OpenAIQuotaHistoryModal
+      :show="showQuotaHistory"
+      :account="account"
+      @close="showQuotaHistory = false"
+    />
   </div>
 </template>
 
@@ -135,6 +152,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Account } from '@/types'
+import Icon from '@/components/icons/Icon.vue'
 import {
   queryOpenAIQuota,
   resetOpenAIQuota,
@@ -142,6 +160,7 @@ import {
   type OpenAIQuotaResetResult
 } from '@/api/admin/accounts'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import OpenAIQuotaHistoryModal from './OpenAIQuotaHistoryModal.vue'
 
 const props = defineProps<{
   account: Account
@@ -159,6 +178,7 @@ const data = ref<OpenAIQuotaUsage | null>(null)
 const resetMessage = ref<string | null>(null)
 const showResetConfirm = ref(false)
 const showResetCreditDetails = ref(false)
+const showQuotaHistory = ref(false)
 
 // 影子账号的额度查询会 resolve 到母账号,但影子本身不支持重置(后端返回 409);
 // 重置必须在母账号上进行。前端据此禁用影子的重置入口(外审 F6)。
@@ -321,6 +341,7 @@ watch(
     resetting.value = false
     showResetConfirm.value = false
     showResetCreditDetails.value = false
+    showQuotaHistory.value = false
   }
 )
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1510,6 +1511,123 @@ func (s *AccountRepoSuite) TestUpdateExtra_ExhaustedCodexSnapshotSyncsSchedulerC
 	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
 	s.Require().Equal(service.StatusActive, cacheRecorder.setAccounts[0].Status)
 	s.Require().Equal(100.0, cacheRecorder.setAccounts[0].Extra["codex_7d_used_percent"])
+}
+
+func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "openai-quota-history",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+
+	firstObserved := time.Date(2026, 7, 14, 16, 0, 0, 0, time.UTC)
+	firstReset := firstObserved.Add(6 * 24 * time.Hour)
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  26.0,
+		"codex_7d_reset_at":      firstReset.Format(time.RFC3339),
+		"codex_usage_updated_at": firstObserved.Format(time.RFC3339),
+	}))
+
+	peakObserved := firstObserved.Add(8 * time.Hour)
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  36.0,
+		"codex_7d_reset_at":      firstReset.Format(time.RFC3339),
+		"codex_usage_updated_at": peakObserved.Format(time.RFC3339),
+	}))
+
+	resetObserved := peakObserved.Add(20 * time.Hour)
+	secondReset := resetObserved.Add(7 * 24 * time.Hour)
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  9.0,
+		"codex_7d_reset_at":      secondReset.Format(time.RFC3339),
+		"codex_usage_updated_at": resetObserved.Format(time.RFC3339),
+	}))
+
+	history, err := s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().NotNil(history.Current)
+	s.Require().Equal(9.0, history.Current.LastUsedPercent)
+	s.Require().Equal(9.0, history.Current.PeakUsedPercent)
+	s.Require().Len(history.History, 1)
+	s.Require().Equal(36.0, history.History[0].LastUsedPercent)
+	s.Require().Equal(36.0, history.History[0].PeakUsedPercent)
+	s.Require().NotNil(history.History[0].ResetToPercent)
+	s.Require().Equal(9.0, *history.History[0].ResetToPercent)
+	s.Require().Equal("usage_drop", history.History[0].DetectionReason)
+	s.Require().False(history.HasMore)
+
+	// An older async response may still update accounts.extra, but it must not
+	// rewind or split the ordered quota history.
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  2.0,
+		"codex_7d_reset_at":      firstReset.Format(time.RFC3339),
+		"codex_usage_updated_at": firstObserved.Add(time.Hour).Format(time.RFC3339),
+	}))
+	history, err = s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().Equal(9.0, history.Current.LastUsedPercent)
+	s.Require().Len(history.History, 1)
+}
+
+func (s *AccountRepoSuite) TestUpdateExtra_ConcurrentQuotaSnapshotsKeepOneActiveCycle() {
+	client := testEntClient(s.T())
+	repo := newAccountRepositoryWithSQL(client, integrationDB, nil)
+	account := mustCreateAccount(s.T(), client, &service.Account{
+		Name:     "openai-quota-history-concurrent",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+	s.T().Cleanup(func() {
+		_, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM accounts WHERE id = $1", account.ID)
+	})
+
+	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	updates := []map[string]any{
+		{
+			"codex_7d_used_percent":  20.0,
+			"codex_7d_reset_at":      base.Add(7 * 24 * time.Hour).Format(time.RFC3339),
+			"codex_usage_updated_at": base.Format(time.RFC3339),
+		},
+		{
+			"codex_7d_used_percent":  21.0,
+			"codex_7d_reset_at":      base.Add(7 * 24 * time.Hour).Format(time.RFC3339),
+			"codex_usage_updated_at": base.Add(time.Minute).Format(time.RFC3339),
+		},
+	}
+
+	var waitGroup sync.WaitGroup
+	errorsCh := make(chan error, len(updates))
+	for _, update := range updates {
+		update := update
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			errorsCh <- repo.UpdateExtra(context.Background(), account.ID, update)
+		}()
+	}
+	waitGroup.Wait()
+	close(errorsCh)
+	for err := range errorsCh {
+		s.Require().NoError(err)
+	}
+
+	history, err := repo.GetOpenAIQuotaHistory(context.Background(), account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().NotNil(history.Current)
+	s.Require().Equal(21.0, history.Current.LastUsedPercent)
+	s.Require().Empty(history.History)
+
+	var activeCount int
+	s.Require().NoError(scanSingleRow(
+		context.Background(),
+		integrationDB,
+		"SELECT COUNT(*) FROM openai_quota_cycles WHERE account_id = $1 AND reset_observed_at IS NULL",
+		[]any{account.ID},
+		&activeCount,
+	))
+	s.Require().Equal(1, activeCount)
 }
 
 func (s *AccountRepoSuite) TestUpdateExtra_SchedulerRelevantStillEnqueuesOutbox() {

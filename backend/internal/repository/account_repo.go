@@ -2288,11 +2288,12 @@ func (r *accountRepository) UpdateExtra(ctx context.Context, id int64, updates m
 
 	clearProbeSnapshot := upstreamBillingProbeExplicitlyDisabled(updates) || upstreamBillingProbeSnapshotClearRequested(updates)
 	durableSchedulerChange := shouldEnqueueSchedulerOutboxForExtraUpdates(updates) || clearProbeSnapshot
+	quotaSnapshot, recordQuotaHistory := extractOpenAIQuotaSnapshot(updates)
 	baseCtx := ctx
 	contextTx := dbent.TxFromContext(ctx)
 	client := clientFromContext(ctx, r.client)
 	var tx *dbent.Tx
-	if durableSchedulerChange && contextTx == nil {
+	if (durableSchedulerChange || recordQuotaHistory) && contextTx == nil {
 		var txErr error
 		tx, txErr = r.client.Tx(ctx)
 		if txErr != nil && !errors.Is(txErr, dbent.ErrTxStarted) {
@@ -2325,25 +2326,26 @@ func (r *accountRepository) UpdateExtra(ctx context.Context, id int64, updates m
 	if affected == 0 {
 		return service.ErrAccountNotFound
 	}
+	if recordQuotaHistory {
+		if err := recordOpenAIQuotaCycle(ctx, client, id, quotaSnapshot); err != nil {
+			return err
+		}
+	}
 	if durableSchedulerChange {
 		if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
 			return err
 		}
-		if tx != nil {
-			if err := tx.Commit(); err != nil {
-				return err
-			}
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
 		}
-		if contextTx == nil {
-			r.syncSchedulerAccountSnapshot(baseCtx, id)
-		}
-	} else {
-		// 观测型 extra 字段不需要触发 bucket 重建，但仍同步单账号快照，
-		// 让 sticky session / GetAccount 命中缓存时也能读到最新数据，
-		// 同时避免缓存局部 patch 覆盖掉并发写入的其它账号字段。
-		if dbent.TxFromContext(ctx) == nil {
-			r.syncSchedulerAccountSnapshot(ctx, id)
-		}
+	}
+	// 观测型 extra 字段不需要触发 bucket 重建，但仍同步单账号快照，
+	// 让 sticky session / GetAccount 命中缓存时也能读到最新数据，
+	// 同时避免缓存局部 patch 覆盖掉并发写入的其它账号字段。
+	if contextTx == nil {
+		r.syncSchedulerAccountSnapshot(baseCtx, id)
 	}
 	return nil
 }

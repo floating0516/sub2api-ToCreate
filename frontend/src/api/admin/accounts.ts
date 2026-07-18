@@ -828,11 +828,40 @@ export interface OpenAIQuotaResetResult {
   windows_reset: number
 }
 
+export interface OpenAIQuotaCycle {
+  id: number
+  cycle_started_at: string
+  last_observed_at: string
+  last_used_percent: number
+  peak_used_percent: number
+  provider_reset_at?: string
+  reset_observed_at?: string
+  reset_to_percent?: number
+  detection_reason?: string
+}
+
+export interface OpenAIQuotaHistoryResponse {
+  current?: OpenAIQuotaCycle
+  history: OpenAIQuotaCycle[]
+  has_more: boolean
+}
+
 /**
  * Query OpenAI/Codex rate-limit usage for an OAuth account.
  */
 export async function queryOpenAIQuota(id: number): Promise<OpenAIQuotaUsage> {
   const { data } = await apiClient.get<OpenAIQuotaUsage>(`/admin/openai/accounts/${id}/quota`)
+  return data
+}
+
+/**
+ * Read locally observed OpenAI/Codex seven-day quota cycles.
+ */
+export async function getOpenAIQuotaHistory(id: number, limit: number = 20): Promise<OpenAIQuotaHistoryResponse> {
+  const { data } = await apiClient.get<OpenAIQuotaHistoryResponse>(
+    `/admin/openai/accounts/${id}/quota-history`,
+    { params: { limit } }
+  )
   return data
 }
 
@@ -934,6 +963,7 @@ export const accountsAPI = {
   setPrivacy,
   revertProxyFallback,
   queryOpenAIQuota,
+  getOpenAIQuotaHistory,
   resetOpenAIQuota,
   createSparkShadow,
   getUpstreamBillingProbeSettings,

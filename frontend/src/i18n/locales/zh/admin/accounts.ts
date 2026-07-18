@@ -383,6 +383,22 @@ export default {
         confirmTitle: '确认重置周限',
         confirmMessage: '将消耗 1 次重置次数立即恢复当前窗口，剩余 {count} 次。此操作不可撤销，确定继续吗？'
       },
+      openaiQuotaHistory: {
+        title: '周额度历史',
+        buttonTooltip: '查看周额度重置历史',
+        refresh: '刷新周额度历史',
+        currentUsage: '当前已用',
+        cyclePeak: '本周期峰值',
+        expectedReset: '预计重置',
+        historyTitle: '重置记录',
+        resetDetected: '检测到重置',
+        peakBeforeReset: '重置前最高观测',
+        afterReset: '重置后',
+        lastObserved: '重置前最后观测',
+        noCurrent: '等待首次周额度采样',
+        noHistory: '暂无周额度重置记录',
+        loadFailed: '加载周额度历史失败'
+      },
       tier: {
         free: 'Free',
         pro: 'Pro',

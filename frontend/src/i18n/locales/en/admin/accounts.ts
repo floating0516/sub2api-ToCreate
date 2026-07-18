@@ -1315,6 +1315,22 @@ export default {
         confirmTitle: 'Confirm Weekly Limit Reset',
         confirmMessage: 'This will consume 1 reset credit to immediately restore the current window ({count} remaining). This action cannot be undone. Continue?'
       },
+      openaiQuotaHistory: {
+        title: 'Weekly Quota History',
+        buttonTooltip: 'View weekly quota reset history',
+        refresh: 'Refresh weekly quota history',
+        currentUsage: 'Current usage',
+        cyclePeak: 'Cycle peak',
+        expectedReset: 'Expected reset',
+        historyTitle: 'Reset history',
+        resetDetected: 'Reset detected',
+        peakBeforeReset: 'Peak before reset',
+        afterReset: 'After reset',
+        lastObserved: 'Last observation before reset',
+        noCurrent: 'Waiting for the first weekly quota sample',
+        noHistory: 'No weekly quota resets recorded',
+        loadFailed: 'Failed to load weekly quota history'
+      },
       tier: {
         free: 'Free',
         pro: 'Pro',

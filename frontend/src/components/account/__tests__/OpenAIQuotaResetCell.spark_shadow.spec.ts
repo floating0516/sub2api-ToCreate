@@ -7,6 +7,7 @@ import { queryOpenAIQuota } from '@/api/admin/accounts'
 vi.mock('@/api/admin/accounts', () => ({
   queryOpenAIQuota: vi.fn(),
   resetOpenAIQuota: vi.fn(),
+  getOpenAIQuotaHistory: vi.fn(),
 }))
 
 vi.mock('vue-i18n', async () => {
