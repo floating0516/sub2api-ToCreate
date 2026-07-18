@@ -1,7 +1,10 @@
 {
   "client_id": "lihe-chat-login",
   "client_secret": "SET_OUT_OF_BAND",
-  "redirect_uris": ["https://lihe.chat/oauth/openid/callback"],
+  "redirect_uris": [
+    "https://lihe.chat/oauth/openid/callback",
+    "https://lihe.chat/oauth/openid/link/callback"
+  ],
   "grant_types": ["authorization_code"],
   "response_types": ["code"],
   "scope": "openid profile email",

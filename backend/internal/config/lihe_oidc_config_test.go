@@ -15,6 +15,7 @@ func TestLoadLiheOIDCDefaultsDisabled(t *testing.T) {
 	require.Equal(t, "https://api.lihe.chat", cfg.LiheOIDC.Issuer)
 	require.Equal(t, "lihe-chat-login", cfg.LiheOIDC.ClientID)
 	require.Equal(t, "https://lihe.chat/oauth/openid/callback", cfg.LiheOIDC.RedirectURI)
+	require.Equal(t, "https://lihe.chat/oauth/openid/link/callback", cfg.LiheOIDC.LinkRedirectURI)
 	require.Equal(t, "/app/data/oidc-keys", cfg.LiheOIDC.KeyDirectory)
 }
 
@@ -67,6 +68,8 @@ func TestLoadLiheOIDCAcceptsFrozenProductionProtocol(t *testing.T) {
 	require.True(t, cfg.LiheOIDC.Enabled)
 	require.Equal(t, "https://api.lihe.chat", cfg.LiheOIDC.Issuer)
 	require.Equal(t, "lihe-chat-login", cfg.LiheOIDC.ClientID)
+	require.Equal(t, "https://lihe.chat/oauth/openid/callback", cfg.LiheOIDC.RedirectURI)
+	require.Equal(t, "https://lihe.chat/oauth/openid/link/callback", cfg.LiheOIDC.LinkRedirectURI)
 }
 
 func TestLoadLiheOIDCRejectsInvalidIssuerAndKeyDirectory(t *testing.T) {
@@ -78,6 +81,7 @@ func TestLoadLiheOIDCRejectsInvalidIssuerAndKeyDirectory(t *testing.T) {
 	}{
 		{"issuer scheme", "LIHE_OIDC_ISSUER", "http://api.lihe.chat", "must use https"},
 		{"issuer path", "LIHE_OIDC_ISSUER", "https://api.lihe.chat/tenant", "must not include a path"},
+		{"link redirect query", "LIHE_OIDC_LINK_REDIRECT_URI", "https://lihe.chat/oauth/openid/link/callback?unsafe=1", "must not include query"},
 		{"relative key directory", "LIHE_OIDC_KEY_DIRECTORY", "data/oidc", "must be an absolute path"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -90,4 +94,14 @@ func TestLoadLiheOIDCRejectsInvalidIssuerAndKeyDirectory(t *testing.T) {
 			require.ErrorContains(t, err, test.errorSubstr)
 		})
 	}
+}
+
+func TestLoadLiheOIDCRejectsDuplicateRedirectURIs(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("LIHE_OIDC_ENABLED", "true")
+	t.Setenv("LIHE_OIDC_CLIENT_SECRET", strings.Repeat("c", 32))
+	t.Setenv("LIHE_OIDC_HMAC_SECRET", strings.Repeat("h", 32))
+	t.Setenv("LIHE_OIDC_LINK_REDIRECT_URI", "https://lihe.chat/oauth/openid/callback")
+	_, err := Load()
+	require.ErrorContains(t, err, "redirect URIs must be distinct")
 }

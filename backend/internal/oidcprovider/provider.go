@@ -133,7 +133,10 @@ func NewProvider(db *sql.DB, cfg *config.Config) (*Provider, error) {
 		DefaultClient: &fosite.DefaultClient{
 			ID:            cfg.LiheOIDC.ClientID,
 			Secret:        hashedSecret,
-			RedirectURIs:  []string{cfg.LiheOIDC.RedirectURI},
+			RedirectURIs: []string{
+				cfg.LiheOIDC.RedirectURI,
+				cfg.LiheOIDC.LinkRedirectURI,
+			},
 			GrantTypes:    []string{"authorization_code"},
 			ResponseTypes: []string{"code"},
 			Scopes:        []string(oidcScopes),
@@ -403,7 +406,7 @@ func (p *Provider) validateAuthorizationParameters(params url.Values) error {
 	}
 	if params.Get("response_type") != "code" ||
 		params.Get("client_id") != p.config.ClientID ||
-		params.Get("redirect_uri") != p.config.RedirectURI ||
+		!p.isAllowedRedirectURI(params.Get("redirect_uri")) ||
 		params.Get("code_challenge_method") != "S256" ||
 		!pkceChallengePattern.MatchString(params.Get("code_challenge")) ||
 		!validEntropyParameter(params.Get("state")) ||
@@ -421,7 +424,11 @@ func (p *Provider) validateAuthorizationParameters(params url.Values) error {
 }
 
 func (p *Provider) authorizationErrorRedirect(params url.Values, errorCode string) string {
-	callback, err := url.Parse(p.config.RedirectURI)
+	redirectURI := params.Get("redirect_uri")
+	if !p.isAllowedRedirectURI(redirectURI) {
+		return ""
+	}
+	callback, err := url.Parse(redirectURI)
 	if err != nil {
 		return ""
 	}
@@ -430,6 +437,10 @@ func (p *Provider) authorizationErrorRedirect(params url.Values, errorCode strin
 	query.Set("state", params.Get("state"))
 	callback.RawQuery = query.Encode()
 	return callback.String()
+}
+
+func (p *Provider) isAllowedRedirectURI(candidate string) bool {
+	return candidate == p.config.RedirectURI || candidate == p.config.LinkRedirectURI
 }
 
 func (p *Provider) newAuthorizationHTTPRequest(ctx context.Context, params url.Values) (*http.Request, error) {

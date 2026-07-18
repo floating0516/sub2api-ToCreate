@@ -11,7 +11,8 @@ not share clients, secrets, database tables, authorization codes, or tokens.
 | Issuer | `https://api.lihe.chat` |
 | Discovery | `https://api.lihe.chat/.well-known/openid-configuration` |
 | Client ID | `lihe-chat-login` |
-| Redirect URI | `https://lihe.chat/oauth/openid/callback` |
+| Login redirect URI | `https://lihe.chat/oauth/openid/callback` |
+| Account-link redirect URI | `https://lihe.chat/oauth/openid/link/callback` |
 | Scope | `openid profile email` |
 | Flow | Authorization Code with PKCE S256 |
 | Client authentication | `client_secret_basic` |
@@ -41,8 +42,10 @@ redirect URI, exact scopes, nonce, state, and PKCE challenge, encrypts the
 short-lived request, and returns a random opaque handle. If the API user is not
 logged in, only that handle is preserved through the normal API login flow.
 
-The authenticated authorization endpoint returns a fixed-host callback URL.
-It never accepts a callback supplied by the SPA after preparation.
+The authenticated authorization endpoint returns the exact pre-registered
+callback from the validated request. Only the login and account-link callback
+URIs above are accepted; prefixes, wildcards, query strings, and fragments are
+rejected. It never accepts a callback supplied by the SPA after preparation.
 `prompt=none` returns `login_required` to that callback when no API session is
 available, and `prompt=login` forces API reauthentication. `max_age` is rejected
 in this phase because API refresh sessions do not yet retain a separate,

@@ -15,9 +15,10 @@ func frozenTestProvider() *Provider {
 	return &Provider{
 		enabled: true,
 		config: config.LiheOIDCConfig{
-			Issuer:      "https://api.lihe.chat",
-			ClientID:    "lihe-chat-login",
-			RedirectURI: "https://lihe.chat/oauth/openid/callback",
+			Issuer:          "https://api.lihe.chat",
+			ClientID:        "lihe-chat-login",
+			RedirectURI:     "https://lihe.chat/oauth/openid/callback",
+			LinkRedirectURI: "https://lihe.chat/oauth/openid/link/callback",
 		},
 	}
 }
@@ -66,6 +67,9 @@ func TestDiscoveryMatchesFrozenLiheContract(t *testing.T) {
 func TestAuthorizationParametersEnforceFrozenClientPKCEAndNonce(t *testing.T) {
 	provider := frozenTestProvider()
 	require.NoError(t, provider.validateAuthorizationParameters(validAuthorizationParams()))
+	linkParams := validAuthorizationParams()
+	linkParams.Set("redirect_uri", "https://lihe.chat/oauth/openid/link/callback")
+	require.NoError(t, provider.validateAuthorizationParameters(linkParams))
 
 	tests := []struct {
 		name   string
@@ -91,9 +95,10 @@ func TestAuthorizationParametersEnforceFrozenClientPKCEAndNonce(t *testing.T) {
 	}
 }
 
-func TestPromptNoneUsesOnlyTheFixedErrorCallback(t *testing.T) {
+func TestPromptNoneUsesTheValidatedRequestCallback(t *testing.T) {
 	provider := frozenTestProvider()
 	params := validAuthorizationParams()
+	params.Set("redirect_uri", "https://lihe.chat/oauth/openid/link/callback")
 	params.Set("prompt", "none")
 	require.NoError(t, provider.validateAuthorizationParameters(params))
 
@@ -102,9 +107,12 @@ func TestPromptNoneUsesOnlyTheFixedErrorCallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https", parsed.Scheme)
 	require.Equal(t, "lihe.chat", parsed.Host)
-	require.Equal(t, "/oauth/openid/callback", parsed.Path)
+	require.Equal(t, "/oauth/openid/link/callback", parsed.Path)
 	require.Equal(t, "login_required", parsed.Query().Get("error"))
 	require.Equal(t, params.Get("state"), parsed.Query().Get("state"))
+
+	params.Set("redirect_uri", "https://attacker.example/callback")
+	require.Empty(t, provider.authorizationErrorRedirect(params, "login_required"))
 }
 
 func TestProfileClaimsUseStableSubjectAndReliableEmailFlag(t *testing.T) {

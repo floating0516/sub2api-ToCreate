@@ -168,6 +168,7 @@ type LiheOIDCConfig struct {
 	ClientID                 string `mapstructure:"client_id"`
 	ClientSecret             string `mapstructure:"client_secret"`
 	RedirectURI              string `mapstructure:"redirect_uri"`
+	LinkRedirectURI          string `mapstructure:"link_redirect_uri"`
 	HMACSecret               string `mapstructure:"hmac_secret"`
 	KeyDirectory             string `mapstructure:"key_directory"`
 	KeyRotationDays          int    `mapstructure:"key_rotation_days"`
@@ -1640,6 +1641,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.LiheOIDC.ClientID = strings.TrimSpace(cfg.LiheOIDC.ClientID)
 	cfg.LiheOIDC.ClientSecret = strings.TrimSpace(cfg.LiheOIDC.ClientSecret)
 	cfg.LiheOIDC.RedirectURI = strings.TrimSpace(cfg.LiheOIDC.RedirectURI)
+	cfg.LiheOIDC.LinkRedirectURI = strings.TrimSpace(cfg.LiheOIDC.LinkRedirectURI)
 	cfg.LiheOIDC.HMACSecret = strings.TrimSpace(cfg.LiheOIDC.HMACSecret)
 	cfg.LiheOIDC.KeyDirectory = strings.TrimSpace(cfg.LiheOIDC.KeyDirectory)
 	cfg.OIDC.UsePKCEExplicit = hasExplicitConfigOrEnv("oidc_connect.use_pkce", "OIDC_CONNECT_USE_PKCE")
@@ -1896,6 +1898,7 @@ func setDefaults() {
 	viper.SetDefault("lihe_oidc.client_id", "lihe-chat-login")
 	viper.SetDefault("lihe_oidc.client_secret", "")
 	viper.SetDefault("lihe_oidc.redirect_uri", "https://lihe.chat/oauth/openid/callback")
+	viper.SetDefault("lihe_oidc.link_redirect_uri", "https://lihe.chat/oauth/openid/link/callback")
 	viper.SetDefault("lihe_oidc.hmac_secret", "")
 	viper.SetDefault("lihe_oidc.key_directory", "/app/data/oidc-keys")
 	viper.SetDefault("lihe_oidc.key_rotation_days", 30)
@@ -3358,12 +3361,16 @@ func validateLiheOIDCConfig(c *Config) error {
 		return fmt.Errorf("lihe_oidc secrets must be independent from jwt.secret")
 	}
 	for name, raw := range map[string]string{
-		"issuer":       oidc.Issuer,
-		"redirect_uri": oidc.RedirectURI,
+		"issuer":            oidc.Issuer,
+		"redirect_uri":      oidc.RedirectURI,
+		"link_redirect_uri": oidc.LinkRedirectURI,
 	} {
 		if err := validateLiheOAuthHTTPSURL(raw); err != nil {
 			return fmt.Errorf("lihe_oidc.%s invalid: %w", name, err)
 		}
+	}
+	if oidc.RedirectURI == oidc.LinkRedirectURI {
+		return fmt.Errorf("lihe_oidc redirect URIs must be distinct")
 	}
 	issuer, err := url.Parse(oidc.Issuer)
 	if err != nil {
