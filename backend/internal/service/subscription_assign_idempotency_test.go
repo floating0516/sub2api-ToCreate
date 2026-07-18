@@ -333,7 +333,7 @@ func TestAssignSubscriptionDoesNotReactivateFutureSuspendedSubscription(t *testi
 func TestAssignSubscriptionDoesNotReactivatePastExpirySuspendedSubscription(t *testing.T) {
 	start := time.Now().AddDate(0, 0, -31)
 	expiresAt := start.AddDate(0, 0, 30)
-	windowStart := startOfDay(start)
+	windowStart := start
 	groupRepo := &subscriptionGroupRepoStub{
 		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
 	}
@@ -383,7 +383,7 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 	}
 	subRepo := newSubscriptionUserSubRepoStub()
 	oldStart := time.Now().Add(-time.Hour)
-	oldWindowStart := startOfDay(oldStart)
+	oldWindowStart := oldStart
 	subRepo.seed(&UserSubscription{
 		ID:                 12,
 		UserID:             1002,
@@ -417,9 +417,9 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 	require.False(t, sub.StartsAt.Before(before))
 	require.False(t, sub.StartsAt.After(after))
 	require.Equal(t, sub.StartsAt.AddDate(0, 0, 30), sub.ExpiresAt)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.DailyWindowStart)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.WeeklyWindowStart)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.MonthlyWindowStart)
+	require.Equal(t, sub.StartsAt, *sub.DailyWindowStart)
+	require.Equal(t, sub.StartsAt, *sub.WeeklyWindowStart)
+	require.Equal(t, sub.StartsAt, *sub.MonthlyWindowStart)
 	require.Zero(t, sub.DailyUsageUSD)
 	require.Zero(t, sub.WeeklyUsageUSD)
 	require.Zero(t, sub.MonthlyUsageUSD)
