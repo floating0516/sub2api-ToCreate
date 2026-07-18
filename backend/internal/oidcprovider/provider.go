@@ -131,8 +131,8 @@ func NewProvider(db *sql.DB, cfg *config.Config) (*Provider, error) {
 	}
 	client := &fosite.DefaultOpenIDConnectClient{
 		DefaultClient: &fosite.DefaultClient{
-			ID:            cfg.LiheOIDC.ClientID,
-			Secret:        hashedSecret,
+			ID:     cfg.LiheOIDC.ClientID,
+			Secret: hashedSecret,
 			RedirectURIs: []string{
 				cfg.LiheOIDC.RedirectURI,
 				cfg.LiheOIDC.LinkRedirectURI,
