@@ -2350,6 +2350,26 @@ func (r *accountRepository) UpdateExtra(ctx context.Context, id int64, updates m
 	return nil
 }
 
+func (r *accountRepository) RecordOpenAIQuotaManualReset(ctx context.Context, accountID int64, observedAt time.Time) error {
+	if r == nil || r.client == nil {
+		return errors.New("nil account repository")
+	}
+	if contextTx := dbent.TxFromContext(ctx); contextTx != nil {
+		return recordOpenAIQuotaManualReset(ctx, contextTx.Client(), accountID, observedAt)
+	}
+
+	tx, err := r.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	if err = recordOpenAIQuotaManualReset(txCtx, tx.Client(), accountID, observedAt); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // UpdateUpstreamBillingProbeSnapshot stores a probe result only while the
 // network identity used by that probe is still current.
 func (r *accountRepository) UpdateUpstreamBillingProbeSnapshot(

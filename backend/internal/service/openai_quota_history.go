@@ -46,6 +46,12 @@ type OpenAIQuotaHistoryRepository interface {
 	GetOpenAIQuotaHistory(ctx context.Context, accountID int64, limit int) (*OpenAIQuotaHistoryResponse, error)
 }
 
+// OpenAIQuotaManualResetRecorder records a reset that was explicitly confirmed
+// by the upstream reset-credit endpoint.
+type OpenAIQuotaManualResetRecorder interface {
+	RecordOpenAIQuotaManualReset(ctx context.Context, accountID int64, observedAt time.Time) error
+}
+
 func normalizeOpenAIQuotaHistoryLimit(limit int) int {
 	if limit <= 0 {
 		return defaultOpenAIQuotaHistoryLimit

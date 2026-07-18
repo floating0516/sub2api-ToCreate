@@ -365,6 +365,13 @@ func (s *OpenAIQuotaService) ResetCredit(ctx context.Context, accountID int64) (
 		"code", payload.Code,
 		"windows_reset", payload.WindowsReset,
 	)
+	if payload.WindowsReset > 0 {
+		if recorder, ok := s.accountRepo.(OpenAIQuotaManualResetRecorder); ok {
+			if recordErr := recorder.RecordOpenAIQuotaManualReset(ctx, accountID, time.Now().UTC()); recordErr != nil {
+				slog.Warn("openai_quota_manual_reset_history_failed", "account_id", accountID, "error", recordErr)
+			}
+		}
+	}
 	return &payload, nil
 }
 

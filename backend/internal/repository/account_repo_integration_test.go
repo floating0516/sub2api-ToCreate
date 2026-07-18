@@ -1536,6 +1536,21 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 		"codex_usage_updated_at": peakObserved.Format(time.RFC3339),
 	}))
 
+	// A startup probe can briefly report 0% while retaining the same reset
+	// forecast. It must not split the cycle or add a chart point.
+	transientObserved := peakObserved.Add(time.Minute)
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  0.0,
+		"codex_7d_reset_at":      firstReset.Format(time.RFC3339),
+		"codex_usage_updated_at": transientObserved.Format(time.RFC3339),
+	}))
+	transientHistory, err := s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().NotNil(transientHistory.Current)
+	s.Require().Equal(36.0, transientHistory.Current.LastUsedPercent)
+	s.Require().Empty(transientHistory.History)
+	s.Require().Len(transientHistory.Samples, 2)
+
 	resetObserved := peakObserved.Add(20 * time.Hour)
 	secondReset := resetObserved.Add(7 * 24 * time.Hour)
 	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
@@ -1575,6 +1590,66 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 	s.Require().Equal(9.0, history.Current.LastUsedPercent)
 	s.Require().Len(history.History, 1)
 	s.Require().Len(history.Samples, 3)
+}
+
+func (s *AccountRepoSuite) TestRecordOpenAIQuotaManualReset() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "openai-quota-manual-reset",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+	observedAt := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	resetAt := observedAt.Add(7 * 24 * time.Hour)
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":  25.0,
+		"codex_7d_reset_at":      resetAt.Format(time.RFC3339),
+		"codex_usage_updated_at": observedAt.Format(time.RFC3339),
+	}))
+
+	manualAt := observedAt.Add(time.Minute)
+	s.Require().NoError(s.repo.RecordOpenAIQuotaManualReset(s.ctx, account.ID, manualAt))
+	history, err := s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().NotNil(history.Current)
+	s.Require().Equal(0.0, history.Current.LastUsedPercent)
+	s.Require().Len(history.History, 1)
+	s.Require().Equal("manual_reset", history.History[0].DetectionReason)
+	s.Require().NotNil(history.History[0].ResetToPercent)
+	s.Require().Equal(0.0, *history.History[0].ResetToPercent)
+	s.Require().Len(history.Samples, 2)
+}
+
+func (s *AccountRepoSuite) TestGetOpenAIQuotaHistory_HidesLegacyUncorroboratedReset() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "openai-quota-legacy-false-reset",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+	startedAt := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	falseResetAt := startedAt.Add(time.Minute)
+	providerResetAt := startedAt.Add(6 * 24 * time.Hour)
+	_, err := s.repo.sql.ExecContext(s.ctx, `
+		INSERT INTO openai_quota_cycles (
+			account_id, window_type, cycle_started_at, last_observed_at,
+			last_used_percent, peak_used_percent, provider_reset_at,
+			reset_observed_at, reset_to_percent, detection_reason
+		) VALUES ($1, '7d', $2, $3, 25, 25, $4, $3, 0, 'usage_drop')
+	`, account.ID, startedAt, falseResetAt, providerResetAt)
+	s.Require().NoError(err)
+	_, err = s.repo.sql.ExecContext(s.ctx, `
+		INSERT INTO openai_quota_cycles (
+			account_id, window_type, cycle_started_at, last_observed_at,
+			last_used_percent, peak_used_percent, provider_reset_at
+		) VALUES ($1, '7d', $2, $2, 25, 25, $3)
+	`, account.ID, falseResetAt, providerResetAt.Add(-15*time.Second))
+	s.Require().NoError(err)
+
+	history, err := s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().NotNil(history.Current)
+	s.Require().Empty(history.History)
 }
 
 func (s *AccountRepoSuite) TestUpdateExtra_ConcurrentQuotaSnapshotsKeepOneActiveCycle() {

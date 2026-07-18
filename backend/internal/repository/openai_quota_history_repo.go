@@ -20,6 +20,7 @@ const (
 	openAIQuotaResetStrongDrop      = 5.0
 	openAIQuotaResetForecastAdvance = time.Hour
 	openAIQuotaResetBoundaryGrace   = 5 * time.Minute
+	openAIQuotaTransientLowMaximum  = 5.0
 	openAIQuotaSampleBucket         = 5 * time.Minute
 	openAIQuotaSampleRetention      = 90 * 24 * time.Hour
 )
@@ -118,13 +119,11 @@ func detectOpenAIQuotaReset(previous *openAIQuotaActiveCycle, next *openAIQuotaS
 	}
 
 	drop := previous.LastUsedPercent - next.Used
+	peakDrop := previous.PeakUsedPercent - next.Used
 	forecastAdvanced := previous.ProviderResetAt != nil && next.ResetAt != nil &&
 		next.ResetAt.After(previous.ProviderResetAt.Add(openAIQuotaResetForecastAdvance))
 
-	if drop >= openAIQuotaResetStrongDrop {
-		return "usage_drop"
-	}
-	if drop >= openAIQuotaResetDropMinimum && forecastAdvanced {
+	if forecastAdvanced && (drop >= openAIQuotaResetDropMinimum || peakDrop >= openAIQuotaResetStrongDrop) {
 		return "usage_drop"
 	}
 	if forecastAdvanced && !next.ObservedAt.Before(previous.ProviderResetAt.Add(-openAIQuotaResetBoundaryGrace)) {
@@ -133,11 +132,18 @@ func detectOpenAIQuotaReset(previous *openAIQuotaActiveCycle, next *openAIQuotaS
 	return ""
 }
 
-func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64, snapshot *openAIQuotaSnapshot) error {
-	if q == nil || snapshot == nil || accountID <= 0 {
-		return nil
+func isUncorroboratedOpenAIQuotaLow(previous *openAIQuotaActiveCycle, next *openAIQuotaSnapshot) bool {
+	if previous == nil || next == nil || next.Used > openAIQuotaTransientLowMaximum {
+		return false
 	}
+	if previous.LastUsedPercent-next.Used < openAIQuotaResetDropMinimum {
+		return false
+	}
+	return previous.ProviderResetAt == nil || next.ResetAt == nil ||
+		!next.ResetAt.After(previous.ProviderResetAt.Add(openAIQuotaResetForecastAdvance))
+}
 
+func isOpenAIQuotaHistoryAccount(ctx context.Context, q sqlQueryer, accountID int64) (bool, error) {
 	var platform, accountType string
 	var parentAccountID sql.NullInt64
 	var quotaDimension sql.NullString
@@ -147,12 +153,24 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 		WHERE id = $1 AND deleted_at IS NULL
 	`, []any{accountID}, &platform, &accountType, &parentAccountID, &quotaDimension)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if platform != service.PlatformOpenAI || accountType != service.AccountTypeOAuth || parentAccountID.Valid {
+		return false, nil
+	}
+	return !quotaDimension.Valid || quotaDimension.String == "" || quotaDimension.String == "global", nil
+}
+
+func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64, snapshot *openAIQuotaSnapshot) error {
+	if q == nil || snapshot == nil || accountID <= 0 {
 		return nil
 	}
-	if quotaDimension.Valid && quotaDimension.String != "" && quotaDimension.String != "global" {
+
+	eligible, err := isOpenAIQuotaHistoryAccount(ctx, q, accountID)
+	if err != nil {
+		return err
+	}
+	if !eligible {
 		return nil
 	}
 
@@ -202,6 +220,11 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 		}
 		return recordOpenAIQuotaSample(ctx, q, accountID, cycleID, snapshot)
 	}
+	// Startup probes can briefly emit 0% without moving the provider's reset
+	// forecast. Keep the last corroborated point until a complete snapshot arrives.
+	if isUncorroboratedOpenAIQuotaLow(active, snapshot) {
+		return nil
+	}
 
 	_, err = q.ExecContext(ctx, `
 		UPDATE openai_quota_cycles
@@ -216,6 +239,67 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 		return err
 	}
 	return recordOpenAIQuotaSample(ctx, q, accountID, active.ID, snapshot)
+}
+
+func recordOpenAIQuotaManualReset(ctx context.Context, q sqlExecutor, accountID int64, observedAt time.Time) error {
+	if q == nil || accountID <= 0 {
+		return nil
+	}
+	eligible, err := isOpenAIQuotaHistoryAccount(ctx, q, accountID)
+	if err != nil {
+		return err
+	}
+	if !eligible {
+		return nil
+	}
+
+	observedAt = observedAt.UTC()
+	snapshot := &openAIQuotaSnapshot{ObservedAt: observedAt, Used: 0}
+	active, err := getOpenAIQuotaActiveCycleForUpdate(ctx, q, accountID)
+	if errors.Is(err, sql.ErrNoRows) {
+		var cycleID int64
+		err = scanSingleRow(ctx, q, `
+			INSERT INTO openai_quota_cycles (
+				account_id, window_type, cycle_started_at, last_observed_at,
+				last_used_percent, peak_used_percent
+			) VALUES ($1, $2, $3, $3, 0, 0)
+			RETURNING id
+		`, []any{accountID, openAIQuotaWindow7d, observedAt}, &cycleID)
+		if err != nil {
+			return err
+		}
+		return recordOpenAIQuotaSample(ctx, q, accountID, cycleID, snapshot)
+	}
+	if err != nil {
+		return err
+	}
+	if !observedAt.After(active.LastObservedAt) {
+		observedAt = active.LastObservedAt.Add(time.Nanosecond)
+		snapshot.ObservedAt = observedAt
+	}
+
+	if _, err = q.ExecContext(ctx, `
+		UPDATE openai_quota_cycles
+		SET reset_observed_at = $1,
+			reset_to_percent = 0,
+			detection_reason = 'manual_reset',
+			updated_at = NOW()
+		WHERE id = $2 AND reset_observed_at IS NULL
+	`, observedAt, active.ID); err != nil {
+		return err
+	}
+	var cycleID int64
+	err = scanSingleRow(ctx, q, `
+		INSERT INTO openai_quota_cycles (
+			account_id, window_type, cycle_started_at, last_observed_at,
+			last_used_percent, peak_used_percent
+		) VALUES ($1, $2, $3, $3, 0, 0)
+		RETURNING id
+	`, []any{accountID, openAIQuotaWindow7d, observedAt}, &cycleID)
+	if err != nil {
+		return err
+	}
+	return recordOpenAIQuotaSample(ctx, q, accountID, cycleID, snapshot)
 }
 
 func recordOpenAIQuotaSample(
@@ -314,11 +398,31 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 	}
 
 	rows, err := r.sql.QueryContext(ctx, `
+		WITH ordered_cycles AS (
+			SELECT id, cycle_started_at, last_observed_at, last_used_percent,
+				peak_used_percent, provider_reset_at, reset_observed_at,
+				reset_to_percent, COALESCE(detection_reason, '') AS detection_reason,
+				LEAD(cycle_started_at) OVER (
+					ORDER BY cycle_started_at ASC, id ASC
+				) AS next_cycle_started_at,
+				LEAD(provider_reset_at) OVER (
+					ORDER BY cycle_started_at ASC, id ASC
+				) AS next_provider_reset_at
+			FROM openai_quota_cycles
+			WHERE account_id = $1 AND window_type = $2
+		)
 		SELECT id, cycle_started_at, last_observed_at, last_used_percent,
 			peak_used_percent, provider_reset_at, reset_observed_at,
-			reset_to_percent, COALESCE(detection_reason, '')
-		FROM openai_quota_cycles
-		WHERE account_id = $1 AND window_type = $2 AND reset_observed_at IS NOT NULL
+			reset_to_percent, detection_reason
+		FROM ordered_cycles
+		WHERE reset_observed_at IS NOT NULL
+			AND NOT (
+				detection_reason = 'usage_drop'
+				AND next_cycle_started_at = reset_observed_at
+				AND provider_reset_at IS NOT NULL
+				AND next_provider_reset_at IS NOT NULL
+				AND next_provider_reset_at <= provider_reset_at + INTERVAL '1 hour'
+			)
 		ORDER BY reset_observed_at DESC, id DESC
 		LIMIT $3
 	`, accountID, openAIQuotaWindow7d, limit+1)

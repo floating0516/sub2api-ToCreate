@@ -27,7 +27,9 @@ import (
 // stubQuotaAccountRepo 是多账号 AccountRepository stub，仅实现 GetByID。
 type stubQuotaAccountRepo struct {
 	AccountRepository
-	accounts map[int64]*Account
+	accounts              map[int64]*Account
+	manualResetAccountIDs []int64
+	manualResetErr        error
 }
 
 func (r *stubQuotaAccountRepo) GetByID(_ context.Context, id int64) (*Account, error) {
@@ -45,6 +47,11 @@ func (r *stubQuotaAccountRepo) UpdateCredentials(_ context.Context, id int64, cr
 	}
 	acc.Credentials = credentials
 	return nil
+}
+
+func (r *stubQuotaAccountRepo) RecordOpenAIQuotaManualReset(_ context.Context, accountID int64, _ time.Time) error {
+	r.manualResetAccountIDs = append(r.manualResetAccountIDs, accountID)
+	return r.manualResetErr
 }
 
 // stubQuotaTokenCache 实现 OpenAITokenCache，返回预设静态 token。
@@ -193,7 +200,10 @@ func TestResetCreditAgentIdentityUsesAssertionAndRecoversInvalidTaskOnce(t *test
 			"chatgpt_account_id": "account-reset-recovery",
 		},
 	}
-	repo := &stubQuotaAccountRepo{accounts: map[int64]*Account{account.ID: account}}
+	repo := &stubQuotaAccountRepo{
+		accounts:       map[int64]*Account{account.ID: account},
+		manualResetErr: errors.New("history unavailable"),
+	}
 	resetCalls := 0
 	registerCalls := 0
 	var assertions []string
@@ -235,6 +245,7 @@ func TestResetCreditAgentIdentityUsesAssertionAndRecoversInvalidTaskOnce(t *test
 	require.NotEqual(t, assertions[0], assertions[1])
 	require.Equal(t, "task-reset-new", account.GetCredential("task_id"))
 	require.Equal(t, []int64{account.ID}, invalidator.accountIDs)
+	require.Equal(t, []int64{account.ID}, repo.manualResetAccountIDs)
 }
 
 func TestResetCreditAgentIdentityReusesConcurrentlyRecoveredTask(t *testing.T) {
@@ -290,6 +301,7 @@ func TestResetCreditAgentIdentityReusesConcurrentlyRecoveredTask(t *testing.T) {
 	require.Zero(t, registerCalls)
 	require.Equal(t, "task-reset-old", decodeAgentAssertionTask(t, assertions[0]))
 	require.Equal(t, "task-reset-concurrent", decodeAgentAssertionTask(t, assertions[1]))
+	require.Equal(t, []int64{account.ID}, repo.manualResetAccountIDs)
 }
 
 // ── Part B: prepareUpstreamCall 影子 resolve ──────────────────────────────

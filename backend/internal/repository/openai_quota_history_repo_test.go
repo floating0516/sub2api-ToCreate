@@ -85,10 +85,26 @@ func TestDetectOpenAIQuotaReset(t *testing.T) {
 			want:         "usage_drop",
 		},
 		{
-			name:         "strong early drop",
+			name:         "uncorroborated strong early drop",
 			previousUsed: 36,
 			nextUsed:     9,
 			observedAt:   base.Add(time.Minute),
+		},
+		{
+			name:         "strong drop with unchanged forecast",
+			previousUsed: 36,
+			nextUsed:     0,
+			observedAt:   base.Add(time.Minute),
+			previousAt:   &previousReset,
+			nextAt:       &previousReset,
+		},
+		{
+			name:         "strong drop with advanced forecast",
+			previousUsed: 36,
+			nextUsed:     9,
+			observedAt:   base.Add(time.Minute),
+			previousAt:   &previousReset,
+			nextAt:       &weekLater,
 			want:         "usage_drop",
 		},
 		{
@@ -124,6 +140,31 @@ func TestDetectOpenAIQuotaReset(t *testing.T) {
 			require.Equal(t, tt.want, detectOpenAIQuotaReset(previous, next))
 		})
 	}
+}
+
+func TestIsUncorroboratedOpenAIQuotaLow(t *testing.T) {
+	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
+	resetAt := base.Add(7 * 24 * time.Hour)
+	previous := &openAIQuotaActiveCycle{
+		LastUsedPercent: 25,
+		ProviderResetAt: &resetAt,
+	}
+
+	require.True(t, isUncorroboratedOpenAIQuotaLow(previous, &openAIQuotaSnapshot{
+		ObservedAt: base.Add(time.Minute),
+		Used:       0,
+		ResetAt:    &resetAt,
+	}))
+	require.False(t, isUncorroboratedOpenAIQuotaLow(previous, &openAIQuotaSnapshot{
+		ObservedAt: base.Add(time.Minute),
+		Used:       0,
+		ResetAt:    timePointer(resetAt.Add(7 * 24 * time.Hour)),
+	}))
+	require.False(t, isUncorroboratedOpenAIQuotaLow(previous, &openAIQuotaSnapshot{
+		ObservedAt: base.Add(time.Minute),
+		Used:       24.7,
+		ResetAt:    &resetAt,
+	}))
 }
 
 func timePointer(value time.Time) *time.Time {
