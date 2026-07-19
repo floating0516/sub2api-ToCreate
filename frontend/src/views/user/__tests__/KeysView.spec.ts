@@ -290,7 +290,7 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockResolvedValue({})
     getLiheIntegration.mockResolvedValue({
       enabled: true,
-      connect_url: 'https://chat.lihe.chat/connect/lihe',
+      connect_url: 'https://lihe.chat/connect/lihe',
       tokens: [],
     })
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
@@ -321,12 +321,29 @@ describe('user KeysView column settings', () => {
 
   it('shows a per-key Lihe Chat import action only when the integration is enabled', async () => {
     getPublicSettings.mockResolvedValueOnce({ lihe_oauth_enabled: true })
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), id: 90 }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
     const wrapper = await mountView()
 
     const importAction = wrapper.get('[data-test="lihe-import-button"]')
     expect(importAction.text()).toContain('Import to chat site')
-    expect(importAction.attributes('href')).toBe('https://chat.lihe.chat/connect/lihe?api_key_id=1')
-    expect(importAction.attributes('data-api-key-id')).toBe('1')
+    expect(importAction.attributes('href')).toBe(
+      'https://lihe.chat/login?redirect_to=%2Fconnect%2Flihe%3Fapi_key_id%3D90%26reconnect%3D1',
+    )
+    expect(importAction.attributes('data-api-key-id')).toBe('90')
+
+    const loginTarget = new URL(importAction.attributes('href'))
+    const redirectTo = loginTarget.searchParams.get('redirect_to')
+    expect([...loginTarget.searchParams.keys()]).toEqual(['redirect_to'])
+    expect(redirectTo).toBe('/connect/lihe?api_key_id=90&reconnect=1')
+
+    const importTarget = new URL(redirectTo!, loginTarget.origin)
+    expect([...importTarget.searchParams.keys()]).toEqual(['api_key_id', 'reconnect'])
     expect(importAction.attributes('href')).not.toContain('sk-test-key')
     expect(getLiheIntegration).toHaveBeenCalledOnce()
   })
@@ -346,8 +363,8 @@ describe('user KeysView column settings', () => {
 
     expect(actions).toHaveLength(2)
     expect(actions.map((action) => action.attributes('href'))).toEqual([
-      'https://chat.lihe.chat/connect/lihe?api_key_id=1',
-      'https://chat.lihe.chat/connect/lihe?api_key_id=2',
+      'https://lihe.chat/login?redirect_to=%2Fconnect%2Flihe%3Fapi_key_id%3D1%26reconnect%3D1',
+      'https://lihe.chat/login?redirect_to=%2Fconnect%2Flihe%3Fapi_key_id%3D2%26reconnect%3D1',
     ])
     expect(actions.map((action) => action.attributes('href')).join(' ')).not.toContain('sk-')
   })

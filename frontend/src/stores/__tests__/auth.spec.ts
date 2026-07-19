@@ -314,6 +314,35 @@ describe('useAuthStore', () => {
     })
   })
 
+  describe('register', () => {
+    it('replaces an existing account session with the newly registered account', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+
+      const registeredUser = {
+        ...fakeUser,
+        id: 3,
+        username: 'new-user',
+        email: 'new-user@example.com',
+      }
+      mockRegister.mockResolvedValue({
+        ...fakeAuthResponse,
+        access_token: 'new-account-token',
+        refresh_token: 'new-account-refresh-token',
+        user: registeredUser,
+      })
+
+      await store.register({ email: registeredUser.email, password: 'new-secret-123' })
+
+      expect(store.token).toBe('new-account-token')
+      expect(store.user).toEqual(registeredUser)
+      expect(localStorage.getItem('auth_token')).toBe('new-account-token')
+      expect(localStorage.getItem('refresh_token')).toBe('new-account-refresh-token')
+      expect(JSON.parse(localStorage.getItem('auth_user')!)).toEqual(registeredUser)
+    })
+  })
+
   // --- isAdmin ---
 
   describe('isAdmin', () => {
