@@ -50,6 +50,73 @@ func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 	require.Zero(t, calls.Load())
 }
 
+func TestAPIKeyAuthAcceptsAnthropicLiheTokenFromXAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(42)
+	user := &service.User{
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	group := &service.Group{
+		ID:       groupID,
+		Platform: service.PlatformAnthropic,
+		Status:   service.StatusActive,
+	}
+	apiKey := &service.APIKey{
+		ID:      100,
+		UserID:  user.ID,
+		GroupID: &groupID,
+		Status:  service.StatusAPIKeyActive,
+		User:    user,
+		Group:   group,
+	}
+	var ordinaryLookupCalls atomic.Int32
+	repo := &liheAPIKeyAuthRepo{
+		stubApiKeyRepo: &stubApiKeyRepo{
+			getByKey: func(context.Context, string) (*service.APIKey, error) {
+				ordinaryLookupCalls.Add(1)
+				return nil, service.ErrAPIKeyNotFound
+			},
+		},
+		resolved: &service.LiheResolvedAccess{
+			TokenID:         19,
+			TokenUserID:     user.ID,
+			Scopes:          []string{service.LiheOAuthScopeModelsRead, service.LiheOAuthScopeChatWrite},
+			BindingFound:    true,
+			BindingProvider: service.PlatformAnthropic,
+			BindingGroupID:  groupID,
+			APIKey:          apiKey,
+		},
+	}
+	cfg := &config.Config{
+		RunMode: config.RunModeSimple,
+		LiheOAuth: config.LiheOAuthConfig{
+			Enabled:  true,
+			ClientID: "lihe-chat",
+		},
+	}
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	router.GET("/v1/models", func(c *gin.Context) {
+		resolvedKey, ok := GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		require.Equal(t, apiKey.ID, resolvedKey.ID)
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("x-api-key", service.LiheAccessTokenPrefix+"anthropic-token")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Zero(t, ordinaryLookupCalls.Load())
+}
+
 func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -1450,6 +1517,16 @@ func requireAPIKeyAuthError(t *testing.T, w *httptest.ResponseRecorder, code, me
 type stubApiKeyRepo struct {
 	getByKey       func(ctx context.Context, key string) (*service.APIKey, error)
 	updateLastUsed func(ctx context.Context, id int64, usedAt time.Time) error
+}
+
+type liheAPIKeyAuthRepo struct {
+	*stubApiKeyRepo
+	service.LiheOAuthRepository
+	resolved *service.LiheResolvedAccess
+}
+
+func (r *liheAPIKeyAuthRepo) ResolveLiheAccessToken(context.Context, string, string) (*service.LiheResolvedAccess, error) {
+	return r.resolved, nil
 }
 
 func (r *stubApiKeyRepo) Create(ctx context.Context, key *service.APIKey) error {

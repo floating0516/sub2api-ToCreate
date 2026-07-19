@@ -294,6 +294,37 @@ func TestLiheOAuthExchangeUsesPKCEAndRejectsReplay(t *testing.T) {
 	require.ErrorIs(t, err, ErrLiheInvalidGrant)
 }
 
+func TestLiheOAuthAnthropicTokenContract(t *testing.T) {
+	repo := &liheOAuthTestAPIKeyRepo{}
+	svc := newLiheOAuthTestService(repo)
+	groupID := int64(102)
+	repo.apiKeys[501].GroupID = &groupID
+	repo.apiKeys[501].Group = &Group{
+		ID:                 groupID,
+		Platform:           PlatformAnthropic,
+		Status:             StatusActive,
+		ActiveAccountCount: 1,
+	}
+	verifier := liheOAuthTestVerifier()
+	plainCode := issueLiheOAuthTestCode(t, svc, verifier)
+
+	result, err := svc.ExchangeLiheAuthorizationCode(
+		context.Background(),
+		plainCode,
+		"https://lihe.chat/api/integrations/lihe/callback",
+		verifier,
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "Bearer", result.TokenType)
+	require.Equal(t, "models:read chat:write", result.Scope)
+	require.Equal(t, []string{"anthropic"}, result.Providers)
+	require.Equal(t, "11111111-1111-4111-8111-111111111111", result.AccountID)
+	require.NotNil(t, repo.exchangeInput)
+	require.Equal(t, []string{LiheOAuthScopeModelsRead, LiheOAuthScopeChatWrite}, repo.exchangeInput.Scopes)
+	require.Equal(t, PlatformAnthropic, repo.exchangeInput.Bindings[0].Provider)
+}
+
 func TestLiheOAuthProviderNamesMatchLibreChatSchema(t *testing.T) {
 	tests := []struct {
 		internal string
@@ -571,6 +602,7 @@ func TestLiheOAuthGatewayScopeAllowlist(t *testing.T) {
 		ok     bool
 	}{
 		{http.MethodGet, "/v1/models", LiheOAuthScopeModelsRead, true},
+		{http.MethodGet, "/models", "", false},
 		{http.MethodPost, "/v1/chat/completions", LiheOAuthScopeChatWrite, true},
 		{http.MethodPost, "/v1/messages", LiheOAuthScopeChatWrite, true},
 		{http.MethodPost, "/v1/messages/count_tokens", LiheOAuthScopeChatWrite, true},

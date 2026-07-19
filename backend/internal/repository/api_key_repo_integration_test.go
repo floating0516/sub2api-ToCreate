@@ -157,6 +157,75 @@ func (s *APIKeyRepoSuite) TestLiheOAuthRevokeLeavesSelectedAPIKeyActive() {
 	s.Require().Equal(service.StatusAPIKeyActive, keyStatus)
 }
 
+func (s *APIKeyRepoSuite) TestLiheOAuthProviderTokensCoexistAndRevokeIndependently() {
+	user := s.mustCreateUser("lihe-provider-tokens@test.com")
+	openAIGroupEntity, err := s.client.Group.Create().
+		SetName("g-lihe-openai-token").
+		SetPlatform(service.PlatformOpenAI).
+		SetStatus(service.StatusActive).
+		Save(s.ctx)
+	s.Require().NoError(err)
+	openAIGroup := groupEntityToService(openAIGroupEntity)
+	anthropicGroupEntity, err := s.client.Group.Create().
+		SetName("g-lihe-anthropic-token").
+		SetPlatform(service.PlatformAnthropic).
+		SetStatus(service.StatusActive).
+		Save(s.ctx)
+	s.Require().NoError(err)
+	anthropicGroup := groupEntityToService(anthropicGroupEntity)
+	openAIKey := s.mustCreateApiKey(user.ID, "sk-lihe-openai-token", "OpenAI source", &openAIGroup.ID)
+	anthropicKey := s.mustCreateApiKey(user.ID, "sk-lihe-anthropic-token", "Anthropic source", &anthropicGroup.ID)
+	openAITokenHash := strings.Repeat("d", 64)
+	anthropicTokenHash := strings.Repeat("e", 64)
+	openAITokenID := s.mustCreateLiheTokenBinding(
+		openAITokenHash,
+		user.ID,
+		openAIKey.ID,
+		openAIGroup.ID,
+		openAIGroup.Platform,
+	)
+	anthropicTokenID := s.mustCreateLiheTokenBinding(
+		anthropicTokenHash,
+		user.ID,
+		anthropicKey.ID,
+		anthropicGroup.ID,
+		anthropicGroup.Platform,
+	)
+
+	tokens, err := s.repo.ListLiheAccessTokens(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 2)
+	s.Require().ElementsMatch([]int64{openAITokenID, anthropicTokenID}, []int64{tokens[0].ID, tokens[1].ID})
+
+	openAIResolved, err := s.repo.ResolveLiheAccessToken(s.ctx, openAITokenHash, "lihe-chat")
+	s.Require().NoError(err)
+	s.Require().NotNil(openAIResolved)
+	s.Require().NotNil(openAIResolved.APIKey)
+	s.Require().Equal(openAIKey.ID, openAIResolved.APIKey.ID)
+	anthropicResolved, err := s.repo.ResolveLiheAccessToken(s.ctx, anthropicTokenHash, "lihe-chat")
+	s.Require().NoError(err)
+	s.Require().NotNil(anthropicResolved)
+	s.Require().NotNil(anthropicResolved.APIKey)
+	s.Require().Equal(anthropicKey.ID, anthropicResolved.APIKey.ID)
+
+	revoked, err := s.repo.RevokeLiheAccessTokenByID(s.ctx, anthropicTokenID, user.ID)
+	s.Require().NoError(err)
+	s.Require().True(revoked)
+	anthropicResolved, err = s.repo.ResolveLiheAccessToken(s.ctx, anthropicTokenHash, "lihe-chat")
+	s.Require().NoError(err)
+	s.Require().Nil(anthropicResolved)
+	openAIResolved, err = s.repo.ResolveLiheAccessToken(s.ctx, openAITokenHash, "lihe-chat")
+	s.Require().NoError(err)
+	s.Require().NotNil(openAIResolved)
+	s.Require().NotNil(openAIResolved.APIKey)
+	s.Require().Equal(openAIKey.ID, openAIResolved.APIKey.ID)
+
+	tokens, err = s.repo.ListLiheAccessTokens(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().Equal(openAITokenID, tokens[0].ID)
+}
+
 func (s *APIKeyRepoSuite) TestLiheOAuthResolveRejectsChangedAPIKeyGroup() {
 	user := s.mustCreateUser("lihe-changed-group@test.com")
 	originalGroup := s.mustCreateGroup("g-lihe-original")

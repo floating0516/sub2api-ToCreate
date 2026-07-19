@@ -336,6 +336,8 @@ describe('user KeysView column settings', () => {
       'https://lihe.chat/login?redirect_to=%2Fconnect%2Flihe%3Fapi_key_id%3D90%26reconnect%3D1',
     )
     expect(importAction.attributes('data-api-key-id')).toBe('90')
+    expect(importAction.attributes('target')).toBe('_blank')
+    expect(importAction.attributes('rel')).toBe('noopener noreferrer')
 
     const loginTarget = new URL(importAction.attributes('href'))
     const redirectTo = loginTarget.searchParams.get('redirect_to')

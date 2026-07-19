@@ -393,6 +393,8 @@
                 v-if="liheIntegration?.enabled && liheIntegration.connect_url"
                 :href="buildLiheLoginUrl(row.id)"
                 :data-api-key-id="row.id"
+                target="_blank"
+                rel="noopener noreferrer"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                 data-test="lihe-import-button"
               >
