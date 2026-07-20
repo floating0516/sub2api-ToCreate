@@ -56,6 +56,7 @@ const DataTableStub = {
     <div data-testid="data-table">
       <span data-testid="column-keys">{{ columns.map(column => column.key).join(',') }}</span>
       <div v-for="row in data" :key="row.id">
+        <slot name="cell-price" :row="row" :value="row.price" />
         <slot name="cell-unit_price" :row="row" :value="row.unit_price" />
       </div>
     </div>
@@ -116,5 +117,46 @@ describe('AdminPaymentPlansView product catalog', () => {
     expect(wrapper.get('[data-testid="column-keys"]').text()).toContain('sku,name,quota_usd,price,unit_price')
     expect(wrapper.text()).toContain('¥0.1990')
     expect(wrapper.text()).toContain('$0.1990')
+  })
+
+  it('uses the configured currency symbol and keeps legacy prices in USD', async () => {
+    getPlans.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'CNY plan',
+          group_id: 1,
+          price: 499,
+          original_price: 599,
+          currency: 'CNY',
+          validity_days: 30,
+          validity_unit: 'day',
+          sort_order: 0,
+          for_sale: true,
+          features: [],
+        },
+        {
+          id: 2,
+          name: 'Legacy plan',
+          group_id: 1,
+          price: 10,
+          original_price: 0,
+          currency: '',
+          validity_days: 30,
+          validity_unit: 'day',
+          sort_order: 0,
+          for_sale: true,
+          features: [],
+        },
+      ],
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('¥499.00')
+    expect(wrapper.text()).toContain('CNY')
+    expect(wrapper.text()).toContain('¥599.00')
+    expect(wrapper.text()).toContain('$10.00')
   })
 })
