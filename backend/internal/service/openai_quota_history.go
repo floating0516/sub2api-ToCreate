@@ -28,10 +28,10 @@ type OpenAIQuotaCycle struct {
 
 // OpenAIQuotaSample is one downsampled point in the seven-day usage timeline.
 type OpenAIQuotaSample struct {
-	CycleID     int64     `json:"cycle_id"`
-	ObservedAt  time.Time `json:"observed_at"`
-	UsedPercent float64   `json:"used_percent"`
-	LocalTokens int64     `json:"local_tokens"` // Cumulative locally logged tokens in this provider window.
+	CycleID      int64     `json:"cycle_id"`
+	ObservedAt   time.Time `json:"observed_at"`
+	UsedPercent  float64   `json:"used_percent"`
+	LocalCostUSD float64   `json:"local_cost_usd"` // Cumulative account-billed cost in this provider window.
 }
 
 type OpenAIQuotaHistoryResponse struct {

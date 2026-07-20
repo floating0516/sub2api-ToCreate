@@ -1337,7 +1337,7 @@ export default {
         expectedReset: 'Expected reset',
         chartTitle: 'Quota and usage over the last 30 days',
         usageLegend: 'Usage',
-        localTokens: 'Local token usage',
+        localUsage: 'Local usage',
         resetLegend: 'Reset',
         noSamples: 'Usage samples will appear after the next quota observation',
         historyTitle: 'Reset history',

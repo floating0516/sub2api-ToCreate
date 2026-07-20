@@ -483,7 +483,7 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 				chart_samples.id AS event_id,
 				chart_samples.id AS sample_id,
 				chart_samples.used_percent,
-				0::BIGINT AS token_delta
+				0::NUMERIC AS cost_delta
 			FROM chart_samples
 
 			UNION ALL
@@ -495,12 +495,8 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 				usage_logs.id AS event_id,
 				NULL::BIGINT AS sample_id,
 				NULL::DOUBLE PRECISION AS used_percent,
-				(
-					usage_logs.input_tokens
-					+ usage_logs.output_tokens
-					+ usage_logs.cache_creation_tokens
-					+ usage_logs.cache_read_tokens
-				)::BIGINT AS token_delta
+				COALESCE(usage_logs.account_stats_cost, usage_logs.total_cost)
+					* COALESCE(usage_logs.account_rate_multiplier, 1) AS cost_delta
 			FROM sampled_cycles
 			JOIN usage_logs
 				ON usage_logs.account_id = $1
@@ -514,14 +510,14 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 				event_id,
 				sample_id,
 				used_percent,
-				CAST(SUM(token_delta) OVER (
+				CAST(SUM(cost_delta) OVER (
 					PARTITION BY cycle_id
 					ORDER BY event_at ASC, event_order ASC, event_id ASC
 					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-				) AS BIGINT) AS local_tokens
+				) AS DOUBLE PRECISION) AS local_cost_usd
 			FROM usage_timeline
 		)
-		SELECT cycle_id, event_at, used_percent, local_tokens
+		SELECT cycle_id, event_at, used_percent, local_cost_usd
 		FROM samples_with_usage
 		WHERE sample_id IS NOT NULL
 		ORDER BY event_at ASC, event_id ASC
@@ -537,7 +533,7 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 			&sample.CycleID,
 			&sample.ObservedAt,
 			&sample.UsedPercent,
-			&sample.LocalTokens,
+			&sample.LocalCostUSD,
 		); err != nil {
 			return nil, err
 		}

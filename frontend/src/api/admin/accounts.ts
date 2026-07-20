@@ -844,7 +844,7 @@ export interface OpenAIQuotaSample {
   cycle_id: number
   observed_at: string
   used_percent: number
-  local_tokens: number
+  local_cost_usd: number
 }
 
 export interface OpenAIQuotaHistoryResponse {

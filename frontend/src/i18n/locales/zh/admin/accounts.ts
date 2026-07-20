@@ -400,7 +400,7 @@ export default {
         expectedReset: '预计重置',
         chartTitle: '近 30 天使用率与用量',
         usageLegend: '使用率',
-        localTokens: '本地 Token 用量',
+        localUsage: '本地用量',
         resetLegend: '重置',
         noSamples: '等待下一次额度采样后生成曲线',
         historyTitle: '重置记录',

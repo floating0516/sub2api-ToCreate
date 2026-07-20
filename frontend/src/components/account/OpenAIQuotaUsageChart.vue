@@ -45,7 +45,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import type { OpenAIQuotaSample } from '@/api/admin/accounts'
-import { formatDateTime, formatNumberLocaleString } from '@/utils/format'
+import { formatCurrency, formatDateTime } from '@/utils/format'
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -71,7 +71,7 @@ const colors = computed(() => ({
 type QuotaChartPoint = {
   x: number
   y: number
-  localTokens: number
+  localCostUSD: number
 }
 
 const normalizedSamples = computed(() =>
@@ -79,12 +79,12 @@ const normalizedSamples = computed(() =>
     .map((sample) => ({
       x: new Date(sample.observed_at).getTime(),
       y: sample.used_percent,
-      localTokens: sample.local_tokens
+      localCostUSD: sample.local_cost_usd
     }))
     .filter((sample) =>
       Number.isFinite(sample.x) &&
       Number.isFinite(sample.y) &&
-      Number.isFinite(sample.localTokens)
+      Number.isFinite(sample.localCostUSD)
     )
     .sort((left, right) => left.x - right.x)
 )
@@ -159,7 +159,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
           const point = context.raw as QuotaChartPoint
           return [
             `${t('admin.accounts.openaiQuotaHistory.usageLegend')}: ${typeof usedPercent === 'number' ? formatPercent(usedPercent) : '-'}`,
-            `${t('admin.accounts.openaiQuotaHistory.localTokens')}: ${Number.isFinite(point.localTokens) ? formatNumberLocaleString(point.localTokens) : '-'}`
+            `${t('admin.accounts.openaiQuotaHistory.localUsage')}: ${Number.isFinite(point.localCostUSD) ? formatCurrency(point.localCostUSD) : '-'}`
           ]
         }
       }

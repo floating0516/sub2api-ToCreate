@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { formatCurrency } from '@/utils/format'
 import OpenAIQuotaUsageChart from '../OpenAIQuotaUsageChart.vue'
 
 vi.mock('vue-i18n', async () => {
@@ -27,13 +28,13 @@ describe('OpenAIQuotaUsageChart', () => {
             cycle_id: 1,
             observed_at: '2026-07-18T10:00:00Z',
             used_percent: 16,
-            local_tokens: 1200
+            local_cost_usd: 1.2
           },
           {
             cycle_id: 1,
             observed_at: '2026-07-18T10:05:00Z',
             used_percent: 18.5,
-            local_tokens: 2500000
+            local_cost_usd: 2500.125
           }
         ],
         resetTimes: []
@@ -44,8 +45,8 @@ describe('OpenAIQuotaUsageChart', () => {
     const data = line.props('data') as any
     const options = line.props('options') as any
     expect(data.datasets[0].data).toEqual([
-      { x: Date.parse('2026-07-18T10:00:00Z'), y: 16, localTokens: 1200 },
-      { x: Date.parse('2026-07-18T10:05:00Z'), y: 18.5, localTokens: 2500000 }
+      { x: Date.parse('2026-07-18T10:00:00Z'), y: 16, localCostUSD: 1.2 },
+      { x: Date.parse('2026-07-18T10:05:00Z'), y: 18.5, localCostUSD: 2500.125 }
     ])
     expect(options.scales.x.type).toBe('linear')
     expect(options.scales.y.min).toBe(0)
@@ -56,7 +57,7 @@ describe('OpenAIQuotaUsageChart', () => {
     })
     expect(tooltipLines).toEqual([
       'admin.accounts.openaiQuotaHistory.usageLegend: 18.5%',
-      `admin.accounts.openaiQuotaHistory.localTokens: ${Number(2500000).toLocaleString()}`
+      `admin.accounts.openaiQuotaHistory.localUsage: ${formatCurrency(2500.125)}`
     ])
   })
 
@@ -68,13 +69,13 @@ describe('OpenAIQuotaUsageChart', () => {
             cycle_id: 1,
             observed_at: '2026-07-18T10:00:00Z',
             used_percent: 16,
-            local_tokens: 1200
+            local_cost_usd: 1.2
           },
           {
             cycle_id: 2,
             observed_at: '2026-07-18T10:10:00Z',
             used_percent: 0,
-            local_tokens: 0
+            local_cost_usd: 0
           }
         ],
         resetTimes: ['2026-07-18T10:05:00Z']

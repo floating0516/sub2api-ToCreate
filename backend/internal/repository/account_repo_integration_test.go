@@ -1533,8 +1533,8 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 		INSERT INTO usage_logs (
 			user_id, api_key_id, account_id, request_id, model,
 			input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens,
-			created_at
-		) VALUES ($1, $2, $3, 'quota-history-before-first', 'gpt-5', 100, 50, 20, 10, $4)
+			total_cost, account_stats_cost, account_rate_multiplier, created_at
+		) VALUES ($1, $2, $3, 'quota-history-before-first', 'gpt-5', 100, 50, 20, 10, 0.18, NULL, 1.5, $4)
 	`, user.ID, apiKey.ID, account.ID, firstObserved.Add(-12*time.Hour))
 	s.Require().NoError(err)
 	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
@@ -1548,8 +1548,8 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 		INSERT INTO usage_logs (
 			user_id, api_key_id, account_id, request_id, model,
 			input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens,
-			created_at
-		) VALUES ($1, $2, $3, 'quota-history-before-peak', 'gpt-5', 200, 80, 30, 10, $4)
+			total_cost, account_stats_cost, account_rate_multiplier, created_at
+		) VALUES ($1, $2, $3, 'quota-history-before-peak', 'gpt-5', 200, 80, 30, 10, 0.32, 0.25, 2, $4)
 	`, user.ID, apiKey.ID, account.ID, firstObserved.Add(4*time.Hour))
 	s.Require().NoError(err)
 	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
@@ -1595,11 +1595,11 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 	s.Require().False(history.HasMore)
 	s.Require().Len(history.Samples, 3)
 	s.Require().Equal(26.0, history.Samples[0].UsedPercent)
-	s.Require().Equal(int64(180), history.Samples[0].LocalTokens)
+	s.Require().InDelta(0.27, history.Samples[0].LocalCostUSD, 1e-9)
 	s.Require().Equal(36.0, history.Samples[1].UsedPercent)
-	s.Require().Equal(int64(500), history.Samples[1].LocalTokens)
+	s.Require().InDelta(0.77, history.Samples[1].LocalCostUSD, 1e-9)
 	s.Require().Equal(9.0, history.Samples[2].UsedPercent)
-	s.Require().Zero(history.Samples[2].LocalTokens)
+	s.Require().Zero(history.Samples[2].LocalCostUSD)
 	s.Require().Equal(history.History[0].ID, history.Samples[0].CycleID)
 	s.Require().Equal(history.Current.ID, history.Samples[2].CycleID)
 
