@@ -84,12 +84,14 @@ describe('OpenAIQuotaHistoryModal', () => {
         {
           cycle_id: 1,
           observed_at: '2026-07-17T07:06:46Z',
-          used_percent: 28
+          used_percent: 28,
+          local_tokens: 1200
         },
         {
           cycle_id: 2,
           observed_at: '2026-07-18T03:25:00Z',
-          used_percent: 0
+          used_percent: 0,
+          local_tokens: 0
         }
       ],
       has_more: false

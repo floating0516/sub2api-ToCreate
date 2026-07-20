@@ -447,8 +447,7 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 	}
 
 	sampleRows, err := r.sql.QueryContext(ctx, `
-		SELECT cycle_id, observed_at, used_percent
-		FROM (
+		WITH chart_samples AS (
 			SELECT DISTINCT ON (
 				cycle_id,
 				date_bin('15 minutes', observed_at, TIMESTAMPTZ '1970-01-01 00:00:00+00')
@@ -462,8 +461,70 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 				date_bin('15 minutes', observed_at, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
 				observed_at DESC,
 				id DESC
-		) AS chart_samples
-		ORDER BY observed_at ASC, id ASC
+		), sampled_cycles AS (
+			SELECT
+				cycles.id,
+				CASE
+					WHEN cycles.provider_reset_at IS NOT NULL
+						AND cycles.provider_reset_at > cycles.cycle_started_at
+						AND cycles.provider_reset_at <= cycles.cycle_started_at + INTERVAL '7 days'
+					THEN cycles.provider_reset_at - INTERVAL '7 days'
+					ELSE cycles.cycle_started_at
+				END AS usage_started_at,
+				MAX(chart_samples.observed_at) AS usage_ended_at
+			FROM openai_quota_cycles AS cycles
+			JOIN chart_samples ON chart_samples.cycle_id = cycles.id
+			GROUP BY cycles.id, cycles.cycle_started_at, cycles.provider_reset_at
+		), usage_timeline AS (
+			SELECT
+				chart_samples.cycle_id,
+				chart_samples.observed_at AS event_at,
+				1 AS event_order,
+				chart_samples.id AS event_id,
+				chart_samples.id AS sample_id,
+				chart_samples.used_percent,
+				0::BIGINT AS token_delta
+			FROM chart_samples
+
+			UNION ALL
+
+			SELECT
+				sampled_cycles.id AS cycle_id,
+				usage_logs.created_at AS event_at,
+				0 AS event_order,
+				usage_logs.id AS event_id,
+				NULL::BIGINT AS sample_id,
+				NULL::DOUBLE PRECISION AS used_percent,
+				(
+					usage_logs.input_tokens
+					+ usage_logs.output_tokens
+					+ usage_logs.cache_creation_tokens
+					+ usage_logs.cache_read_tokens
+				)::BIGINT AS token_delta
+			FROM sampled_cycles
+			JOIN usage_logs
+				ON usage_logs.account_id = $1
+				AND usage_logs.created_at >= sampled_cycles.usage_started_at
+				AND usage_logs.created_at <= sampled_cycles.usage_ended_at
+		), samples_with_usage AS (
+			SELECT
+				cycle_id,
+				event_at,
+				event_order,
+				event_id,
+				sample_id,
+				used_percent,
+				CAST(SUM(token_delta) OVER (
+					PARTITION BY cycle_id
+					ORDER BY event_at ASC, event_order ASC, event_id ASC
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				) AS BIGINT) AS local_tokens
+			FROM usage_timeline
+		)
+		SELECT cycle_id, event_at, used_percent, local_tokens
+		FROM samples_with_usage
+		WHERE sample_id IS NOT NULL
+		ORDER BY event_at ASC, event_id ASC
 	`, accountID)
 	if err != nil {
 		return nil, err
@@ -472,7 +533,12 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 
 	for sampleRows.Next() {
 		var sample service.OpenAIQuotaSample
-		if err = sampleRows.Scan(&sample.CycleID, &sample.ObservedAt, &sample.UsedPercent); err != nil {
+		if err = sampleRows.Scan(
+			&sample.CycleID,
+			&sample.ObservedAt,
+			&sample.UsedPercent,
+			&sample.LocalTokens,
+		); err != nil {
 			return nil, err
 		}
 		result.Samples = append(result.Samples, sample)

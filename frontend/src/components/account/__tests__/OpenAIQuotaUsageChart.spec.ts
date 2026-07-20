@@ -23,8 +23,18 @@ describe('OpenAIQuotaUsageChart', () => {
     const wrapper = mount(OpenAIQuotaUsageChart, {
       props: {
         samples: [
-          { cycle_id: 1, observed_at: '2026-07-18T10:00:00Z', used_percent: 16 },
-          { cycle_id: 1, observed_at: '2026-07-18T10:05:00Z', used_percent: 18.5 }
+          {
+            cycle_id: 1,
+            observed_at: '2026-07-18T10:00:00Z',
+            used_percent: 16,
+            local_tokens: 1200
+          },
+          {
+            cycle_id: 1,
+            observed_at: '2026-07-18T10:05:00Z',
+            used_percent: 18.5,
+            local_tokens: 2500000
+          }
         ],
         resetTimes: []
       }
@@ -34,20 +44,38 @@ describe('OpenAIQuotaUsageChart', () => {
     const data = line.props('data') as any
     const options = line.props('options') as any
     expect(data.datasets[0].data).toEqual([
-      { x: Date.parse('2026-07-18T10:00:00Z'), y: 16 },
-      { x: Date.parse('2026-07-18T10:05:00Z'), y: 18.5 }
+      { x: Date.parse('2026-07-18T10:00:00Z'), y: 16, localTokens: 1200 },
+      { x: Date.parse('2026-07-18T10:05:00Z'), y: 18.5, localTokens: 2500000 }
     ])
     expect(options.scales.x.type).toBe('linear')
     expect(options.scales.y.min).toBe(0)
     expect(options.scales.y.max).toBe(100)
+    const tooltipLines = options.plugins.tooltip.callbacks.label({
+      parsed: { y: 18.5 },
+      raw: data.datasets[0].data[1]
+    })
+    expect(tooltipLines).toEqual([
+      'admin.accounts.openaiQuotaHistory.usageLegend: 18.5%',
+      `admin.accounts.openaiQuotaHistory.localTokens: ${Number(2500000).toLocaleString()}`
+    ])
   })
 
   it('draws reset timestamps as vertical red dashed markers', () => {
     const wrapper = mount(OpenAIQuotaUsageChart, {
       props: {
         samples: [
-          { cycle_id: 1, observed_at: '2026-07-18T10:00:00Z', used_percent: 16 },
-          { cycle_id: 2, observed_at: '2026-07-18T10:10:00Z', used_percent: 0 }
+          {
+            cycle_id: 1,
+            observed_at: '2026-07-18T10:00:00Z',
+            used_percent: 16,
+            local_tokens: 1200
+          },
+          {
+            cycle_id: 2,
+            observed_at: '2026-07-18T10:10:00Z',
+            used_percent: 0,
+            local_tokens: 0
+          }
         ],
         resetTimes: ['2026-07-18T10:05:00Z']
       }

@@ -45,7 +45,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import type { OpenAIQuotaSample } from '@/api/admin/accounts'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, formatNumberLocaleString } from '@/utils/format'
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -68,13 +68,24 @@ const colors = computed(() => ({
   text: isDarkMode.value ? '#9ca3af' : '#6b7280'
 }))
 
+type QuotaChartPoint = {
+  x: number
+  y: number
+  localTokens: number
+}
+
 const normalizedSamples = computed(() =>
   props.samples
     .map((sample) => ({
       x: new Date(sample.observed_at).getTime(),
-      y: sample.used_percent
+      y: sample.used_percent,
+      localTokens: sample.local_tokens
     }))
-    .filter((sample) => Number.isFinite(sample.x) && Number.isFinite(sample.y))
+    .filter((sample) =>
+      Number.isFinite(sample.x) &&
+      Number.isFinite(sample.y) &&
+      Number.isFinite(sample.localTokens)
+    )
     .sort((left, right) => left.x - right.x)
 )
 
@@ -85,7 +96,7 @@ const resetMarkers = computed(() =>
     .sort((left, right) => left - right)
 )
 
-const chartData = computed<ChartData<'line', { x: number; y: number }[]> | null>(() => {
+const chartData = computed<ChartData<'line', QuotaChartPoint[]> | null>(() => {
   if (normalizedSamples.value.length === 0) return null
 
   return {
@@ -145,7 +156,11 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
         },
         label: (context) => {
           const usedPercent = context.parsed.y
-          return `${t('admin.accounts.openaiQuotaHistory.usageLegend')}: ${typeof usedPercent === 'number' ? formatPercent(usedPercent) : '-'}`
+          const point = context.raw as QuotaChartPoint
+          return [
+            `${t('admin.accounts.openaiQuotaHistory.usageLegend')}: ${typeof usedPercent === 'number' ? formatPercent(usedPercent) : '-'}`,
+            `${t('admin.accounts.openaiQuotaHistory.localTokens')}: ${Number.isFinite(point.localTokens) ? formatNumberLocaleString(point.localTokens) : '-'}`
+          ]
         }
       }
     }
