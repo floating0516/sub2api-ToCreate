@@ -61,7 +61,7 @@ describe('OpenAIQuotaUsageChart', () => {
     ])
   })
 
-  it('draws manual resets in green and official resets in red', () => {
+  it('draws manual, official, and unknown resets in distinct colors', () => {
     const wrapper = mount(OpenAIQuotaUsageChart, {
       props: {
         samples: [
@@ -79,8 +79,9 @@ describe('OpenAIQuotaUsageChart', () => {
           }
         ],
         resetMarkers: [
-          { observedAt: '2026-07-18T10:03:00Z', source: 'manual' },
-          { observedAt: '2026-07-18T10:05:00Z', source: 'provider' }
+          { cycleId: 1, observedAt: '2026-07-18T10:03:00Z', source: 'manual' },
+          { cycleId: 2, observedAt: '2026-07-18T10:05:00Z', source: 'provider' },
+          { cycleId: 3, observedAt: '2026-07-18T10:07:00Z', source: 'unknown' }
         ]
       }
     })
@@ -108,7 +109,9 @@ describe('OpenAIQuotaUsageChart', () => {
       scales: {
         x: {
           getPixelForValue: (value: number) => (
-            value === Date.parse('2026-07-18T10:03:00Z') ? 30 : 70
+            value === Date.parse('2026-07-18T10:03:00Z')
+              ? 30
+              : value === Date.parse('2026-07-18T10:05:00Z') ? 50 : 70
           )
         }
       }
@@ -116,12 +119,52 @@ describe('OpenAIQuotaUsageChart', () => {
 
     expect(ctx.setLineDash).toHaveBeenCalledWith([5, 4])
     expect(ctx.moveTo).toHaveBeenNthCalledWith(1, 30, 10)
-    expect(ctx.moveTo).toHaveBeenNthCalledWith(2, 70, 10)
+    expect(ctx.moveTo).toHaveBeenNthCalledWith(2, 50, 10)
+    expect(ctx.moveTo).toHaveBeenNthCalledWith(3, 70, 10)
     expect(ctx.lineTo).toHaveBeenNthCalledWith(1, 30, 90)
-    expect(ctx.lineTo).toHaveBeenNthCalledWith(2, 70, 90)
-    expect(ctx.stroke).toHaveBeenCalledTimes(2)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(2, 50, 90)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(3, 70, 90)
+    expect(ctx.stroke).toHaveBeenCalledTimes(3)
     expect(strokeStyles[0]).toMatch(/#(16a34a|4ade80)/)
     expect(strokeStyles[1]).toMatch(/#(dc2626|f87171)/)
+    expect(strokeStyles[2]).toMatch(/#(6b7280|9ca3af)/)
+  })
+
+  it('emits the selected marker when its dashed line is clicked', () => {
+    const wrapper = mount(OpenAIQuotaUsageChart, {
+      props: {
+        samples: [
+          {
+            cycle_id: 1,
+            observed_at: '2026-07-18T10:00:00Z',
+            used_percent: 16,
+            local_cost_usd: 1.2
+          }
+        ],
+        resetMarkers: [
+          { cycleId: 7, observedAt: '2026-07-18T10:03:00Z', source: 'unknown' }
+        ]
+      }
+    })
+
+    const line = wrapper.getComponent({ name: 'Line' })
+    const plugin = (line.props('plugins') as any[])[0]
+    const canvas = { style: { cursor: '' } }
+    const chart = {
+      canvas,
+      chartArea: { left: 0, right: 100, top: 10, bottom: 90 },
+      scales: { x: { getPixelForValue: () => 40 } }
+    }
+    plugin.afterEvent(chart, { event: { type: 'mousemove', x: 43, y: 50 } })
+    expect(canvas.style.cursor).toBe('pointer')
+    plugin.afterEvent(chart, { event: { type: 'click', x: 43, y: 50 } })
+    expect(wrapper.emitted('reset-marker-click')).toEqual([[
+      {
+        cycleId: 7,
+        observedAt: '2026-07-18T10:03:00Z',
+        source: 'unknown'
+      }
+    ]])
   })
 
   it('shows an empty state when no samples have been collected', () => {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -198,7 +199,8 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 		break
 	}
 
-	payload.FetchedAt = time.Now().Unix()
+	observedAt := time.Now().UTC()
+	payload.FetchedAt = observedAt.Unix()
 	details := s.queryResetCreditDetails(callCtx, client, accessToken, chatGPTAccountID, fedRAMP, accountID)
 	if details != nil {
 		hasDetailCount := details.AvailableCount != nil
@@ -215,7 +217,93 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 			payload.RateLimitResetCredits.AvailableCount = details.AvailableCreditCount
 		}
 	}
+	s.recordOpenAIQuotaObservation(ctx, accountID, &payload, details, observedAt)
 	return &payload, nil
+}
+
+func (s *OpenAIQuotaService) recordOpenAIQuotaObservation(
+	ctx context.Context,
+	accountID int64,
+	usage *OpenAIQuotaUsage,
+	details *openAIRateLimitResetCreditDetails,
+	observedAt time.Time,
+) {
+	recorder, ok := s.accountRepo.(OpenAIQuotaObservationRecorder)
+	if !ok {
+		return
+	}
+	observation := buildOpenAIQuotaObservation(usage, details, observedAt)
+	if observation == nil {
+		return
+	}
+	if err := recorder.RecordOpenAIQuotaObservation(ctx, accountID, observation); err != nil {
+		slog.Warn("openai_quota_history_observation_failed", "account_id", accountID, "error", err)
+	}
+}
+
+func buildOpenAIQuotaObservation(
+	usage *OpenAIQuotaUsage,
+	details *openAIRateLimitResetCreditDetails,
+	observedAt time.Time,
+) *OpenAIQuotaObservation {
+	if usage == nil {
+		return nil
+	}
+	observation := &OpenAIQuotaObservation{ObservedAt: observedAt.UTC()}
+	if window := openAIWeeklyQuotaWindow(usage.RateLimit); window != nil &&
+		!math.IsNaN(window.UsedPercent) && !math.IsInf(window.UsedPercent, 0) &&
+		window.UsedPercent >= 0 && window.UsedPercent <= 100 {
+		used := window.UsedPercent
+		observation.UsedPercent = &used
+		switch {
+		case window.ResetAt > 0:
+			resetAt := time.Unix(window.ResetAt, 0).UTC()
+			observation.ProviderResetAt = &resetAt
+		case window.ResetAfterSeconds > 0:
+			resetAt := observation.ObservedAt.Add(time.Duration(window.ResetAfterSeconds) * time.Second)
+			observation.ProviderResetAt = &resetAt
+		}
+	}
+
+	if details != nil && details.CreditListPresent && usage.RateLimitResetCredits != nil &&
+		usage.RateLimitResetCredits.AvailableCount == details.AvailableCreditCount &&
+		len(details.Credits) == details.AvailableCreditCount {
+		expiresAt := make([]time.Time, 0, len(details.Credits))
+		complete := true
+		for _, credit := range details.Credits {
+			parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(credit.ExpiresAt))
+			if err != nil {
+				complete = false
+				break
+			}
+			expiresAt = append(expiresAt, parsed.UTC())
+		}
+		if complete {
+			observation.CreditSnapshotKnown = true
+			observation.CreditExpiresAt = expiresAt
+		}
+	}
+
+	if observation.UsedPercent == nil && !observation.CreditSnapshotKnown {
+		return nil
+	}
+	return observation
+}
+
+func openAIWeeklyQuotaWindow(rateLimit *OpenAIRateLimit) *OpenAIRateLimitWindow {
+	if rateLimit == nil {
+		return nil
+	}
+	var weekly *OpenAIRateLimitWindow
+	for _, window := range []*OpenAIRateLimitWindow{rateLimit.PrimaryWindow, rateLimit.SecondaryWindow} {
+		if window == nil || window.LimitWindowSeconds <= 6*60*60 {
+			continue
+		}
+		if weekly == nil || window.LimitWindowSeconds > weekly.LimitWindowSeconds {
+			weekly = window
+		}
+	}
+	return weekly
 }
 
 // QueryResetCredits fetches the reset-credit list for an OpenAI OAuth account.

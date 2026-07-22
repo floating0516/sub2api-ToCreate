@@ -1592,6 +1592,7 @@ func (s *AccountRepoSuite) TestUpdateExtra_TracksOpenAIQuotaCycles() {
 	s.Require().NotNil(history.History[0].ResetToPercent)
 	s.Require().Equal(9.0, *history.History[0].ResetToPercent)
 	s.Require().Equal("usage_drop", history.History[0].DetectionReason)
+	s.Require().Equal(service.OpenAIQuotaResetSourceUnknown, history.History[0].ResetSource)
 	s.Require().False(history.HasMore)
 	s.Require().Len(history.Samples, 3)
 	s.Require().Equal(26.0, history.Samples[0].UsedPercent)
@@ -1640,9 +1641,77 @@ func (s *AccountRepoSuite) TestRecordOpenAIQuotaManualReset() {
 	s.Require().Equal(0.0, history.Current.LastUsedPercent)
 	s.Require().Len(history.History, 1)
 	s.Require().Equal("manual_reset", history.History[0].DetectionReason)
+	s.Require().Equal(service.OpenAIQuotaResetSourceManual, history.History[0].ResetSource)
 	s.Require().NotNil(history.History[0].ResetToPercent)
 	s.Require().Equal(0.0, *history.History[0].ResetToPercent)
 	s.Require().Len(history.Samples, 2)
+}
+
+func (s *AccountRepoSuite) TestOpenAIQuotaResetSourcesUseCreditEvidenceAndAllowOverrides() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "openai-quota-reset-sources",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+	firstObserved := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Second)
+	firstReset := firstObserved.Add(6 * 24 * time.Hour)
+	creditExpiry := firstObserved.Add(30 * 24 * time.Hour)
+	firstUsed := 100.0
+	s.Require().NoError(s.repo.RecordOpenAIQuotaObservation(s.ctx, account.ID, &service.OpenAIQuotaObservation{
+		ObservedAt:          firstObserved,
+		UsedPercent:         &firstUsed,
+		ProviderResetAt:     &firstReset,
+		CreditSnapshotKnown: true,
+		CreditExpiresAt:     []time.Time{creditExpiry},
+	}))
+
+	secondObserved := firstObserved.Add(24 * time.Hour)
+	secondReset := firstReset.Add(7 * 24 * time.Hour)
+	secondUsed := 47.0
+	s.Require().NoError(s.repo.RecordOpenAIQuotaObservation(s.ctx, account.ID, &service.OpenAIQuotaObservation{
+		ObservedAt:          secondObserved,
+		UsedPercent:         &secondUsed,
+		ProviderResetAt:     &secondReset,
+		CreditSnapshotKnown: true,
+		CreditExpiresAt:     []time.Time{creditExpiry},
+	}))
+
+	thirdObserved := secondObserved.Add(24 * time.Hour)
+	thirdReset := secondReset.Add(7 * 24 * time.Hour)
+	thirdUsed := 0.0
+	s.Require().NoError(s.repo.RecordOpenAIQuotaObservation(s.ctx, account.ID, &service.OpenAIQuotaObservation{
+		ObservedAt:          thirdObserved,
+		UsedPercent:         &thirdUsed,
+		ProviderResetAt:     &thirdReset,
+		CreditSnapshotKnown: true,
+		CreditExpiresAt:     []time.Time{},
+	}))
+
+	history, err := s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().Len(history.History, 2)
+	s.Require().Equal(service.OpenAIQuotaResetSourceManual, history.History[0].ResetSource)
+	s.Require().Equal("credit_consumed", history.History[0].ResetSourceEvidence)
+	s.Require().Equal(service.OpenAIQuotaResetSourceProvider, history.History[1].ResetSource)
+	s.Require().Equal("credits_unchanged", history.History[1].ResetSourceEvidence)
+
+	override := service.OpenAIQuotaResetSourceManual
+	s.Require().NoError(s.repo.SetOpenAIQuotaResetSource(s.ctx, account.ID, history.History[1].ID, &override))
+	history, err = s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().Equal(service.OpenAIQuotaResetSourceManual, history.History[1].ResetSource)
+	s.Require().NotNil(history.History[1].ResetSourceOverride)
+
+	s.Require().NoError(s.repo.SetOpenAIQuotaResetSource(s.ctx, account.ID, history.History[1].ID, nil))
+	history, err = s.repo.GetOpenAIQuotaHistory(s.ctx, account.ID, 20)
+	s.Require().NoError(err)
+	s.Require().Equal(service.OpenAIQuotaResetSourceProvider, history.History[1].ResetSource)
+	s.Require().Nil(history.History[1].ResetSourceOverride)
+	s.Require().ErrorIs(
+		s.repo.SetOpenAIQuotaResetSource(s.ctx, account.ID, history.Current.ID, &override),
+		service.ErrOpenAIQuotaCycleNotFound,
+	)
 }
 
 func (s *AccountRepoSuite) TestGetOpenAIQuotaHistory_HidesLegacyUncorroboratedReset() {

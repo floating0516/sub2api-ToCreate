@@ -17,6 +17,10 @@
           <span class="w-5 border-t border-dashed border-red-500"></span>
           {{ t('admin.accounts.openaiQuotaHistory.providerResetLegend') }}
         </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="w-5 border-t border-dashed border-gray-500"></span>
+          {{ t('admin.accounts.openaiQuotaHistory.unknownResetLegend') }}
+        </span>
       </div>
     </div>
 
@@ -56,9 +60,18 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Filler
 const props = defineProps<{
   samples: OpenAIQuotaSample[]
   resetMarkers: Array<{
+    cycleId: number
     observedAt: string
-    source: 'manual' | 'provider'
+    source: 'manual' | 'provider' | 'unknown'
   }>
+}>()
+
+const emit = defineEmits<{
+  (event: 'reset-marker-click', marker: {
+    cycleId: number
+    observedAt: string
+    source: 'manual' | 'provider' | 'unknown'
+  }): void
 }>()
 
 const { t } = useI18n()
@@ -72,6 +85,7 @@ const colors = computed(() => ({
   fill: isDarkMode.value ? 'rgba(96, 165, 250, 0.12)' : 'rgba(37, 99, 235, 0.10)',
   manualReset: isDarkMode.value ? '#4ade80' : '#16a34a',
   providerReset: isDarkMode.value ? '#f87171' : '#dc2626',
+  unknownReset: isDarkMode.value ? '#9ca3af' : '#6b7280',
   grid: isDarkMode.value ? '#374151' : '#e5e7eb',
   text: isDarkMode.value ? '#9ca3af' : '#6b7280'
 }))
@@ -80,6 +94,13 @@ type QuotaChartPoint = {
   x: number
   y: number
   localCostUSD: number
+}
+
+type NormalizedQuotaResetMarker = {
+  cycleId: number
+  x: number
+  observedAt: string
+  source: 'manual' | 'provider' | 'unknown'
 }
 
 const normalizedSamples = computed(() =>
@@ -97,10 +118,12 @@ const normalizedSamples = computed(() =>
     .sort((left, right) => left.x - right.x)
 )
 
-const normalizedResetMarkers = computed(() =>
+const normalizedResetMarkers = computed<NormalizedQuotaResetMarker[]>(() =>
   props.resetMarkers
     .map((marker) => ({
+      cycleId: marker.cycleId,
       x: new Date(marker.observedAt).getTime(),
+      observedAt: marker.observedAt,
       source: marker.source
     }))
     .filter((marker) => Number.isFinite(marker.x))
@@ -218,13 +241,51 @@ const resetMarkerPlugin: Plugin<'line'> = {
       if (x < chartArea.left || x > chartArea.right) continue
       ctx.strokeStyle = marker.source === 'manual'
         ? colors.value.manualReset
-        : colors.value.providerReset
+        : marker.source === 'provider'
+          ? colors.value.providerReset
+          : colors.value.unknownReset
       ctx.beginPath()
       ctx.moveTo(x, chartArea.top)
       ctx.lineTo(x, chartArea.bottom)
       ctx.stroke()
     }
     ctx.restore()
+  },
+  afterEvent(chart, args) {
+    if (args.event.type === 'mouseout') {
+      chart.canvas.style.cursor = ''
+      return
+    }
+    const eventX = args.event.x
+    const eventY = args.event.y
+    if (typeof eventX !== 'number' || typeof eventY !== 'number') return
+
+    const { chartArea, scales } = chart
+    const xScale = scales.x
+    if (!xScale) return
+    const insideChart = eventY >= chartArea.top && eventY <= chartArea.bottom
+    let nearest: NormalizedQuotaResetMarker | undefined
+    let nearestDistance = Number.POSITIVE_INFINITY
+    if (insideChart) {
+      for (const marker of normalizedResetMarkers.value) {
+        const distance = Math.abs(xScale.getPixelForValue(marker.x) - eventX)
+        if (distance <= 7 && distance < nearestDistance) {
+          nearest = marker
+          nearestDistance = distance
+        }
+      }
+    }
+
+    if (args.event.type === 'mousemove') {
+      chart.canvas.style.cursor = nearest ? 'pointer' : ''
+    }
+    if (args.event.type === 'click' && nearest) {
+      emit('reset-marker-click', {
+        cycleId: nearest.cycleId,
+        observedAt: nearest.observedAt,
+        source: nearest.source
+      })
+    }
   }
 }
 

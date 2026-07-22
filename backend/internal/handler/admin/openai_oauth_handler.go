@@ -456,6 +456,45 @@ func (h *OpenAIOAuthHandler) QueryQuotaHistory(c *gin.Context) {
 	response.Success(c, history)
 }
 
+type OpenAIQuotaResetSourceRequest struct {
+	ResetSource string `json:"reset_source" binding:"required"`
+}
+
+// UpdateQuotaHistoryResetSource applies or clears the administrator's source
+// override for one closed weekly quota cycle.
+// PATCH /api/v1/admin/openai/accounts/:id/quota-history/:cycle_id/reset-source
+func (h *OpenAIOAuthHandler) UpdateQuotaHistoryResetSource(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	cycleID, err := strconv.ParseInt(c.Param("cycle_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid quota cycle ID")
+		return
+	}
+	var req OpenAIQuotaResetSourceRequest
+	if err = c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if h.quotaService == nil {
+		response.BadRequest(c, "openai quota service is not enabled")
+		return
+	}
+	if err = h.quotaService.SetQuotaHistoryResetSource(
+		c.Request.Context(),
+		accountID,
+		cycleID,
+		req.ResetSource,
+	); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"reset_source": strings.ToLower(strings.TrimSpace(req.ResetSource))})
+}
+
 // QueryResetCredits queries available OpenAI/Codex reset credits and their expiration metadata.
 // GET /api/v1/admin/openai/accounts/:id/reset-credits
 func (h *OpenAIOAuthHandler) QueryResetCredits(c *gin.Context) {

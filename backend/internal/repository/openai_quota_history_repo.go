@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,14 +16,19 @@ import (
 )
 
 const (
-	openAIQuotaWindow7d             = "7d"
-	openAIQuotaResetDropMinimum     = 0.5
-	openAIQuotaResetStrongDrop      = 5.0
-	openAIQuotaResetForecastAdvance = time.Hour
-	openAIQuotaResetBoundaryGrace   = 5 * time.Minute
-	openAIQuotaTransientLowMaximum  = 5.0
-	openAIQuotaSampleBucket         = 5 * time.Minute
-	openAIQuotaSampleRetention      = 90 * 24 * time.Hour
+	openAIQuotaWindow7d              = "7d"
+	openAIQuotaResetDropMinimum      = 0.5
+	openAIQuotaResetStrongDrop       = 5.0
+	openAIQuotaResetForecastAdvance  = time.Hour
+	openAIQuotaResetBoundaryGrace    = 5 * time.Minute
+	openAIQuotaTransientLowMaximum   = 5.0
+	openAIQuotaSampleBucket          = 5 * time.Minute
+	openAIQuotaSampleRetention       = 90 * 24 * time.Hour
+	openAIQuotaResetEvidenceEndpoint = "reset_endpoint"
+	openAIQuotaResetEvidenceElapsed  = "window_elapsed"
+	openAIQuotaResetEvidenceConsumed = "credit_consumed"
+	openAIQuotaResetEvidenceSame     = "credits_unchanged"
+	openAIQuotaResetEvidenceExpired  = "credits_expired_only"
 )
 
 type openAIQuotaSnapshot struct {
@@ -33,10 +39,22 @@ type openAIQuotaSnapshot struct {
 
 type openAIQuotaActiveCycle struct {
 	ID              int64
+	CycleStartedAt  time.Time
 	LastObservedAt  time.Time
 	LastUsedPercent float64
 	PeakUsedPercent float64
 	ProviderResetAt *time.Time
+}
+
+func automaticOpenAIQuotaResetSource(reason string) (string, string) {
+	switch reason {
+	case "manual_reset":
+		return service.OpenAIQuotaResetSourceManual, openAIQuotaResetEvidenceEndpoint
+	case "window_elapsed":
+		return service.OpenAIQuotaResetSourceProvider, openAIQuotaResetEvidenceElapsed
+	default:
+		return service.OpenAIQuotaResetSourceUnknown, ""
+	}
 }
 
 func extractOpenAIQuotaSnapshot(updates map[string]any) (*openAIQuotaSnapshot, bool) {
@@ -197,14 +215,17 @@ func recordOpenAIQuotaCycle(ctx context.Context, q sqlExecutor, accountID int64,
 	}
 
 	if reason := detectOpenAIQuotaReset(active, snapshot); reason != "" {
+		resetSource, evidence := automaticOpenAIQuotaResetSource(reason)
 		if _, err = q.ExecContext(ctx, `
 			UPDATE openai_quota_cycles
 			SET reset_observed_at = $1,
 				reset_to_percent = $2,
 				detection_reason = $3,
+				detected_reset_source = $4,
+				reset_source_evidence = NULLIF($5, ''),
 				updated_at = NOW()
-			WHERE id = $4 AND reset_observed_at IS NULL
-		`, snapshot.ObservedAt, snapshot.Used, reason, active.ID); err != nil {
+			WHERE id = $6 AND reset_observed_at IS NULL
+		`, snapshot.ObservedAt, snapshot.Used, reason, resetSource, evidence, active.ID); err != nil {
 			return err
 		}
 		var cycleID int64
@@ -283,9 +304,11 @@ func recordOpenAIQuotaManualReset(ctx context.Context, q sqlExecutor, accountID 
 		SET reset_observed_at = $1,
 			reset_to_percent = 0,
 			detection_reason = 'manual_reset',
+			detected_reset_source = 'manual',
+			reset_source_evidence = $2,
 			updated_at = NOW()
-		WHERE id = $2 AND reset_observed_at IS NULL
-	`, observedAt, active.ID); err != nil {
+		WHERE id = $3 AND reset_observed_at IS NULL
+	`, observedAt, openAIQuotaResetEvidenceEndpoint, active.ID); err != nil {
 		return err
 	}
 	var cycleID int64
@@ -350,12 +373,13 @@ func getOpenAIQuotaActiveCycleForUpdate(ctx context.Context, q sqlQueryer, accou
 	var cycle openAIQuotaActiveCycle
 	var providerResetAt sql.NullTime
 	err := scanSingleRow(ctx, q, `
-		SELECT id, last_observed_at, last_used_percent, peak_used_percent, provider_reset_at
+		SELECT id, cycle_started_at, last_observed_at, last_used_percent, peak_used_percent, provider_reset_at
 		FROM openai_quota_cycles
 		WHERE account_id = $1 AND window_type = $2 AND reset_observed_at IS NULL
 		FOR UPDATE
 	`, []any{accountID, openAIQuotaWindow7d},
 		&cycle.ID,
+		&cycle.CycleStartedAt,
 		&cycle.LastObservedAt,
 		&cycle.LastUsedPercent,
 		&cycle.PeakUsedPercent,
@@ -369,6 +393,174 @@ func getOpenAIQuotaActiveCycleForUpdate(ctx context.Context, q sqlQueryer, accou
 		cycle.ProviderResetAt = &resetAt
 	}
 	return &cycle, nil
+}
+
+func recordOpenAIQuotaObservation(
+	ctx context.Context,
+	q sqlExecutor,
+	accountID int64,
+	observation *service.OpenAIQuotaObservation,
+) error {
+	if q == nil || observation == nil || accountID <= 0 {
+		return nil
+	}
+	if observation.UsedPercent != nil {
+		used := *observation.UsedPercent
+		if !math.IsNaN(used) && !math.IsInf(used, 0) && used >= 0 && used <= 100 {
+			if err := recordOpenAIQuotaCycle(ctx, q, accountID, &openAIQuotaSnapshot{
+				ObservedAt: observation.ObservedAt.UTC(),
+				Used:       used,
+				ResetAt:    observation.ProviderResetAt,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	if !observation.CreditSnapshotKnown {
+		return nil
+	}
+	return recordOpenAIQuotaCreditSnapshot(
+		ctx,
+		q,
+		accountID,
+		observation.ObservedAt.UTC(),
+		observation.CreditExpiresAt,
+	)
+}
+
+func recordOpenAIQuotaCreditSnapshot(
+	ctx context.Context,
+	q sqlExecutor,
+	accountID int64,
+	observedAt time.Time,
+	expiresAt []time.Time,
+) error {
+	eligible, err := isOpenAIQuotaHistoryAccount(ctx, q, accountID)
+	if err != nil || !eligible {
+		return err
+	}
+	active, err := getOpenAIQuotaActiveCycleForUpdate(ctx, q, accountID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if observedAt.Before(active.CycleStartedAt) {
+		return nil
+	}
+
+	normalized := normalizeOpenAIQuotaCreditExpirations(expiresAt)
+	payload, err := json.Marshal(normalized)
+	if err != nil {
+		return err
+	}
+	result, err := q.ExecContext(ctx, `
+		UPDATE openai_quota_cycles
+		SET reset_credit_snapshot_at = $1,
+			reset_credit_expirations = $2::jsonb,
+			updated_at = NOW()
+		WHERE id = $3
+			AND (reset_credit_snapshot_at IS NULL OR reset_credit_snapshot_at < $1)
+	`, observedAt, string(payload), active.ID)
+	if err != nil {
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil || updated == 0 {
+		return err
+	}
+
+	var previousID int64
+	var resetObservedAt time.Time
+	var previousSnapshotAt sql.NullTime
+	var previousPayload []byte
+	err = scanSingleRow(ctx, q, `
+		SELECT id, reset_observed_at, reset_credit_snapshot_at, reset_credit_expirations
+		FROM openai_quota_cycles
+		WHERE account_id = $1
+			AND window_type = $2
+			AND reset_observed_at IS NOT NULL
+			AND reset_observed_at <= $3
+		ORDER BY reset_observed_at DESC, id DESC
+		LIMIT 1
+		FOR UPDATE
+	`, []any{accountID, openAIQuotaWindow7d, active.CycleStartedAt},
+		&previousID,
+		&resetObservedAt,
+		&previousSnapshotAt,
+		&previousPayload,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !previousSnapshotAt.Valid || previousSnapshotAt.Time.After(resetObservedAt) || observedAt.Before(resetObservedAt) {
+		return nil
+	}
+	previousExpirations, err := decodeOpenAIQuotaCreditExpirations(previousPayload)
+	if err != nil {
+		return err
+	}
+	resetSource, evidence := classifyOpenAIQuotaResetFromCredits(previousExpirations, expiresAt, observedAt)
+	_, err = q.ExecContext(ctx, `
+		UPDATE openai_quota_cycles
+		SET detected_reset_source = $1,
+			reset_source_evidence = $2,
+			updated_at = NOW()
+		WHERE id = $3 AND detected_reset_source = 'unknown'
+	`, resetSource, evidence, previousID)
+	return err
+}
+
+func normalizeOpenAIQuotaCreditExpirations(values []time.Time) []string {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		normalized = append(normalized, value.UTC().Format(time.RFC3339Nano))
+	}
+	sort.Strings(normalized)
+	return normalized
+}
+
+func decodeOpenAIQuotaCreditExpirations(payload []byte) ([]time.Time, error) {
+	var values []string
+	if err := json.Unmarshal(payload, &values); err != nil {
+		return nil, err
+	}
+	result := make([]time.Time, 0, len(values))
+	for _, value := range values {
+		parsed, err := time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, parsed.UTC())
+	}
+	return result, nil
+}
+
+func classifyOpenAIQuotaResetFromCredits(before, after []time.Time, afterObservedAt time.Time) (string, string) {
+	afterCounts := make(map[string]int, len(after))
+	for _, expiry := range after {
+		afterCounts[expiry.UTC().Format(time.RFC3339Nano)]++
+	}
+	expiredOnly := false
+	for _, expiry := range before {
+		key := expiry.UTC().Format(time.RFC3339Nano)
+		if afterCounts[key] > 0 {
+			afterCounts[key]--
+			continue
+		}
+		if expiry.After(afterObservedAt) {
+			return service.OpenAIQuotaResetSourceManual, openAIQuotaResetEvidenceConsumed
+		}
+		expiredOnly = true
+	}
+	if expiredOnly {
+		return service.OpenAIQuotaResetSourceProvider, openAIQuotaResetEvidenceExpired
+	}
+	return service.OpenAIQuotaResetSourceProvider, openAIQuotaResetEvidenceSame
 }
 
 func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID int64, limit int) (*service.OpenAIQuotaHistoryResponse, error) {
@@ -386,7 +578,9 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 	current, err := scanOpenAIQuotaCycle(ctx, r.sql, `
 		SELECT id, cycle_started_at, last_observed_at, last_used_percent,
 			peak_used_percent, provider_reset_at, reset_observed_at,
-			reset_to_percent, COALESCE(detection_reason, '')
+			reset_to_percent, COALESCE(detection_reason, ''),
+			COALESCE(detected_reset_source, 'unknown'), reset_source_override,
+			COALESCE(reset_source_evidence, '')
 		FROM openai_quota_cycles
 		WHERE account_id = $1 AND window_type = $2 AND reset_observed_at IS NULL
 		LIMIT 1
@@ -402,6 +596,9 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 			SELECT id, cycle_started_at, last_observed_at, last_used_percent,
 				peak_used_percent, provider_reset_at, reset_observed_at,
 				reset_to_percent, COALESCE(detection_reason, '') AS detection_reason,
+				COALESCE(detected_reset_source, 'unknown') AS detected_reset_source,
+				reset_source_override,
+				COALESCE(reset_source_evidence, '') AS reset_source_evidence,
 				LEAD(cycle_started_at) OVER (
 					ORDER BY cycle_started_at ASC, id ASC
 				) AS next_cycle_started_at,
@@ -413,11 +610,13 @@ func (r *accountRepository) GetOpenAIQuotaHistory(ctx context.Context, accountID
 		)
 		SELECT id, cycle_started_at, last_observed_at, last_used_percent,
 			peak_used_percent, provider_reset_at, reset_observed_at,
-			reset_to_percent, detection_reason
+			reset_to_percent, detection_reason, detected_reset_source,
+			reset_source_override, reset_source_evidence
 		FROM ordered_cycles
 		WHERE reset_observed_at IS NOT NULL
 			AND NOT (
 				detection_reason = 'usage_drop'
+				AND reset_source_override IS NULL
 				AND next_cycle_started_at = reset_observed_at
 				AND provider_reset_at IS NOT NULL
 				AND next_provider_reset_at IS NOT NULL
@@ -564,6 +763,7 @@ func scanOpenAIQuotaCycleRow(scanner interface{ Scan(dest ...any) error }) (*ser
 	var cycle service.OpenAIQuotaCycle
 	var providerResetAt, resetObservedAt sql.NullTime
 	var resetToPercent sql.NullFloat64
+	var resetSourceOverride sql.NullString
 	if err := scanner.Scan(
 		&cycle.ID,
 		&cycle.CycleStartedAt,
@@ -574,6 +774,9 @@ func scanOpenAIQuotaCycleRow(scanner interface{ Scan(dest ...any) error }) (*ser
 		&resetObservedAt,
 		&resetToPercent,
 		&cycle.DetectionReason,
+		&cycle.AutomaticResetSource,
+		&resetSourceOverride,
+		&cycle.ResetSourceEvidence,
 	); err != nil {
 		return nil, err
 	}
@@ -589,5 +792,45 @@ func scanOpenAIQuotaCycleRow(scanner interface{ Scan(dest ...any) error }) (*ser
 		value := resetToPercent.Float64
 		cycle.ResetToPercent = &value
 	}
+	if cycle.AutomaticResetSource == "" {
+		cycle.AutomaticResetSource = service.OpenAIQuotaResetSourceUnknown
+	}
+	cycle.ResetSource = cycle.AutomaticResetSource
+	if resetSourceOverride.Valid {
+		value := resetSourceOverride.String
+		cycle.ResetSourceOverride = &value
+		cycle.ResetSource = value
+	}
 	return &cycle, nil
+}
+
+func (r *accountRepository) SetOpenAIQuotaResetSource(
+	ctx context.Context,
+	accountID, cycleID int64,
+	resetSourceOverride *string,
+) error {
+	if r == nil || r.client == nil {
+		return errors.New("nil account repository")
+	}
+	client := clientFromContext(ctx, r.client)
+	result, err := client.ExecContext(ctx, `
+		UPDATE openai_quota_cycles
+		SET reset_source_override = $1,
+			updated_at = NOW()
+		WHERE id = $2
+			AND account_id = $3
+			AND window_type = $4
+			AND reset_observed_at IS NOT NULL
+	`, resetSourceOverride, cycleID, accountID, openAIQuotaWindow7d)
+	if err != nil {
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return service.ErrOpenAIQuotaCycleNotFound
+	}
+	return nil
 }

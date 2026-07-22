@@ -828,6 +828,9 @@ export interface OpenAIQuotaResetResult {
   windows_reset: number
 }
 
+export type OpenAIQuotaResetSource = 'manual' | 'provider' | 'unknown'
+export type OpenAIQuotaResetSourceSelection = 'auto' | Exclude<OpenAIQuotaResetSource, 'unknown'>
+
 export interface OpenAIQuotaCycle {
   id: number
   cycle_started_at: string
@@ -838,6 +841,10 @@ export interface OpenAIQuotaCycle {
   reset_observed_at?: string
   reset_to_percent?: number
   detection_reason?: string
+  automatic_reset_source?: OpenAIQuotaResetSource
+  reset_source?: OpenAIQuotaResetSource
+  reset_source_override?: Exclude<OpenAIQuotaResetSource, 'unknown'>
+  reset_source_evidence?: string
 }
 
 export interface OpenAIQuotaSample {
@@ -871,6 +878,19 @@ export async function getOpenAIQuotaHistory(id: number, limit: number = 20): Pro
     { params: { limit } }
   )
   return data
+}
+
+/**
+ * Apply a manual source classification or restore automatic detection.
+ */
+export async function setOpenAIQuotaResetSource(
+  id: number,
+  cycleId: number,
+  resetSource: OpenAIQuotaResetSourceSelection
+): Promise<void> {
+  await apiClient.patch(`/admin/openai/accounts/${id}/quota-history/${cycleId}/reset-source`, {
+    reset_source: resetSource
+  })
 }
 
 /**
@@ -972,6 +992,7 @@ export const accountsAPI = {
   revertProxyFallback,
   queryOpenAIQuota,
   getOpenAIQuotaHistory,
+  setOpenAIQuotaResetSource,
   resetOpenAIQuota,
   createSparkShadow,
   getUpstreamBillingProbeSettings,

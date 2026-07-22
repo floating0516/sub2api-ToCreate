@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import OpenAIQuotaHistoryModal from '../OpenAIQuotaHistoryModal.vue'
-import { getOpenAIQuotaHistory } from '@/api/admin/accounts'
+import { getOpenAIQuotaHistory, setOpenAIQuotaResetSource } from '@/api/admin/accounts'
 import type { Account } from '@/types'
 
 vi.mock('@/api/admin/accounts', () => ({
-  getOpenAIQuotaHistory: vi.fn()
+  getOpenAIQuotaHistory: vi.fn(),
+  setOpenAIQuotaResetSource: vi.fn()
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -56,6 +57,8 @@ const mountModal = () => mount(OpenAIQuotaHistoryModal, {
 describe('OpenAIQuotaHistoryModal', () => {
   beforeEach(() => {
     vi.mocked(getOpenAIQuotaHistory).mockReset()
+    vi.mocked(setOpenAIQuotaResetSource).mockReset()
+    vi.mocked(setOpenAIQuotaResetSource).mockResolvedValue(undefined)
   })
 
   it('shows the current cycle and closed reset cycles', async () => {
@@ -77,7 +80,9 @@ describe('OpenAIQuotaHistoryModal', () => {
           peak_used_percent: 32,
           reset_observed_at: '2026-07-19T03:21:00Z',
           reset_to_percent: 0,
-          detection_reason: 'manual_reset'
+          detection_reason: 'manual_reset',
+          automatic_reset_source: 'manual',
+          reset_source: 'manual'
         },
         {
           id: 1,
@@ -87,7 +92,10 @@ describe('OpenAIQuotaHistoryModal', () => {
           peak_used_percent: 28,
           reset_observed_at: '2026-07-18T03:25:00Z',
           reset_to_percent: 0,
-          detection_reason: 'usage_drop'
+          detection_reason: 'usage_drop',
+          automatic_reset_source: 'unknown',
+          reset_source: 'provider',
+          reset_source_override: 'provider'
         }
       ],
       samples: [
@@ -117,9 +125,23 @@ describe('OpenAIQuotaHistoryModal', () => {
     expect(wrapper.text()).toContain('0%')
     expect(wrapper.text()).not.toContain('usage_drop')
     expect(wrapper.getComponent({ name: 'OpenAIQuotaUsageChart' }).props('resetMarkers')).toEqual([
-      { observedAt: '2026-07-19T03:21:00Z', source: 'manual' },
-      { observedAt: '2026-07-18T03:25:00Z', source: 'provider' }
+      { cycleId: 2, observedAt: '2026-07-19T03:21:00Z', source: 'manual' },
+      { cycleId: 1, observedAt: '2026-07-18T03:25:00Z', source: 'provider' }
     ])
+
+    wrapper.getComponent({ name: 'OpenAIQuotaUsageChart' }).vm.$emit('reset-marker-click', {
+      cycleId: 2,
+      observedAt: '2026-07-19T03:21:00Z',
+      source: 'manual'
+    })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="reset-source-editor"]').exists()).toBe(true)
+    const sourceOptions = wrapper.findAll('[role="radio"]')
+    await sourceOptions[2].trigger('click')
+    await wrapper.get('[data-testid="save-reset-source"]').trigger('click')
+    await flushPromises()
+    expect(setOpenAIQuotaResetSource).toHaveBeenCalledWith(44, 2, 'provider')
+    expect(getOpenAIQuotaHistory).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 

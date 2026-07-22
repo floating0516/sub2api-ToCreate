@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -185,4 +186,45 @@ func TestQueryUsageResetCreditCountPrecedence(t *testing.T) {
 			require.Len(t, usage.RateLimitResetCredits.Credits, tt.wantCredits)
 		})
 	}
+}
+
+func TestBuildOpenAIQuotaObservationRequiresCompleteCreditExpirations(t *testing.T) {
+	observedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
+	resetAt := observedAt.Add(6 * 24 * time.Hour)
+	expiresAt := observedAt.Add(48 * time.Hour)
+	usage := &OpenAIQuotaUsage{
+		RateLimit: &OpenAIRateLimit{
+			PrimaryWindow: &OpenAIRateLimitWindow{
+				UsedPercent:        12,
+				LimitWindowSeconds: 5 * 60 * 60,
+			},
+			SecondaryWindow: &OpenAIRateLimitWindow{
+				UsedPercent:        47,
+				LimitWindowSeconds: 7 * 24 * 60 * 60,
+				ResetAt:            resetAt.Unix(),
+			},
+		},
+		RateLimitResetCredits: &OpenAIRateLimitResetCredits{AvailableCount: 1},
+	}
+	details := &openAIRateLimitResetCreditDetails{
+		AvailableCreditCount: 1,
+		CreditListPresent:    true,
+		Credits: []OpenAIRateLimitResetCreditDetail{
+			{ExpiresAt: expiresAt.Format(time.RFC3339)},
+		},
+	}
+
+	observation := buildOpenAIQuotaObservation(usage, details, observedAt)
+	require.NotNil(t, observation)
+	require.NotNil(t, observation.UsedPercent)
+	require.Equal(t, 47.0, *observation.UsedPercent)
+	require.Equal(t, resetAt, *observation.ProviderResetAt)
+	require.True(t, observation.CreditSnapshotKnown)
+	require.Equal(t, []time.Time{expiresAt}, observation.CreditExpiresAt)
+
+	usage.RateLimitResetCredits.AvailableCount = 2
+	observation = buildOpenAIQuotaObservation(usage, details, observedAt)
+	require.NotNil(t, observation)
+	require.False(t, observation.CreditSnapshotKnown)
+	require.Empty(t, observation.CreditExpiresAt)
 }
