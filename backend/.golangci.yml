@@ -121,6 +121,10 @@ linters:
       # Default: true — must be true, ent generates 130K+ lines of code
       generated-is-used: true
 
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 formatters:
   enable:
     - gofmt
