@@ -85,7 +85,7 @@
 
         <OpenAIQuotaUsageChart
           :samples="data?.samples ?? []"
-          :reset-times="resetTimes"
+          :reset-markers="resetMarkers"
         />
 
         <section>
@@ -175,10 +175,20 @@ const error = ref('')
 const data = ref<OpenAIQuotaHistoryResponse | null>(null)
 let requestID = 0
 
-const resetTimes = computed(() =>
-  data.value?.history
-    .map((cycle) => cycle.reset_observed_at)
-    .filter((value): value is string => Boolean(value)) ?? []
+type QuotaResetMarker = {
+  observedAt: string
+  source: 'manual' | 'provider'
+}
+
+const resetMarkers = computed<QuotaResetMarker[]>(() =>
+  data.value?.history.flatMap((cycle): QuotaResetMarker[] => (
+    cycle.reset_observed_at
+      ? [{
+          observedAt: cycle.reset_observed_at,
+          source: cycle.detection_reason === 'manual_reset' ? 'manual' : 'provider'
+        }]
+      : []
+  )) ?? []
 )
 
 const formatPercent = (value: number): string => {

@@ -61,14 +61,24 @@ describe('OpenAIQuotaHistoryModal', () => {
   it('shows the current cycle and closed reset cycles', async () => {
     vi.mocked(getOpenAIQuotaHistory).mockResolvedValue({
       current: {
-        id: 2,
-        cycle_started_at: '2026-07-18T03:25:00Z',
-        last_observed_at: '2026-07-18T03:43:25Z',
+        id: 3,
+        cycle_started_at: '2026-07-19T03:21:00Z',
+        last_observed_at: '2026-07-19T03:43:25Z',
         last_used_percent: 1,
         peak_used_percent: 1,
-        provider_reset_at: '2026-07-25T03:24:48Z'
+        provider_reset_at: '2026-07-26T03:20:48Z'
       },
       history: [
+        {
+          id: 2,
+          cycle_started_at: '2026-07-18T03:25:00Z',
+          last_observed_at: '2026-07-19T03:20:00Z',
+          last_used_percent: 12,
+          peak_used_percent: 32,
+          reset_observed_at: '2026-07-19T03:21:00Z',
+          reset_to_percent: 0,
+          detection_reason: 'manual_reset'
+        },
         {
           id: 1,
           cycle_started_at: '2026-07-17T07:06:46Z',
@@ -88,8 +98,8 @@ describe('OpenAIQuotaHistoryModal', () => {
           local_cost_usd: 1.2
         },
         {
-          cycle_id: 2,
-          observed_at: '2026-07-18T03:25:00Z',
+          cycle_id: 3,
+          observed_at: '2026-07-19T03:21:00Z',
           used_percent: 0,
           local_cost_usd: 0
         }
@@ -106,6 +116,10 @@ describe('OpenAIQuotaHistoryModal', () => {
     expect(wrapper.text()).toContain('28%')
     expect(wrapper.text()).toContain('0%')
     expect(wrapper.text()).not.toContain('usage_drop')
+    expect(wrapper.getComponent({ name: 'OpenAIQuotaUsageChart' }).props('resetMarkers')).toEqual([
+      { observedAt: '2026-07-19T03:21:00Z', source: 'manual' },
+      { observedAt: '2026-07-18T03:25:00Z', source: 'provider' }
+    ])
     wrapper.unmount()
   })
 

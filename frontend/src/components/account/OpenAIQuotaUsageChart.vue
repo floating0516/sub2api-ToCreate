@@ -4,14 +4,18 @@
       <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
         {{ t('admin.accounts.openaiQuotaHistory.chartTitle') }}
       </h4>
-      <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+      <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
         <span class="inline-flex items-center gap-1.5">
           <span class="h-0.5 w-5 bg-blue-500"></span>
           {{ t('admin.accounts.openaiQuotaHistory.usageLegend') }}
         </span>
         <span class="inline-flex items-center gap-1.5">
+          <span class="w-5 border-t border-dashed border-green-500"></span>
+          {{ t('admin.accounts.openaiQuotaHistory.manualResetLegend') }}
+        </span>
+        <span class="inline-flex items-center gap-1.5">
           <span class="w-5 border-t border-dashed border-red-500"></span>
-          {{ t('admin.accounts.openaiQuotaHistory.resetLegend') }}
+          {{ t('admin.accounts.openaiQuotaHistory.providerResetLegend') }}
         </span>
       </div>
     </div>
@@ -51,7 +55,10 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Filler
 
 const props = defineProps<{
   samples: OpenAIQuotaSample[]
-  resetTimes: string[]
+  resetMarkers: Array<{
+    observedAt: string
+    source: 'manual' | 'provider'
+  }>
 }>()
 
 const { t } = useI18n()
@@ -63,7 +70,8 @@ const isDarkMode = computed(() =>
 const colors = computed(() => ({
   line: isDarkMode.value ? '#60a5fa' : '#2563eb',
   fill: isDarkMode.value ? 'rgba(96, 165, 250, 0.12)' : 'rgba(37, 99, 235, 0.10)',
-  reset: isDarkMode.value ? '#f87171' : '#dc2626',
+  manualReset: isDarkMode.value ? '#4ade80' : '#16a34a',
+  providerReset: isDarkMode.value ? '#f87171' : '#dc2626',
   grid: isDarkMode.value ? '#374151' : '#e5e7eb',
   text: isDarkMode.value ? '#9ca3af' : '#6b7280'
 }))
@@ -89,11 +97,14 @@ const normalizedSamples = computed(() =>
     .sort((left, right) => left.x - right.x)
 )
 
-const resetMarkers = computed(() =>
-  props.resetTimes
-    .map((value) => new Date(value).getTime())
-    .filter((value) => Number.isFinite(value))
-    .sort((left, right) => left - right)
+const normalizedResetMarkers = computed(() =>
+  props.resetMarkers
+    .map((marker) => ({
+      x: new Date(marker.observedAt).getTime(),
+      source: marker.source
+    }))
+    .filter((marker) => Number.isFinite(marker.x))
+    .sort((left, right) => left.x - right.x)
 )
 
 const chartData = computed<ChartData<'line', QuotaChartPoint[]> | null>(() => {
@@ -196,16 +207,18 @@ const resetMarkerPlugin: Plugin<'line'> = {
   id: 'openAIQuotaResetMarkers',
   afterDatasetsDraw(chart) {
     const xScale = chart.scales.x
-    if (!xScale || resetMarkers.value.length === 0) return
+    if (!xScale || normalizedResetMarkers.value.length === 0) return
 
     const { ctx, chartArea } = chart
     ctx.save()
-    ctx.strokeStyle = colors.value.reset
     ctx.lineWidth = 1.5
     ctx.setLineDash([5, 4])
-    for (const resetAt of resetMarkers.value) {
-      const x = xScale.getPixelForValue(resetAt)
+    for (const marker of normalizedResetMarkers.value) {
+      const x = xScale.getPixelForValue(marker.x)
       if (x < chartArea.left || x > chartArea.right) continue
+      ctx.strokeStyle = marker.source === 'manual'
+        ? colors.value.manualReset
+        : colors.value.providerReset
       ctx.beginPath()
       ctx.moveTo(x, chartArea.top)
       ctx.lineTo(x, chartArea.bottom)

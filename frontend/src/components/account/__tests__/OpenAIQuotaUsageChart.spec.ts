@@ -37,7 +37,7 @@ describe('OpenAIQuotaUsageChart', () => {
             local_cost_usd: 2500.125
           }
         ],
-        resetTimes: []
+        resetMarkers: []
       }
     })
 
@@ -61,7 +61,7 @@ describe('OpenAIQuotaUsageChart', () => {
     ])
   })
 
-  it('draws reset timestamps as vertical red dashed markers', () => {
+  it('draws manual resets in green and official resets in red', () => {
     const wrapper = mount(OpenAIQuotaUsageChart, {
       props: {
         samples: [
@@ -78,13 +78,17 @@ describe('OpenAIQuotaUsageChart', () => {
             local_cost_usd: 0
           }
         ],
-        resetTimes: ['2026-07-18T10:05:00Z']
+        resetMarkers: [
+          { observedAt: '2026-07-18T10:03:00Z', source: 'manual' },
+          { observedAt: '2026-07-18T10:05:00Z', source: 'provider' }
+        ]
       }
     })
 
     const line = wrapper.getComponent({ name: 'Line' })
     const plugin = (line.props('plugins') as any[])[0]
-    const ctx = {
+    const strokeStyles: string[] = []
+    const ctx: any = {
       save: vi.fn(),
       restore: vi.fn(),
       setLineDash: vi.fn(),
@@ -92,25 +96,37 @@ describe('OpenAIQuotaUsageChart', () => {
       moveTo: vi.fn(),
       lineTo: vi.fn(),
       stroke: vi.fn(),
-      strokeStyle: '',
       lineWidth: 0
     }
+    Object.defineProperty(ctx, 'strokeStyle', {
+      get: () => strokeStyles[strokeStyles.length - 1] ?? '',
+      set: (value: string) => strokeStyles.push(value)
+    })
     plugin.afterDatasetsDraw({
       ctx,
       chartArea: { left: 0, right: 100, top: 10, bottom: 90 },
-      scales: { x: { getPixelForValue: () => 50 } }
+      scales: {
+        x: {
+          getPixelForValue: (value: number) => (
+            value === Date.parse('2026-07-18T10:03:00Z') ? 30 : 70
+          )
+        }
+      }
     })
 
     expect(ctx.setLineDash).toHaveBeenCalledWith([5, 4])
-    expect(ctx.moveTo).toHaveBeenCalledWith(50, 10)
-    expect(ctx.lineTo).toHaveBeenCalledWith(50, 90)
-    expect(ctx.stroke).toHaveBeenCalledOnce()
-    expect(ctx.strokeStyle).toMatch(/#(dc2626|f87171)/)
+    expect(ctx.moveTo).toHaveBeenNthCalledWith(1, 30, 10)
+    expect(ctx.moveTo).toHaveBeenNthCalledWith(2, 70, 10)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(1, 30, 90)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(2, 70, 90)
+    expect(ctx.stroke).toHaveBeenCalledTimes(2)
+    expect(strokeStyles[0]).toMatch(/#(16a34a|4ade80)/)
+    expect(strokeStyles[1]).toMatch(/#(dc2626|f87171)/)
   })
 
   it('shows an empty state when no samples have been collected', () => {
     const wrapper = mount(OpenAIQuotaUsageChart, {
-      props: { samples: [], resetTimes: [] }
+      props: { samples: [], resetMarkers: [] }
     })
 
     expect(wrapper.findComponent({ name: 'Line' }).exists()).toBe(false)
