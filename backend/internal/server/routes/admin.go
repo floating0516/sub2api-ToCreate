@@ -152,6 +152,9 @@ func registerCustomBuildRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	customBuild := admin.Group("/custom-build")
 	{
 		customBuild.GET("/notes", h.Admin.CustomBuild.GetNotes)
+		customBuild.GET("/update/status", h.Admin.CustomBuild.GetCustomUpdateStatus)
+		customBuild.POST("/update/stage", h.Admin.CustomBuild.StartCustomUpdate)
+		customBuild.POST("/update/promote", h.Admin.CustomBuild.PromoteCustomUpdate)
 	}
 }
 

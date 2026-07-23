@@ -1,0 +1,120 @@
+package admin
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+)
+
+func newCustomUpdateTestRouter(handler *CustomBuildHandler) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/status", handler.GetCustomUpdateStatus)
+	router.POST("/stage", handler.StartCustomUpdate)
+	router.POST("/promote", handler.PromoteCustomUpdate)
+	return router
+}
+
+func newCustomUpdateTestHandler(t *testing.T) (*CustomBuildHandler, string) {
+	t.Helper()
+	controlDir := t.TempDir()
+	handler := &CustomBuildHandler{updateControlDir: controlDir}
+	return handler, controlDir
+}
+
+func markCustomUpdateControllerOnline(t *testing.T, controlDir string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(controlDir, customUpdateHeartbeatFile),
+		[]byte(time.Now().UTC().Format(time.RFC3339)),
+		0644,
+	))
+}
+
+func writeCustomUpdateTestStatus(t *testing.T, controlDir string, status customUpdateStatus) {
+	t.Helper()
+	data, err := json.Marshal(status)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(controlDir, customUpdateStatusFile), data, 0644))
+}
+
+func TestCustomUpdateStatusReportsOfflineController(t *testing.T) {
+	handler, _ := newCustomUpdateTestHandler(t)
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/status", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"enabled":true`)
+	require.Contains(t, recorder.Body.String(), `"controller_online":false`)
+	require.Contains(t, recorder.Body.String(), `"state":"idle"`)
+}
+
+func TestStartCustomUpdateQueuesOnlyOneFixedStageAction(t *testing.T) {
+	handler, controlDir := newCustomUpdateTestHandler(t)
+	markCustomUpdateControllerOnline(t, controlDir)
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+
+	requestData, err := os.ReadFile(filepath.Join(controlDir, customUpdateRequestFile))
+	require.NoError(t, err)
+	var request customUpdateRequest
+	require.NoError(t, json.Unmarshal(requestData, &request))
+	require.Equal(t, "stage", request.Action)
+	require.Empty(t, request.Image)
+	require.Len(t, request.ID, 32)
+
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
+	require.Equal(t, http.StatusConflict, recorder.Code)
+}
+
+func TestPromoteCustomUpdateRequiresExactStagedImage(t *testing.T) {
+	handler, controlDir := newCustomUpdateTestHandler(t)
+	markCustomUpdateControllerOnline(t, controlDir)
+	const stagedImage = "ghcr.io/floating0516/sub2api-tocreate:0.1.164-tc1.17"
+	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
+		State: "awaiting_approval",
+		Image: stagedImage,
+	})
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"image":"ghcr.io/floating0516/sub2api-tocreate:wrong"}`)
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/promote", body))
+	require.Equal(t, http.StatusConflict, recorder.Code)
+
+	recorder = httptest.NewRecorder()
+	body = bytes.NewBufferString(`{"image":"` + stagedImage + `"}`)
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/promote", body))
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+
+	requestData, err := os.ReadFile(filepath.Join(controlDir, customUpdateRequestFile))
+	require.NoError(t, err)
+	var request customUpdateRequest
+	require.NoError(t, json.Unmarshal(requestData, &request))
+	require.Equal(t, "promote", request.Action)
+	require.Equal(t, stagedImage, request.Image)
+}
+
+func TestStartCustomUpdateRejectsOfflineController(t *testing.T) {
+	handler, _ := newCustomUpdateTestHandler(t)
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
+
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+}

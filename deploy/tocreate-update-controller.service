@@ -1,0 +1,19 @@
+[Unit]
+Description=Sub2API ToCreate custom update controller
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/sub2api-deploy
+Environment=HOME=/home/ubuntu
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/ubuntu/sub2api-src/deploy/tocreate-update-controller.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

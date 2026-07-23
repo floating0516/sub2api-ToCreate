@@ -55,7 +55,32 @@ export default {
     deployScript: '脚本部署',
     deployDocker: 'Docker',
     dockerEditCompose: '修改 docker-compose.yml 中的镜像版本',
-    dockerRecreate: '重新创建容器'
+    dockerRecreate: '重新创建容器',
+    customUpdateTitle: 'ToCreate 自定义更新',
+    customUpdateOffline: '主机更新控制器未运行',
+    customUpdateStage: '同步官方并部署到 18080',
+    customUpdateRetry: '重新执行更新',
+    customUpdateStagingReady: '18080 已通过健康、版本、菜单和页面资源检查',
+    customUpdatePromote: '推广到正式环境',
+    customUpdatePromoteWarning:
+      '将把上方精确镜像切换到 8080；现有数据库和 Redis 不会重建。',
+    customUpdateConfirmPromote: '确认推广',
+    customUpdateCommit: '源码 {commit}',
+    customUpdateRequestFailed: '提交自定义更新请求失败',
+    customUpdateStates: {
+      disabled: '自定义更新未启用',
+      idle: '可以检查官方更新',
+      queued: '更新请求已排队',
+      checking: '正在检查源码和官方更新',
+      merging: '正在合并官方代码',
+      building: 'GitHub Actions 正在构建镜像',
+      staging: '正在部署到 18080',
+      validating: '正在验证测试环境',
+      awaiting_approval: '等待正式推广确认',
+      promoting: '正在原子切换正式环境',
+      completed: '正式环境已是当前自定义版本',
+      failed: '自定义更新失败'
+    }
   },
 
   // Recharge / Subscription Page

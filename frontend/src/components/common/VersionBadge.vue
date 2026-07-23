@@ -32,7 +32,7 @@
           v-if="dropdownOpen"
           ref="dropdownRef"
           class="absolute left-0 z-50 mt-2 overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
-          :class="rollbackPanelOpen && isReleaseBuild ? 'w-80' : 'w-64'"
+          :class="customUpdateAvailable || (rollbackPanelOpen && isReleaseBuild) ? 'w-80' : 'w-64'"
         >
           <!-- Header with refresh button -->
           <div
@@ -114,8 +114,174 @@
                 </p>
               </div>
 
+              <div
+                v-if="customUpdateAvailable"
+                class="-mx-4 mb-3 border-y border-gray-100 px-4 py-3 dark:border-dark-700"
+              >
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <span
+                    class="flex min-w-0 items-center gap-2 text-sm font-medium text-gray-700 dark:text-dark-200"
+                  >
+                    <Icon name="sync" size="sm" :stroke-width="2" />
+                    <span>{{ t('version.customUpdateTitle') }}</span>
+                  </span>
+                  <span
+                    class="h-2 w-2 flex-shrink-0 rounded-full"
+                    :class="customUpdateStatusDotClass"
+                  ></span>
+                </div>
+
+                <div
+                  v-if="!customUpdateControllerOnline"
+                  class="flex items-start gap-2 bg-amber-50 px-2.5 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                >
+                  <Icon
+                    name="exclamationTriangle"
+                    size="xs"
+                    :stroke-width="2"
+                    class="mt-0.5 flex-shrink-0"
+                  />
+                  <span>{{ t('version.customUpdateOffline') }}</span>
+                </div>
+
+                <template v-else>
+                  <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-400">
+                    <svg
+                      v-if="customUpdateBusy"
+                      class="h-3.5 w-3.5 flex-shrink-0 animate-spin text-primary-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      ></circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <Icon
+                      v-else
+                      :name="customUpdateStatus?.state === 'failed' ? 'xCircle' : 'checkCircle'"
+                      size="xs"
+                      :stroke-width="2"
+                      :class="
+                        customUpdateStatus?.state === 'failed'
+                          ? 'text-red-500'
+                          : 'text-green-500'
+                      "
+                    />
+                    <span>{{ customUpdateStatusLabel }}</span>
+                  </div>
+
+                  <div
+                    v-if="customUpdateStatus?.image"
+                    class="mt-2 border-l-2 border-gray-200 pl-2 dark:border-dark-600"
+                  >
+                    <p class="break-all font-mono text-[10px] leading-4 text-gray-500 dark:text-dark-400">
+                      {{ customUpdateStatus.image }}
+                    </p>
+                    <p
+                      v-if="customUpdateImageDigestLabel || customUpdateCommitLabel"
+                      class="mt-0.5 font-mono text-[10px] text-gray-400 dark:text-dark-500"
+                    >
+                      {{ customUpdateImageDigestLabel }}
+                      <span v-if="customUpdateImageDigestLabel && customUpdateCommitLabel"> · </span>
+                      {{ customUpdateCommitLabel }}
+                    </p>
+                  </div>
+
+                  <p
+                    v-if="customUpdateError"
+                    class="mt-2 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                  >
+                    {{ customUpdateError }}
+                  </p>
+
+                  <div
+                    v-if="customUpdateStatus?.state === 'awaiting_approval'"
+                    class="mt-3 space-y-2"
+                  >
+                    <div
+                      class="flex items-start gap-2 bg-green-50 px-2.5 py-2 text-xs leading-4 text-green-700 dark:bg-green-900/20 dark:text-green-300"
+                    >
+                      <Icon
+                        name="checkCircle"
+                        size="xs"
+                        :stroke-width="2"
+                        class="mt-0.5 flex-shrink-0"
+                      />
+                      <span>{{ t('version.customUpdateStagingReady') }}</span>
+                    </div>
+
+                    <button
+                      v-if="!promotionConfirmationVisible"
+                      @click="promotionConfirmationVisible = true"
+                      class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                    >
+                      <Icon name="server" size="sm" :stroke-width="2" />
+                      {{ t('version.customUpdatePromote') }}
+                    </button>
+
+                    <div v-else class="space-y-2">
+                      <p
+                        class="flex items-start gap-1.5 text-xs leading-4 text-amber-600 dark:text-amber-400"
+                      >
+                        <Icon
+                          name="exclamationTriangle"
+                          size="xs"
+                          :stroke-width="2"
+                          class="mt-0.5 flex-shrink-0"
+                        />
+                        <span>{{ t('version.customUpdatePromoteWarning') }}</span>
+                      </p>
+                      <div class="grid grid-cols-2 gap-2">
+                        <button
+                          @click="promotionConfirmationVisible = false"
+                          :disabled="customUpdateSubmitting"
+                          class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-dark-600 dark:text-dark-300 dark:hover:bg-dark-700"
+                        >
+                          {{ t('common.cancel') }}
+                        </button>
+                        <button
+                          @click="handleCustomUpdatePromotion"
+                          :disabled="customUpdateSubmitting"
+                          class="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                        >
+                          <Icon name="check" size="xs" :stroke-width="2" />
+                          {{ t('version.customUpdateConfirmPromote') }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    v-else-if="customUpdateCanStage"
+                    @click="handleCustomUpdateStage"
+                    :disabled="customUpdateSubmitting"
+                    class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Icon name="sync" size="sm" :stroke-width="2" />
+                    {{
+                      customUpdateStatus?.state === 'failed'
+                        ? t('version.customUpdateRetry')
+                        : t('version.customUpdateStage')
+                    }}
+                  </button>
+                </template>
+              </div>
+
               <!-- Priority 1: Update error (must check before hasUpdate) -->
-              <div v-if="updateError" class="space-y-2">
+              <div
+                v-if="customUpdateStatusChecked && !customUpdateAvailable && updateError"
+                class="space-y-2"
+              >
                 <div
                   class="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/50 dark:bg-red-900/20"
                 >
@@ -150,7 +316,15 @@
               </div>
 
               <!-- Priority 2: Update success - need restart -->
-              <div v-else-if="updateSuccess && needRestart" class="space-y-2">
+              <div
+                v-else-if="
+                  customUpdateStatusChecked &&
+                  !customUpdateAvailable &&
+                  updateSuccess &&
+                  needRestart
+                "
+                class="space-y-2"
+              >
                 <div
                   class="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800/50 dark:bg-green-900/20"
                 >
@@ -232,7 +406,15 @@
               </div>
 
               <!-- Priority 3: Update available for source build - show git pull hint -->
-              <div v-else-if="hasUpdate && !isReleaseBuild" class="space-y-2">
+              <div
+                v-else-if="
+                  customUpdateStatusChecked &&
+                  !customUpdateAvailable &&
+                  hasUpdate &&
+                  !isReleaseBuild
+                "
+                class="space-y-2"
+              >
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
                   :href="releaseInfo.html_url"
@@ -292,7 +474,15 @@
               </div>
 
               <!-- Priority 4: Update available for release build - show update button -->
-              <div v-else-if="hasUpdate && isReleaseBuild" class="space-y-2">
+              <div
+                v-else-if="
+                  customUpdateStatusChecked &&
+                  !customUpdateAvailable &&
+                  hasUpdate &&
+                  isReleaseBuild
+                "
+                class="space-y-2"
+              >
                 <!-- Update info card -->
                 <div
                   class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-900/20"
@@ -356,7 +546,10 @@
               </div>
 
               <!-- Priority 5: Up to date - GitHub link + version rollback -->
-              <div v-else class="space-y-2">
+              <div
+                v-else-if="customUpdateStatusChecked && !customUpdateAvailable"
+                class="space-y-2"
+              >
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
                   :href="releaseInfo.html_url"
@@ -648,6 +841,13 @@ import {
   rollback as rollbackAPI,
   type RollbackVersionInfo
 } from '@/api/admin/system'
+import {
+  getCustomUpdateStatus,
+  startCustomUpdate,
+  promoteCustomUpdate,
+  type CustomUpdateState,
+  type CustomUpdateStatus
+} from '@/api/admin/customBuild'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
 
@@ -687,6 +887,15 @@ const restartCountdown = ref(0)
 // Distinguishes the success + restart panel between update and rollback flows
 const successKind = ref<'update' | 'rollback'>('update')
 
+// ToCreate custom image update states
+const customUpdateStatus = ref<CustomUpdateStatus | null>(null)
+const customUpdateStatusChecked = ref(false)
+const customUpdateSubmitting = ref(false)
+const customUpdateLoadError = ref('')
+const customUpdateActionError = ref('')
+const promotionConfirmationVisible = ref(false)
+let customUpdatePollingTimer: number | undefined
+
 // Rollback states
 const rollbackPanelOpen = ref(false)
 const rollbackVersions = ref<RollbackVersionInfo[]>([])
@@ -697,6 +906,68 @@ const rollingBack = ref(false)
 const rollbackError = ref('')
 
 const { copied, copyToClipboard } = useClipboard()
+
+const customUpdateBusyStates = new Set<CustomUpdateState>([
+  'queued',
+  'checking',
+  'merging',
+  'building',
+  'staging',
+  'validating',
+  'promoting'
+])
+
+const customUpdateAvailable = computed(() => customUpdateStatus.value?.enabled === true)
+const customUpdateControllerOnline = computed(
+  () => customUpdateStatus.value?.controller_online === true
+)
+const customUpdateBusy = computed(() => {
+  const state = customUpdateStatus.value?.state
+  return state ? customUpdateBusyStates.has(state) : false
+})
+const customUpdateCanStage = computed(() => {
+  if (!customUpdateControllerOnline.value) return false
+  const state = customUpdateStatus.value?.state
+  return state === 'idle' || state === 'completed' || state === 'failed'
+})
+const customUpdateStatusLabel = computed(() => {
+  const state = customUpdateStatus.value?.state || 'idle'
+  return t(`version.customUpdateStates.${state}`)
+})
+const customUpdateStatusDotClass = computed(() => {
+  if (!customUpdateControllerOnline.value) return 'bg-gray-300 dark:bg-dark-500'
+  switch (customUpdateStatus.value?.state) {
+    case 'failed':
+      return 'bg-red-500'
+    case 'awaiting_approval':
+    case 'completed':
+      return 'bg-green-500'
+    case 'queued':
+    case 'checking':
+    case 'merging':
+    case 'building':
+    case 'staging':
+    case 'validating':
+    case 'promoting':
+      return 'animate-pulse bg-primary-500'
+    default:
+      return 'bg-gray-400'
+  }
+})
+const customUpdateImageDigestLabel = computed(() => {
+  const digest = customUpdateStatus.value?.image_digest?.split('@').pop() || ''
+  return digest.length > 22 ? `${digest.slice(0, 22)}...` : digest
+})
+const customUpdateCommitLabel = computed(() => {
+  const commit = customUpdateStatus.value?.source_commit
+  return commit ? t('version.customUpdateCommit', { commit: commit.slice(0, 8) }) : ''
+})
+const customUpdateError = computed(
+  () =>
+    customUpdateStatus.value?.error ||
+    customUpdateActionError.value ||
+    customUpdateLoadError.value
+)
 
 // Manual rollback methods differ by deployment: script installs use install.sh,
 // docker deployments pin the image tag instead
@@ -733,10 +1004,19 @@ const isReleaseBuild = computed(() => buildType.value === 'release')
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
+  if (dropdownOpen.value) {
+    void refreshCustomUpdateStatus()
+    startCustomUpdatePolling()
+  } else {
+    stopCustomUpdatePolling()
+    promotionConfirmationVisible.value = false
+  }
 }
 
 function closeDropdown() {
   dropdownOpen.value = false
+  stopCustomUpdatePolling()
+  promotionConfirmationVisible.value = false
 }
 
 async function refreshVersion(force = true) {
@@ -770,6 +1050,93 @@ async function handleUpdate() {
     updateError.value = err.response?.data?.message || err.message || t('version.updateFailed')
   } finally {
     updating.value = false
+  }
+}
+
+async function refreshCustomUpdateStatus() {
+  if (!isAdmin.value) return
+  try {
+    const status = await getCustomUpdateStatus()
+    customUpdateStatus.value = status
+    customUpdateLoadError.value = ''
+    if (status.state !== 'awaiting_approval') {
+      promotionConfirmationVisible.value = false
+    }
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    customUpdateLoadError.value = err.response?.data?.message || err.message || ''
+  } finally {
+    customUpdateStatusChecked.value = true
+  }
+}
+
+function startCustomUpdatePolling() {
+  stopCustomUpdatePolling()
+  customUpdatePollingTimer = window.setInterval(() => {
+    void refreshCustomUpdateStatus()
+  }, 3000)
+}
+
+function stopCustomUpdatePolling() {
+  if (customUpdatePollingTimer !== undefined) {
+    window.clearInterval(customUpdatePollingTimer)
+    customUpdatePollingTimer = undefined
+  }
+}
+
+async function handleCustomUpdateStage() {
+  if (customUpdateSubmitting.value || !customUpdateCanStage.value) return
+
+  customUpdateSubmitting.value = true
+  customUpdateActionError.value = ''
+  try {
+    const result = await startCustomUpdate()
+    if (customUpdateStatus.value) {
+      customUpdateStatus.value = {
+        ...customUpdateStatus.value,
+        state: result.state,
+        action: result.action,
+        request_id: result.request_id,
+        message: result.message,
+        error: undefined
+      }
+    }
+    startCustomUpdatePolling()
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    customUpdateActionError.value =
+      err.response?.data?.message || err.message || t('version.customUpdateRequestFailed')
+  } finally {
+    customUpdateSubmitting.value = false
+  }
+}
+
+async function handleCustomUpdatePromotion() {
+  const image = customUpdateStatus.value?.image
+  if (customUpdateSubmitting.value || !image) return
+
+  customUpdateSubmitting.value = true
+  customUpdateActionError.value = ''
+  try {
+    const result = await promoteCustomUpdate(image)
+    if (customUpdateStatus.value) {
+      customUpdateStatus.value = {
+        ...customUpdateStatus.value,
+        state: result.state,
+        action: result.action,
+        request_id: result.request_id,
+        message: result.message,
+        error: undefined
+      }
+    }
+    promotionConfirmationVisible.value = false
+    startCustomUpdatePolling()
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    customUpdateActionError.value =
+      err.response?.data?.message || err.message || t('version.customUpdateRequestFailed')
+  } finally {
+    customUpdateSubmitting.value = false
   }
 }
 
@@ -913,11 +1280,13 @@ onMounted(() => {
   if (isAdmin.value) {
     // Use cached version if available, otherwise fetch
     appStore.fetchVersion(false)
+    void refreshCustomUpdateStatus()
   }
   document.addEventListener('click', handleClickOutside)
 })
 
 onBeforeUnmount(() => {
+  stopCustomUpdatePolling()
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

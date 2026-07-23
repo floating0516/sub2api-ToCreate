@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -14,11 +15,15 @@ import (
 const (
 	customBuildNotesPathEnv     = "CUSTOM_BUILD_NOTES_PATH"
 	defaultCustomBuildNotesPath = "/app/custom/CUSTOM_BUILD_NOTES.md"
+	customUpdateControlDirEnv   = "CUSTOM_UPDATE_CONTROL_DIR"
+	defaultCustomUpdateDir      = "/app/data/custom-update"
 	maxCustomBuildNotesBytes    = 1 << 20
 )
 
 type CustomBuildHandler struct {
-	notesPath string
+	notesPath        string
+	updateControlDir string
+	updateMu         sync.Mutex
 }
 
 func NewCustomBuildHandler() *CustomBuildHandler {
@@ -26,7 +31,14 @@ func NewCustomBuildHandler() *CustomBuildHandler {
 	if path == "" {
 		path = defaultCustomBuildNotesPath
 	}
-	return &CustomBuildHandler{notesPath: path}
+	updateControlDir := strings.TrimSpace(os.Getenv(customUpdateControlDirEnv))
+	if updateControlDir == "" {
+		updateControlDir = defaultCustomUpdateDir
+	}
+	return &CustomBuildHandler{
+		notesPath:        path,
+		updateControlDir: updateControlDir,
+	}
 }
 
 func (h *CustomBuildHandler) GetNotes(c *gin.Context) {

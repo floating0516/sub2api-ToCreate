@@ -56,7 +56,33 @@ export default {
     deployScript: 'Script',
     deployDocker: 'Docker',
     dockerEditCompose: 'Edit the image tag in docker-compose.yml',
-    dockerRecreate: 'Recreate the container'
+    dockerRecreate: 'Recreate the container',
+    customUpdateTitle: 'ToCreate Custom Update',
+    customUpdateOffline: 'The host update controller is offline',
+    customUpdateStage: 'Sync upstream and deploy to 18080',
+    customUpdateRetry: 'Retry custom update',
+    customUpdateStagingReady:
+      'Port 18080 passed health, version, menu, and page asset validation',
+    customUpdatePromote: 'Promote to production',
+    customUpdatePromoteWarning:
+      'This switches port 8080 to the exact image shown above. PostgreSQL and Redis are preserved.',
+    customUpdateConfirmPromote: 'Confirm promotion',
+    customUpdateCommit: 'source {commit}',
+    customUpdateRequestFailed: 'Failed to submit the custom update request',
+    customUpdateStates: {
+      disabled: 'Custom updates are disabled',
+      idle: 'Ready to check official updates',
+      queued: 'Update request queued',
+      checking: 'Checking source and official updates',
+      merging: 'Merging official source',
+      building: 'GitHub Actions is building the image',
+      staging: 'Deploying to port 18080',
+      validating: 'Validating staging',
+      awaiting_approval: 'Waiting for production approval',
+      promoting: 'Atomically switching production',
+      completed: 'Production is on the current custom version',
+      failed: 'Custom update failed'
+    }
   },
 
   // Recharge / Subscription Page
