@@ -232,7 +232,7 @@ func TestLiheOAuthLibreChatContractEndToEnd(t *testing.T) {
 	gatewayService := service.NewGatewayService(
 		&liheContractAccountRepository{}, nil, nil, nil, nil, nil, nil, nil, cfg,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 	)
 	gatewayHandler := handler.NewGatewayHandler(
 		gatewayService, nil, nil, nil, nil, nil, nil, nil, apiKeyService, nil, nil,
@@ -251,6 +251,7 @@ func TestLiheOAuthLibreChatContractEndToEnd(t *testing.T) {
 		handlers,
 		servermiddleware.NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg),
 		apiKeyService,
+		nil,
 		nil,
 		nil,
 		nil,
