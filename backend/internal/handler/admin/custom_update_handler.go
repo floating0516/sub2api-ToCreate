@@ -25,25 +25,25 @@ const (
 )
 
 type customUpdateStatus struct {
-	Enabled          bool   `json:"enabled"`
-	ControllerOnline bool   `json:"controller_online"`
-	HeartbeatAt      string `json:"heartbeat_at,omitempty"`
-	State            string `json:"state"`
-	Action           string `json:"action,omitempty"`
-	RequestID        string `json:"request_id,omitempty"`
-	Message          string `json:"message,omitempty"`
-	Image            string `json:"image,omitempty"`
-	ImageDigest      string `json:"image_digest,omitempty"`
-	AppVersion       string `json:"app_version,omitempty"`
-	UpstreamCommit   string `json:"upstream_commit,omitempty"`
-	SourceCommit     string `json:"source_commit,omitempty"`
-	StartedAt        string `json:"started_at,omitempty"`
-	UpdatedAt        string `json:"updated_at,omitempty"`
-	CompletedAt      string `json:"completed_at,omitempty"`
-	Error            string `json:"error,omitempty"`
-	LogFile          string `json:"log_file,omitempty"`
-	StagingURL       string `json:"staging_url,omitempty"`
-	ProductionURL    string `json:"production_url,omitempty"`
+	Enabled          bool               `json:"enabled"`
+	ControllerOnline bool               `json:"controller_online"`
+	HeartbeatAt      string             `json:"heartbeat_at,omitempty"`
+	State            string             `json:"state"`
+	Action           string             `json:"action,omitempty"`
+	RequestID        string             `json:"request_id,omitempty"`
+	Message          string             `json:"message,omitempty"`
+	Image            string             `json:"image,omitempty"`
+	ImageDigest      string             `json:"image_digest,omitempty"`
+	AppVersion       string             `json:"app_version,omitempty"`
+	UpstreamCommit   string             `json:"upstream_commit,omitempty"`
+	SourceCommit     string             `json:"source_commit,omitempty"`
+	StartedAt        string             `json:"started_at,omitempty"`
+	UpdatedAt        string             `json:"updated_at,omitempty"`
+	CompletedAt      string             `json:"completed_at,omitempty"`
+	Error            string             `json:"error,omitempty"`
+	LogFile          string             `json:"log_file,omitempty"`
+	StagingURL       string             `json:"staging_url,omitempty"`
+	ProductionURL    string             `json:"production_url,omitempty"`
 	Steps            []customUpdateStep `json:"steps,omitempty"`
 }
 
