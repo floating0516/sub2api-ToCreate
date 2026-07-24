@@ -44,6 +44,12 @@ type customUpdateStatus struct {
 	LogFile          string `json:"log_file,omitempty"`
 	StagingURL       string `json:"staging_url,omitempty"`
 	ProductionURL    string `json:"production_url,omitempty"`
+	Steps            []customUpdateStep `json:"steps,omitempty"`
+}
+
+type customUpdateStep struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
 type customUpdateRequest struct {
@@ -255,7 +261,7 @@ func (h *CustomBuildHandler) writeEnqueueError(c *gin.Context, err error) {
 
 func customUpdateBlocksStage(state string) bool {
 	switch state {
-	case "queued", "checking", "merging", "building", "staging", "validating", "awaiting_approval", "promoting":
+	case "queued", "checking", "merging", "pushing", "building", "staging", "validating", "awaiting_approval", "promoting":
 		return true
 	default:
 		return false

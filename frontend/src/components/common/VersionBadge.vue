@@ -31,7 +31,7 @@
         <div
           v-if="dropdownOpen"
           ref="dropdownRef"
-          class="absolute left-0 z-50 mt-2 overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
+          class="absolute left-0 z-50 mt-2 max-h-[calc(100vh-5rem)] overflow-x-hidden overflow-y-auto whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
           :class="customUpdateAvailable || (rollbackPanelOpen && isReleaseBuild) ? 'w-80' : 'w-64'"
         >
           <!-- Header with refresh button -->
@@ -178,6 +178,62 @@
                       "
                     />
                     <span>{{ customUpdateStatusLabel }}</span>
+                  </div>
+
+                  <div class="mt-3 border-t border-gray-100 pt-2.5 dark:border-dark-700">
+                    <div
+                      class="mb-1.5 flex items-center justify-between text-[11px] text-gray-400 dark:text-dark-500"
+                    >
+                      <span>{{
+                        t('version.customUpdateProgress', {
+                          completed: customUpdateCompletedStepCount
+                        })
+                      }}</span>
+                      <span>{{
+                        customUpdateStatus?.updated_at
+                          ? formatCustomUpdateTime(customUpdateStatus.updated_at)
+                          : ''
+                      }}</span>
+                    </div>
+                    <ol class="space-y-0.5">
+                      <li
+                        v-for="(step, index) in customUpdateSteps"
+                        :key="step.id"
+                        class="flex h-7 min-w-0 items-center gap-2 text-xs"
+                      >
+                        <span
+                          class="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+                          :class="customUpdateStepIconClass(step.status)"
+                          :title="t(`version.customUpdateStepStatuses.${step.status}`)"
+                        >
+                          <Icon
+                            :name="customUpdateStepIcon(step.status)"
+                            size="sm"
+                            :stroke-width="2"
+                            :class="{ 'animate-spin': step.status === 'running' }"
+                          />
+                        </span>
+                        <span class="w-4 flex-shrink-0 text-[10px] tabular-nums text-gray-400">
+                          {{ index + 1 }}
+                        </span>
+                        <span
+                          class="min-w-0 flex-1 truncate"
+                          :class="
+                            step.status === 'pending' || step.status === 'skipped'
+                              ? 'text-gray-400 dark:text-dark-500'
+                              : 'text-gray-600 dark:text-dark-300'
+                          "
+                        >
+                          {{ t(`version.customUpdateSteps.${step.id}`) }}
+                        </span>
+                        <span
+                          class="flex-shrink-0 text-[10px]"
+                          :class="customUpdateStepTextClass(step.status)"
+                        >
+                          {{ t(`version.customUpdateStepStatuses.${step.status}`) }}
+                        </span>
+                      </li>
+                    </ol>
                   </div>
 
                   <div
@@ -846,10 +902,12 @@ import {
   startCustomUpdate,
   promoteCustomUpdate,
   type CustomUpdateState,
-  type CustomUpdateStatus
+  type CustomUpdateStatus,
+  type CustomUpdateStepStatus
 } from '@/api/admin/customBuild'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
+import { resolveCustomUpdateSteps } from '@/utils/customUpdateSteps'
 
 const GITHUB_REPO = 'Wei-Shaw/sub2api'
 // Docker Hub image published by CI (tags carry no "v" prefix, e.g. weishaw/sub2api:0.1.146)
@@ -911,6 +969,7 @@ const customUpdateBusyStates = new Set<CustomUpdateState>([
   'queued',
   'checking',
   'merging',
+  'pushing',
   'building',
   'staging',
   'validating',
@@ -934,6 +993,13 @@ const customUpdateStatusLabel = computed(() => {
   const state = customUpdateStatus.value?.state || 'idle'
   return t(`version.customUpdateStates.${state}`)
 })
+const customUpdateSteps = computed(() => resolveCustomUpdateSteps(customUpdateStatus.value))
+const customUpdateCompletedStepCount = computed(
+  () =>
+    customUpdateSteps.value.filter(
+      (step) => step.status === 'completed' || step.status === 'skipped'
+    ).length
+)
 const customUpdateStatusDotClass = computed(() => {
   if (!customUpdateControllerOnline.value) return 'bg-gray-300 dark:bg-dark-500'
   switch (customUpdateStatus.value?.state) {
@@ -945,6 +1011,7 @@ const customUpdateStatusDotClass = computed(() => {
     case 'queued':
     case 'checking':
     case 'merging':
+    case 'pushing':
     case 'building':
     case 'staging':
     case 'validating':
@@ -968,6 +1035,65 @@ const customUpdateError = computed(
     customUpdateActionError.value ||
     customUpdateLoadError.value
 )
+
+function customUpdateStepIcon(
+  status: CustomUpdateStepStatus
+): 'clock' | 'sync' | 'checkCircle' | 'xCircle' | 'exclamationCircle' | 'check' {
+  switch (status) {
+    case 'running':
+      return 'sync'
+    case 'completed':
+      return 'checkCircle'
+    case 'failed':
+      return 'xCircle'
+    case 'action_required':
+      return 'exclamationCircle'
+    case 'skipped':
+      return 'check'
+    default:
+      return 'clock'
+  }
+}
+
+function customUpdateStepIconClass(status: CustomUpdateStepStatus): string {
+  switch (status) {
+    case 'running':
+      return 'text-primary-500'
+    case 'completed':
+      return 'text-green-500'
+    case 'failed':
+      return 'text-red-500'
+    case 'action_required':
+      return 'text-amber-500'
+    default:
+      return 'text-gray-300 dark:text-dark-500'
+  }
+}
+
+function customUpdateStepTextClass(status: CustomUpdateStepStatus): string {
+  switch (status) {
+    case 'running':
+      return 'text-primary-500'
+    case 'completed':
+      return 'text-green-600 dark:text-green-400'
+    case 'failed':
+      return 'text-red-600 dark:text-red-400'
+    case 'action_required':
+      return 'text-amber-600 dark:text-amber-400'
+    default:
+      return 'text-gray-400 dark:text-dark-500'
+  }
+}
+
+function formatCustomUpdateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(date)
+}
 
 // Manual rollback methods differ by deployment: script installs use install.sh,
 // docker deployments pin the image tag instead
@@ -1098,7 +1224,8 @@ async function handleCustomUpdateStage() {
         action: result.action,
         request_id: result.request_id,
         message: result.message,
-        error: undefined
+        error: undefined,
+        steps: []
       }
     }
     startCustomUpdatePolling()

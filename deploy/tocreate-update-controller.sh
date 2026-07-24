@@ -47,6 +47,9 @@ chosen_suffix=""
 previous_state=""
 previous_image=""
 previous_source_commit=""
+previous_steps="[]"
+current_steps="[]"
+active_stage_step=""
 heartbeat_pid=""
 
 log() {
@@ -89,6 +92,7 @@ write_status() {
     --arg log_file "$current_log_file" \
     --arg staging_url "$STAGING_BASE_URL" \
     --arg production_url "$PROD_BASE_URL" \
+    --argjson steps "$current_steps" \
     '{
       state: $state,
       action: $action,
@@ -105,7 +109,8 @@ write_status() {
       error: $error,
       log_file: $log_file,
       staging_url: $staging_url,
-      production_url: $production_url
+      production_url: $production_url,
+      steps: $steps
     } | with_entries(select(.value != ""))' > "$temporary"; then
     rm -f -- "$temporary"
     return 1
@@ -122,8 +127,74 @@ status_value() {
   jq -r "$expression // empty" "$STATUS_FILE" 2>/dev/null
 }
 
+initialize_stage_steps() {
+  current_steps='[
+    {"id":"source_check","status":"pending"},
+    {"id":"upstream_fetch","status":"pending"},
+    {"id":"upstream_merge","status":"pending"},
+    {"id":"source_push","status":"pending"},
+    {"id":"image_build","status":"pending"},
+    {"id":"staging_deploy","status":"pending"},
+    {"id":"staging_validate","status":"pending"},
+    {"id":"production_approval","status":"pending"}
+  ]'
+  active_stage_step=""
+}
+
+set_step_status() {
+  local step_id="$1"
+  local step_status="$2"
+  local updated_steps=""
+
+  updated_steps="$(
+    jq -c \
+      --arg step_id "$step_id" \
+      --arg step_status "$step_status" \
+      'map(if .id == $step_id then .status = $step_status else . end)' \
+      <<<"$current_steps"
+  )" || return 1
+  current_steps="$updated_steps"
+}
+
+begin_stage_step() {
+  active_stage_step="$1"
+  set_step_status "$active_stage_step" "running"
+}
+
+complete_stage_step() {
+  local step_id="$1"
+  set_step_status "$step_id" "completed" || return 1
+  if [ "$active_stage_step" = "$step_id" ]; then
+    active_stage_step=""
+  fi
+}
+
+skip_stage_step() {
+  set_step_status "$1" "skipped"
+}
+
+restore_or_initialize_stage_steps() {
+  current_steps="$previous_steps"
+  if ! jq -e 'type == "array" and length > 0' <<<"$current_steps" >/dev/null 2>&1; then
+    initialize_stage_steps
+    set_step_status "source_check" "completed"
+    set_step_status "upstream_fetch" "completed"
+    set_step_status "upstream_merge" "completed"
+    set_step_status "source_push" "completed"
+    set_step_status "image_build" "completed"
+    set_step_status "staging_deploy" "completed"
+    set_step_status "staging_validate" "completed"
+    set_step_status "production_approval" "action_required"
+  fi
+  active_stage_step=""
+}
+
 write_failure() {
   local message="$1"
+  if [ -n "$active_stage_step" ]; then
+    set_step_status "$active_stage_step" "failed" || true
+    active_stage_step=""
+  fi
   current_message="Custom update failed"
   write_status "failed" "$current_message" "$message" "$(utc_now)"
   log "$message"
@@ -238,6 +309,13 @@ stage_update() {
   current_action="stage"
   current_started_at="$(utc_now)"
   current_log_file="stage-${current_request_id}-$(date '+%Y%m%d%H%M%S').log"
+  current_image=""
+  current_image_digest=""
+  current_app_version=""
+  current_upstream_commit=""
+  current_source_commit=""
+  initialize_stage_steps
+  begin_stage_step "source_check"
   current_message="Checking source and official upstream"
   write_status "checking" "$current_message" || return 1
 
@@ -251,6 +329,11 @@ stage_update() {
     write_failure "Could not check out $BRANCH"
     return 1
   fi
+  complete_stage_step "source_check" || return 1
+
+  begin_stage_step "upstream_fetch"
+  current_message="Fetching official upstream source"
+  write_status "checking" "$current_message" || return 1
   if ! run_logged git -C "$SRC_DIR" fetch "$UPSTREAM_REMOTE" "$UPSTREAM_REF" --tags; then
     write_failure "Could not fetch $UPSTREAM_REMOTE/$UPSTREAM_REF"
     return 1
@@ -261,7 +344,9 @@ stage_update() {
     write_failure "Could not resolve the official upstream commit"
     return 1
   fi
+  complete_stage_step "upstream_fetch" || return 1
 
+  begin_stage_step "upstream_merge"
   current_message="Merging official upstream into the ToCreate branch"
   write_status "merging" "$current_message" || return 1
   if ! run_logged git -C "$SRC_DIR" merge --no-edit "$UPSTREAM_REMOTE/$UPSTREAM_REF"; then
@@ -277,23 +362,39 @@ stage_update() {
     write_failure "Could not resolve source, version, or production image metadata"
     return 1
   fi
+  complete_stage_step "upstream_merge" || return 1
 
   if [ "$previous_state" = "completed" ] \
     && [ "$previous_source_commit" = "$current_source_commit" ] \
     && [ "$previous_image" = "$prod_image" ]; then
     current_image="$prod_image"
     current_image_digest="$(image_digest "$prod_image")"
+    skip_stage_step "source_push"
+    skip_stage_step "image_build"
+    skip_stage_step "staging_deploy"
+    skip_stage_step "staging_validate"
+    skip_stage_step "production_approval"
     current_message="Production already uses the latest merged ToCreate source"
     write_status "completed" "$current_message" "" "$(utc_now)"
     return 0
   fi
 
+  begin_stage_step "source_push"
   if ! choose_image "$prod_image"; then
     write_failure "Could not allocate the next ToCreate image version"
     return 1
   fi
   suffix="$chosen_suffix"
 
+  current_message="Pushing the ToCreate branch"
+  write_status "pushing" "$current_message" || return 1
+  if ! run_logged git -C "$SRC_DIR" push origin "$BRANCH"; then
+    write_failure "Could not push $BRANCH to the custom repository"
+    return 1
+  fi
+  complete_stage_step "source_push" || return 1
+
+  begin_stage_step "image_build"
   current_message="Building $current_image with GitHub Actions"
   write_status "building" "$current_message" || return 1
   if ! run_logged env \
@@ -309,14 +410,18 @@ stage_update() {
     write_failure "GitHub Actions custom image build failed"
     return 1
   fi
+  complete_stage_step "image_build" || return 1
 
+  begin_stage_step "staging_deploy"
   current_message="Deploying the exact image to port 18080"
   write_status "staging" "$current_message" || return 1
   if ! run_logged "$STAGING_SCRIPT" "$current_image"; then
     write_failure "Staging deployment or validation failed; production was not changed"
     return 1
   fi
+  complete_stage_step "staging_deploy" || return 1
 
+  begin_stage_step "staging_validate"
   current_message="Validating the staged image"
   write_status "validating" "$current_message" || return 1
   staged_image="$(sudo docker inspect "$STAGING_CONTAINER_NAME" --format '{{.Config.Image}}' 2>/dev/null)"
@@ -339,7 +444,9 @@ stage_update() {
     write_failure "Could not resolve the staged image digest"
     return 1
   fi
+  complete_stage_step "staging_validate" || return 1
 
+  set_step_status "production_approval" "action_required" || return 1
   current_message="Staging is healthy; explicit production approval is required"
   write_status "awaiting_approval" "$current_message" || return 1
   log "Staged $current_image ($current_image_digest) on port 18080"
@@ -354,6 +461,8 @@ promote_update() {
   current_action="promote"
   current_started_at="$(utc_now)"
   current_log_file="promote-${current_request_id}-$(date '+%Y%m%d%H%M%S').log"
+  restore_or_initialize_stage_steps
+  set_step_status "production_approval" "completed" || return 1
   current_image="$previous_image"
   current_image_digest="$(status_value '.image_digest')"
   current_app_version="$(status_value '.app_version')"
@@ -414,12 +523,15 @@ process_request() {
   previous_state="$(status_value '.state')"
   previous_image="$(status_value '.image')"
   previous_source_commit="$(status_value '.source_commit')"
+  previous_steps="$(jq -c '.steps // []' "$STATUS_FILE" 2>/dev/null || printf '[]')"
 
   if ! jq -e '
     (.id | type == "string" and test("^[0-9a-f]{32}$")) and
     (.action == "stage" or .action == "promote") and
     ((.image // "") | type == "string")
   ' "$PROCESSING_FILE" >/dev/null 2>&1; then
+    current_steps="[]"
+    active_stage_step=""
     current_action="invalid"
     current_request_id="invalid"
     current_started_at="$(utc_now)"

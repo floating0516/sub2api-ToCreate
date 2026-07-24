@@ -59,6 +59,26 @@ func TestCustomUpdateStatusReportsOfflineController(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"state":"idle"`)
 }
 
+func TestCustomUpdateStatusReturnsControllerSteps(t *testing.T) {
+	handler, controlDir := newCustomUpdateTestHandler(t)
+	markCustomUpdateControllerOnline(t, controlDir)
+	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
+		State: "building",
+		Steps: []customUpdateStep{
+			{ID: "source_check", Status: "completed"},
+			{ID: "image_build", Status: "running"},
+		},
+	})
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/status", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"id":"source_check","status":"completed"`)
+	require.Contains(t, recorder.Body.String(), `"id":"image_build","status":"running"`)
+}
+
 func TestStartCustomUpdateQueuesOnlyOneFixedStageAction(t *testing.T) {
 	handler, controlDir := newCustomUpdateTestHandler(t)
 	markCustomUpdateControllerOnline(t, controlDir)
@@ -117,4 +137,16 @@ func TestStartCustomUpdateRejectsOfflineController(t *testing.T) {
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
 
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+}
+
+func TestStartCustomUpdateRejectsWhileSourcePushIsActive(t *testing.T) {
+	handler, controlDir := newCustomUpdateTestHandler(t)
+	markCustomUpdateControllerOnline(t, controlDir)
+	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{State: "pushing"})
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
 }

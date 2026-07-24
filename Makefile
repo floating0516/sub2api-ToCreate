@@ -8,6 +8,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/admin.paymentAddonProducts.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/utils/__tests__/subscriptionColors.spec.ts \
+	src/utils/__tests__/customUpdateSteps.spec.ts \
 	src/views/admin/orders/__tests__/AddonProductEditDialog.spec.ts \
 	src/views/admin/orders/__tests__/AdminPaymentPlansView.spec.ts \
 	src/views/admin/__tests__/SettingsView.spec.ts

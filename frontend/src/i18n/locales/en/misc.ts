@@ -69,12 +69,32 @@ export default {
     customUpdateConfirmPromote: 'Confirm promotion',
     customUpdateCommit: 'source {commit}',
     customUpdateRequestFailed: 'Failed to submit the custom update request',
+    customUpdateProgress: 'Progress {completed}/8',
+    customUpdateStepStatuses: {
+      pending: 'Waiting',
+      running: 'Running',
+      completed: 'Complete',
+      failed: 'Failed',
+      action_required: 'Confirm',
+      skipped: 'Not needed'
+    },
+    customUpdateSteps: {
+      source_check: 'Check local source',
+      upstream_fetch: 'Fetch official source',
+      upstream_merge: 'Merge official update',
+      source_push: 'Push custom branch',
+      image_build: 'Build image with GitHub Actions',
+      staging_deploy: 'Deploy image to port 18080',
+      staging_validate: 'Validate port 18080',
+      production_approval: 'Approve promotion to port 8080'
+    },
     customUpdateStates: {
       disabled: 'Custom updates are disabled',
       idle: 'Ready to check official updates',
       queued: 'Update request queued',
       checking: 'Checking source and official updates',
       merging: 'Merging official source',
+      pushing: 'Pushing the custom branch',
       building: 'GitHub Actions is building the image',
       staging: 'Deploying to port 18080',
       validating: 'Validating staging',

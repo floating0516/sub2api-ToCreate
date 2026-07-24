@@ -67,12 +67,32 @@ export default {
     customUpdateConfirmPromote: '确认推广',
     customUpdateCommit: '源码 {commit}',
     customUpdateRequestFailed: '提交自定义更新请求失败',
+    customUpdateProgress: '执行进度 {completed}/8',
+    customUpdateStepStatuses: {
+      pending: '等待',
+      running: '进行中',
+      completed: '完成',
+      failed: '失败',
+      action_required: '待确认',
+      skipped: '无需执行'
+    },
+    customUpdateSteps: {
+      source_check: '检查本地源码',
+      upstream_fetch: '拉取官方源码',
+      upstream_merge: '合并官方更新',
+      source_push: '推送自定义分支',
+      image_build: 'GitHub Actions 构建镜像',
+      staging_deploy: '部署镜像到 18080',
+      staging_validate: '验证 18080',
+      production_approval: '确认是否推广到 8080'
+    },
     customUpdateStates: {
       disabled: '自定义更新未启用',
       idle: '可以检查官方更新',
       queued: '更新请求已排队',
       checking: '正在检查源码和官方更新',
       merging: '正在合并官方代码',
+      pushing: '正在推送自定义分支',
       building: 'GitHub Actions 正在构建镜像',
       staging: '正在部署到 18080',
       validating: '正在验证测试环境',

@@ -12,6 +12,7 @@ export type CustomUpdateState =
   | 'queued'
   | 'checking'
   | 'merging'
+  | 'pushing'
   | 'building'
   | 'staging'
   | 'validating'
@@ -19,6 +20,29 @@ export type CustomUpdateState =
   | 'promoting'
   | 'completed'
   | 'failed'
+
+export type CustomUpdateStepID =
+  | 'source_check'
+  | 'upstream_fetch'
+  | 'upstream_merge'
+  | 'source_push'
+  | 'image_build'
+  | 'staging_deploy'
+  | 'staging_validate'
+  | 'production_approval'
+
+export type CustomUpdateStepStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'action_required'
+  | 'skipped'
+
+export interface CustomUpdateStep {
+  id: CustomUpdateStepID
+  status: CustomUpdateStepStatus
+}
 
 export interface CustomUpdateStatus {
   enabled: boolean
@@ -40,6 +64,7 @@ export interface CustomUpdateStatus {
   log_file?: string
   staging_url?: string
   production_url?: string
+  steps?: CustomUpdateStep[]
 }
 
 export interface CustomUpdateRequestResult {
