@@ -107,6 +107,66 @@ func TestIsImageGenerationIntent(t *testing.T) {
 	}
 }
 
+func TestOpenAIRequestBodyHasCodexImageGenerationTool(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+		want bool
+	}{
+		{
+			name: "top-level image_gen namespace",
+			body: []byte(`{"tools":[{"type":"namespace","name":"image_gen","tools":[{"type":"function","name":"imagegen"}]}]}`),
+			want: true,
+		},
+		{
+			name: "flat image_gen function",
+			body: []byte(`{"tools":[{"type":"function","name":"image_gen.imagegen","parameters":{"type":"object"}}]}`),
+			want: true,
+		},
+		{
+			name: "nested image_gen function",
+			body: []byte(`{"tools":[{"type":"function","function":{"namespace":"image_gen","name":"imagegen","parameters":{"type":"object"}}}]}`),
+			want: true,
+		},
+		{
+			name: "additional_tools image_gen namespace",
+			body: []byte(`{"input":[{"type":"additional_tools","tools":[{"type":"namespace","name":"image_gen"}]}]}`),
+			want: true,
+		},
+		{
+			name: "additional_tools image_gen function",
+			body: []byte(`{"input":[{"type":"additional_tools","tools":[{"type":"function","name":"image_gen__imagegen"}]}]}`),
+			want: true,
+		},
+		{
+			name: "description mention is not a tool",
+			body: []byte(`{"input":[{"type":"additional_tools","tools":[{"type":"custom","name":"exec","description":"Execute code-mode tools, including image_gen.imagegen."}]}]}`),
+		},
+		{
+			name: "hosted image_generation is not a client image_gen tool",
+			body: []byte(`{"tools":[{"type":"image_generation"}]}`),
+		},
+		{
+			name: "unrelated function",
+			body: []byte(`{"tools":[{"type":"function","name":"imagegen","parameters":{"type":"object"}}]}`),
+		},
+		{
+			name: "no tools",
+			body: []byte(`{"model":"gpt-5.5","input":"draw a cat"}`),
+		},
+		{
+			name: "invalid json",
+			body: []byte(`{"tools":[`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, openAIRequestBodyHasCodexImageGenerationTool(tt.body))
+		})
+	}
+}
+
 func TestIsImageGenerationIntentJSONSemantics(t *testing.T) {
 	largeInput := strings.Repeat("x", 1<<20)
 	tests := []struct {

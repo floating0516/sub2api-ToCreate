@@ -271,6 +271,57 @@ func openAIJSONInputContainsImageGenTool(input gjson.Result) bool {
 	return found
 }
 
+func openAIRequestBodyHasCodexImageGenerationTool(body []byte) bool {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return false
+	}
+	if openAIJSONToolsContainCodexImageGenerationTool(gjson.GetBytes(body, "tools")) {
+		return true
+	}
+	input := gjson.GetBytes(body, "input")
+	if !input.IsArray() {
+		return false
+	}
+	found := false
+	input.ForEach(func(_, item gjson.Result) bool {
+		if openAIJSONString(item.Get("type")) != "additional_tools" {
+			return true
+		}
+		found = openAIJSONToolsContainCodexImageGenerationTool(item.Get("tools"))
+		return !found
+	})
+	return found
+}
+
+func openAIJSONToolsContainCodexImageGenerationTool(tools gjson.Result) bool {
+	if !tools.IsArray() {
+		return false
+	}
+	found := false
+	tools.ForEach(func(_, item gjson.Result) bool {
+		if isImageGenNamespaceTool(item) {
+			found = true
+			return false
+		}
+		if openAIJSONString(item.Get("type")) != "function" {
+			return true
+		}
+		namespace := openAIJSONString(item.Get("namespace"))
+		name := openAIJSONString(item.Get("name"))
+		if function := item.Get("function"); function.IsObject() {
+			if namespace == "" {
+				namespace = openAIJSONString(function.Get("namespace"))
+			}
+			if name == "" {
+				name = openAIJSONString(function.Get("name"))
+			}
+		}
+		found = isOpenAIImageGenFunctionReference(namespace, name)
+		return !found
+	})
+	return found
+}
+
 func openAIRequestBodyHasImageGenerationDeclaration(body []byte) bool {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return false

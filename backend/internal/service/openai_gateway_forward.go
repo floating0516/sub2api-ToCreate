@@ -45,6 +45,23 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if normalized {
 		body = normalizedBody
 	}
+	if isOpenAIResponsesLiteHeader(c.GetHeader(responsesLiteHeader)) {
+		apiKey := getAPIKeyFromContext(c)
+		isCodexCLI := openai.IsCodexOfficialClientByHeaders(c.GetHeader("User-Agent"), c.GetHeader("originator")) || (s.cfg != nil && s.cfg.Gateway.ForceCodexCLI)
+		requestedModel := strings.TrimSpace(gjson.GetBytes(body, "model").String())
+		if s.shouldDowngradeCodexResponsesLiteForHostedImageBridge(
+			ctx,
+			account,
+			apiKey,
+			isCodexCLI,
+			requestedModel,
+			body,
+			isOpenAIResponsesCompactPath(c),
+		) {
+			c.Request.Header.Del(responsesLiteHeader)
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Downgraded Responses Lite request for hosted image_generation bridge")
+		}
+	}
 	if account.IsOpenAIOAuth() && isOpenAIResponsesLiteHeader(c.GetHeader(responsesLiteHeader)) {
 		liteBody, changed, liteErr := normalizeOpenAIResponsesLiteToolsPayload(body)
 		if liteErr != nil {

@@ -1,6 +1,9 @@
 package service
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
 const featureKeyCodexImageGenerationBridge = "codex_image_generation_bridge"
 
@@ -106,4 +109,29 @@ func (a *Account) CodexImageGenerationExplicitToolPolicy() string {
 		return normalizeCodexImageGenerationExplicitToolPolicy(policy)
 	}
 	return codexImageGenerationExplicitToolPolicyAllow
+}
+
+func (s *OpenAIGatewayService) shouldDowngradeCodexResponsesLiteForHostedImageBridge(
+	ctx context.Context,
+	account *Account,
+	apiKey *APIKey,
+	isCodexCLI bool,
+	requestedModel string,
+	body []byte,
+	isCompact bool,
+) bool {
+	if account == nil ||
+		!account.IsOpenAIOAuth() ||
+		!isCodexCLI ||
+		isCompact ||
+		account.IsOpenAIPassthroughEnabled() ||
+		!GroupAllowsImageGeneration(apiKeyGroup(apiKey)) ||
+		account.CodexImageGenerationExplicitToolPolicy() == codexImageGenerationExplicitToolPolicyStrip {
+		return false
+	}
+	upstreamModel := normalizeOpenAIModelForUpstream(account, account.GetMappedModel(requestedModel))
+	if isCodexSparkModel(upstreamModel) || openAIRequestBodyHasCodexImageGenerationTool(body) {
+		return false
+	}
+	return s.isCodexImageGenerationBridgeEnabled(ctx, account, apiKey)
 }

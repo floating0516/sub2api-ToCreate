@@ -237,6 +237,24 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 			normalized = next
 		}
+		apiKey := getAPIKeyFromContext(c)
+		if isOpenAIResponsesLiteWebSocketPayload(normalized) &&
+			s.shouldDowngradeCodexResponsesLiteForHostedImageBridge(
+				ctx,
+				account,
+				apiKey,
+				isCodexCLI,
+				originalModel,
+				normalized,
+				false,
+			) {
+			next, deleteErr := sjson.DeleteBytes(normalized, "client_metadata."+responsesLiteWSMetadataKey)
+			if deleteErr != nil {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", deleteErr)
+			}
+			normalized = next
+			logOpenAIWSModeInfo("ingress_ws_responses_lite_downgraded_for_hosted_image_bridge account_id=%d", account.ID)
+		}
 		if account.IsOpenAIOAuth() && isOpenAIResponsesLiteWebSocketPayload(normalized) {
 			litePayload, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(normalized)
 			if liteErr != nil {
@@ -248,7 +266,6 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 			normalized = litePayload
 		}
-		apiKey := getAPIKeyFromContext(c)
 		imageGenerationAllowed := GroupAllowsImageGeneration(apiKeyGroup(apiKey))
 		codexImageGenerationExplicitToolPolicy := codexImageGenerationExplicitToolPolicyAllow
 		if isCodexCLI {

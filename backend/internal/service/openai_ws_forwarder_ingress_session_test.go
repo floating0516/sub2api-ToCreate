@@ -437,7 +437,8 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 	captureConn := &openAIWSCaptureConn{
 		events: [][]byte{
 			[]byte(`{"type":"response.completed","response":{"id":"resp_codex_image_bridge","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
-			[]byte(`{"type":"response.completed","response":{"id":"resp_codex_image_lite","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
+			[]byte(`{"type":"response.completed","response":{"id":"resp_codex_image_lite_fallback","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
+			[]byte(`{"type":"response.completed","response":{"id":"resp_codex_image_lite_namespace","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
 			[]byte(`{"type":"response.completed","response":{"id":"resp_codex_image_function","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
 		},
 	}
@@ -551,7 +552,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 			{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec","description":"Execute code-mode tools, including image_gen.imagegen."}]},
 			{"type":"message","role":"user","content":[{"type":"input_text","text":"draw a cat"}]}
 		],
-		"tool_choice":{"type":"namespace","name":"collaboration"}
+		"tool_choice":"auto"
 	}`))
 	cancelWrite()
 	require.NoError(t, err)
@@ -561,14 +562,35 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 	cancelRead()
 	require.NoError(t, err)
 	require.Equal(t, coderws.MessageText, msgType)
-	require.Equal(t, "resp_codex_image_lite", gjson.GetBytes(message, "response.id").String())
+	require.Equal(t, "resp_codex_image_lite_fallback", gjson.GetBytes(message, "response.id").String())
 
 	writeCtx, cancelWrite = context.WithTimeout(context.Background(), 3*time.Second)
 	err = clientConn.Write(writeCtx, coderws.MessageText, []byte(`{
 		"type":"response.create",
 		"model":"gpt-5.5",
 		"stream":false,
-		"previous_response_id":"resp_codex_image_lite",
+		"previous_response_id":"resp_codex_image_lite_fallback",
+		"client_metadata":{"ws_request_header_x_openai_internal_codex_responses_lite":"true"},
+		"input":"draw a cat",
+		"tools":[{"type":"namespace","name":"image_gen","tools":[{"type":"function","name":"imagegen"}]}],
+		"tool_choice":{"type":"namespace","name":"image_gen"}
+	}`))
+	cancelWrite()
+	require.NoError(t, err)
+
+	readCtx, cancelRead = context.WithTimeout(context.Background(), 3*time.Second)
+	msgType, message, err = clientConn.Read(readCtx)
+	cancelRead()
+	require.NoError(t, err)
+	require.Equal(t, coderws.MessageText, msgType)
+	require.Equal(t, "resp_codex_image_lite_namespace", gjson.GetBytes(message, "response.id").String())
+
+	writeCtx, cancelWrite = context.WithTimeout(context.Background(), 3*time.Second)
+	err = clientConn.Write(writeCtx, coderws.MessageText, []byte(`{
+		"type":"response.create",
+		"model":"gpt-5.5",
+		"stream":false,
+		"previous_response_id":"resp_codex_image_lite_namespace",
 		"input":"draw a cat",
 		"tools":[{"type":"function","name":"image_gen.imagegen","parameters":{"type":"object"}}]
 	}`))
@@ -591,7 +613,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 		t.Fatal("等待 ingress websocket 结束超时")
 	}
 
-	require.Len(t, captureConn.writes, 3)
+	require.Len(t, captureConn.writes, 4)
 	nonLitePayload := requestToJSONString(captureConn.writes[0])
 	require.True(t, gjson.Get(nonLitePayload, `tools.#(type=="image_generation")`).Exists())
 	require.Equal(t, "png", gjson.Get(nonLitePayload, `tools.#(type=="image_generation").output_format`).String())
@@ -599,19 +621,29 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 	require.Contains(t, gjson.Get(nonLitePayload, "instructions").String(), "image_generation")
 	require.False(t, gjson.Get(nonLitePayload, "reasoning.context").Exists())
 
-	litePayload := requestToJSONString(captureConn.writes[1])
-	require.False(t, gjson.Get(litePayload, `tools.#(type=="image_generation")`).Exists())
-	require.NotContains(t, gjson.Get(litePayload, "instructions").String(), "image_generation")
-	require.Equal(t, "exec", gjson.Get(litePayload, `input.#(type=="additional_tools").tools.0.name`).String())
-	require.Contains(t, gjson.Get(litePayload, `input.#(type=="additional_tools").tools.0.description`).String(), "image_gen.imagegen")
-	require.False(t, gjson.Get(litePayload, `tools.#(type=="namespace")`).Exists())
-	require.Equal(t, "collaboration", gjson.Get(litePayload, `input.#(type=="additional_tools").tools.1.name`).String())
-	require.Equal(t, "namespace", gjson.Get(litePayload, "tool_choice.type").String())
-	require.Equal(t, "collaboration", gjson.Get(litePayload, "tool_choice.name").String())
-	require.Equal(t, "high", gjson.Get(litePayload, "reasoning.effort").String())
-	require.Equal(t, "all_turns", gjson.Get(litePayload, "reasoning.context").String())
+	fallbackPayload := requestToJSONString(captureConn.writes[1])
+	require.True(t, gjson.Get(fallbackPayload, `tools.#(type=="image_generation")`).Exists())
+	require.Equal(t, "png", gjson.Get(fallbackPayload, `tools.#(type=="image_generation").output_format`).String())
+	require.Contains(t, gjson.Get(fallbackPayload, "instructions").String(), "image_generation")
+	require.Equal(t, "exec", gjson.Get(fallbackPayload, `input.#(type=="additional_tools").tools.0.name`).String())
+	require.Contains(t, gjson.Get(fallbackPayload, `input.#(type=="additional_tools").tools.0.description`).String(), "image_gen.imagegen")
+	require.Equal(t, "collaboration", gjson.Get(fallbackPayload, `tools.#(type=="namespace").name`).String())
+	require.Equal(t, "auto", gjson.Get(fallbackPayload, "tool_choice").String())
+	require.Equal(t, "high", gjson.Get(fallbackPayload, "reasoning.effort").String())
+	require.False(t, gjson.Get(fallbackPayload, "reasoning.context").Exists())
+	require.False(t, gjson.Get(fallbackPayload, "client_metadata."+responsesLiteWSMetadataKey).Exists())
 
-	functionPayload := requestToJSONString(captureConn.writes[2])
+	liteNamespacePayload := requestToJSONString(captureConn.writes[2])
+	require.False(t, gjson.Get(liteNamespacePayload, `tools.#(type=="image_generation")`).Exists())
+	require.NotContains(t, gjson.Get(liteNamespacePayload, "instructions").String(), codexImageGenerationBridgeMarker)
+	require.False(t, gjson.Get(liteNamespacePayload, `tools.#(type=="namespace")`).Exists())
+	require.Equal(t, "image_gen", gjson.Get(liteNamespacePayload, `input.#(type=="additional_tools").tools.0.name`).String())
+	require.Equal(t, "namespace", gjson.Get(liteNamespacePayload, "tool_choice.type").String())
+	require.Equal(t, "image_gen", gjson.Get(liteNamespacePayload, "tool_choice.name").String())
+	require.Equal(t, "all_turns", gjson.Get(liteNamespacePayload, "reasoning.context").String())
+	require.Equal(t, "true", gjson.Get(liteNamespacePayload, "client_metadata."+responsesLiteWSMetadataKey).String())
+
+	functionPayload := requestToJSONString(captureConn.writes[3])
 	require.True(t, gjson.Get(functionPayload, `tools.#(name=="image_gen.imagegen")`).Exists())
 	require.False(t, gjson.Get(functionPayload, `tools.#(type=="image_generation")`).Exists())
 	require.False(t, gjson.Get(functionPayload, "tool_choice").Exists())

@@ -93,7 +93,7 @@ func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(
 		{name: "disabled group skips injection", allowImages: false, bridgeEnabled: true, wantInjected: false},
 		{name: "enabled group skips injection by default", allowImages: true, bridgeEnabled: false, wantInjected: false},
 		{name: "enabled group injects image tool when bridge enabled", allowImages: true, bridgeEnabled: true, wantInjected: true},
-		{name: "responses lite skips hosted image bridge", allowImages: true, bridgeEnabled: true, responsesLite: true, wantInjected: false},
+		{name: "responses lite falls back to hosted image bridge", allowImages: true, bridgeEnabled: true, responsesLite: true, wantInjected: true},
 	}
 
 	for _, tt := range tests {
@@ -112,6 +112,9 @@ func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(
 				c.Request.Header.Set(responsesLiteHeader, "true")
 			}
 			account := newOpenAIImageGenerationControlTestAccount()
+			if tt.responsesLite {
+				account = newOpenAIImageGenerationControlTestOAuthAccount()
+			}
 
 			result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`))
 
@@ -120,17 +123,127 @@ func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(
 			require.NotNil(t, upstream.lastReq)
 			hasImageTool := gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists()
 			require.Equal(t, tt.wantInjected, hasImageTool)
-			expectedLiteHeader := ""
-			if tt.responsesLite {
-				expectedLiteHeader = "true"
-			}
-			require.Equal(t, expectedLiteHeader, upstream.lastReq.Header.Get(responsesLiteHeader))
+			require.Empty(t, upstream.lastReq.Header.Get(responsesLiteHeader))
 			instructions := gjson.GetBytes(upstream.lastBody, "instructions").String()
 			require.Equal(t, tt.wantInjected, strings.Contains(instructions, "image_generation"))
 			toolChoice := gjson.GetBytes(upstream.lastBody, "tool_choice")
 			require.Equal(t, tt.wantInjected, toolChoice.Exists())
 			if tt.wantInjected {
 				require.Equal(t, "auto", toolChoice.String())
+			}
+		})
+	}
+}
+
+func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallbackExclusions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name          string
+		allowImages   bool
+		bridgeEnabled bool
+		path          string
+		body          []byte
+		configure     func(*Account)
+	}{
+		{
+			name:          "client image_gen namespace keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			body: []byte(`{
+				"model":"gpt-5.5",
+				"input":"draw a cat",
+				"stream":false,
+				"tools":[{"type":"namespace","name":"image_gen","tools":[{"type":"function","name":"imagegen"}]}]
+			}`),
+		},
+		{
+			name:          "disabled bridge keeps lite",
+			allowImages:   true,
+			bridgeEnabled: false,
+			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
+		},
+		{
+			name:          "api key account keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
+			configure: func(account *Account) {
+				account.Type = AccountTypeAPIKey
+				account.Credentials = map[string]any{"api_key": "sk-test"}
+			},
+		},
+		{
+			name:          "disabled group keeps lite",
+			allowImages:   false,
+			bridgeEnabled: true,
+			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
+		},
+		{
+			name:          "passthrough account keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
+			configure: func(account *Account) {
+				account.Extra = map[string]any{"openai_passthrough": true}
+			},
+		},
+		{
+			name:          "strip policy keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
+			configure: func(account *Account) {
+				account.Extra = map[string]any{featureKeyCodexImageGenerationExplicitToolPolicy: codexImageGenerationExplicitToolPolicyStrip}
+			},
+		},
+		{
+			name:          "compact request keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			path:          "/openai/v1/responses/compact",
+			body:          []byte(`{"model":"gpt-5.4","input":"summarize the conversation","stream":false}`),
+		},
+		{
+			name:          "spark model keeps lite",
+			allowImages:   true,
+			bridgeEnabled: true,
+			body:          []byte(`{"model":"gpt-5.3-codex-spark","input":"write code","stream":false}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{
+				resp: &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"id":"resp_codex_lite","model":"gpt-5.4","usage":{"input_tokens":1,"output_tokens":1}}`)),
+				},
+			}
+			svc := newOpenAIImageGenerationControlTestService(upstream)
+			svc.cfg.Gateway.CodexImageGenerationBridgeEnabled = tt.bridgeEnabled
+			c, _ := newOpenAIImageGenerationControlTestContext(tt.allowImages, "codex_cli_rs/0.98.0")
+			if tt.path != "" {
+				c.Request = httptest.NewRequest(http.MethodPost, tt.path, nil)
+				c.Request.Header.Set("User-Agent", "codex_cli_rs/0.98.0")
+			}
+			c.Request.Header.Set(responsesLiteHeader, "true")
+			account := newOpenAIImageGenerationControlTestOAuthAccount()
+			if tt.configure != nil {
+				tt.configure(account)
+			}
+
+			result, err := svc.Forward(context.Background(), c, account, tt.body)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.NotNil(t, upstream.lastReq)
+			require.Equal(t, "true", upstream.lastReq.Header.Get(responsesLiteHeader))
+			require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
+			require.NotContains(t, gjson.GetBytes(upstream.lastBody, "instructions").String(), codexImageGenerationBridgeMarker)
+			if tt.name == "client image_gen namespace keeps lite" {
+				require.Equal(t, "image_gen", gjson.GetBytes(upstream.lastBody, `input.#(type=="additional_tools").tools.0.name`).String())
 			}
 		})
 	}
@@ -788,4 +901,11 @@ func newOpenAIImageGenerationControlTestAccount() *Account {
 			"api_key": "sk-test",
 		},
 	}
+}
+
+func newOpenAIImageGenerationControlTestOAuthAccount() *Account {
+	account := newOpenAIImageGenerationControlTestAccount()
+	account.Type = AccountTypeOAuth
+	account.Credentials = map[string]any{"access_token": "test-token"}
+	return account
 }
