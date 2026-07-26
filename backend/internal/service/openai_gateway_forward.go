@@ -20,6 +20,7 @@ import (
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
 	clearGrokResponsesClientToolMapping(c)
+	setCodexImageArtifactFallbackActive(c, false)
 	startTime := time.Now()
 	// 固定渠道映射后的请求级 canonical body；账号 normalize/strip 不得改写跨 failover hint。
 	canonicalImageIntentBody := body
@@ -256,6 +257,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		imageGenerationAllowed &&
 		codexImageGenerationExplicitToolPolicy != codexImageGenerationExplicitToolPolicyStrip &&
 		s.isCodexImageGenerationBridgeEnabled(ctx, account, apiKey)
+	codexImageArtifactFallbackEnabled := false
 	var imageIntent bool
 	canonicalImageIntent := resolveOpenAIImageIntentHint(c, reqModel, canonicalImageIntentBody, IsImageGenerationIntent)
 	if isCodexCLI && codexImageGenerationExplicitToolPolicy == codexImageGenerationExplicitToolPolicyStrip {
@@ -422,6 +424,12 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			promptCacheKey = codexResult.PromptCacheKey
 		}
 	}
+	if codexImageGenerationBridgeEnabled && reqBody != nil {
+		codexImageArtifactFallbackEnabled =
+			hasOpenAINativeImageGenerationTool(reqBody) &&
+				!hasCodexImageGenerationFunctionTool(reqBody)
+	}
+	setCodexImageArtifactFallbackActive(c, codexImageArtifactFallbackEnabled)
 
 	if !SupportsVerbosity(upstreamModel) && gjson.GetBytes(body, "text.verbosity").Exists() {
 		markPatchDelete("text.verbosity")
@@ -942,6 +950,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		imageCount := 0
 		var imageOutputSizes []string
 		if reqStream {
+			if codexImageArtifactFallbackEnabled {
+				resp.Body = s.wrapCodexImageArtifactStream(c, resp.Body)
+			}
 			streamResult, err := s.handleStreamingResponseWithReasoning(ctx, resp, c, account, startTime, originalModel, upstreamModel, reasoningEffortValue)
 			if err != nil {
 				return nil, err

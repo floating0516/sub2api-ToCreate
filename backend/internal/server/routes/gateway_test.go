@@ -76,6 +76,41 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	}
 }
 
+func TestGatewayRoutesCodexGeneratedImagePathIsPublic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	authCalled := false
+	RegisterGatewayRoutes(
+		router,
+		&handler.Handlers{
+			Gateway:       &handler.GatewayHandler{},
+			OpenAIGateway: &handler.OpenAIGatewayHandler{},
+			AsyncImage:    handler.NewAsyncImageHandler(nil, nil),
+		},
+		servermiddleware.APIKeyAuthMiddleware(func(c *gin.Context) {
+			authCalled = true
+			c.AbortWithStatus(http.StatusUnauthorized)
+		}),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		&config.Config{Gateway: config.GatewayConfig{
+			MaxBodySize:     1024 * 1024,
+			TextMaxBodySize: 1024 * 1024,
+		}},
+	)
+
+	name := strings.Repeat("0", 48) + ".png"
+	req := httptest.NewRequest(http.MethodGet, "/v1/generated-images/"+name, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.False(t, authCalled)
+}
+
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
 	router := newGatewayRoutesTestRouter()
 	registered := make(map[string]bool)

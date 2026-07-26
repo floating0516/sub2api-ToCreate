@@ -41,6 +41,10 @@ func RegisterGatewayRoutes(
 	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
 
+	// Generated image names contain 192 bits of randomness. This route is public
+	// so desktop Markdown renderers can load an artifact without exposing API keys.
+	r.GET(service.CodexGeneratedImageRoutePattern, h.OpenAIGateway.GeneratedImage)
+
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
 	requireGroupGoogle := middleware.RequireGroupAssignment(settingService, middleware.GoogleErrorWriter)

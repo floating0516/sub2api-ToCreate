@@ -420,6 +420,7 @@ type OpenAIGatewayService struct {
 	openaiProxyStreamCircuitOnce  sync.Once
 	openaiWSPassthroughDialerOnce sync.Once
 	openaiModelTransientOnce      sync.Once
+	codexImageArtifactStoreOnce   sync.Once
 	agentIdentityTaskMu           sync.Mutex
 	openaiWSPool                  *openAIWSConnPool
 	openaiWSStateStore            OpenAIWSStateStore
@@ -428,6 +429,7 @@ type OpenAIGatewayService struct {
 	openaiAccountStats            *openAIAccountRuntimeStats
 	openaiModelTransient          *openAIAccountModelTransientState
 	openaiProxyStreamCircuit      *openAIProxyStreamCircuit
+	codexImageArtifactStore       *codexGeneratedImageStore
 
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
