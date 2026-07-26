@@ -233,6 +233,15 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			if tt.configure != nil {
 				tt.configure(account)
 			}
+			if account.IsOpenAIPassthroughEnabled() {
+				upstream.resp.Header.Set("Content-Type", "text/event-stream")
+				upstream.resp.Body = io.NopCloser(strings.NewReader(strings.Join([]string{
+					`data: {"type":"response.completed","response":{"id":"resp_codex_lite","model":"gpt-5.4","usage":{"input_tokens":1,"output_tokens":1}}}`,
+					"",
+					"data: [DONE]",
+					"",
+				}, "\n")))
+			}
 
 			result, err := svc.Forward(context.Background(), c, account, tt.body)
 

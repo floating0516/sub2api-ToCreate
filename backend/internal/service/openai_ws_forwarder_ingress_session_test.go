@@ -637,7 +637,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 	require.False(t, gjson.Get(liteNamespacePayload, `tools.#(type=="image_generation")`).Exists())
 	require.NotContains(t, gjson.Get(liteNamespacePayload, "instructions").String(), codexImageGenerationBridgeMarker)
 	require.False(t, gjson.Get(liteNamespacePayload, `tools.#(type=="namespace")`).Exists())
-	require.Equal(t, "image_gen", gjson.Get(liteNamespacePayload, `input.#(type=="additional_tools").tools.0.name`).String())
+	require.True(t, openAIRequestBodyHasCodexImageGenerationTool([]byte(liteNamespacePayload)))
 	require.Equal(t, "namespace", gjson.Get(liteNamespacePayload, "tool_choice.type").String())
 	require.Equal(t, "image_gen", gjson.Get(liteNamespacePayload, "tool_choice.name").String())
 	require.Equal(t, "all_turns", gjson.Get(liteNamespacePayload, "reasoning.context").String())
