@@ -356,19 +356,19 @@ func (f *codexImageArtifactFallback) markdownMessage() string {
 	var builder strings.Builder
 	for index, link := range f.links {
 		if index > 0 {
-			builder.WriteString("\n\n")
+			_, _ = builder.WriteString("\n\n")
 		}
 		label := "Generated image"
 		if len(f.links) > 1 {
 			label = fmt.Sprintf("Generated image %d", index+1)
 		}
-		builder.WriteString(label)
-		builder.WriteString(":\n\n![")
-		builder.WriteString(label)
-		builder.WriteString("](")
-		builder.WriteString(link.url)
-		builder.WriteString(")\n\nDownload: ")
-		builder.WriteString(link.url)
+		_, _ = builder.WriteString(label)
+		_, _ = builder.WriteString(":\n\n![")
+		_, _ = builder.WriteString(label)
+		_, _ = builder.WriteString("](")
+		_, _ = builder.WriteString(link.url)
+		_, _ = builder.WriteString(")\n\nDownload: ")
+		_, _ = builder.WriteString(link.url)
 	}
 	return builder.String()
 }
