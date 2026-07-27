@@ -21,6 +21,7 @@ func RegisterLiheOIDCRoutes(
 	auditLog servermiddleware.AuditLogMiddleware,
 	settingService *service.SettingService,
 	redisClient *redis.Client,
+	panelRateLimiter *servermiddleware.PanelRateLimiter,
 ) {
 	rateLimiter := appmiddleware.NewRateLimiter(redisClient)
 	failClose := appmiddleware.RateLimitOptions{FailureMode: appmiddleware.RateLimitFailClose}
@@ -58,6 +59,7 @@ func RegisterLiheOIDCRoutes(
 	authorize := v1.Group("/oidc")
 	authorize.Use(gin.HandlerFunc(jwtAuth))
 	authorize.Use(servermiddleware.BackendModeUserGuard(settingService))
+	authorize.Use(panelRateLimiter.Global())
 	authorize.Use(gin.HandlerFunc(auditLog))
 	{
 		authorize.POST(

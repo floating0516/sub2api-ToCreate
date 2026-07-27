@@ -17,6 +17,7 @@ func RegisterLiheOAuthRoutes(
 	adminAuth middleware.AdminAuthMiddleware,
 	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
+	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
 	r.POST("/oauth/token", h.APIKey.ExchangeLiheOAuthToken)
 	r.POST("/oauth/revoke", h.APIKey.RevokeLiheOAuthToken)
@@ -24,6 +25,7 @@ func RegisterLiheOAuthRoutes(
 	lihe := v1.Group("/oauth/lihe")
 	lihe.Use(gin.HandlerFunc(jwtAuth))
 	lihe.Use(middleware.BackendModeUserGuard(settingService))
+	lihe.Use(panelRateLimiter.Global())
 	lihe.Use(gin.HandlerFunc(auditLog))
 	{
 		lihe.GET("", h.APIKey.GetLiheIntegration)
@@ -34,6 +36,7 @@ func RegisterLiheOAuthRoutes(
 
 	admin := v1.Group("/admin/oauth/lihe")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	admin.Use(panelRateLimiter.Global())
 	admin.Use(gin.HandlerFunc(auditLog))
 	{
 		admin.GET("/tokens", h.APIKey.ListLiheAccessTokensAsAdmin)

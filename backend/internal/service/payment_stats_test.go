@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/stretchr/testify/require"
-
-	"entgo.io/ent/dialect"
-	entsql "entgo.io/ent/dialect/sql"
 	_ "modernc.org/sqlite"
 )
 
@@ -30,25 +29,27 @@ func TestPaymentDashboardStatsExcludeBalanceWalletOrders(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	createPaymentStatsOrder(t, ctx, client, user.ID, user.Email, user.Username, payment.TypeAlipay, 20, now.Add(-time.Hour))
-	createPaymentStatsOrder(t, ctx, client, user.ID, user.Email, user.Username, PaymentTypeBalanceWallet, 8, now.Add(-30*time.Minute))
+	createPaymentStatsOrder(t, ctx, client, user.ID, user.Email, user.Username, payment.TypeAlipay, 20, now)
+	createPaymentStatsOrder(t, ctx, client, user.ID, user.Email, user.Username, PaymentTypeBalanceWallet, 8, now)
 
 	svc := &PaymentService{entClient: client}
 	got, err := svc.GetDashboardStats(ctx, 1)
 	require.NoError(t, err)
 
-	require.Equal(t, 20.0, got.TotalAmount)
-	require.Equal(t, 20.0, got.TodayAmount)
+	currency := payment.DefaultPaymentCurrency
+	require.Equal(t, CurrencyAmounts{currency: 20}, got.TotalAmount)
+	require.Equal(t, CurrencyAmounts{currency: 20}, got.TodayAmount)
 	require.Equal(t, 1, got.TotalCount)
 	require.Equal(t, 1, got.TodayCount)
-	require.Equal(t, 20.0, got.AvgAmount)
+	require.Equal(t, CurrencyAmounts{currency: 20}, got.AvgAmount)
 	require.Len(t, got.PaymentMethods, 1)
 	require.Equal(t, payment.TypeAlipay, got.PaymentMethods[0].Type)
-	require.Equal(t, 20.0, got.PaymentMethods[0].Amount)
+	require.Equal(t, CurrencyAmounts{currency: 20}, got.PaymentMethods[0].Amount)
 	require.Len(t, got.TopUsers, 1)
-	require.Equal(t, 20.0, got.TopUsers[0].Amount)
+	require.Len(t, got.TopUsers[currency], 1)
+	require.Equal(t, 20.0, got.TopUsers[currency][0].Amount)
 	require.NotEmpty(t, got.DailySeries)
-	require.Equal(t, 20.0, got.DailySeries[len(got.DailySeries)-1].Amount)
+	require.Equal(t, CurrencyAmounts{currency: 20}, got.DailySeries[len(got.DailySeries)-1].Amount)
 }
 
 func createPaymentStatsOrder(t *testing.T, ctx context.Context, client *dbent.Client, userID int64, email, username, paymentType string, amount float64, paidAt time.Time) {
@@ -65,6 +66,7 @@ func createPaymentStatsOrder(t *testing.T, ctx context.Context, client *dbent.Cl
 		SetOutTradeNo("").
 		SetPaymentType(paymentType).
 		SetPaymentTradeNo(paymentType + "-trade").
+		SetProviderSnapshot(map[string]any{"currency": payment.DefaultPaymentCurrency}).
 		SetOrderType(payment.OrderTypeSubscription).
 		SetStatus(OrderStatusCompleted).
 		SetExpiresAt(paidAt.Add(time.Hour)).
@@ -90,4 +92,77 @@ func newPaymentStatsTestClient(t *testing.T) *dbent.Client {
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
 	t.Cleanup(func() { _ = client.Close() })
 	return client
+}
+
+func TestComputeBasicStatsGroupsAmountsByCurrency(t *testing.T) {
+	t.Parallel()
+
+	todayStart := time.Date(2026, time.July, 25, 0, 0, 0, 0, time.UTC)
+	yesterday := todayStart.Add(-time.Hour)
+	today := todayStart.Add(time.Hour)
+	orders := []*dbent.PaymentOrder{
+		paymentStatsTestOrder(1, "alice@example.com", "CNY", 10, &today),
+		paymentStatsTestOrder(2, "bob@example.com", "USD", 10, &today),
+		paymentStatsTestOrder(1, "alice@example.com", "CNY", 5, &yesterday),
+	}
+
+	stats := &DashboardStats{}
+	computeBasicStats(stats, orders, todayStart)
+
+	require.Equal(t, CurrencyAmounts{"CNY": 15, "USD": 10}, stats.TotalAmount)
+	require.Equal(t, CurrencyAmounts{"CNY": 10, "USD": 10}, stats.TodayAmount)
+	require.Equal(t, CurrencyAmounts{"CNY": 7.5, "USD": 10}, stats.AvgAmount)
+	require.Equal(t, 3, stats.TotalCount)
+	require.Equal(t, 2, stats.TodayCount)
+}
+
+func TestPaymentDashboardBreakdownsGroupAmountsAndRankingsByCurrency(t *testing.T) {
+	t.Parallel()
+
+	firstDay := time.Date(2026, time.July, 24, 12, 0, 0, 0, time.UTC)
+	secondDay := firstDay.AddDate(0, 0, 1)
+	orders := []*dbent.PaymentOrder{
+		paymentStatsTestOrder(1, "alice@example.com", "CNY", 5.555, &firstDay),
+		paymentStatsTestOrder(2, "bob@example.com", "CNY", 10, &firstDay),
+		paymentStatsTestOrder(1, "alice@example.com", "USD", 20, &secondDay),
+		paymentStatsTestOrder(2, "bob@example.com", "USD", 10, &secondDay),
+	}
+	orders[0].PaymentType = "stripe"
+	orders[1].PaymentType = "stripe"
+	orders[2].PaymentType = "stripe"
+	orders[3].PaymentType = "alipay"
+
+	daily := buildDailySeries(orders, firstDay.AddDate(0, 0, -1), 2)
+	require.Equal(t, []DailyStats{
+		{Date: "2026-07-24", Amount: CurrencyAmounts{"CNY": 15.56}, Count: 2},
+		{Date: "2026-07-25", Amount: CurrencyAmounts{"USD": 30}, Count: 2},
+	}, daily)
+
+	methods := buildMethodDistribution(orders)
+	require.Equal(t, []PaymentMethodStat{
+		{Type: "alipay", Amount: CurrencyAmounts{"USD": 10}, Count: 1},
+		{Type: "stripe", Amount: CurrencyAmounts{"CNY": 15.56, "USD": 20}, Count: 3},
+	}, methods)
+
+	users := buildTopUsers(orders)
+	require.Equal(t, TopUsersByCurrency{
+		"CNY": {
+			{UserID: 2, Email: "bob@example.com", Amount: 10},
+			{UserID: 1, Email: "alice@example.com", Amount: 5.56},
+		},
+		"USD": {
+			{UserID: 1, Email: "alice@example.com", Amount: 20},
+			{UserID: 2, Email: "bob@example.com", Amount: 10},
+		},
+	}, users)
+}
+
+func paymentStatsTestOrder(userID int64, email, currency string, amount float64, paidAt *time.Time) *dbent.PaymentOrder {
+	return &dbent.PaymentOrder{
+		UserID:           userID,
+		UserEmail:        email,
+		PayAmount:        amount,
+		PaidAt:           paidAt,
+		ProviderSnapshot: map[string]any{"currency": currency},
+	}
 }
