@@ -527,7 +527,10 @@ export default {
         homeContentIframeWarning:
           '⚠️ iframe 模式提示：部分网站设置了 X-Frame-Options 或 CSP 安全策略，禁止被嵌入到 iframe 中。如果页面显示空白或报错，请确认目标网站允许被嵌入，或考虑使用 HTML 模式自行构建页面内容。',
         hideCcsImportButton: '隐藏 CCS 导入按钮',
-        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
+        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮',
+        quickStartInstallerEnabled: '公开快速开始安装向导',
+        quickStartInstallerEnabledHint:
+          '开启后普通用户可访问快速开始并签发一行安装命令；关闭时仅管理员可访问。'
       },
       purchase: {
         title: '充值/订阅页面',

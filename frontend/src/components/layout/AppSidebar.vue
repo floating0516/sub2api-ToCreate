@@ -195,7 +195,8 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
-import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { FeatureFlags, isFeatureFlagEnabled, makeSidebarFlag } from '@/utils/featureFlags'
+import { isQuickStartInstallerAccessible } from '@/utils/quickstart'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import type { CustomMenuItem } from '@/types'
 
@@ -717,6 +718,11 @@ const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
 const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
+const canAccessQuickStartInstaller = () =>
+  isQuickStartInstallerAccessible(
+    authStore.isAdmin,
+    isFeatureFlagEnabled(FeatureFlags.quickStartInstaller),
+  )
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
 const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 const flagBatchImageAccess = () => canUseBatchImage.value
@@ -733,7 +739,10 @@ function customMenuItemToNavItem(item: CustomMenuItem): NavItem {
 function isQuickStartMenuItem(item: CustomMenuItem): boolean {
   const label = item.label.trim().toLowerCase()
   const id = item.id.trim().toLowerCase()
-  return label === '快速开始' || label === 'quick start' || id === 'quick-start'
+  return label === '快速开始'
+    || label === 'quick start'
+    || id === 'quick-start'
+    || id === 'codex-claude-import'
 }
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
@@ -743,7 +752,9 @@ function isQuickStartMenuItem(item: CustomMenuItem): boolean {
 // 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
-  const quickStartMenuItems = customMenuItemsForUser.value.filter(isQuickStartMenuItem)
+  const quickStartMenuItems = canAccessQuickStartInstaller()
+    ? customMenuItemsForUser.value.filter(isQuickStartMenuItem)
+    : []
   const remainingCustomMenuItems = customMenuItemsForUser.value.filter(item => !isQuickStartMenuItem(item))
   if (withDashboard) {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })

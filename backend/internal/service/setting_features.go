@@ -68,6 +68,19 @@ func (s *SettingService) GetCustomMenuItemsRaw(ctx context.Context) string {
 	return value
 }
 
+// IsQuickStartInstallerEnabled reports whether ordinary users may use the
+// Quick Start installer. Missing or unreadable settings fail closed.
+func (s *SettingService) IsQuickStartInstallerEnabled(ctx context.Context) bool {
+	if s == nil || s.settingRepo == nil {
+		return false
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyQuickStartInstallerEnabled)
+	if err != nil {
+		return false
+	}
+	return value == "true"
+}
+
 // IsAffiliateEnabled 检查是否启用邀请返利功能（总开关）
 func (s *SettingService) IsAffiliateEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateEnabled)

@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <QuickStartWizard
-      v-if="isQuickStartPage"
+      v-if="showQuickStartWizard"
       :faq-slug="quickStartFaqSlug"
     />
     <div v-else class="custom-page-layout">
@@ -131,6 +131,8 @@ import Icon from '@/components/icons/Icon.vue'
 import QuickStartWizard from '@/components/quickstart/QuickStartWizard.vue'
 import { buildApiUrl } from '@/api/client'
 import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
+import { isQuickStartInstallerAccessible } from '@/utils/quickstart'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -157,9 +159,21 @@ let themeObserver: MutationObserver | null = null
 
 const menuItemId = computed(() => route.params.id as string)
 const isQuickStartPage = computed(() => menuItemId.value === 'codex-claude-import')
+const canAccessQuickStartInstaller = computed(
+  () => isQuickStartInstallerAccessible(
+    authStore.isAdmin,
+    isFeatureFlagEnabled(FeatureFlags.quickStartInstaller),
+  ),
+)
+const showQuickStartWizard = computed(
+  () => isQuickStartPage.value && canAccessQuickStartInstaller.value,
+)
 
 const menuItem = computed(() => {
   const id = menuItemId.value
+  if (isQuickStartPage.value && !canAccessQuickStartInstaller.value) {
+    return null
+  }
   const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
   const found = publicItems.find((item) => item.id === id) ?? null
   if (found) return found
@@ -341,7 +355,7 @@ function injectCopyButtons() {
   })
 }
 
-watch([markdownSlug, isQuickStartPage], ([slug, quickStart]) => {
+watch([markdownSlug, showQuickStartWizard], ([slug, quickStart]) => {
   if (slug && !quickStart) {
     fetchAndRenderMarkdown(slug)
   } else {

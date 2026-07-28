@@ -29,7 +29,7 @@ func RegisterInstallTokenRoutes(
 	authenticated.Use(panelRateLimiter.Global())
 	authenticated.Use(gin.HandlerFunc(auditLog))
 	{
-		authenticated.POST("", h.Issue)
+		authenticated.POST("", middleware.QuickStartInstallerGuard(settingService), h.Issue)
 		authenticated.POST("/revoke", h.Revoke)
 	}
 }

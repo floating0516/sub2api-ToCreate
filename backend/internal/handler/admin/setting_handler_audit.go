@@ -299,6 +299,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.HideCcsImportButton != after.HideCcsImportButton {
 		changed = append(changed, "hide_ccs_import_button")
 	}
+	if before.QuickStartInstallerEnabled != after.QuickStartInstallerEnabled {
+		changed = append(changed, "quick_start_installer_enabled")
+	}
 	if before.DefaultConcurrency != after.DefaultConcurrency {
 		changed = append(changed, "default_concurrency")
 	}

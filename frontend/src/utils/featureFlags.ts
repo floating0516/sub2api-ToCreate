@@ -104,6 +104,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Available Channels',
   }),
+  quickStartInstaller: defineFlag({
+    key: 'quick_start_installer_enabled',
+    mode: 'opt-in',
+    label: 'Quick Start Installer',
+  }),
   payment: defineFlag({
     key: 'payment_enabled',
     mode: 'opt-out',

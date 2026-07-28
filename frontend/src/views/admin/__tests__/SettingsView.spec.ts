@@ -373,6 +373,7 @@ const baseSettingsResponse = {
   doc_url: "",
   home_content: "",
   hide_ccs_import_button: false,
+  quick_start_installer_enabled: false,
   table_default_page_size: 20,
   table_page_size_options: [10, 20, 50, 100],
   backend_mode_enabled: false,
@@ -837,6 +838,26 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({
         affiliate_admin_recharge_enabled: true,
+      }),
+    );
+  });
+
+  it("submits the Quick Start installer feature setting", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      quick_start_installer_enabled: true,
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quick_start_installer_enabled: true,
       }),
     );
   });

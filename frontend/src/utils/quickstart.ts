@@ -16,6 +16,13 @@ export interface InstallConfirmationAction {
   request: InstallCredentialRequest
 }
 
+export function isQuickStartInstallerAccessible(
+  isAdmin: boolean,
+  featureEnabled: boolean,
+): boolean {
+  return isAdmin || featureEnabled
+}
+
 export function isQuickStartPlatformCompatible(
   client: InstallClient,
   platform: GroupPlatform | string | null | undefined

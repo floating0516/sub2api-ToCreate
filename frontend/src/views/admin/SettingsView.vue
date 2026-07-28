@@ -5932,6 +5932,21 @@
                 </div>
                 <Toggle v-model="form.hide_ccs_import_button" />
               </div>
+
+              <!-- Quick Start Installer -->
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <div class="pr-6">
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.site.quickStartInstallerEnabled")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.site.quickStartInstallerEnabledHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.quick_start_installer_enabled" />
+              </div>
             </div>
           </div>
 
@@ -8726,6 +8741,7 @@ const form = reactive<SettingsForm>({
   home_content: "",
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
+  quick_start_installer_enabled: false,
   payment_enabled: false,
   risk_control_enabled: false,
   cyber_session_block_enabled: false,
@@ -10245,6 +10261,7 @@ async function saveSettings() {
       home_content: form.home_content,
       backend_mode_enabled: form.backend_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
+      quick_start_installer_enabled: form.quick_start_installer_enabled,
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,

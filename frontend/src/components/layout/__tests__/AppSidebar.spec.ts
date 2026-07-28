@@ -60,3 +60,11 @@ describe('AppSidebar Lihe Chat entry', () => {
     expect(componentSource).not.toContain("t('nav.liheChat')")
   })
 })
+
+describe('AppSidebar Quick Start access', () => {
+  it('recognizes the deployed menu id and applies the installer feature gate', () => {
+    expect(componentSource).toContain("id === 'codex-claude-import'")
+    expect(componentSource).toContain('canAccessQuickStartInstaller()')
+    expect(componentSource).toContain('FeatureFlags.quickStartInstaller')
+  })
+})

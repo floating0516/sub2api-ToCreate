@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildInstallTokenIssueRequest,
+  isQuickStartInstallerAccessible,
   isQuickStartPlatformCompatible,
   resolveInstallConfirmationAction
 } from '@/utils/quickstart'
 
 describe('quickstart utils', () => {
+  it.each([
+    [false, false, false],
+    [false, true, true],
+    [true, false, true],
+    [true, true, true],
+  ])(
+    'resolves installer access for admin=%s enabled=%s',
+    (isAdmin, enabled, expected) => {
+      expect(isQuickStartInstallerAccessible(isAdmin, enabled)).toBe(expected)
+    },
+  )
+
   it.each([
     ['claude-code', 'anthropic', true],
     ['claude-code', 'antigravity', true],

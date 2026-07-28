@@ -229,6 +229,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DocURL:                                                 settings.DocURL,
 		HomeContent:                                            settings.HomeContent,
 		HideCcsImportButton:                                    settings.HideCcsImportButton,
+		QuickStartInstallerEnabled:                             settings.QuickStartInstallerEnabled,
 		PurchaseSubscriptionEnabled:                            settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:                                settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                                   settings.TableDefaultPageSize,
