@@ -109,6 +109,22 @@ parse_args() {
   done
 }
 
+validate_token_shape() {
+  case "$TOKEN" in
+    tcinst_*) ;;
+    *) die 'The install token is invalid. Return to Quick Start and refresh the command.' ;;
+  esac
+
+  token_body="${TOKEN#tcinst_}"
+  [ "${#token_body}" -ge 32 ] && [ "${#TOKEN}" -le 160 ] ||
+    die 'The install token is invalid. Return to Quick Start and refresh the command.'
+  case "$token_body" in
+    *[!A-Za-z0-9_-]*)
+      die 'The install token is invalid. Return to Quick Start and refresh the command.'
+      ;;
+  esac
+}
+
 detect_platform() {
   case "$(uname -s)" in
     Darwin) OS='darwin' ;;
@@ -183,6 +199,10 @@ request_json() {
   node -e 'process.stdout.write(JSON.stringify({token: process.argv[1], os: process.argv[2], arch: process.argv[3]}))' "$TOKEN" "$OS" "$ARCH"
 }
 
+preflight_request_json() {
+  printf '{"token":"%s","os":"%s","arch":"%s"}' "$TOKEN" "$OS" "$ARCH"
+}
+
 post_api() {
   endpoint="$1"
   payload="$2"
@@ -212,18 +232,41 @@ explain_api_error() {
   esac
 }
 
-load_install_metadata() {
+explain_preflight_api_error() {
+  file="$1"
+  status="$2"
+  body="$(tr -d '\r\n' <"$file" 2>/dev/null || true)"
+  case "$body" in
+    *'"reason":"token_expired"'*) fail 'The install token expired. Return to Quick Start and choose "Refresh command".' ;;
+    *'"reason":"token_used"'*) fail 'This install token was already used. Return to Quick Start and refresh the command.' ;;
+    *'"reason":"token_revoked"'*) fail 'This install token was revoked. Return to Quick Start and refresh the command.' ;;
+    *'"reason":"key_disabled"'*) fail 'The selected API key was deleted, disabled, expired, or exhausted.' ;;
+    *'"reason":"no_credit"'*) fail 'This account needs balance or an active subscription before installation.' ;;
+    *'"reason":"client_mismatch"'*) fail 'The selected API key group no longer matches this CLI.' ;;
+    *'"reason":"install_token_rate_limited"'*) fail 'Too many token requests were made. Wait a minute and try again.' ;;
+    *'"reason":"token_invalid"'*|*'"reason":"token_not_found"'*)
+      fail 'The install token is invalid. Return to Quick Start and refresh the command.'
+      ;;
+    *) fail "ToCreate returned HTTP ${status} while validating the install token." ;;
+  esac
+}
+
+fetch_install_metadata() {
   metadata_file="$TMP_DIR/peek.json"
-  status="$(post_api '/api/v1/install-token/peek' "$(request_json)" "$metadata_file")" ||
+  status="$(post_api '/api/v1/install-token/peek' "$(preflight_request_json)" "$metadata_file")" ||
     die 'Could not reach ToCreate. Check the network connection and run the command again.'
   case "$status" in
     2??) ;;
     *)
-      explain_api_error "$metadata_file" "$status"
+      explain_preflight_api_error "$metadata_file" "$status"
       exit 1
       ;;
   esac
+  success 'Install token is valid'
+}
 
+load_install_metadata() {
+  metadata_file="$TMP_DIR/peek.json"
   CLIENT="$(json_get "$metadata_file" data.client)"
   case "$CLIENT" in
     claude-code)
@@ -245,7 +288,7 @@ load_install_metadata() {
       die 'The install token returned an unsupported client.'
       ;;
   esac
-  success "Install token is valid for ${CLIENT_LABEL}"
+  success "Selected client: ${CLIENT_LABEL}"
 }
 
 install_cli() {
@@ -452,9 +495,12 @@ main() {
   detect_platform
   success "Detected ${OS}/${ARCH}"
   success 'Install token is present'
-  ensure_node
 
-  TMP_DIR="$(mktemp -d)"
+  validate_token_shape
+  TMP_DIR="$(mktemp -d)" || die 'Could not create a temporary installer directory.'
+  progress 'Validating install token'
+  fetch_install_metadata
+  ensure_node
   load_install_metadata
 
   section '2. Install tools'

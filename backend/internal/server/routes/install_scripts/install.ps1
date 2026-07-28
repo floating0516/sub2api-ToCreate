@@ -307,8 +307,8 @@ $arch = Get-Architecture
 Write-Section "1. Preflight"
 Write-Success "Detected windows/$arch"
 Write-Success "Install token is present"
-Ensure-Node
 Load-InstallMetadata $arch
+Ensure-Node
 
 Write-Section "2. Install tools"
 Install-Cli
