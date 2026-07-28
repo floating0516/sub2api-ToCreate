@@ -1,0 +1,112 @@
+export default {
+  quickStart: {
+    title: 'Quick Start',
+    subtitle: 'Choose one CLI and one API key, then install and configure everything with one command.',
+    steps: {
+      client: 'Choose tool',
+      key: 'Choose key',
+      install: 'Install'
+    },
+    clientStep: {
+      title: 'Which tool are you using?',
+      description: 'The first release configures one CLI at a time. You can return later for another tool.',
+      claude: 'Claude Code',
+      claudeDescription: "Anthropic's official terminal coding assistant",
+      codex: 'Codex',
+      codexDescription: "OpenAI's official terminal coding assistant",
+      gemini: 'Gemini CLI',
+      geminiDescription: "Google's official terminal AI assistant"
+    },
+    keyStep: {
+      title: 'Which API key should be used?',
+      description: 'The command contains only a short-lived install token, never the API key itself.',
+      existing: 'Use existing key',
+      create: 'Create new key',
+      loading: 'Loading keys and available groups...',
+      loadFailed: 'Could not load API keys or groups.',
+      retry: 'Retry',
+      noExisting: 'There are no usable keys for this tool.',
+      keyName: 'Key name',
+      group: 'Group',
+      rate: '{rate}x rate',
+      subscription: 'Subscription group',
+      standard: 'Balance group',
+      createName: 'Name',
+      createNamePlaceholder: 'For example: Codex Quick Start',
+      createGroup: 'Group',
+      chooseGroup: 'Choose a group',
+      noFundedGroup: 'No group is currently usable for this tool, or the account has no balance.',
+      noCredit: 'Available balance or an active subscription is required to create an install command.',
+      recharge: 'Recharge',
+      subscribe: 'Buy subscription'
+    },
+    installStep: {
+      title: 'Copy and run the command',
+      description: 'Paste this one-line command into a terminal. The install token lasts about 20 minutes and can be redeemed once.',
+      selectedClient: 'Tool',
+      selectedKey: 'API key',
+      expiresAt: 'Command expires at {time}',
+      unix: 'macOS / Linux',
+      windows: 'Windows',
+      copy: 'Copy command',
+      copied: 'Install command copied',
+      refresh: 'Refresh command',
+      refreshing: 'Refreshing...',
+      issuing: 'Creating a secure install command...',
+      issueFailed: 'Could not create the install command.',
+      scriptDoes: 'This command will',
+      runtime: 'Check Node.js and npm',
+      cli: 'Install the selected CLI',
+      ccSwitch: 'Install or detect CC Switch',
+      import: 'Redeem the short-lived token and import the provider',
+      done: 'I finished installing',
+      nextTitle: 'Run a quick test',
+      nextRestart: 'Close existing terminal sessions, then start {client} again.',
+      nextPrompt: 'Send a short test request, such as: "Reply only with ToCreate connected."',
+      nextCheck: 'Confirm that the ToCreate provider is enabled in CC Switch.',
+      fallback: 'Open the confirmation page if automatic import fails',
+      tokenExpired: 'This command has expired. Refresh it before running.'
+    },
+    faq: {
+      title: 'FAQ and full visual guide',
+      description: 'Pricing, FAQs, saving tips, and the original guide remain available here.',
+      loading: 'Loading guide...',
+      failed: 'Could not load the guide. Try again later.'
+    },
+    actions: {
+      back: 'Back',
+      continue: 'Continue',
+      creating: 'Creating...',
+      createAndContinue: 'Create and continue'
+    },
+    errors: {
+      noCredit: 'Available balance or an active subscription is required.',
+      keyDisabled: 'The selected API key is disabled, deleted, expired, or exhausted.',
+      clientMismatch: 'The selected group does not support this CLI.',
+      tokenExpired: 'The install token expired. Refresh the command.',
+      tokenUsed: 'The install token has already been used. Refresh the command.',
+      tokenRevoked: 'The install token was revoked. Refresh the command.',
+      generic: 'The operation failed. Try again.'
+    }
+  },
+  installConfirm: {
+    title: 'Complete the CC Switch import',
+    subtitle: 'This is the secure fallback when the installer cannot open CC Switch automatically.',
+    loading: 'Validating the install credential...',
+    invalidTitle: 'Invalid install link',
+    invalidDescription: 'The link has no valid token or confirmation receipt. Return to Quick Start and refresh the command.',
+    expiredTitle: 'Install link no longer available',
+    expiredDescription: 'The token may be expired, used, or revoked. Return to Quick Start and refresh the command.',
+    client: 'Tool',
+    key: 'API key',
+    endpoint: 'API endpoint',
+    open: 'Open CC Switch and import',
+    opening: 'Preparing import...',
+    retryOpen: 'Open CC Switch again',
+    openFailed: 'The browser could not open CC Switch. Install CC Switch, then try again.',
+    browserHint: 'If the browser asks for permission to open CC Switch, choose Allow.',
+    download: 'Need CC Switch? Download it',
+    back: 'Back to Quick Start',
+    ready: 'The import request was sent to CC Switch.'
+  }
+}

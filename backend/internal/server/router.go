@@ -120,10 +120,19 @@ func registerRoutes(
 	// 面板 API 限流器：认证接口按用户 ID、公开接口按安全客户端 IP，
 	// 防止高频刷管理面接口打爆数据库（阈值可在系统设置中调整）。
 	panelRateLimiter := middleware2.NewPanelRateLimiter(redisClient, settingService)
+	installTokenService := service.NewInstallTokenService(
+		redisClient,
+		apiKeyService,
+		subscriptionService,
+		settingService,
+		cfg,
+	)
+	installTokenHandler := handler.NewInstallTokenHandler(installTokenService)
 
 	// 注册各模块路由
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
 	routes.RegisterUserRoutes(v1, h, jwtAuth, auditLog, settingService, panelRateLimiter)
+	routes.RegisterInstallTokenRoutes(v1, installTokenHandler, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterLiheOAuthRoutes(r, v1, h, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterLiheOIDCRoutes(r, v1, h, jwtAuth, auditLog, settingService, redisClient, panelRateLimiter)
 	routes.RegisterAdminRoutes(v1, h, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)

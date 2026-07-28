@@ -14,6 +14,7 @@ func RegisterCommonRoutes(r *gin.Engine) {
 	})
 
 	registerCCSwitchDownloadRoutes(r)
+	registerInstallScriptRoutes(r)
 
 	// Claude Code 遥测日志（忽略，直接返回200）
 	r.POST("/api/event_logging/batch", func(c *gin.Context) {

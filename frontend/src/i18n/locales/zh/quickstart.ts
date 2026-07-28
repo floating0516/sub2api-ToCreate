@@ -1,0 +1,112 @@
+export default {
+  quickStart: {
+    title: '快速开始',
+    subtitle: '选择一个 CLI 和一把 API Key，用一行命令完成安装与配置。',
+    steps: {
+      client: '选择工具',
+      key: '选择密钥',
+      install: '安装'
+    },
+    clientStep: {
+      title: '你在用哪个工具？',
+      description: '首版一次只配置一个 CLI，之后可以返回这里为其他工具重新生成命令。',
+      claude: 'Claude Code',
+      claudeDescription: 'Anthropic 官方终端编码助手',
+      codex: 'Codex',
+      codexDescription: 'OpenAI 官方终端编码助手',
+      gemini: 'Gemini CLI',
+      geminiDescription: 'Google 官方终端 AI 助手'
+    },
+    keyStep: {
+      title: '用哪把 API Key？',
+      description: '命令只包含短期安装令牌，不会出现 API Key 明文。',
+      existing: '选择已有 Key',
+      create: '创建新 Key',
+      loading: '正在加载 Key 与可用分组...',
+      loadFailed: '加载 API Key 或分组失败。',
+      retry: '重新加载',
+      noExisting: '当前没有适用于此工具的可用 Key。',
+      keyName: 'Key 名称',
+      group: '分组',
+      rate: '{rate}x 倍率',
+      subscription: '订阅分组',
+      standard: '余额分组',
+      createName: '名称',
+      createNamePlaceholder: '例如：Codex 快速开始',
+      createGroup: '分组',
+      chooseGroup: '请选择分组',
+      noFundedGroup: '当前没有可用于此工具的分组，或账户余额不足。',
+      noCredit: '需要可用余额或有效订阅才能生成安装命令。',
+      recharge: '去充值',
+      subscribe: '购买订阅'
+    },
+    installStep: {
+      title: '复制命令并运行',
+      description: '在终端粘贴下面的一行命令。安装令牌有效期约 20 分钟，且只能兑换一次。',
+      selectedClient: '工具',
+      selectedKey: 'API Key',
+      expiresAt: '命令有效期至 {time}',
+      unix: 'macOS / Linux',
+      windows: 'Windows',
+      copy: '复制命令',
+      copied: '安装命令已复制',
+      refresh: '刷新命令',
+      refreshing: '正在刷新...',
+      issuing: '正在生成安全安装命令...',
+      issueFailed: '生成安装命令失败。',
+      scriptDoes: '这条命令会完成',
+      runtime: '检测 Node.js 与 npm',
+      cli: '安装所选 CLI',
+      ccSwitch: '安装或检测 CC Switch',
+      import: '兑换短期令牌并导入配置',
+      done: '我装完了',
+      nextTitle: '试跑一下',
+      nextRestart: '关闭已有终端会话，然后重新启动 {client}。',
+      nextPrompt: '发送一句测试请求，例如：“只回复 ToCreate connected.”',
+      nextCheck: '在 CC Switch 中确认 ToCreate 配置已启用。',
+      fallback: '自动导入失败时，打开确认导入页',
+      tokenExpired: '这条命令已过期，请刷新后再运行。'
+    },
+    faq: {
+      title: '常见问题与完整图文指南',
+      description: '价格说明、FAQ、省钱技巧和原有教程都保留在这里。',
+      loading: '正在加载指南...',
+      failed: '指南加载失败，请稍后重试。'
+    },
+    actions: {
+      back: '上一步',
+      continue: '继续',
+      creating: '正在创建...',
+      createAndContinue: '创建并继续'
+    },
+    errors: {
+      noCredit: '账户需要可用余额或有效订阅。',
+      keyDisabled: '所选 API Key 已停用、删除、过期或额度耗尽。',
+      clientMismatch: '所选分组不支持这个 CLI。',
+      tokenExpired: '安装令牌已过期，请刷新命令。',
+      tokenUsed: '安装令牌已经使用过，请刷新命令。',
+      tokenRevoked: '安装令牌已被吊销，请刷新命令。',
+      generic: '操作失败，请稍后重试。'
+    }
+  },
+  installConfirm: {
+    title: '完成 CC Switch 导入',
+    subtitle: '这是自动唤起失败后的安全确认步骤。',
+    loading: '正在验证安装凭据...',
+    invalidTitle: '安装链接无效',
+    invalidDescription: '链接缺少有效的短期令牌或确认凭据，请返回快速开始刷新命令。',
+    expiredTitle: '安装链接已失效',
+    expiredDescription: '短期令牌可能已过期、使用或吊销，请返回快速开始刷新命令。',
+    client: '工具',
+    key: 'API Key',
+    endpoint: 'API 端点',
+    open: '打开 CC Switch 并导入',
+    opening: '正在准备导入...',
+    retryOpen: '再次打开 CC Switch',
+    openFailed: '浏览器未能打开 CC Switch，请先安装 CC Switch 后重试。',
+    browserHint: '如果浏览器询问是否允许打开 CC Switch，请选择允许。',
+    download: '还没有 CC Switch？下载安装',
+    back: '返回快速开始',
+    ready: '导入请求已发送到 CC Switch。'
+  }
+}

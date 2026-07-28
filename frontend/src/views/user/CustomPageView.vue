@@ -1,6 +1,10 @@
 <template>
   <AppLayout>
-    <div class="custom-page-layout">
+    <QuickStartWizard
+      v-if="isQuickStartPage"
+      :faq-slug="quickStartFaqSlug"
+    />
+    <div v-else class="custom-page-layout">
       <div class="card flex-1 min-h-0 overflow-hidden">
         <div v-if="loading" class="flex h-full items-center justify-center py-12">
           <div
@@ -124,6 +128,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import QuickStartWizard from '@/components/quickstart/QuickStartWizard.vue'
 import { buildApiUrl } from '@/api/client'
 import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
 import { marked } from 'marked'
@@ -151,6 +156,7 @@ const activeHeadingId = ref('')
 let themeObserver: MutationObserver | null = null
 
 const menuItemId = computed(() => route.params.id as string)
+const isQuickStartPage = computed(() => menuItemId.value === 'codex-claude-import')
 
 const menuItem = computed(() => {
   const id = menuItemId.value
@@ -172,6 +178,7 @@ const markdownSlug = computed(() => {
 })
 
 const isMarkdownMode = computed(() => !!markdownSlug.value)
+const quickStartFaqSlug = computed(() => markdownSlug.value || 'codex-claude-import')
 
 const embeddedUrl = computed(() => {
   if (!menuItem.value || isMarkdownMode.value) return ''
@@ -334,8 +341,8 @@ function injectCopyButtons() {
   })
 }
 
-watch(markdownSlug, (slug) => {
-  if (slug) {
+watch([markdownSlug, isQuickStartPage], ([slug, quickStart]) => {
+  if (slug && !quickStart) {
     fetchAndRenderMarkdown(slug)
   } else {
     renderedHtml.value = ''
