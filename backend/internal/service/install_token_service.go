@@ -9,13 +9,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -99,8 +97,16 @@ type installSettingsReader interface {
 	GetPublicSettings(ctx context.Context) (*PublicSettings, error)
 }
 
+type InstallCredentialStore interface {
+	Save(ctx context.Context, storageKey string, record *InstallCredentialRecord, ttl time.Duration) error
+	Load(ctx context.Context, storageKey string) (*InstallCredentialRecord, error)
+	Transition(ctx context.Context, storageKey string, now time.Time, nextStatus string) (string, error)
+	Delete(ctx context.Context, storageKey string) error
+	Increment(ctx context.Context, storageKey string, window time.Duration) (int64, error)
+}
+
 type InstallTokenService struct {
-	redis         *redis.Client
+	store         InstallCredentialStore
 	apiKeys       installAPIKeyReader
 	subscriptions installSubscriptionReader
 	settings      installSettingsReader
@@ -154,7 +160,7 @@ type InstallTokenRedeemResult struct {
 	KeyName      string `json:"key_name"`
 }
 
-type installCredentialRecord struct {
+type InstallCredentialRecord struct {
 	Kind      string
 	Status    string
 	UserID    int64
@@ -177,44 +183,15 @@ type installImportConfig struct {
 	Model    string
 }
 
-var installTransitionScript = redis.NewScript(`
-local status = redis.call("HGET", KEYS[1], "status")
-if not status then
-  return "missing"
-end
-if status ~= "pending" then
-  return status
-end
-local expires_at = tonumber(redis.call("HGET", KEYS[1], "expires_at") or "0")
-local now = tonumber(ARGV[1])
-if expires_at <= now then
-  redis.call("HSET", KEYS[1], "status", "expired")
-  return "expired"
-end
-redis.call("HSET", KEYS[1], "status", ARGV[2])
-if ARGV[2] == "redeemed" then
-  redis.call("HSET", KEYS[1], "used_at", ARGV[1])
-end
-return "transitioned"
-`)
-
-var installRateLimitScript = redis.NewScript(`
-local current = redis.call("INCR", KEYS[1])
-if current == 1 then
-  redis.call("PEXPIRE", KEYS[1], ARGV[1])
-end
-return current
-`)
-
 func NewInstallTokenService(
-	redisClient *redis.Client,
+	store InstallCredentialStore,
 	apiKeyService *APIKeyService,
 	subscriptionService *SubscriptionService,
 	settingService *SettingService,
 	cfg *config.Config,
 ) *InstallTokenService {
 	return newInstallTokenService(
-		redisClient,
+		store,
 		apiKeyService,
 		subscriptionService,
 		settingService,
@@ -223,14 +200,14 @@ func NewInstallTokenService(
 }
 
 func newInstallTokenService(
-	redisClient *redis.Client,
+	store InstallCredentialStore,
 	apiKeys installAPIKeyReader,
 	subscriptions installSubscriptionReader,
 	settings installSettingsReader,
 	cfg *config.Config,
 ) *InstallTokenService {
 	return &InstallTokenService{
-		redis:         redisClient,
+		store:         store,
 		apiKeys:       apiKeys,
 		subscriptions: subscriptions,
 		settings:      settings,
@@ -278,7 +255,7 @@ func (s *InstallTokenService) Issue(
 	if err != nil {
 		return nil, fmt.Errorf("generate install token: %w", err)
 	}
-	record := &installCredentialRecord{
+	record := &InstallCredentialRecord{
 		Kind:      installCredentialKindToken,
 		Status:    installCredentialPending,
 		UserID:    userID,
@@ -375,7 +352,7 @@ func (s *InstallTokenService) Redeem(
 	if err != nil {
 		return nil, fmt.Errorf("generate install confirmation receipt: %w", err)
 	}
-	receiptRecord := &installCredentialRecord{
+	receiptRecord := &InstallCredentialRecord{
 		Kind:      installCredentialKindReceipt,
 		Status:    installCredentialPending,
 		UserID:    record.UserID,
@@ -549,31 +526,20 @@ func (s *InstallTokenService) loadPublicContext(
 func (s *InstallTokenService) saveRecord(
 	ctx context.Context,
 	raw string,
-	record *installCredentialRecord,
+	record *InstallCredentialRecord,
 ) error {
-	if s.redis == nil {
+	if s.store == nil {
 		return fmt.Errorf("install token storage is not configured")
 	}
 	key, err := installCredentialRedisKey(raw, record.Kind)
 	if err != nil {
 		return err
 	}
-	ttl := time.Until(record.ExpiresAt) + installCredentialTombTTL
+	ttl := record.ExpiresAt.Sub(s.now()) + installCredentialTombTTL
 	if ttl < installCredentialTombTTL {
 		ttl = installCredentialTombTTL
 	}
-	pipe := s.redis.TxPipeline()
-	pipe.HSet(ctx, key, map[string]any{
-		"kind":       record.Kind,
-		"status":     record.Status,
-		"user_id":    record.UserID,
-		"key_id":     record.KeyID,
-		"client":     record.Client,
-		"created_at": record.CreatedAt.Unix(),
-		"expires_at": record.ExpiresAt.Unix(),
-	})
-	pipe.Expire(ctx, key, ttl)
-	if _, err := pipe.Exec(ctx); err != nil {
+	if err := s.store.Save(ctx, key, record, ttl); err != nil {
 		return fmt.Errorf("store install credential: %w", err)
 	}
 	return nil
@@ -583,60 +549,32 @@ func (s *InstallTokenService) loadRecord(
 	ctx context.Context,
 	raw string,
 	kind string,
-) (*installCredentialRecord, error) {
-	if s.redis == nil {
+) (*InstallCredentialRecord, error) {
+	if s.store == nil {
 		return nil, fmt.Errorf("install token storage is not configured")
 	}
 	key, err := installCredentialRedisKey(raw, kind)
 	if err != nil {
 		return nil, err
 	}
-	values, err := s.redis.HGetAll(ctx, key).Result()
+	record, err := s.store.Load(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("load install credential: %w", err)
 	}
-	if len(values) == 0 {
+	if record == nil {
 		return nil, ErrInstallTokenNotFound
-	}
-
-	userID, err := strconv.ParseInt(values["user_id"], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid install credential user")
-	}
-	keyID, err := strconv.ParseInt(values["key_id"], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid install credential key")
-	}
-	createdUnix, err := strconv.ParseInt(values["created_at"], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid install credential creation time")
-	}
-	expiresUnix, err := strconv.ParseInt(values["expires_at"], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid install credential expiry")
-	}
-	record := &installCredentialRecord{
-		Kind:      values["kind"],
-		Status:    values["status"],
-		UserID:    userID,
-		KeyID:     keyID,
-		Client:    values["client"],
-		CreatedAt: time.Unix(createdUnix, 0).UTC(),
-		ExpiresAt: time.Unix(expiresUnix, 0).UTC(),
 	}
 	if record.Kind != kind {
 		return nil, ErrInstallTokenInvalid
 	}
-	if used := values["used_at"]; used != "" {
-		usedUnix, parseErr := strconv.ParseInt(used, 10, 64)
-		if parseErr == nil {
-			usedAt := time.Unix(usedUnix, 0).UTC()
-			record.UsedAt = &usedAt
-		}
-	}
 	if record.Status == installCredentialPending && !record.ExpiresAt.After(s.now()) {
 		record.Status = installCredentialExpired
-		_ = s.redis.HSet(ctx, key, "status", installCredentialExpired).Err()
+		_, _ = s.store.Transition(
+			ctx,
+			key,
+			s.now().UTC(),
+			installCredentialExpired,
+		)
 	}
 	return record, nil
 }
@@ -645,7 +583,7 @@ func (s *InstallTokenService) loadUsableRecord(
 	ctx context.Context,
 	raw string,
 	kind string,
-) (*installCredentialRecord, error) {
+) (*InstallCredentialRecord, error) {
 	record, err := s.loadRecord(ctx, raw, kind)
 	if err != nil {
 		return nil, err
@@ -696,20 +634,19 @@ func (s *InstallTokenService) transitionRecord(
 	key string,
 	nextStatus string,
 ) (string, error) {
-	if s.redis == nil {
+	if s.store == nil {
 		return "", fmt.Errorf("install token storage is not configured")
 	}
-	result, err := installTransitionScript.Run(
+	result, err := s.store.Transition(
 		ctx,
-		s.redis,
-		[]string{key},
-		s.now().UTC().Unix(),
+		key,
+		s.now().UTC(),
 		nextStatus,
-	).Result()
+	)
 	if err != nil {
 		return "", fmt.Errorf("update install credential: %w", err)
 	}
-	return fmt.Sprint(result), nil
+	return result, nil
 }
 
 func (s *InstallTokenService) deleteRecord(
@@ -717,12 +654,12 @@ func (s *InstallTokenService) deleteRecord(
 	raw string,
 	kind string,
 ) {
-	if s.redis == nil {
+	if s.store == nil {
 		return
 	}
 	key, err := installCredentialRedisKey(raw, kind)
 	if err == nil {
-		_ = s.redis.Del(ctx, key).Err()
+		_ = s.store.Delete(ctx, key)
 	}
 }
 
@@ -737,7 +674,7 @@ func (s *InstallTokenService) checkAccessRate(
 	if err != nil {
 		return err
 	}
-	if s.redis == nil {
+	if s.store == nil {
 		return fmt.Errorf("install token storage is not configured")
 	}
 
@@ -770,12 +707,7 @@ func (s *InstallTokenService) enforceRateLimit(
 	limit int64,
 	window time.Duration,
 ) error {
-	result, err := installRateLimitScript.Run(
-		ctx,
-		s.redis,
-		[]string{key},
-		window.Milliseconds(),
-	).Int64()
+	result, err := s.store.Increment(ctx, key, window)
 	if err != nil {
 		return fmt.Errorf("check install token rate limit: %w", err)
 	}
@@ -964,8 +896,8 @@ func buildInstallCommands(origin string, token string) InstallTokenCommands {
 	origin = strings.TrimRight(origin, "/")
 	return InstallTokenCommands{
 		Unix: fmt.Sprintf(
-			"curl -fsSL %s/install.sh | bash -s -- --token %s",
-			shellQuote(origin),
+			"curl -fsSL %s | bash -s -- --token %s",
+			shellQuote(origin+"/install.sh"),
 			shellQuote(token),
 		),
 		Windows: fmt.Sprintf(

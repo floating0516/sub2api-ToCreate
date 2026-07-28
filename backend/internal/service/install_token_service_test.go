@@ -9,8 +9,6 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,8 +49,107 @@ func (f *fakeInstallSettingsReader) GetPublicSettings(context.Context) (*PublicS
 	return f.settings, f.err
 }
 
+type fakeInstallCredentialStore struct {
+	mu      sync.Mutex
+	records map[string]*InstallCredentialRecord
+	rates   map[string]int64
+}
+
+func newFakeInstallCredentialStore() *fakeInstallCredentialStore {
+	return &fakeInstallCredentialStore{
+		records: make(map[string]*InstallCredentialRecord),
+		rates:   make(map[string]int64),
+	}
+}
+
+func (s *fakeInstallCredentialStore) Save(
+	_ context.Context,
+	storageKey string,
+	record *InstallCredentialRecord,
+	_ time.Duration,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.records[storageKey] = cloneInstallCredentialRecord(record)
+	return nil
+}
+
+func (s *fakeInstallCredentialStore) Load(
+	_ context.Context,
+	storageKey string,
+) (*InstallCredentialRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return cloneInstallCredentialRecord(s.records[storageKey]), nil
+}
+
+func (s *fakeInstallCredentialStore) Transition(
+	_ context.Context,
+	storageKey string,
+	now time.Time,
+	nextStatus string,
+) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record := s.records[storageKey]
+	if record == nil {
+		return "missing", nil
+	}
+	if record.Status != installCredentialPending {
+		return record.Status, nil
+	}
+	if !record.ExpiresAt.After(now) {
+		record.Status = installCredentialExpired
+		return installCredentialExpired, nil
+	}
+	record.Status = nextStatus
+	if nextStatus == installCredentialRedeemed {
+		usedAt := now.UTC()
+		record.UsedAt = &usedAt
+	}
+	return "transitioned", nil
+}
+
+func (s *fakeInstallCredentialStore) Delete(_ context.Context, storageKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.records, storageKey)
+	return nil
+}
+
+func (s *fakeInstallCredentialStore) Increment(
+	_ context.Context,
+	storageKey string,
+	_ time.Duration,
+) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rates[storageKey]++
+	return s.rates[storageKey], nil
+}
+
+func (s *fakeInstallCredentialStore) setExpiresAt(storageKey string, expiresAt time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if record := s.records[storageKey]; record != nil {
+		record.ExpiresAt = expiresAt
+	}
+}
+
+func cloneInstallCredentialRecord(record *InstallCredentialRecord) *InstallCredentialRecord {
+	if record == nil {
+		return nil
+	}
+	cloned := *record
+	if record.UsedAt != nil {
+		usedAt := *record.UsedAt
+		cloned.UsedAt = &usedAt
+	}
+	return &cloned
+}
+
 func TestInstallTokenIssueRedeemAndConfirmAreOneTime(t *testing.T) {
-	service, key, redisServer := newInstallTokenTestService(t, PlatformOpenAI)
+	service, key, store := newInstallTokenTestService(t, PlatformOpenAI)
 	ctx := context.Background()
 
 	issued, err := service.Issue(ctx, key.UserID, InstallClientCodex, key.ID, "", "https://fallback.example")
@@ -64,15 +161,15 @@ func TestInstallTokenIssueRedeemAndConfirmAreOneTime(t *testing.T) {
 	require.NotContains(t, issued.Commands.Windows, key.Key)
 	require.Contains(t, issued.Commands.Unix, "https://api.example.com/install.sh")
 
-	for _, redisKey := range redisServer.Keys() {
-		require.NotContains(t, redisKey, issued.Token)
-		values, redisErr := service.redis.HGetAll(ctx, redisKey).Result()
-		require.NoError(t, redisErr)
-		for _, value := range values {
-			require.NotContains(t, value, issued.Token)
-			require.NotContains(t, value, key.Key)
-		}
+	store.mu.Lock()
+	for storageKey, record := range store.records {
+		require.NotContains(t, storageKey, issued.Token)
+		require.NotContains(t, record.Kind, issued.Token)
+		require.NotContains(t, record.Client, issued.Token)
+		require.NotContains(t, record.Kind, key.Key)
+		require.NotContains(t, record.Client, key.Key)
 	}
+	store.mu.Unlock()
 
 	peeked, err := service.Peek(ctx, issued.Token, "203.0.113.5", "https://fallback.example")
 	require.NoError(t, err)
@@ -174,21 +271,22 @@ func TestInstallTokenRefreshRevokesPreviousCommand(t *testing.T) {
 }
 
 func TestInstallTokenRejectsExpiredAndDeletedKeys(t *testing.T) {
-	service, key, _ := newInstallTokenTestService(t, PlatformGemini)
+	service, key, store := newInstallTokenTestService(t, PlatformGemini)
 	ctx := context.Background()
 
 	issued, err := service.Issue(ctx, key.UserID, InstallClientGeminiCLI, key.ID, "", "https://api.example.com")
 	require.NoError(t, err)
 	redisKey, err := installCredentialRedisKey(issued.Token, installCredentialKindToken)
 	require.NoError(t, err)
-	require.NoError(t, service.redis.HSet(ctx, redisKey, "expires_at", time.Now().Add(-time.Minute).Unix()).Err())
+	store.setExpiresAt(redisKey, time.Now().Add(-time.Minute))
 
 	_, err = service.Redeem(ctx, issued.Token, "203.0.113.9", "https://api.example.com")
 	require.Equal(t, "token_expired", infraerrors.Reason(err))
 
 	issued, err = service.Issue(ctx, key.UserID, InstallClientGeminiCLI, key.ID, "", "https://api.example.com")
 	require.NoError(t, err)
-	keyReader := service.apiKeys.(*fakeInstallAPIKeyReader)
+	keyReader, ok := service.apiKeys.(*fakeInstallAPIKeyReader)
+	require.True(t, ok)
 	keyReader.key = nil
 	keyReader.err = ErrAPIKeyNotFound
 
@@ -233,13 +331,9 @@ func TestInstallClientPlatformCompatibility(t *testing.T) {
 func newInstallTokenTestService(
 	t *testing.T,
 	platform string,
-) (*InstallTokenService, *APIKey, *miniredis.Miniredis) {
+) (*InstallTokenService, *APIKey, *fakeInstallCredentialStore) {
 	t.Helper()
-	redisServer := miniredis.RunT(t)
-	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
-	t.Cleanup(func() {
-		_ = redisClient.Close()
-	})
+	store := newFakeInstallCredentialStore()
 
 	group := &Group{
 		ID:               22,
@@ -265,7 +359,7 @@ func newInstallTokenTestService(
 		Group:   group,
 	}
 	service := newInstallTokenService(
-		redisClient,
+		store,
 		&fakeInstallAPIKeyReader{key: key},
 		&fakeInstallSubscriptionReader{},
 		&fakeInstallSettingsReader{settings: &PublicSettings{
@@ -274,5 +368,5 @@ func newInstallTokenTestService(
 		}},
 		&config.Config{RunMode: config.RunModeStandard},
 	)
-	return service, key, redisServer
+	return service, key, store
 }
