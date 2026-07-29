@@ -41,6 +41,10 @@ func TestInstallScriptsUseRequestOriginWithoutEmbeddingSecrets(t *testing.T) {
 
 			body := recorder.Body.String()
 			if test.path == "/install.sh" {
+				require.Contains(t, body, "https://deb.nodesource.com/node_${MIN_NODE_VERSION}.x")
+				require.Contains(t, body, "https://rpm.nodesource.com/pub_${MIN_NODE_VERSION}.x")
+				require.NotContains(t, body, "apt-get install -y nodejs npm")
+
 				mainIndex := strings.LastIndex(body, "\nmain() {")
 				require.NotEqual(t, -1, mainIndex)
 				main := body[mainIndex:]
@@ -50,6 +54,11 @@ func TestInstallScriptsUseRequestOriginWithoutEmbeddingSecrets(t *testing.T) {
 				require.NotEqual(t, -1, ensureNodeIndex)
 				require.Less(t, fetchIndex, ensureNodeIndex)
 			} else {
+				require.Contains(t, body, "Invoke-NodeWinget")
+				require.Contains(t, body, "OpenJS.NodeJS.LTS")
+				require.Contains(t, body, "\"upgrade\"")
+				require.Contains(t, body, "\"--force\"")
+
 				preflightIndex := strings.LastIndex(body, "Write-Section \"1. Preflight\"")
 				require.NotEqual(t, -1, preflightIndex)
 				preflight := body[preflightIndex:]

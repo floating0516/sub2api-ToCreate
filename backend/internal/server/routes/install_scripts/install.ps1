@@ -67,10 +67,39 @@ function Get-NodeMajorVersion {
   }
 }
 
+function Test-NodeReady {
+  return (
+    (Get-Command node -ErrorAction SilentlyContinue) -and
+    (Get-Command npm.cmd -ErrorAction SilentlyContinue) -and
+    (Get-NodeMajorVersion) -ge $MinNodeVersion
+  )
+}
+
+function Invoke-NodeWinget([string]$Action, [switch]$Force) {
+  $wingetArguments = @(
+    $Action,
+    "--id", "OpenJS.NodeJS.LTS",
+    "--exact",
+    "--source", "winget",
+    "--silent",
+    "--accept-package-agreements",
+    "--accept-source-agreements"
+  )
+  if ($Force) {
+    $wingetArguments += "--force"
+  }
+
+  try {
+    $process = Start-Process winget.exe -ArgumentList $wingetArguments -Wait -PassThru
+    return $process.ExitCode
+  } catch {
+    return 1
+  }
+}
+
 function Ensure-Node {
   $node = Get-Command node -ErrorAction SilentlyContinue
-  $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
-  if ($node -and $npm -and (Get-NodeMajorVersion) -ge $MinNodeVersion) {
+  if (Test-NodeReady) {
     Write-Success "Node.js $(& node --version) and npm are available"
     return
   }
@@ -85,24 +114,25 @@ function Ensure-Node {
     Stop-Install "Install Node.js $MinNodeVersion+ from https://nodejs.org/ and run this command again."
   }
 
-  Write-Progress "Installing Node.js LTS with winget"
-  $process = Start-Process winget.exe -ArgumentList @(
-    "install",
-    "--id", "OpenJS.NodeJS.LTS",
-    "--exact",
-    "--silent",
-    "--accept-package-agreements",
-    "--accept-source-agreements"
-  ) -Wait -PassThru
-  if ($process.ExitCode -ne 0) {
-    Stop-Install "winget could not install Node.js. Install it from https://nodejs.org/ and run this command again."
+  $action = if ($node) { "upgrade" } else { "install" }
+  $progressLabel = if ($node) { "Upgrading" } else { "Installing" }
+  Write-Progress "$progressLabel Node.js LTS with winget"
+  $exitCode = Invoke-NodeWinget $action
+  Refresh-ProcessPath
+
+  if ($exitCode -ne 0 -or -not (Test-NodeReady)) {
+    Write-WarningText "winget did not make Node.js $MinNodeVersion+ available on the first attempt"
+    Write-Progress "Installing the current Node.js LTS package with winget"
+    $exitCode = Invoke-NodeWinget "install" -Force
+    Refresh-ProcessPath
   }
 
-  Refresh-ProcessPath
-  if (-not (Get-Command node -ErrorAction SilentlyContinue) -or
-      -not (Get-Command npm.cmd -ErrorAction SilentlyContinue) -or
-      (Get-NodeMajorVersion) -lt $MinNodeVersion) {
-    Stop-Install "Node.js was installed but is not available in this terminal. Open a new PowerShell window and run the command again."
+  if ($exitCode -ne 0 -or -not (Test-NodeReady)) {
+    $activeNode = Get-Command node -ErrorAction SilentlyContinue
+    if ($activeNode) {
+      Stop-Install "Node.js $MinNodeVersion+ was installed, but $($activeNode.Source) still reports $(& node --version). Remove the older Node.js PATH entry and run this command again."
+    }
+    Stop-Install "winget could not install Node.js $MinNodeVersion+. Install it from https://nodejs.org/ and run this command again."
   }
   Write-Success "Node.js $(& node --version) and npm are ready"
 }

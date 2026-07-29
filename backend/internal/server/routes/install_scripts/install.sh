@@ -146,22 +146,123 @@ node_major_version() {
   node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || printf '0'
 }
 
-install_node_linux() {
-  if command -v apt-get >/dev/null 2>&1; then
-    as_root apt-get update >/dev/null 2>&1 &&
-      as_root apt-get install -y nodejs npm >/dev/null 2>&1
-  elif command -v dnf >/dev/null 2>&1; then
-    as_root dnf install -y nodejs npm >/dev/null 2>&1
+install_node_debian() {
+  local deb_arch
+  local key_source
+  local keyring
+  local preferences
+  local sources
+
+  command -v dpkg >/dev/null 2>&1 || return 1
+  deb_arch="$(dpkg --print-architecture 2>/dev/null)" || return 1
+  case "$deb_arch" in
+    amd64|arm64) ;;
+    *) return 1 ;;
+  esac
+
+  key_source="${TMP_DIR}/nodesource-repo.gpg.key"
+  keyring="${TMP_DIR}/nodesource.gpg"
+  sources="${TMP_DIR}/nodesource.sources"
+  preferences="${TMP_DIR}/nodesource-nodejs"
+
+  as_root apt-get update >/dev/null 2>&1 || return 1
+  as_root env DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y ca-certificates curl gnupg >/dev/null 2>&1 || return 1
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    -o "$key_source" >/dev/null 2>&1 || return 1
+  gpg --dearmor --yes --output "$keyring" "$key_source" >/dev/null 2>&1 || return 1
+
+  cat >"$sources" <<EOF
+Types: deb
+URIs: https://deb.nodesource.com/node_${MIN_NODE_VERSION}.x
+Suites: nodistro
+Components: main
+Architectures: ${deb_arch}
+Signed-By: /usr/share/keyrings/nodesource.gpg
+EOF
+  cat >"$preferences" <<'EOF'
+Package: nodejs
+Pin: origin deb.nodesource.com
+Pin-Priority: 600
+EOF
+
+  as_root mkdir -p /usr/share/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d || return 1
+  as_root install -m 0644 "$keyring" /usr/share/keyrings/nodesource.gpg || return 1
+  as_root install -m 0644 "$sources" /etc/apt/sources.list.d/nodesource.sources || return 1
+  as_root install -m 0644 "$preferences" /etc/apt/preferences.d/nodesource-nodejs || return 1
+  as_root apt-get update >/dev/null 2>&1 || return 1
+  as_root env DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y nodejs >/dev/null 2>&1
+}
+
+install_node_rpm() {
+  local repo_file
+  local rpm_arch
+
+  rpm_arch="$(uname -m)"
+  case "$rpm_arch" in
+    x86_64|aarch64) ;;
+    *) return 1 ;;
+  esac
+
+  repo_file="${TMP_DIR}/nodesource-nodejs.repo"
+  cat >"$repo_file" <<EOF
+[nodesource-nodejs]
+name=Node.js ${MIN_NODE_VERSION}.x packages
+baseurl=https://rpm.nodesource.com/pub_${MIN_NODE_VERSION}.x/nodistro/nodejs/${rpm_arch}
+priority=9
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.nodesource.com/gpgkey/ns-operations-public.key
+module_hotfixes=1
+EOF
+
+  as_root mkdir -p /etc/yum.repos.d || return 1
+  as_root install -m 0644 "$repo_file" /etc/yum.repos.d/nodesource-nodejs.repo || return 1
+
+  if command -v dnf >/dev/null 2>&1; then
+    as_root dnf install -y nodejs --allowerasing >/dev/null 2>&1
   elif command -v yum >/dev/null 2>&1; then
-    as_root yum install -y nodejs npm >/dev/null 2>&1
-  elif command -v pacman >/dev/null 2>&1; then
-    as_root pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1
+    as_root yum install -y nodejs >/dev/null 2>&1
+  elif command -v microdnf >/dev/null 2>&1; then
+    as_root microdnf install -y nodejs >/dev/null 2>&1
   else
     return 1
   fi
 }
 
+install_node_linux() {
+  if command -v apt-get >/dev/null 2>&1; then
+    install_node_debian
+  elif command -v dnf >/dev/null 2>&1 ||
+    command -v yum >/dev/null 2>&1 ||
+    command -v microdnf >/dev/null 2>&1; then
+    install_node_rpm
+  elif command -v pacman >/dev/null 2>&1; then
+    as_root pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1
+  elif command -v apk >/dev/null 2>&1; then
+    as_root apk add --no-cache nodejs npm >/dev/null 2>&1
+  else
+    return 1
+  fi
+}
+
+install_node_macos() {
+  brew update >/dev/null 2>&1 || return 1
+  if brew list --versions node >/dev/null 2>&1; then
+    brew upgrade node >/dev/null 2>&1 ||
+      brew reinstall node >/dev/null 2>&1 ||
+      return 1
+  else
+    brew install node >/dev/null 2>&1 || return 1
+  fi
+  brew link --overwrite --force node >/dev/null 2>&1 || true
+}
+
 ensure_node() {
+  local active_node_path
+  local active_node_version
+
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     if [ "$(node_major_version)" -ge "$MIN_NODE_VERSION" ]; then
       success "Node.js $(node --version) and npm are available"
@@ -173,19 +274,23 @@ ensure_node() {
   fi
 
   if [ "$OS" = 'darwin' ] && command -v brew >/dev/null 2>&1; then
-    progress 'Installing Node.js with Homebrew'
-    brew install node >/dev/null 2>&1 || die "Homebrew could not install Node.js. Install Node.js ${MIN_NODE_VERSION}+ from https://nodejs.org/ and run this command again."
+    progress "Installing Node.js ${MIN_NODE_VERSION}+ with Homebrew"
+    install_node_macos || die "Homebrew could not install Node.js ${MIN_NODE_VERSION}+. Update Homebrew or install Node.js from https://nodejs.org/ and run this command again."
   elif [ "$OS" = 'linux' ]; then
-    progress 'Installing Node.js with the system package manager'
+    progress "Installing Node.js ${MIN_NODE_VERSION}+ from a supported package repository"
     install_node_linux || die "Node.js could not be installed automatically. Install Node.js ${MIN_NODE_VERSION}+ from https://nodejs.org/ and run this command again."
   else
     die "Node.js could not be installed automatically. Install Node.js ${MIN_NODE_VERSION}+ from https://nodejs.org/ and run this command again."
   fi
 
+  hash -r 2>/dev/null || true
   command -v node >/dev/null 2>&1 || die 'Node.js installation finished but node is not on PATH.'
   command -v npm >/dev/null 2>&1 || die 'Node.js installation finished but npm is not on PATH.'
-  [ "$(node_major_version)" -ge "$MIN_NODE_VERSION" ] ||
-    die "The installed Node.js version is older than ${MIN_NODE_VERSION}. Update it from https://nodejs.org/."
+  if [ "$(node_major_version)" -lt "$MIN_NODE_VERSION" ]; then
+    active_node_path="$(command -v node)"
+    active_node_version="$(node --version 2>/dev/null || printf 'unknown')"
+    die "Node.js ${MIN_NODE_VERSION}+ was installed, but ${active_node_path} still reports ${active_node_version}. Remove the older Node.js PATH entry and run this command again."
+  fi
   success "Node.js $(node --version) and npm are ready"
 }
 
