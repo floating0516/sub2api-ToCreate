@@ -17,12 +17,18 @@ var unixInstallScript string
 //go:embed install_scripts/install.ps1
 var windowsInstallScript string
 
+//go:embed install_scripts/install-config.js
+var installConfigHelper string
+
 func registerInstallScriptRoutes(r *gin.Engine) {
 	r.GET("/install.sh", func(c *gin.Context) {
 		serveInstallScript(c, unixInstallScript, "text/x-shellscript; charset=utf-8")
 	})
 	r.GET("/install.ps1", func(c *gin.Context) {
 		serveInstallScript(c, windowsInstallScript, "text/plain; charset=utf-8")
+	})
+	r.GET("/install-config.js", func(c *gin.Context) {
+		serveInstallScript(c, installConfigHelper, "application/javascript; charset=utf-8")
 	})
 }
 

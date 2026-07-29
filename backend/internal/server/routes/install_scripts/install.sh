@@ -14,6 +14,8 @@ CLI_PACKAGE=""
 MIN_NODE_VERSION=22
 CC_SWITCH_READY=0
 CC_SWITCH_BIN=""
+HEADLESS=0
+CONFIG_HELPER=""
 
 if [ -t 1 ]; then
   COLOR_GREEN='\033[0;32m'
@@ -50,7 +52,7 @@ print_banner() {
 BANNER
   printf '%b\n' "${COLOR_RESET}"
   printf '%b%s%b\n\n' "${COLOR_BOLD}${COLOR_GREEN}" '                               ToCreate Quick Start' "${COLOR_RESET}"
-  printf '%s\n\n' 'Install one CLI, CC Switch, and your ToCreate provider.'
+  printf '%s\n\n' 'Install one CLI and connect it to your ToCreate provider.'
 }
 
 section() {
@@ -101,8 +103,12 @@ parse_args() {
         BASE_URL="${2%/}"
         shift 2
         ;;
+      --headless)
+        HEADLESS=1
+        shift
+        ;;
       -h|--help)
-        printf '%s\n' 'Usage: install.sh --token <INSTALL_TOKEN> [--base-url <URL>]'
+        printf '%s\n' 'Usage: install.sh --token <INSTALL_TOKEN> [--base-url <URL>] [--headless]'
         exit 0
         ;;
       *)
@@ -140,6 +146,19 @@ detect_platform() {
     arm64|aarch64) ARCH='arm64' ;;
     *) die "Unsupported CPU architecture: $(uname -m)" ;;
   esac
+}
+
+detect_headless_mode() {
+  if [ "$HEADLESS" -eq 1 ]; then
+    success 'Direct configuration mode requested'
+    return
+  fi
+  if [ "$OS" = 'linux' ] &&
+    [ -z "${DISPLAY:-}" ] &&
+    [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    HEADLESS=1
+    success 'No Linux desktop session detected; using direct configuration mode'
+  fi
 }
 
 node_major_version() {
@@ -321,6 +340,18 @@ post_api() {
     -H 'Content-Type: application/json' \
     --data "$payload" \
     "${BASE_URL%/}${endpoint}"
+}
+
+download_config_helper() {
+  CONFIG_HELPER="$TMP_DIR/install-config.js"
+  progress 'Downloading the direct configuration helper'
+  curl -fsSL "${BASE_URL%/}/install-config.js" -o "$CONFIG_HELPER" ||
+    die 'Could not download the direct configuration helper. Check the network connection and run the command again.'
+  chmod 0600 "$CONFIG_HELPER" ||
+    die 'Could not secure the direct configuration helper.'
+  node --check "$CONFIG_HELPER" >/dev/null 2>&1 ||
+    die 'The downloaded direct configuration helper is invalid. The install token was not redeemed.'
+  success 'Direct configuration helper is ready'
 }
 
 explain_api_error() {
@@ -549,6 +580,30 @@ open_url() {
   fi
 }
 
+configure_direct() {
+  local response_file="$1"
+  local confirm_url="$2"
+  local config_status
+
+  progress "Merging the ${CLIENT_LABEL} user configuration"
+  if node "$CONFIG_HELPER" \
+    --client "$CLIENT" \
+    --response "$response_file" \
+    --home "$HOME" \
+    --shell "${SHELL:-}"; then
+    success "${CLIENT_LABEL} is configured for ToCreate"
+  else
+    config_status=$?
+    fail 'Direct configuration failed. Review the error above before retrying.'
+    printf '%s\n' 'The one-click import remains available at:'
+    printf '%s\n' "$confirm_url"
+    return "$config_status"
+  fi
+
+  printf '\n%bInstallation complete%b\n' "${COLOR_BOLD}${COLOR_GREEN}" "$COLOR_RESET"
+  print_next_steps
+}
+
 redeem_and_import() {
   response_file="$TMP_DIR/redeem.json"
   status="$(post_api '/api/v1/install-token/redeem' "$(request_json)" "$response_file")" ||
@@ -561,10 +616,16 @@ redeem_and_import() {
       ;;
   esac
 
-  deeplink="$(json_get "$response_file" data.deeplink)"
   confirm_url="$(json_get "$response_file" data.confirm_url)"
-  [ -n "$deeplink" ] || die 'ToCreate returned an incomplete CC Switch import payload.'
   [ -n "$confirm_url" ] || die 'ToCreate returned an incomplete fallback URL.'
+
+  if [ "$HEADLESS" -eq 1 ]; then
+    configure_direct "$response_file" "$confirm_url" || exit 1
+    return
+  fi
+
+  deeplink="$(json_get "$response_file" data.deeplink)"
+  [ -n "$deeplink" ] || die 'ToCreate returned an incomplete CC Switch import payload.'
 
   if [ "$CC_SWITCH_READY" -eq 1 ] && open_deeplink "$deeplink"; then
     success 'CC Switch import opened'
@@ -586,6 +647,35 @@ redeem_and_import() {
 
 print_next_steps() {
   printf '\n%bNext steps%b\n' "$COLOR_BOLD" "$COLOR_RESET"
+  if [ "$HEADLESS" -eq 1 ]; then
+    if [ "$CLIENT" = 'codex' ]; then
+      codex_dir="${CODEX_HOME:-$HOME/.codex}"
+      case "$codex_dir" in
+        '~') codex_dir="$HOME" ;;
+        '~/'*) codex_dir="$HOME/${codex_dir#\~/}" ;;
+        /*) ;;
+        *) codex_dir="$PWD/$codex_dir" ;;
+      esac
+      shell_path="${SHELL:-}"
+      shell_name="${shell_path##*/}"
+      printf '%s\n' '1. Load the Codex API key in this shell (new terminals load it automatically):'
+      if [ "$shell_name" = 'fish' ]; then
+        printf '   %bsource "%s"%b\n' "$COLOR_BLUE" "$codex_dir/tocreate.fish" "$COLOR_RESET"
+      else
+        printf '   %b. "%s"%b\n' "$COLOR_BLUE" "$codex_dir/tocreate.env" "$COLOR_RESET"
+      fi
+      printf '%s\n' '2. Start a new Codex session:'
+      printf '   %b%s%b\n' "$COLOR_BLUE" "$CLI_COMMAND" "$COLOR_RESET"
+      printf '%s\n' '3. Send a short test request, for example: "Reply with ToCreate connected."'
+    else
+      printf '%s\n' "1. Close any existing ${CLIENT_LABEL} session and start a new one:"
+      printf '   %b%s%b\n' "$COLOR_BLUE" "$CLI_COMMAND" "$COLOR_RESET"
+      printf '%s\n' '2. Send a short test request, for example: "Reply with ToCreate connected."'
+    fi
+    printf '%s\n' "Docs: ${BASE_URL%/}/custom/codex-claude-import"
+    return
+  fi
+
   printf '%s\n' "1. Finish and enable the ${CLIENT_LABEL} provider in CC Switch."
   printf '%s\n' '2. Close any existing CLI session and start a new one:'
   printf '   %b%s%b\n' "$COLOR_BLUE" "$CLI_COMMAND" "$COLOR_RESET"
@@ -602,6 +692,7 @@ main() {
   section '1. Preflight'
   detect_platform
   success "Detected ${OS}/${ARCH}"
+  detect_headless_mode
   success 'Install token is present'
 
   validate_token_shape
@@ -613,9 +704,13 @@ main() {
 
   section '2. Install tools'
   install_cli
-  ensure_cc_switch
+  if [ "$HEADLESS" -eq 1 ]; then
+    download_config_helper
+  else
+    ensure_cc_switch
+  fi
 
-  section '3. Import config'
+  section '3. Configure client'
   progress 'Redeeming the one-time install token'
   redeem_and_import
 }
