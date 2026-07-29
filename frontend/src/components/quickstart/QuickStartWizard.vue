@@ -98,6 +98,43 @@
           </button>
         </div>
 
+        <div class="mt-8 max-w-3xl">
+          <h3 class="text-base font-semibold text-gray-950 dark:text-white">
+            {{ t('quickStart.clientStep.methodTitle') }}
+          </h3>
+          <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300">
+            {{ t('quickStart.clientStep.methodDescription') }}
+          </p>
+
+          <div
+            class="mt-4 inline-grid w-full grid-cols-2 rounded-lg bg-gray-100 p-1 dark:bg-dark-800 sm:w-auto"
+            role="radiogroup"
+            :aria-label="t('quickStart.clientStep.methodTitle')"
+          >
+            <button
+              v-for="method in installMethods"
+              :key="method.id"
+              type="button"
+              class="flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              :class="selectedInstallMethod === method.id
+                ? 'bg-white text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white'
+                : 'text-gray-500 hover:text-gray-800 dark:text-dark-300 dark:hover:text-white'"
+              role="radio"
+              :aria-checked="selectedInstallMethod === method.id"
+              @click="selectedInstallMethod = method.id"
+            >
+              <Icon :name="method.icon" size="sm" :stroke-width="2" />
+              <span>{{ t(method.nameKey) }}</span>
+            </button>
+          </div>
+
+          <p class="mt-3 text-sm text-gray-500 dark:text-dark-400">
+            {{ selectedInstallMethodConfig
+              ? t(selectedInstallMethodConfig.descriptionKey)
+              : '' }}
+          </p>
+        </div>
+
         <div class="mt-8 flex justify-end border-t border-gray-200 pt-5 dark:border-dark-700">
           <button
             type="button"
@@ -327,10 +364,10 @@
           <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
               <h2 class="text-xl font-semibold text-gray-950 dark:text-white">
-                {{ t('quickStart.installStep.title') }}
+                {{ installStepTitle }}
               </h2>
               <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
-                {{ t('quickStart.installStep.description') }}
+                {{ installStepDescription }}
               </p>
             </div>
             <button type="button" class="btn btn-secondary btn-sm flex-none" @click="goToStep(2)">
@@ -373,6 +410,14 @@
                   {{ selectedClientLabel }}
                 </span>
               </div>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-500 dark:text-dark-400">
+                  {{ t('quickStart.installStep.selectedMethod') }}
+                </span>
+                <span class="font-semibold text-gray-950 dark:text-white">
+                  {{ selectedInstallMethodLabel }}
+                </span>
+              </div>
               <div class="flex min-w-0 items-center gap-2">
                 <span class="text-gray-500 dark:text-dark-400">
                   {{ t('quickStart.installStep.selectedKey') }}
@@ -397,77 +442,126 @@
               {{ t('quickStart.installStep.tokenExpired') }}
             </div>
 
-            <div class="mt-5 overflow-hidden rounded-lg border border-gray-800 bg-gray-950">
-              <div class="flex items-center justify-between border-b border-gray-800 px-3 py-2">
-                <div class="inline-flex rounded-md bg-gray-900 p-1" role="tablist">
+            <template v-if="selectedInstallMethod === 'command'">
+              <div class="mt-5 overflow-hidden rounded-lg border border-gray-800 bg-gray-950">
+                <div class="flex items-center justify-between border-b border-gray-800 px-3 py-2">
+                  <div class="inline-flex rounded-md bg-gray-900 p-1" role="tablist">
+                    <button
+                      type="button"
+                      class="rounded px-3 py-1.5 text-xs font-medium transition-colors"
+                      :class="commandPlatform === 'unix'
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-400 hover:text-white'"
+                      role="tab"
+                      :aria-selected="commandPlatform === 'unix'"
+                      @click="commandPlatform = 'unix'"
+                    >
+                      {{ t('quickStart.installStep.unix') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded px-3 py-1.5 text-xs font-medium transition-colors"
+                      :class="commandPlatform === 'windows'
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-400 hover:text-white'"
+                      role="tab"
+                      :aria-selected="commandPlatform === 'windows'"
+                      @click="commandPlatform = 'windows'"
+                    >
+                      {{ t('quickStart.installStep.windows') }}
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    class="rounded px-3 py-1.5 text-xs font-medium transition-colors"
-                    :class="commandPlatform === 'unix'
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-400 hover:text-white'"
-                    role="tab"
-                    :aria-selected="commandPlatform === 'unix'"
-                    @click="commandPlatform = 'unix'"
+                    class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                    :title="t('quickStart.installStep.copy')"
+                    :aria-label="t('quickStart.installStep.copy')"
+                    @click="copyCommand"
                   >
-                    {{ t('quickStart.installStep.unix') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded px-3 py-1.5 text-xs font-medium transition-colors"
-                    :class="commandPlatform === 'windows'
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-400 hover:text-white'"
-                    role="tab"
-                    :aria-selected="commandPlatform === 'windows'"
-                    @click="commandPlatform = 'windows'"
-                  >
-                    {{ t('quickStart.installStep.windows') }}
+                    <Icon name="copy" size="sm" :stroke-width="2" />
                   </button>
                 </div>
+                <div class="min-h-[112px] overflow-x-auto p-5">
+                  <code class="whitespace-pre font-mono text-sm leading-6 text-emerald-300">
+                    {{ currentCommand }}
+                  </code>
+                </div>
+              </div>
+
+              <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <a
+                  :href="installSession.fallback_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-950 dark:text-dark-300 dark:hover:text-white"
+                >
+                  {{ t('quickStart.installStep.fallback') }}
+                  <Icon name="externalLink" size="sm" class="ml-1.5" />
+                </a>
                 <button
                   type="button"
-                  class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-                  :title="t('quickStart.installStep.copy')"
-                  :aria-label="t('quickStart.installStep.copy')"
-                  @click="copyCommand"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="issuingToken"
+                  @click="refreshCommand"
                 >
-                  <Icon name="copy" size="sm" :stroke-width="2" />
+                  <Icon name="refresh" size="sm" class="mr-2" :class="{ 'animate-spin': issuingToken }" />
+                  {{ issuingToken ? t('quickStart.installStep.refreshing') : t('quickStart.installStep.refresh') }}
                 </button>
               </div>
-              <div class="min-h-[112px] overflow-x-auto p-5">
-                <code class="whitespace-pre font-mono text-sm leading-6 text-emerald-300">
-                  {{ currentCommand }}
-                </code>
-              </div>
-            </div>
+            </template>
 
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <a
-                :href="installSession.fallback_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-950 dark:text-dark-300 dark:hover:text-white"
-              >
-                {{ t('quickStart.installStep.fallback') }}
-                <Icon name="externalLink" size="sm" class="ml-1.5" />
-              </a>
-              <button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                :disabled="issuingToken"
-                @click="refreshCommand"
-              >
-                <Icon name="refresh" size="sm" class="mr-2" :class="{ 'animate-spin': issuingToken }" />
-                {{ issuingToken ? t('quickStart.installStep.refreshing') : t('quickStart.installStep.refresh') }}
-              </button>
-            </div>
+            <template v-else>
+              <div class="mt-5 border-y border-gray-200 py-7 dark:border-dark-700">
+                <div class="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="flex min-w-0 items-start gap-4">
+                    <span class="flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                      <Icon name="sync" size="md" :stroke-width="2" />
+                    </span>
+                    <div class="min-w-0">
+                      <h3 class="font-semibold text-gray-950 dark:text-white">
+                        {{ t('quickStart.installStep.ccSwitchActionTitle') }}
+                      </h3>
+                      <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300">
+                        {{ t('quickStart.installStep.ccSwitchActionDescription') }}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    :href="installSession.fallback_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-primary flex-none"
+                  >
+                    <Icon name="externalLink" size="sm" class="mr-2" />
+                    {{ t('quickStart.installStep.openCcSwitch') }}
+                  </a>
+                </div>
+                <p class="mt-4 text-xs leading-5 text-gray-500 dark:text-dark-400">
+                  {{ t('quickStart.installStep.ccSwitchOnlyConfigures') }}
+                </p>
+              </div>
+
+              <div class="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="issuingToken"
+                  @click="refreshCommand"
+                >
+                  <Icon name="refresh" size="sm" class="mr-2" :class="{ 'animate-spin': issuingToken }" />
+                  {{ issuingToken ? t('quickStart.installStep.refreshing') : t('quickStart.installStep.refresh') }}
+                </button>
+              </div>
+            </template>
 
             <div class="mt-8 border-t border-gray-200 pt-6 dark:border-dark-700">
               <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-dark-400">
-                {{ t('quickStart.installStep.scriptDoes') }}
+                {{ installActionsTitle }}
               </h3>
-              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                class="mt-4 grid gap-3 sm:grid-cols-2"
+                :class="selectedInstallMethod === 'command' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'"
+              >
                 <div
                   v-for="item in installActions"
                   :key="item"
@@ -482,7 +576,9 @@
             <div class="mt-8 flex justify-end">
               <button type="button" class="btn btn-primary" @click="showNextSteps = true">
                 <Icon name="check" size="sm" class="mr-2" :stroke-width="2.5" />
-                {{ t('quickStart.installStep.done') }}
+                {{ selectedInstallMethod === 'command'
+                  ? t('quickStart.installStep.done')
+                  : t('quickStart.installStep.importDone') }}
               </button>
             </div>
 
@@ -494,9 +590,9 @@
                 {{ t('quickStart.installStep.nextTitle') }}
               </h3>
               <ol class="mt-3 space-y-2 text-sm leading-6 text-emerald-900 dark:text-emerald-200">
-                <li>1. {{ t('quickStart.installStep.nextRestart', { client: selectedClientLabel }) }}</li>
-                <li>2. {{ t('quickStart.installStep.nextCheck') }}</li>
-                <li>3. {{ t('quickStart.installStep.nextPrompt') }}</li>
+                <li v-for="(item, index) in nextSteps" :key="item">
+                  {{ index + 1 }}. {{ item }}
+                </li>
               </ol>
             </div>
           </template>
@@ -577,9 +673,12 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
+type InstallMethod = 'command' | 'cc-switch'
+
 const currentStep = ref(1)
 const maxReachedStep = ref(1)
 const selectedClient = ref<InstallClient | ''>('')
+const selectedInstallMethod = ref<InstallMethod>('command')
 const keyMode = ref<'existing' | 'create'>('existing')
 const selectedKeyId = ref<number | null>(null)
 const createKeyName = ref('')
@@ -631,6 +730,21 @@ const clients = computed(() => [
     descriptionKey: 'quickStart.clientStep.geminiDescription',
     icon: 'sparkles' as const,
     iconClass: 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300'
+  }
+])
+
+const installMethods = computed(() => [
+  {
+    id: 'command' as const,
+    nameKey: 'quickStart.clientStep.commandMethod',
+    descriptionKey: 'quickStart.clientStep.commandMethodDescription',
+    icon: 'terminal' as const
+  },
+  {
+    id: 'cc-switch' as const,
+    nameKey: 'quickStart.clientStep.ccSwitchMethod',
+    descriptionKey: 'quickStart.clientStep.ccSwitchMethodDescription',
+    icon: 'sync' as const
   }
 ])
 
@@ -701,6 +815,26 @@ const selectedClientLabel = computed(() =>
   selectedClientConfig.value ? t(selectedClientConfig.value.nameKey) : ''
 )
 
+const selectedInstallMethodConfig = computed(() =>
+  installMethods.value.find((method) => method.id === selectedInstallMethod.value)
+)
+
+const selectedInstallMethodLabel = computed(() =>
+  selectedInstallMethodConfig.value ? t(selectedInstallMethodConfig.value.nameKey) : ''
+)
+
+const installStepTitle = computed(() =>
+  t(selectedInstallMethod.value === 'command'
+    ? 'quickStart.installStep.title'
+    : 'quickStart.installStep.ccSwitchTitle')
+)
+
+const installStepDescription = computed(() =>
+  t(selectedInstallMethod.value === 'command'
+    ? 'quickStart.installStep.description'
+    : 'quickStart.installStep.ccSwitchDescription')
+)
+
 const currentCommand = computed(() => {
   if (!installSession.value) return ''
   return installSession.value.commands[commandPlatform.value]
@@ -717,12 +851,40 @@ const installSessionMatchesSelection = computed(() =>
   installSession.value.key.id === selectedKeyId.value
 )
 
-const installActions = computed(() => [
-  t('quickStart.installStep.runtime'),
-  t('quickStart.installStep.cli'),
-  t('quickStart.installStep.ccSwitch'),
-  t('quickStart.installStep.import')
-])
+const installActionsTitle = computed(() =>
+  t(selectedInstallMethod.value === 'command'
+    ? 'quickStart.installStep.scriptDoes'
+    : 'quickStart.installStep.ccSwitchDoes')
+)
+
+const installActions = computed(() =>
+  selectedInstallMethod.value === 'command'
+    ? [
+        t('quickStart.installStep.runtime'),
+        t('quickStart.installStep.cli'),
+        t('quickStart.installStep.ccSwitch'),
+        t('quickStart.installStep.import')
+      ]
+    : [
+        t('quickStart.installStep.ccSwitchValidate'),
+        t('quickStart.installStep.ccSwitchOpen'),
+        t('quickStart.installStep.ccSwitchImport')
+      ]
+)
+
+const nextSteps = computed(() =>
+  selectedInstallMethod.value === 'command'
+    ? [
+        t('quickStart.installStep.nextFinishCommand'),
+        t('quickStart.installStep.nextRestart', { client: selectedClientLabel.value }),
+        t('quickStart.installStep.nextPrompt')
+      ]
+    : [
+        t('quickStart.installStep.nextCheck'),
+        t('quickStart.installStep.nextRestart', { client: selectedClientLabel.value }),
+        t('quickStart.installStep.nextPrompt')
+      ]
+)
 
 function stepCircleClass(step: number): string {
   if (currentStep.value > step) {
@@ -992,6 +1154,10 @@ async function loadFaq() {
 
 watch(selectedClient, () => {
   normalizeKeySelections()
+})
+
+watch(selectedInstallMethod, () => {
+  showNextSteps.value = false
 })
 
 watch([eligibleKeys, fundedCompatibleGroups], () => {
