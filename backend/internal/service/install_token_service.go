@@ -272,7 +272,7 @@ func (s *InstallTokenService) Issue(
 		Token:     rawToken,
 		Client:    client,
 		ExpiresAt: record.ExpiresAt,
-		Commands:  buildInstallCommands(publicContext.Origin, rawToken),
+		Commands:  buildInstallCommands(publicContext.Origin, rawToken, client),
 		FallbackURL: buildInstallConfirmURL(
 			publicContext.Origin,
 			"token",
@@ -892,14 +892,18 @@ func maskInstallAPIKey(key string) string {
 	return key[:8] + "****"
 }
 
-func buildInstallCommands(origin string, token string) InstallTokenCommands {
+func buildInstallCommands(origin string, token string, client string) InstallTokenCommands {
 	origin = strings.TrimRight(origin, "/")
+	unixCommand := fmt.Sprintf(
+		"curl -fsSL %s | bash -s -- --token %s",
+		shellQuote(origin+"/install.sh"),
+		shellQuote(token),
+	)
+	if client == InstallClientCodex {
+		unixCommand += ` && . "${CODEX_HOME:-$HOME/.codex}/tocreate.env"`
+	}
 	return InstallTokenCommands{
-		Unix: fmt.Sprintf(
-			"curl -fsSL %s | bash -s -- --token %s",
-			shellQuote(origin+"/install.sh"),
-			shellQuote(token),
-		),
+		Unix: unixCommand,
 		Windows: fmt.Sprintf(
 			"& ([scriptblock]::Create((irm %s))) -Token %s",
 			powerShellQuote(origin+"/install.ps1"),

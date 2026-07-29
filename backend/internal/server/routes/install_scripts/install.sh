@@ -658,7 +658,8 @@ print_next_steps() {
       esac
       shell_path="${SHELL:-}"
       shell_name="${shell_path##*/}"
-      printf '%s\n' '1. Load the Codex API key in this shell (new terminals load it automatically):'
+      printf '%s\n' '1. The Quick Start command loads the Codex API key after this installer exits.'
+      printf '%s\n' '   If you ran install.sh directly, load it manually:'
       if [ "$shell_name" = 'fish' ]; then
         printf '   %bsource "%s"%b\n' "$COLOR_BLUE" "$codex_dir/tocreate.fish" "$COLOR_RESET"
       else

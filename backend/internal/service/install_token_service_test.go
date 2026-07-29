@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -160,6 +161,7 @@ func TestInstallTokenIssueRedeemAndConfirmAreOneTime(t *testing.T) {
 	require.NotContains(t, issued.Commands.Unix, key.Key)
 	require.NotContains(t, issued.Commands.Windows, key.Key)
 	require.Contains(t, issued.Commands.Unix, "https://api.example.com/install.sh")
+	require.Contains(t, issued.Commands.Unix, `. "${CODEX_HOME:-$HOME/.codex}/tocreate.env"`)
 
 	store.mu.Lock()
 	for storageKey, record := range store.records {
@@ -203,6 +205,35 @@ func TestInstallTokenIssueRedeemAndConfirmAreOneTime(t *testing.T) {
 
 	_, err = service.Confirm(ctx, receipt, "203.0.113.5", "https://fallback.example")
 	require.Equal(t, "token_used", infraerrors.Reason(err))
+}
+
+func TestBuildInstallCommandsLoadsOnlyCodexEnvironmentInCurrentUnixShell(t *testing.T) {
+	const (
+		origin = "https://api.example.com/"
+		token  = "tcinst_test-token"
+	)
+
+	for _, test := range []struct {
+		client     string
+		loadsCodex bool
+	}{
+		{client: InstallClientClaudeCode, loadsCodex: false},
+		{client: InstallClientCodex, loadsCodex: true},
+		{client: InstallClientGeminiCLI, loadsCodex: false},
+	} {
+		t.Run(test.client, func(t *testing.T) {
+			commands := buildInstallCommands(origin, token, test.client)
+
+			require.Contains(t, commands.Unix, "https://api.example.com/install.sh")
+			require.Contains(t, commands.Unix, token)
+			require.Equal(
+				t,
+				test.loadsCodex,
+				strings.Contains(commands.Unix, `. "${CODEX_HOME:-$HOME/.codex}/tocreate.env"`),
+			)
+			require.NotContains(t, commands.Windows, "tocreate.env")
+		})
+	}
 }
 
 func TestInstallTokenConcurrentRedeemOnlyReturnsSecretOnce(t *testing.T) {
