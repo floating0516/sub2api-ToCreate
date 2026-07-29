@@ -40,12 +40,16 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 print_banner() {
-  printf '%b\n' "${COLOR_BOLD}"
-  printf '%s\n' '  ______     ______   ______     ______     ______     ______   ______'
-  printf '%s\n' ' /\  ___\   /\  __ \ /\  ___\   /\  == \   /\  ___\   /\  __ \ /\__  _\'
-  printf '%s\n' ' \ \ \____  \ \  __ \\ \ \____  \ \  __<   \ \  __\   \ \  __ \\/_/\ \/'
-  printf '%s\n' '  \ \_____\  \ \_\ \_\\ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\ \ \_\'
-  printf '%s\n' '   \/_____/   \/_/\/_/ \/_____/   \/_/ /_/   \/_____/   \/_/\/_/  \/_/'
+  printf '%b' "${COLOR_BOLD}${COLOR_BLUE}"
+  cat <<'BANNER'
+  _____     ____                _
+ |_   _|__ / ___|_ __ ___  __ _| |_ ___
+   | |/ _ \ |   | '__/ _ \/ _` | __/ _ \
+   | | (_) | |__| | |  __/ (_| | ||  __/
+   |_|\___/ \____|_|  \___|\__,_|\__\___|
+
+             ToCreate Quick Start
+BANNER
   printf '%b\n' "${COLOR_RESET}"
   printf '%s\n\n' 'Install one CLI, CC Switch, and your ToCreate provider.'
 }
