@@ -17,15 +17,16 @@ $CcSwitchReady = $false
 function Write-Banner {
   Write-Host ""
   $banner = @'
-  _____     ____                _
- |_   _|__ / ___|_ __ ___  __ _| |_ ___
-   | |/ _ \ |   | '__/ _ \/ _` | __/ _ \
-   | | (_) | |__| | |  __/ (_| | ||  __/
-   |_|\___/ \____|_|  \___|\__,_|\__\___|
-
-             ToCreate Quick Start
+ ______   ______   ______     ______     ______     ______   ______   ______
+/\__  _\ /\  __ \ /\  ___\   /\  == \   /\  ___\   /\  __ \ /\__  _\ /\  ___\
+\/_/\ \/ \ \ \/\ \\ \ \____  \ \  __<   \ \  __\   \ \  __ \\/_/\ \/ \ \  __\
+   \ \_\  \ \_____\\ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_\  \ \_____\
+    \/_/   \/_____/ \/_____/   \/_/ /_/   \/_____/   \/_/\/_/   \/_/   \/_____/
 '@
   Write-Host $banner -ForegroundColor Cyan
+  Write-Host ""
+  Write-Host "                               ToCreate Quick Start" -ForegroundColor Green
+  Write-Host ""
   Write-Host "  Install one CLI, CC Switch, and your ToCreate provider."
   Write-Host ""
 }

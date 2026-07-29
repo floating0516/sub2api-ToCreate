@@ -34,6 +34,7 @@ func TestInstallScriptsUseRequestOriginWithoutEmbeddingSecrets(t *testing.T) {
 			require.Contains(t, recorder.Header().Get("Content-Type"), test.contentType)
 			require.Contains(t, recorder.Body.String(), "https://api.example.com")
 			require.Contains(t, recorder.Body.String(), "/api/v1/install-token/redeem")
+			require.Contains(t, recorder.Body.String(), " ______   ______   ______     ______")
 			require.Contains(t, recorder.Body.String(), "ToCreate Quick Start")
 			require.NotContains(t, recorder.Body.String(), installScriptBaseURLPlaceholder)
 			require.NotContains(t, recorder.Body.String(), "sk-test")
