@@ -16,7 +16,7 @@ import (
 
 const (
 	BenefitGrantAudienceTodayActive = "today_active"
-	BenefitGrantTypeSubscription     = "subscription"
+	BenefitGrantTypeSubscription    = "subscription"
 
 	benefitGrantNotesMaxRunes = 1800
 )
