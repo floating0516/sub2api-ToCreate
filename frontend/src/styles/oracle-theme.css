@@ -388,6 +388,17 @@ select {
   background: var(--nb-paper-alt) !important;
 }
 
+.data-table-mobile-card {
+  border: var(--nb-border-width) solid var(--nb-ink) !important;
+  border-radius: var(--nb-radius) !important;
+  background: var(--nb-paper) !important;
+  box-shadow: var(--nb-shadow-sm);
+}
+
+.data-table-mobile-card-selected {
+  background: var(--nb-soft-yellow) !important;
+}
+
 .table-wrapper thead.sticky {
   box-shadow: 0 3px 0 var(--nb-shadow-color) !important;
 }
@@ -431,10 +442,10 @@ select {
 
 /* Menus, dialogs, and notifications */
 .dropdown {
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
+  border: var(--nb-border-width) solid var(--nb-ink) !important;
+  border-radius: var(--nb-radius) !important;
   background: var(--nb-paper) !important;
-  box-shadow: var(--nb-shadow);
+  box-shadow: var(--nb-shadow) !important;
 }
 
 .dropdown-item {
@@ -480,28 +491,84 @@ select {
 }
 
 .toast {
-  border: var(--nb-border-width) solid var(--nb-ink);
+  border: var(--nb-border-width) solid var(--nb-ink) !important;
   border-left-width: 7px;
-  border-radius: var(--nb-radius);
+  border-radius: var(--nb-radius) !important;
   background: var(--nb-paper) !important;
   color: var(--nb-ink);
-  box-shadow: var(--nb-shadow);
+  box-shadow: var(--nb-shadow) !important;
 }
 
 .toast-success {
-  border-left-color: var(--nb-green);
+  border-left-color: var(--nb-green) !important;
+  background: var(--nb-soft-green) !important;
 }
 
 .toast-error {
-  border-left-color: var(--nb-red);
+  border-left-color: var(--nb-red) !important;
+  background: var(--nb-soft-red) !important;
 }
 
 .toast-warning {
-  border-left-color: var(--nb-yellow);
+  border-left-color: var(--nb-yellow) !important;
+  background: var(--nb-soft-yellow) !important;
 }
 
 .toast-info {
-  border-left-color: var(--nb-blue);
+  border-left-color: var(--nb-blue) !important;
+  background: var(--nb-soft-blue) !important;
+}
+
+.toast-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--nb-ink);
+  border-radius: var(--nb-radius) !important;
+  background: var(--nb-paper) !important;
+  box-shadow: 1px 1px 0 var(--nb-shadow-color);
+  color: var(--nb-ink) !important;
+}
+
+.toast-close:hover {
+  background: var(--nb-yellow) !important;
+}
+
+.toast-progress-track {
+  border-top: 2px solid var(--nb-ink);
+  background: var(--nb-paper) !important;
+}
+
+.toast-success .toast-progress {
+  background: var(--nb-green) !important;
+}
+
+.toast-error .toast-progress {
+  background: var(--nb-red) !important;
+}
+
+.toast-warning .toast-progress {
+  background: var(--nb-yellow) !important;
+}
+
+.toast-info .toast-progress {
+  background: var(--nb-blue) !important;
+}
+
+/* Operations dashboard panels still use legacy low-opacity Tailwind rings. */
+.ops-dashboard {
+  padding-right: 5px;
+}
+
+[class~="ring-gray-900/5"] {
+  border: var(--nb-border-width) solid var(--nb-ink) !important;
+  border-radius: var(--nb-radius) !important;
+  background: var(--nb-paper) !important;
+  box-shadow: var(--nb-shadow) !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
 }
 
 /* App shell */
