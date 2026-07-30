@@ -21,7 +21,7 @@ func NewBenefitGrantHandler(benefitGrantService *service.BenefitGrantService) *B
 }
 
 type BenefitGrantRequest struct {
-	OperationKey    string  `json:"operation_key" binding:"required,min=8,max=128"`
+	OperationKey   string  `json:"operation_key" binding:"required,min=8,max=128"`
 	AudienceType   string  `json:"audience_type" binding:"required,oneof=today_active recent_active recent_registered"`
 	AudienceDate   string  `json:"audience_date" binding:"omitempty,max=10"`
 	AudienceDays   int     `json:"audience_days" binding:"required,min=1,max=365"`
@@ -182,7 +182,7 @@ func (h *BenefitGrantHandler) Retry(c *gin.Context) {
 
 func benefitGrantInputFromRequest(req BenefitGrantRequest) *service.BenefitGrantInput {
 	return &service.BenefitGrantInput{
-		OperationKey:    req.OperationKey,
+		OperationKey:   req.OperationKey,
 		AudienceType:   req.AudienceType,
 		AudienceDate:   req.AudienceDate,
 		AudienceDays:   req.AudienceDays,

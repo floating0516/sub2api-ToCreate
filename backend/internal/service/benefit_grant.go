@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	BenefitGrantAudienceTodayActive     = "today_active"
-	BenefitGrantAudienceRecentActive    = "recent_active"
+	BenefitGrantAudienceTodayActive      = "today_active"
+	BenefitGrantAudienceRecentActive     = "recent_active"
 	BenefitGrantAudienceRecentRegistered = "recent_registered"
 
 	BenefitGrantTypeSubscription = "subscription"
@@ -78,16 +78,16 @@ var (
 // Fields that do not apply to the selected variant are normalized to zero values.
 type BenefitGrantInput struct {
 	OperationKey   string
-	AudienceType  string
-	AudienceDate  string
-	AudienceDays  int
-	Timezone      string
-	BenefitType   string
+	AudienceType   string
+	AudienceDate   string
+	AudienceDays   int
+	Timezone       string
+	BenefitType    string
 	ConflictPolicy string
-	GroupID       int64
-	ValidityDays  int
-	BalanceAmount float64
-	Notes         string
+	GroupID        int64
+	ValidityDays   int
+	BalanceAmount  float64
+	Notes          string
 }
 
 type ExecuteBenefitGrantInput struct {
@@ -176,15 +176,15 @@ type BenefitGrantRecipient struct {
 }
 
 type BenefitGrantResult struct {
-	Campaign     *BenefitGrantCampaign `json:"campaign"`
-	Preview      *BenefitGrantPreview  `json:"preview,omitempty"`
-	GrantedCount int                   `json:"granted_count"`
-	CreatedCount int                   `json:"created_count"`
-	RenewedCount int                   `json:"renewed_count"`
-	ExtendedCount int                  `json:"extended_count"`
-	FailedCount  int                   `json:"failed_count"`
-	SkippedCount int                   `json:"skipped_count"`
-	Errors       []string              `json:"errors"`
+	Campaign      *BenefitGrantCampaign `json:"campaign"`
+	Preview       *BenefitGrantPreview  `json:"preview,omitempty"`
+	GrantedCount  int                   `json:"granted_count"`
+	CreatedCount  int                   `json:"created_count"`
+	RenewedCount  int                   `json:"renewed_count"`
+	ExtendedCount int                   `json:"extended_count"`
+	FailedCount   int                   `json:"failed_count"`
+	SkippedCount  int                   `json:"skipped_count"`
+	Errors        []string              `json:"errors"`
 }
 
 type BenefitGrantAudienceUser struct {
@@ -845,7 +845,7 @@ func normalizeBenefitGrantInputWithDatePolicy(
 
 	normalized := &normalizedBenefitGrant{
 		BenefitGrantInput: BenefitGrantInput{
-			OperationKey:    operationKey,
+			OperationKey:   operationKey,
 			AudienceType:   audienceType,
 			AudienceDate:   audienceDate,
 			AudienceDays:   audienceDays,

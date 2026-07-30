@@ -13,15 +13,15 @@ func TestNormalizeBenefitGrantInputBuildsTodayWindowAndStableMarker(t *testing.T
 
 	got, err := normalizeBenefitGrantInput(&BenefitGrantInput{
 		OperationKey:   "benefit-grant-operation-17",
-		AudienceType:  BenefitGrantAudienceTodayActive,
-		AudienceDate:  "2026-07-30",
-		AudienceDays:  30,
-		Timezone:      "Asia/Shanghai",
-		BenefitType:   BenefitGrantTypeSubscription,
+		AudienceType:   BenefitGrantAudienceTodayActive,
+		AudienceDate:   "2026-07-30",
+		AudienceDays:   30,
+		Timezone:       "Asia/Shanghai",
+		BenefitType:    BenefitGrantTypeSubscription,
 		ConflictPolicy: BenefitGrantConflictSkipActive,
-		GroupID:       17,
-		ValidityDays:  1,
-		Notes:         "summer campaign",
+		GroupID:        17,
+		ValidityDays:   1,
+		Notes:          "summer campaign",
 	}, now)
 
 	require.NoError(t, err)
@@ -40,11 +40,11 @@ func TestNormalizeBenefitGrantInputBuildsRecentCalendarDayWindow(t *testing.T) {
 
 	got, err := normalizeBenefitGrantInput(&BenefitGrantInput{
 		OperationKey:  "benefit-grant-operation-18",
-		AudienceType: BenefitGrantAudienceRecentActive,
-		AudienceDate: "2026-07-30",
-		AudienceDays: 7,
-		Timezone:     "Asia/Shanghai",
-		BenefitType:  BenefitGrantTypeBalance,
+		AudienceType:  BenefitGrantAudienceRecentActive,
+		AudienceDate:  "2026-07-30",
+		AudienceDays:  7,
+		Timezone:      "Asia/Shanghai",
+		BenefitType:   BenefitGrantTypeBalance,
 		BalanceAmount: 2.5,
 	}, now)
 
@@ -60,7 +60,7 @@ func TestNormalizeBenefitGrantInputRejectsNonCurrentDateForNewGrant(t *testing.T
 	now := time.Date(2026, time.July, 30, 4, 30, 0, 0, time.UTC)
 
 	_, err := normalizeBenefitGrantInput(&BenefitGrantInput{
-		OperationKey:  "benefit-grant-operation-19",
+		OperationKey: "benefit-grant-operation-19",
 		AudienceType: BenefitGrantAudienceTodayActive,
 		AudienceDate: "2026-07-29",
 		AudienceDays: 1,
@@ -79,11 +79,11 @@ func TestNormalizeBenefitGrantInputAllowsHistoricDateForIdempotentReplay(t *test
 
 	got, err := normalizeBenefitGrantInputForReplay(&BenefitGrantInput{
 		OperationKey:  "benefit-grant-operation-20",
-		AudienceType: BenefitGrantAudienceRecentRegistered,
-		AudienceDate: "2026-07-30",
-		AudienceDays: 3,
-		Timezone:     "Asia/Shanghai",
-		BenefitType:  BenefitGrantTypeBalance,
+		AudienceType:  BenefitGrantAudienceRecentRegistered,
+		AudienceDate:  "2026-07-30",
+		AudienceDays:  3,
+		Timezone:      "Asia/Shanghai",
+		BenefitType:   BenefitGrantTypeBalance,
 		BalanceAmount: 1,
 	}, now)
 
@@ -97,11 +97,11 @@ func TestNormalizeBenefitGrantInputRoundsBalanceToStoredPrecision(t *testing.T) 
 
 	got, err := normalizeBenefitGrantInput(&BenefitGrantInput{
 		OperationKey:  "benefit-grant-operation-precision",
-		AudienceType: BenefitGrantAudienceTodayActive,
-		AudienceDate: "2026-07-30",
-		AudienceDays: 1,
-		Timezone:     "Asia/Shanghai",
-		BenefitType:  BenefitGrantTypeBalance,
+		AudienceType:  BenefitGrantAudienceTodayActive,
+		AudienceDate:  "2026-07-30",
+		AudienceDays:  1,
+		Timezone:      "Asia/Shanghai",
+		BenefitType:   BenefitGrantTypeBalance,
 		BalanceAmount: 1.234567899,
 	}, now)
 
@@ -114,11 +114,11 @@ func TestNormalizeBenefitGrantInputRejectsBalanceBelowStoredPrecision(t *testing
 
 	_, err := normalizeBenefitGrantInput(&BenefitGrantInput{
 		OperationKey:  "benefit-grant-operation-too-small",
-		AudienceType: BenefitGrantAudienceTodayActive,
-		AudienceDate: "2026-07-30",
-		AudienceDays: 1,
-		Timezone:     "Asia/Shanghai",
-		BenefitType:  BenefitGrantTypeBalance,
+		AudienceType:  BenefitGrantAudienceTodayActive,
+		AudienceDate:  "2026-07-30",
+		AudienceDays:  1,
+		Timezone:      "Asia/Shanghai",
+		BenefitType:   BenefitGrantTypeBalance,
 		BalanceAmount: 0.000000001,
 	}, now)
 
