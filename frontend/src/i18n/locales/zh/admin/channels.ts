@@ -831,7 +831,7 @@ export default {
         section: '活动记录',
         templateLabel: '常用备注',
         templatePlaceholder: '选择一个备注模板',
-        templateHint: '选择后会自动填入备注，仍可继续修改。',
+        templateHint: '选择后会自动填入备注并生成公告，仍可继续修改。',
         label: '备注',
         placeholder: '可选，例如活动名称或发放原因',
         templates: {
@@ -856,7 +856,33 @@ export default {
         popup: '弹窗提醒',
         bindingHint: '公告与本次发放绑定：发放成功后才可见；失败、冲突跳过或未参与活动的用户不会收到。',
         enabled: '已开启',
-        disabled: '不发送'
+        disabled: '不发送',
+        templates: {
+          activeReward: {
+            title: '活跃用户回馈权益已到账',
+            content: '感谢你近期对平台的支持。本次活跃用户回馈权益已发放至你的账户，具体内容和有效期请以账户页面显示为准。'
+          },
+          newUserWelcome: {
+            title: '新用户欢迎权益已到账',
+            content: '欢迎加入平台。新用户欢迎权益已发放至你的账户，请前往账户页面查看并在有效期内使用。'
+          },
+          seasonalCampaign: {
+            title: '限时活动福利已到账',
+            content: '你已获得本次节日或限时活动福利，相关权益已发放至账户，请留意有效期并及时使用。'
+          },
+          serviceCompensation: {
+            title: '服务补偿权益已到账',
+            content: '针对近期系统维护或服务异常，我们已向你发放补偿权益。感谢你的理解与支持。'
+          },
+          supportCompensation: {
+            title: '客服补偿权益已到账',
+            content: '根据本次客服处理结果，相关补偿权益已发放至你的账户，请前往账户页面查收。'
+          },
+          operationsCampaign: {
+            title: '运营活动权益已到账',
+            content: '你已获得本次运营活动权益，相关额度已发放至账户，具体内容和有效期请以账户页面显示为准。'
+          }
+        }
       },
       preview: {
         title: '发放预览',

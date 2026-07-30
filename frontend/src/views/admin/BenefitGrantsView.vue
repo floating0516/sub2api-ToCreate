@@ -203,6 +203,7 @@
                 <div>
                   <label class="input-label">{{ t('admin.benefitGrants.notes.templateLabel') }}</label>
                   <Select
+                    data-test="note-template-select"
                     :model-value="selectedNoteTemplate"
                     :options="noteTemplateOptions"
                     :placeholder="t('admin.benefitGrants.notes.templatePlaceholder')"
@@ -217,6 +218,7 @@
                   <label class="input-label">{{ t('admin.benefitGrants.notes.label') }}</label>
                   <textarea
                     v-model="form.notes"
+                    data-test="activity-notes"
                     maxlength="1800"
                     rows="3"
                     class="input min-h-[84px] resize-y"
@@ -235,6 +237,7 @@
                   </h2>
                 </div>
                 <button
+                  data-test="announcement-toggle"
                   type="button"
                   role="switch"
                   :aria-checked="form.announcement_enabled"
@@ -262,6 +265,7 @@
                     <label class="input-label">{{ t('admin.benefitGrants.announcement.title') }}</label>
                     <input
                       v-model="form.announcement_title"
+                      data-test="announcement-title"
                       type="text"
                       maxlength="200"
                       class="input"
@@ -282,6 +286,7 @@
                   <label class="input-label">{{ t('admin.benefitGrants.announcement.content') }}</label>
                   <textarea
                     v-model="form.announcement_content"
+                    data-test="announcement-content"
                     maxlength="20000"
                     rows="4"
                     class="input min-h-[104px] resize-y"
@@ -822,14 +827,17 @@ import { formatCurrency, formatDateTime } from '@/utils/format'
 type Tab = 'create' | 'history'
 type GrantMode = BenefitGrantDeliveryMode
 type SelectValue = string | number | boolean | null
-type NoteTemplate =
-  | 'active_reward'
-  | 'new_user_welcome'
-  | 'seasonal_campaign'
-  | 'service_compensation'
-  | 'support_compensation'
-  | 'operations_campaign'
-  | 'custom'
+const noteTemplateKeys = {
+  active_reward: 'activeReward',
+  new_user_welcome: 'newUserWelcome',
+  seasonal_campaign: 'seasonalCampaign',
+  service_compensation: 'serviceCompensation',
+  support_compensation: 'supportCompensation',
+  operations_campaign: 'operationsCampaign'
+} as const
+
+type PresetNoteTemplate = keyof typeof noteTemplateKeys
+type NoteTemplate = PresetNoteTemplate | 'custom'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -1078,20 +1086,29 @@ function setNoteTemplate(value: SelectValue) {
   }
   selectedNoteTemplate.value = value
   if (value !== 'custom') {
-    form.notes = noteTemplateText(value)
+    const copy = noteTemplateCopy(value)
+    form.notes = copy.notes
+    form.announcement_enabled = true
+    form.announcement_title = copy.announcementTitle
+    form.announcement_content = copy.announcementContent
   }
 }
 
-function noteTemplateText(template: Exclude<NoteTemplate, 'custom'>): string {
-  const keys = {
-    active_reward: 'activeReward',
-    new_user_welcome: 'newUserWelcome',
-    seasonal_campaign: 'seasonalCampaign',
-    service_compensation: 'serviceCompensation',
-    support_compensation: 'supportCompensation',
-    operations_campaign: 'operationsCampaign'
-  } as const
-  return t(`admin.benefitGrants.notes.templates.${keys[template]}`)
+function noteTemplateText(template: PresetNoteTemplate): string {
+  return t(`admin.benefitGrants.notes.templates.${noteTemplateKeys[template]}`)
+}
+
+function noteTemplateCopy(template: PresetNoteTemplate): {
+  notes: string
+  announcementTitle: string
+  announcementContent: string
+} {
+  const key = noteTemplateKeys[template]
+  return {
+    notes: noteTemplateText(template),
+    announcementTitle: t(`admin.benefitGrants.announcement.templates.${key}.title`),
+    announcementContent: t(`admin.benefitGrants.announcement.templates.${key}.content`)
+  }
 }
 
 function setGroupID(value: SelectValue) {

@@ -833,7 +833,7 @@ export default {
         section: 'Campaign Record',
         templateLabel: 'Common note',
         templatePlaceholder: 'Select a note template',
-        templateHint: 'Selecting a template fills the note automatically. You can still edit it.',
+        templateHint: 'Selecting a template fills the note and generates an announcement. You can still edit both.',
         label: 'Notes',
         placeholder: 'Optional campaign name or grant reason',
         templates: {
@@ -858,7 +858,33 @@ export default {
         popup: 'Popup reminder',
         bindingHint: 'The announcement is bound to this grant. Failed, skipped, or non-participating users cannot see it.',
         enabled: 'Enabled',
-        disabled: 'Disabled'
+        disabled: 'Disabled',
+        templates: {
+          activeReward: {
+            title: 'Your active-user reward is ready',
+            content: 'Thank you for your recent support. Your active-user reward has been added to your account. Check your account for the benefit details and validity.'
+          },
+          newUserWelcome: {
+            title: 'Your welcome benefit is ready',
+            content: 'Welcome to the platform. Your new-user benefit has been added to your account. Check your account and use it before it expires.'
+          },
+          seasonalCampaign: {
+            title: 'Your limited-time campaign benefit is ready',
+            content: 'You received this seasonal or limited-time campaign benefit. It has been added to your account; please check its validity and use it in time.'
+          },
+          serviceCompensation: {
+            title: 'Your service compensation is ready',
+            content: 'We added a compensation benefit to your account for the recent maintenance or service issue. Thank you for your understanding.'
+          },
+          supportCompensation: {
+            title: 'Your support compensation is ready',
+            content: 'The compensation from your recent support case has been added to your account. Please check your account for details.'
+          },
+          operationsCampaign: {
+            title: 'Your campaign benefit is ready',
+            content: 'You received this operations campaign benefit. It has been added to your account. Check your account for the benefit details and validity.'
+          }
+        }
       },
       preview: {
         title: 'Grant Preview',
