@@ -809,8 +809,20 @@ export default {
       },
       notes: {
         section: 'Campaign Record',
+        templateLabel: 'Common note',
+        templatePlaceholder: 'Select a note template',
+        templateHint: 'Selecting a template fills the note automatically. You can still edit it.',
         label: 'Notes',
-        placeholder: 'Optional campaign name or grant reason'
+        placeholder: 'Optional campaign name or grant reason',
+        templates: {
+          activeReward: 'Routine reward for active users',
+          newUserWelcome: 'Welcome benefit for new users',
+          seasonalCampaign: 'Seasonal or limited-time campaign',
+          serviceCompensation: 'Maintenance or service issue compensation',
+          supportCompensation: 'Customer support compensation',
+          operationsCampaign: 'Operations campaign benefit grant',
+          custom: 'Other / Custom'
+        }
       },
       preview: {
         title: 'Grant Preview',

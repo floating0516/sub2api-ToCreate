@@ -150,14 +150,31 @@
                   {{ t('admin.benefitGrants.notes.section') }}
                 </h2>
               </div>
-              <label class="input-label">{{ t('admin.benefitGrants.notes.label') }}</label>
-              <textarea
-                v-model="form.notes"
-                maxlength="1800"
-                rows="3"
-                class="input min-h-[84px] resize-y"
-                :placeholder="t('admin.benefitGrants.notes.placeholder')"
-              ></textarea>
+              <div class="grid gap-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <div>
+                  <label class="input-label">{{ t('admin.benefitGrants.notes.templateLabel') }}</label>
+                  <Select
+                    :model-value="selectedNoteTemplate"
+                    :options="noteTemplateOptions"
+                    :placeholder="t('admin.benefitGrants.notes.templatePlaceholder')"
+                    :searchable="false"
+                    @update:model-value="setNoteTemplate"
+                  />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.benefitGrants.notes.templateHint') }}
+                  </p>
+                </div>
+                <div>
+                  <label class="input-label">{{ t('admin.benefitGrants.notes.label') }}</label>
+                  <textarea
+                    v-model="form.notes"
+                    maxlength="1800"
+                    rows="3"
+                    class="input min-h-[84px] resize-y"
+                    :placeholder="t('admin.benefitGrants.notes.placeholder')"
+                  ></textarea>
+                </div>
+              </div>
             </div>
 
             <div class="flex justify-end gap-3 bg-gray-50 px-5 py-4 dark:bg-dark-800/60 sm:px-6">
@@ -540,6 +557,14 @@ import { formatCurrency, formatDateTime } from '@/utils/format'
 
 type Tab = 'create' | 'history'
 type SelectValue = string | number | boolean | null
+type NoteTemplate =
+  | 'active_reward'
+  | 'new_user_welcome'
+  | 'seasonal_campaign'
+  | 'service_compensation'
+  | 'support_compensation'
+  | 'operations_campaign'
+  | 'custom'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -550,6 +575,7 @@ const previewLoading = ref(false)
 const previewError = ref('')
 const executing = ref(false)
 const confirmVisible = ref(false)
+const selectedNoteTemplate = ref<NoteTemplate | null>(null)
 let previewSequence = 0
 
 const browserTimezone = getBrowserTimezone()
@@ -600,6 +626,16 @@ const conflictPolicyOptions = computed<Array<{
 }>>(() => [
   { value: 'skip_active', label: t('admin.benefitGrants.policy.skipActive') },
   { value: 'extend_active', label: t('admin.benefitGrants.policy.extendActive') }
+])
+
+const noteTemplateOptions = computed<Array<{ value: NoteTemplate; label: string }>>(() => [
+  { value: 'active_reward', label: t('admin.benefitGrants.notes.templates.activeReward') },
+  { value: 'new_user_welcome', label: t('admin.benefitGrants.notes.templates.newUserWelcome') },
+  { value: 'seasonal_campaign', label: t('admin.benefitGrants.notes.templates.seasonalCampaign') },
+  { value: 'service_compensation', label: t('admin.benefitGrants.notes.templates.serviceCompensation') },
+  { value: 'support_compensation', label: t('admin.benefitGrants.notes.templates.supportCompensation') },
+  { value: 'operations_campaign', label: t('admin.benefitGrants.notes.templates.operationsCampaign') },
+  { value: 'custom', label: t('admin.benefitGrants.notes.templates.custom') }
 ])
 
 const subscriptionGroupOptions = computed(() =>
@@ -667,6 +703,20 @@ watch(
   }
 )
 
+watch(
+  () => form.notes,
+  notes => {
+    const template = selectedNoteTemplate.value
+    if (!template) {
+      if (notes.trim()) selectedNoteTemplate.value = 'custom'
+      return
+    }
+    if (template !== 'custom' && notes !== noteTemplateText(template)) {
+      selectedNoteTemplate.value = 'custom'
+    }
+  }
+)
+
 function invalidatePreview() {
   previewSequence++
   preview.value = null
@@ -694,6 +744,36 @@ function setConflictPolicy(value: SelectValue) {
   if (value === 'skip_active' || value === 'extend_active') {
     form.conflict_policy = value
   }
+}
+
+function setNoteTemplate(value: SelectValue) {
+  if (
+    value !== 'active_reward' &&
+    value !== 'new_user_welcome' &&
+    value !== 'seasonal_campaign' &&
+    value !== 'service_compensation' &&
+    value !== 'support_compensation' &&
+    value !== 'operations_campaign' &&
+    value !== 'custom'
+  ) {
+    return
+  }
+  selectedNoteTemplate.value = value
+  if (value !== 'custom') {
+    form.notes = noteTemplateText(value)
+  }
+}
+
+function noteTemplateText(template: Exclude<NoteTemplate, 'custom'>): string {
+  const keys = {
+    active_reward: 'activeReward',
+    new_user_welcome: 'newUserWelcome',
+    seasonal_campaign: 'seasonalCampaign',
+    service_compensation: 'serviceCompensation',
+    support_compensation: 'supportCompensation',
+    operations_campaign: 'operationsCampaign'
+  } as const
+  return t(`admin.benefitGrants.notes.templates.${keys[template]}`)
 }
 
 function setGroupID(value: SelectValue) {
@@ -838,6 +918,7 @@ function resetForm() {
     : null
   form.validity_days = 1
   form.balance_amount = 1
+  selectedNoteTemplate.value = null
   form.notes = ''
   invalidatePreview()
 }

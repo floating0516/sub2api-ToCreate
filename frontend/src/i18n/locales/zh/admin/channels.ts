@@ -807,8 +807,20 @@ export default {
       },
       notes: {
         section: '活动记录',
+        templateLabel: '常用备注',
+        templatePlaceholder: '选择一个备注模板',
+        templateHint: '选择后会自动填入备注，仍可继续修改。',
         label: '备注',
-        placeholder: '可选，例如活动名称或发放原因'
+        placeholder: '可选，例如活动名称或发放原因',
+        templates: {
+          activeReward: '活跃用户日常回馈',
+          newUserWelcome: '新注册用户欢迎权益',
+          seasonalCampaign: '节日或限时活动福利',
+          serviceCompensation: '系统维护或服务异常补偿',
+          supportCompensation: '客服工单补偿',
+          operationsCampaign: '运营专项权益发放',
+          custom: '其他 / 自定义'
+        }
       },
       preview: {
         title: '发放预览',
