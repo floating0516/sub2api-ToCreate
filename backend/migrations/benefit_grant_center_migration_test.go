@@ -33,3 +33,15 @@ func TestRecentRegisteredAudienceIndexMigrationIsOnline(t *testing.T) {
 	require.Contains(t, sql, "role = 'user'")
 	require.False(t, strings.Contains(strings.ToUpper(sql), "BEGIN;"))
 }
+
+func TestBenefitGrantActivityWindowMigrationAddsDeliveryModeAndAnnouncementLink(t *testing.T) {
+	content, err := FS.ReadFile("195_benefit_grant_activity_window.sql")
+	require.NoError(t, err)
+
+	sql := string(content)
+	require.Contains(t, sql, "delivery_mode VARCHAR(32)")
+	require.Contains(t, sql, "'activity_window'")
+	require.Contains(t, sql, "'scheduled'")
+	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS benefit_grant_campaign_announcements")
+	require.Contains(t, sql, "announcement_id BIGINT NOT NULL UNIQUE")
+}

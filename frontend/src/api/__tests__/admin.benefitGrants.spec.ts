@@ -10,12 +10,14 @@ vi.mock('@/api/client', () => ({
 }))
 
 import {
+  createAutomatic,
   execute,
   get as getCampaign,
   list as listCampaigns,
   listRecipients,
   preview,
   retry,
+  type AutomaticBenefitGrantRequest,
   type BenefitGrantRequest
 } from '@/api/admin/benefitGrants'
 
@@ -69,6 +71,37 @@ describe('admin benefit grants API', () => {
       }
     )
     expect(result.granted_count).toBe(10)
+  })
+
+  it('creates an authenticated activity-window campaign', async () => {
+    post.mockResolvedValue({ data: { id: 15, delivery_mode: 'activity_window' } })
+    const automaticRequest: AutomaticBenefitGrantRequest = {
+      operation_key: 'benefit-grant-automatic-operation-1',
+      timezone: 'Asia/Shanghai',
+      window_start: 1785384000,
+      window_end: 1785427140,
+      benefit_type: 'balance',
+      conflict_policy: 'none',
+      balance_amount: 1,
+      announcement_enabled: true,
+      announcement_title: 'Benefit received',
+      announcement_content: 'Your campaign benefit is now available.',
+      announcement_notify_mode: 'popup'
+    }
+
+    const result = await createAutomatic(automaticRequest)
+
+    expect(post).toHaveBeenCalledWith(
+      '/admin/benefit-grants/automatic',
+      automaticRequest,
+      {
+        headers: {
+          'Idempotency-Key': 'benefit-grant-automatic-operation-1'
+        },
+        timeout: 90000
+      }
+    )
+    expect(result.delivery_mode).toBe('activity_window')
   })
 
   it('lists campaigns and recipients with pagination filters', async () => {

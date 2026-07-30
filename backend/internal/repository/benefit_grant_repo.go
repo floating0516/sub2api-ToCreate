@@ -17,6 +17,7 @@ const benefitGrantCampaignSelect = `
 		c.id,
 		c.operation_key,
 		c.request_hash,
+		c.delivery_mode,
 		c.audience_type,
 		c.audience_date::text,
 		c.audience_days,
@@ -31,6 +32,10 @@ const benefitGrantCampaignSelect = `
 		c.balance_amount::double precision,
 		c.notes,
 		c.marker,
+		links.announcement_id,
+		COALESCE(a.title, ''),
+		COALESCE(a.content, ''),
+		COALESCE(a.notify_mode, ''),
 		c.status,
 		c.matched_count,
 		c.eligible_count,
@@ -50,6 +55,8 @@ const benefitGrantCampaignSelect = `
 		c.updated_at
 	FROM benefit_grant_campaigns c
 	LEFT JOIN groups g ON g.id = c.group_id
+	LEFT JOIN benefit_grant_campaign_announcements links ON links.campaign_id = c.id
+	LEFT JOIN announcements a ON a.id = links.announcement_id
 `
 
 const benefitGrantRecipientSelect = `
@@ -193,9 +200,16 @@ func (r *benefitGrantRepository) CreateCampaign(
 	ctx context.Context,
 	campaign *service.BenefitGrantCampaign,
 	recipients []service.BenefitGrantRecipient,
+	announcement *service.BenefitGrantAnnouncement,
 ) (*service.BenefitGrantCampaign, bool, error) {
 	if r == nil || r.db == nil || campaign == nil {
 		return nil, false, service.ErrBenefitGrantUnavailable
+	}
+	if campaign.DeliveryMode == "" {
+		campaign.DeliveryMode = service.BenefitGrantDeliverySnapshot
+	}
+	if campaign.Status == "" {
+		campaign.Status = service.BenefitGrantStatusRunning
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -207,6 +221,7 @@ func (r *benefitGrantRepository) CreateCampaign(
 		INSERT INTO benefit_grant_campaigns (
 			operation_key,
 			request_hash,
+			delivery_mode,
 			audience_type,
 			audience_date,
 			audience_days,
@@ -230,13 +245,14 @@ func (r *benefitGrantRepository) CreateCampaign(
 			created_by
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-			$12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+			$12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
 		)
 		ON CONFLICT (created_by, operation_key) DO NOTHING
 		RETURNING id
 	`,
 		campaign.OperationKey,
 		campaign.RequestHash,
+		campaign.DeliveryMode,
 		campaign.AudienceType,
 		campaign.AudienceDate,
 		campaign.AudienceDays,
@@ -251,7 +267,7 @@ func (r *benefitGrantRepository) CreateCampaign(
 		nullableFloat64(campaign.BalanceAmount),
 		campaign.Notes,
 		campaign.Marker,
-		service.BenefitGrantStatusRunning,
+		campaign.Status,
 		campaign.MatchedCount,
 		campaign.EligibleCount,
 		campaign.AlreadyGrantedCount,
@@ -317,6 +333,50 @@ func (r *benefitGrantRepository) CreateCampaign(
 		}
 	}
 
+	if announcement != nil {
+		var announcementID int64
+		err := tx.QueryRowContext(ctx, `
+			INSERT INTO announcements (
+				title,
+				content,
+				status,
+				notify_mode,
+				targeting,
+				starts_at,
+				created_by,
+				updated_by
+			) VALUES (
+				$1,
+				$2,
+				'active',
+				$3,
+				'{"any_of":[{"all_of":[{"type":"subscription","operator":"in","group_ids":[9223372036854775807]}]}]}'::jsonb,
+				$4,
+				$5,
+				$5
+			)
+			RETURNING id
+		`,
+			announcement.Title,
+			announcement.Content,
+			announcement.NotifyMode,
+			nullableTime(announcement.StartsAt),
+			campaign.CreatedBy,
+		).Scan(&announcementID)
+		if err != nil {
+			return nil, false, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO benefit_grant_campaign_announcements (
+				campaign_id,
+				announcement_id
+			) VALUES ($1, $2)
+		`, campaign.ID, announcementID); err != nil {
+			return nil, false, err
+		}
+		campaign.AnnouncementID = &announcementID
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, false, err
 	}
@@ -331,6 +391,16 @@ func (r *benefitGrantRepository) GetCampaign(
 	if r == nil || r.db == nil {
 		return nil, service.ErrBenefitGrantUnavailable
 	}
+	if err := r.refreshAutomaticCampaignStatuses(ctx, time.Now()); err != nil {
+		return nil, err
+	}
+	return r.getCampaign(ctx, id)
+}
+
+func (r *benefitGrantRepository) getCampaign(
+	ctx context.Context,
+	id int64,
+) (*service.BenefitGrantCampaign, error) {
 	campaign, err := scanBenefitGrantCampaign(r.db.QueryRowContext(
 		ctx,
 		benefitGrantCampaignSelect+` WHERE c.id = $1`,
@@ -350,6 +420,9 @@ func (r *benefitGrantRepository) ListCampaigns(
 		return nil, 0, service.ErrBenefitGrantUnavailable
 	}
 	page, pageSize = normalizeBenefitGrantPagination(page, pageSize)
+	if err := r.refreshAutomaticCampaignStatuses(ctx, time.Now()); err != nil {
+		return nil, 0, err
+	}
 
 	var total int64
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM benefit_grant_campaigns`).Scan(&total); err != nil {
@@ -378,6 +451,93 @@ func (r *benefitGrantRepository) ListCampaigns(
 		campaigns = append(campaigns, *campaign)
 	}
 	return campaigns, total, rows.Err()
+}
+
+func (r *benefitGrantRepository) ListAutomaticCampaignCandidates(
+	ctx context.Context,
+	now, startsBefore time.Time,
+) ([]service.BenefitGrantCampaign, error) {
+	if r == nil || r.db == nil {
+		return nil, service.ErrBenefitGrantUnavailable
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		benefitGrantCampaignSelect+`
+			WHERE c.delivery_mode = 'activity_window'
+				AND c.window_start <= $2
+				AND c.window_end > $1
+			ORDER BY c.id ASC
+		`,
+		now,
+		startsBefore,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	campaigns := make([]service.BenefitGrantCampaign, 0)
+	for rows.Next() {
+		campaign, err := scanBenefitGrantCampaign(rows)
+		if err != nil {
+			return nil, err
+		}
+		campaigns = append(campaigns, *campaign)
+	}
+	return campaigns, rows.Err()
+}
+
+func (r *benefitGrantRepository) refreshAutomaticCampaignStatuses(
+	ctx context.Context,
+	now time.Time,
+) error {
+	_, err := r.db.ExecContext(ctx, `
+		WITH automatic AS (
+			SELECT
+				c.id,
+				c.window_start,
+				c.window_end,
+				COUNT(r.id) FILTER (
+					WHERE r.status IN ('pending', 'processing')
+				)::integer AS unresolved_count,
+				COUNT(r.id) FILTER (WHERE r.status = 'granted')::integer AS granted_count,
+				COUNT(r.id) FILTER (WHERE r.status = 'failed')::integer AS failed_count
+			FROM benefit_grant_campaigns c
+			LEFT JOIN benefit_grant_recipients r ON r.campaign_id = c.id
+			WHERE c.delivery_mode = 'activity_window'
+			GROUP BY c.id
+		),
+		calculated AS (
+			SELECT
+				id,
+				CASE
+					WHEN $1 < window_start THEN 'scheduled'
+					WHEN $1 < window_end THEN 'running'
+					WHEN (unresolved_count > 0 OR failed_count > 0)
+						AND granted_count > 0 THEN 'partial'
+					WHEN unresolved_count > 0 OR failed_count > 0 THEN 'failed'
+					ELSE 'completed'
+				END AS next_status,
+				CASE
+					WHEN $1 < window_end THEN NULL
+					ELSE $1
+				END AS next_completed_at
+			FROM automatic
+		)
+		UPDATE benefit_grant_campaigns c
+		SET status = calculated.next_status,
+			completed_at = CASE
+				WHEN calculated.next_completed_at IS NULL THEN NULL
+				ELSE COALESCE(c.completed_at, calculated.next_completed_at)
+			END,
+			updated_at = CASE
+				WHEN c.status IS DISTINCT FROM calculated.next_status THEN $1
+				ELSE c.updated_at
+			END
+		FROM calculated
+		WHERE c.id = calculated.id
+	`, now)
+	return err
 }
 
 func (r *benefitGrantRepository) ListRecipients(
@@ -428,6 +588,110 @@ func (r *benefitGrantRepository) ListRecipients(
 		recipients = append(recipients, *recipient)
 	}
 	return recipients, total, rows.Err()
+}
+
+func (r *benefitGrantRepository) GetRecipient(
+	ctx context.Context,
+	campaignID, userID int64,
+) (*service.BenefitGrantRecipient, error) {
+	if r == nil || r.db == nil {
+		return nil, service.ErrBenefitGrantUnavailable
+	}
+	recipient, err := scanBenefitGrantRecipient(r.db.QueryRowContext(
+		ctx,
+		benefitGrantRecipientSelect+`
+			WHERE campaign_id = $1 AND user_id = $2
+		`,
+		campaignID,
+		userID,
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return recipient, err
+}
+
+func (r *benefitGrantRepository) EnsureAutomaticRecipient(
+	ctx context.Context,
+	campaignID, userID int64,
+	eligibility, plannedAction, status, resultType string,
+) (*service.BenefitGrantRecipient, bool, error) {
+	if r == nil || r.db == nil {
+		return nil, false, service.ErrBenefitGrantUnavailable
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO benefit_grant_recipients (
+			campaign_id,
+			user_id,
+			email_snapshot,
+			username_snapshot,
+			eligibility,
+			planned_action,
+			status,
+			result_type
+		)
+		SELECT
+			c.id,
+			u.id,
+			u.email,
+			COALESCE(u.username, ''),
+			$3,
+			$4,
+			$5,
+			$6
+		FROM benefit_grant_campaigns c
+		JOIN users u ON u.id = $2
+		WHERE c.id = $1
+			AND c.delivery_mode = 'activity_window'
+			AND c.window_start <= NOW()
+			AND c.window_end > NOW()
+			AND u.deleted_at IS NULL
+			AND u.status = 'active'
+			AND u.role = 'user'
+		ON CONFLICT (campaign_id, user_id) DO NOTHING
+	`,
+		campaignID,
+		userID,
+		eligibility,
+		plannedAction,
+		status,
+		nullableString(resultType),
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, false, err
+	}
+
+	recipient, err := scanBenefitGrantRecipient(tx.QueryRowContext(
+		ctx,
+		benefitGrantRecipientSelect+`
+			WHERE campaign_id = $1 AND user_id = $2
+		`,
+		campaignID,
+		userID,
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		if err := tx.Commit(); err != nil {
+			return nil, false, err
+		}
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, false, err
+	}
+	return recipient, affected > 0, nil
 }
 
 func (r *benefitGrantRepository) ListActionableRecipients(
@@ -687,12 +951,27 @@ func (r *benefitGrantRepository) RefreshCampaign(
 			extended_count = counts.extended_count,
 			balance_granted_count = counts.balance_granted_count,
 			status = CASE
+				WHEN c.delivery_mode = 'activity_window' AND NOW() < c.window_start
+					THEN 'scheduled'
+				WHEN c.delivery_mode = 'activity_window' AND NOW() < c.window_end
+					THEN 'running'
+				WHEN c.delivery_mode = 'activity_window'
+					AND (counts.pending_count > 0 OR counts.failed_count > 0)
+					AND counts.granted_count > 0
+					THEN 'partial'
+				WHEN c.delivery_mode = 'activity_window'
+					AND (counts.pending_count > 0 OR counts.failed_count > 0)
+					THEN 'failed'
 				WHEN counts.pending_count > 0 THEN 'running'
 				WHEN counts.failed_count > 0 AND counts.granted_count > 0 THEN 'partial'
 				WHEN counts.failed_count > 0 THEN 'failed'
 				ELSE 'completed'
 			END,
 			completed_at = CASE
+				WHEN c.delivery_mode = 'activity_window' AND NOW() < c.window_end
+					THEN NULL
+				WHEN c.delivery_mode = 'activity_window'
+					THEN COALESCE(c.completed_at, NOW())
 				WHEN counts.pending_count = 0 THEN COALESCE(c.completed_at, NOW())
 				ELSE NULL
 			END,
@@ -710,7 +989,95 @@ func (r *benefitGrantRepository) RefreshCampaign(
 	if affected == 0 {
 		return nil, service.ErrBenefitGrantNotFound
 	}
-	return r.GetCampaign(ctx, campaignID)
+	return r.getCampaign(ctx, campaignID)
+}
+
+func (r *benefitGrantRepository) ListAnnouncementGrantAccess(
+	ctx context.Context,
+	userID int64,
+	announcementIDs []int64,
+) (map[int64]bool, error) {
+	access := make(map[int64]bool)
+	if len(announcementIDs) == 0 {
+		return access, nil
+	}
+	if r == nil || r.db == nil {
+		return nil, service.ErrBenefitGrantUnavailable
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			links.announcement_id,
+			EXISTS (
+				SELECT 1
+				FROM benefit_grant_recipients recipients
+				WHERE recipients.campaign_id = links.campaign_id
+					AND recipients.user_id = $1
+					AND recipients.status = 'granted'
+			)
+		FROM benefit_grant_campaign_announcements links
+		WHERE links.announcement_id = ANY($2)
+	`, userID, pq.Array(announcementIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var announcementID int64
+		var granted bool
+		if err := rows.Scan(&announcementID, &granted); err != nil {
+			return nil, err
+		}
+		access[announcementID] = granted
+	}
+	return access, rows.Err()
+}
+
+func (r *benefitGrantRepository) ListAnnouncementGrantedUsers(
+	ctx context.Context,
+	announcementID int64,
+	userIDs []int64,
+) (bool, map[int64]struct{}, error) {
+	granted := make(map[int64]struct{})
+	if r == nil || r.db == nil {
+		return false, nil, service.ErrBenefitGrantUnavailable
+	}
+
+	var campaignID int64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT campaign_id
+		FROM benefit_grant_campaign_announcements
+		WHERE announcement_id = $1
+	`, announcementID).Scan(&campaignID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, granted, nil
+	}
+	if err != nil {
+		return false, nil, err
+	}
+	if len(userIDs) == 0 {
+		return true, granted, nil
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT user_id
+		FROM benefit_grant_recipients
+		WHERE campaign_id = $1
+			AND status = 'granted'
+			AND user_id = ANY($2)
+	`, campaignID, pq.Array(userIDs))
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil {
+			return false, nil, err
+		}
+		granted[userID] = struct{}{}
+	}
+	return true, granted, rows.Err()
 }
 
 type benefitGrantScanner interface {
@@ -723,12 +1090,14 @@ func scanBenefitGrantCampaign(scanner benefitGrantScanner) (*service.BenefitGran
 		groupID       sql.NullInt64
 		validityDays  sql.NullInt64
 		balanceAmount sql.NullFloat64
+		announcementID sql.NullInt64
 		completedAt   sql.NullTime
 	)
 	err := scanner.Scan(
 		&campaign.ID,
 		&campaign.OperationKey,
 		&campaign.RequestHash,
+		&campaign.DeliveryMode,
 		&campaign.AudienceType,
 		&campaign.AudienceDate,
 		&campaign.AudienceDays,
@@ -743,6 +1112,10 @@ func scanBenefitGrantCampaign(scanner benefitGrantScanner) (*service.BenefitGran
 		&balanceAmount,
 		&campaign.Notes,
 		&campaign.Marker,
+		&announcementID,
+		&campaign.AnnouncementTitle,
+		&campaign.AnnouncementContent,
+		&campaign.AnnouncementNotify,
 		&campaign.Status,
 		&campaign.MatchedCount,
 		&campaign.EligibleCount,
@@ -775,6 +1148,10 @@ func scanBenefitGrantCampaign(scanner benefitGrantScanner) (*service.BenefitGran
 	if balanceAmount.Valid {
 		value := balanceAmount.Float64
 		campaign.BalanceAmount = &value
+	}
+	if announcementID.Valid {
+		value := announcementID.Int64
+		campaign.AnnouncementID = &value
 	}
 	if completedAt.Valid {
 		value := completedAt.Time
@@ -860,6 +1237,13 @@ func nullableInt(value *int) any {
 }
 
 func nullableFloat64(value *float64) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func nullableTime(value *time.Time) any {
 	if value == nil {
 		return nil
 	}

@@ -21,17 +21,21 @@ func NewBenefitGrantHandler(benefitGrantService *service.BenefitGrantService) *B
 }
 
 type BenefitGrantRequest struct {
-	OperationKey   string  `json:"operation_key" binding:"required,min=8,max=128"`
-	AudienceType   string  `json:"audience_type" binding:"required,oneof=today_active recent_active recent_registered"`
-	AudienceDate   string  `json:"audience_date" binding:"omitempty,max=10"`
-	AudienceDays   int     `json:"audience_days" binding:"required,min=1,max=365"`
-	Timezone       string  `json:"timezone" binding:"omitempty,max=64"`
-	BenefitType    string  `json:"benefit_type" binding:"required,oneof=subscription balance"`
-	ConflictPolicy string  `json:"conflict_policy" binding:"omitempty,oneof=skip_active extend_active none"`
-	GroupID        int64   `json:"group_id" binding:"omitempty,gte=0"`
-	ValidityDays   int     `json:"validity_days" binding:"omitempty,gte=0,lte=36500"`
-	BalanceAmount  float64 `json:"balance_amount" binding:"omitempty,gte=0,lte=1000000"`
-	Notes          string  `json:"notes" binding:"max=1800"`
+	OperationKey        string  `json:"operation_key" binding:"required,min=8,max=128"`
+	AudienceType        string  `json:"audience_type" binding:"required,oneof=today_active recent_active recent_registered"`
+	AudienceDate        string  `json:"audience_date" binding:"omitempty,max=10"`
+	AudienceDays        int     `json:"audience_days" binding:"required,min=1,max=365"`
+	Timezone            string  `json:"timezone" binding:"omitempty,max=64"`
+	BenefitType         string  `json:"benefit_type" binding:"required,oneof=subscription balance"`
+	ConflictPolicy      string  `json:"conflict_policy" binding:"omitempty,oneof=skip_active extend_active none"`
+	GroupID             int64   `json:"group_id" binding:"omitempty,gte=0"`
+	ValidityDays        int     `json:"validity_days" binding:"omitempty,gte=0,lte=36500"`
+	BalanceAmount       float64 `json:"balance_amount" binding:"omitempty,gte=0,lte=1000000"`
+	Notes               string  `json:"notes" binding:"max=1800"`
+	AnnouncementEnabled bool    `json:"announcement_enabled"`
+	AnnouncementTitle   string  `json:"announcement_title" binding:"omitempty,max=200"`
+	AnnouncementContent string  `json:"announcement_content" binding:"omitempty,max=20000"`
+	AnnouncementNotify  string  `json:"announcement_notify_mode" binding:"omitempty,oneof=silent popup"`
 }
 
 type ExecuteBenefitGrantRequest struct {
@@ -39,6 +43,23 @@ type ExecuteBenefitGrantRequest struct {
 	ExpectedMatchedCount  *int   `json:"expected_matched_count" binding:"required,min=0"`
 	ExpectedEligibleCount *int   `json:"expected_eligible_count" binding:"required,min=0"`
 	ExpectedSnapshot      string `json:"expected_snapshot" binding:"required,len=64"`
+}
+
+type CreateAutomaticBenefitGrantRequest struct {
+	OperationKey        string  `json:"operation_key" binding:"required,min=8,max=128"`
+	Timezone            string  `json:"timezone" binding:"omitempty,max=64"`
+	WindowStart         int64   `json:"window_start" binding:"required,gt=0"`
+	WindowEnd           int64   `json:"window_end" binding:"required,gt=0"`
+	BenefitType         string  `json:"benefit_type" binding:"required,oneof=subscription balance"`
+	ConflictPolicy      string  `json:"conflict_policy" binding:"omitempty,oneof=skip_active extend_active none"`
+	GroupID             int64   `json:"group_id" binding:"omitempty,gte=0"`
+	ValidityDays        int     `json:"validity_days" binding:"omitempty,gte=0,lte=36500"`
+	BalanceAmount       float64 `json:"balance_amount" binding:"omitempty,gte=0,lte=1000000"`
+	Notes               string  `json:"notes" binding:"max=1800"`
+	AnnouncementEnabled bool    `json:"announcement_enabled"`
+	AnnouncementTitle   string  `json:"announcement_title" binding:"omitempty,max=200"`
+	AnnouncementContent string  `json:"announcement_content" binding:"omitempty,max=20000"`
+	AnnouncementNotify  string  `json:"announcement_notify_mode" binding:"omitempty,oneof=silent popup"`
 }
 
 // Preview resolves the exact audience and benefit eligibility without writing.
@@ -89,6 +110,51 @@ func (h *BenefitGrantHandler) Execute(c *gin.Context) {
 				ExpectedEligibleCount: *req.ExpectedEligibleCount,
 				ExpectedSnapshot:      req.ExpectedSnapshot,
 				AssignedBy:            adminID,
+			})
+		},
+	)
+}
+
+// CreateAutomatic creates a campaign that grants once when an authenticated
+// normal user visits during the configured time window.
+// POST /api/v1/admin/benefit-grants/automatic
+func (h *BenefitGrantHandler) CreateAutomatic(c *gin.Context) {
+	middleware2.SetAuditAction(c, "admin.benefit_grants.create_automatic")
+
+	var req CreateAutomaticBenefitGrantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if headerKey := strings.TrimSpace(c.GetHeader("Idempotency-Key")); headerKey != "" &&
+		headerKey != strings.TrimSpace(req.OperationKey) {
+		response.BadRequest(c, "Idempotency-Key must match operation_key")
+		return
+	}
+
+	adminID := getAdminIDFromContext(c)
+	executeAdminIdempotentJSON(
+		c,
+		"admin.benefit_grants.create_automatic",
+		req,
+		24*time.Hour,
+		func(ctx context.Context) (any, error) {
+			return h.service.CreateAutomatic(ctx, &service.CreateAutomaticBenefitGrantInput{
+				OperationKey:        req.OperationKey,
+				Timezone:            req.Timezone,
+				WindowStart:         time.Unix(req.WindowStart, 0),
+				WindowEnd:           time.Unix(req.WindowEnd, 0),
+				BenefitType:         req.BenefitType,
+				ConflictPolicy:      req.ConflictPolicy,
+				GroupID:             req.GroupID,
+				ValidityDays:        req.ValidityDays,
+				BalanceAmount:       req.BalanceAmount,
+				Notes:               req.Notes,
+				AnnouncementEnabled: req.AnnouncementEnabled,
+				AnnouncementTitle:   req.AnnouncementTitle,
+				AnnouncementContent: req.AnnouncementContent,
+				AnnouncementNotify:  req.AnnouncementNotify,
+				AssignedBy:          adminID,
 			})
 		},
 	)
@@ -193,6 +259,10 @@ func benefitGrantInputFromRequest(req BenefitGrantRequest) *service.BenefitGrant
 		ValidityDays:   req.ValidityDays,
 		BalanceAmount:  req.BalanceAmount,
 		Notes:          req.Notes,
+		AnnouncementEnabled: req.AnnouncementEnabled,
+		AnnouncementTitle:   req.AnnouncementTitle,
+		AnnouncementContent: req.AnnouncementContent,
+		AnnouncementNotify:  req.AnnouncementNotify,
 	}
 }
 

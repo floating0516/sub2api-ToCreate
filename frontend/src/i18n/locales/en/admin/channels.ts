@@ -778,6 +778,11 @@ export default {
       units: {
         days: 'days'
       },
+      mode: {
+        label: 'Delivery mode',
+        snapshot: 'Grant a selected audience now',
+        activityWindow: 'Auto-grant on visits during a window'
+      },
       audience: {
         section: 'Target Audience',
         type: 'Audience',
@@ -786,7 +791,24 @@ export default {
         recentActive: 'Visited in the last N days',
         recentRegistered: 'Registered in the last N days',
         recentActiveDays: 'Visited in the last {days} days',
-        recentRegisteredDays: 'Registered in the last {days} days'
+        recentRegisteredDays: 'Registered in the last {days} days',
+        authenticatedActivity: 'Authenticated visitors during the campaign'
+      },
+      automatic: {
+        windowSection: 'Campaign window',
+        startsAt: 'Starts at',
+        endsAt: 'Ends at',
+        windowHint: 'Users do not need to sign in again. Any normal user with a valid session who visits during this window receives the benefit once.',
+        createAction: 'Create automatic campaign',
+        summaryTitle: 'Automatic grant rules',
+        summaryHint: 'Recipients are added as they actually visit, so there is no fixed audience snapshot before creation.',
+        onceHint: 'Each user can receive the campaign once. Admins, anonymous visits, and visits after the cutoff do not trigger a grant.',
+        confirmTitle: 'Create automatic grant campaign',
+        confirmMessage: 'After creation, eligible authenticated visitors receive the configured benefit immediately. The campaign window and benefit settings are retained as the grant record.',
+        confirmSubmit: 'Create campaign',
+        creating: 'Creating...',
+        success: 'Automatic grant campaign created',
+        failed: 'Failed to create the automatic grant campaign'
       },
       benefit: {
         section: 'Benefit',
@@ -823,6 +845,20 @@ export default {
           operationsCampaign: 'Operations campaign benefit grant',
           custom: 'Other / Custom'
         }
+      },
+      announcement: {
+        section: 'Send announcement',
+        disabledHint: 'No announcement will be sent. When enabled, only users whose grant succeeds can see it.',
+        title: 'Announcement title',
+        titlePlaceholder: 'For example: Your day pass is ready',
+        content: 'Announcement content',
+        contentPlaceholder: 'Describe the granted benefit, validity, or campaign terms',
+        notifyMode: 'Notification',
+        silent: 'Notification center only',
+        popup: 'Popup reminder',
+        bindingHint: 'The announcement is bound to this grant. Failed, skipped, or non-participating users cannot see it.',
+        enabled: 'Enabled',
+        disabled: 'Disabled'
       },
       preview: {
         title: 'Grant Preview',
@@ -873,7 +909,7 @@ export default {
         title: 'Grant Batch Details',
         granted: 'Granted',
         failed: 'Failed',
-        window: 'Audience window',
+        window: 'Campaign / audience window',
         statusFilter: 'Recipient status',
         allStatuses: 'All statuses',
         user: 'User',
@@ -884,6 +920,7 @@ export default {
         loadFailed: 'Failed to load recipient results'
       },
       campaignStatus: {
+        scheduled: 'Scheduled',
         running: 'Running',
         completed: 'Completed',
         partial: 'Partial',

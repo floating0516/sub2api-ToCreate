@@ -776,6 +776,11 @@ export default {
       units: {
         days: '天'
       },
+      mode: {
+        label: '发放方式',
+        snapshot: '立即按人群发放',
+        activityWindow: '活动期间访问自动发放'
+      },
       audience: {
         section: '目标用户',
         type: '用户范围',
@@ -784,7 +789,24 @@ export default {
         recentActive: '近 N 天访问用户',
         recentRegistered: '近 N 天注册用户',
         recentActiveDays: '近 {days} 天访问用户',
-        recentRegisteredDays: '近 {days} 天注册用户'
+        recentRegisteredDays: '近 {days} 天注册用户',
+        authenticatedActivity: '活动期间已登录访问用户'
+      },
+      automatic: {
+        windowSection: '活动时间',
+        startsAt: '开始时间',
+        endsAt: '截止时间',
+        windowHint: '活动生效后，普通用户无需重新登录；只要保持有效登录态并在这个时间段内访问网站，就会自动领取一次。',
+        createAction: '创建自动发放活动',
+        summaryTitle: '自动发放规则',
+        summaryHint: '人数会随活动期间的实际访问动态增加，因此创建前不生成固定用户快照。',
+        onceHint: '同一用户在同一活动中最多领取一次。管理员、未登录访问以及截止时间后的访问不会触发发放。',
+        confirmTitle: '确认创建自动发放活动',
+        confirmMessage: '创建后，符合条件的已登录用户访问网站时会立即获得权益。活动时间和权益内容创建后将作为发放依据保留。',
+        confirmSubmit: '确认创建',
+        creating: '创建中...',
+        success: '自动发放活动已创建',
+        failed: '创建自动发放活动失败'
       },
       benefit: {
         section: '发放权益',
@@ -821,6 +843,20 @@ export default {
           operationsCampaign: '运营专项权益发放',
           custom: '其他 / 自定义'
         }
+      },
+      announcement: {
+        section: '同步发送公告',
+        disabledHint: '当前不发送公告。开启后，公告只会展示给本次实际发放成功的用户。',
+        title: '公告标题',
+        titlePlaceholder: '例如：日卡权益已到账',
+        content: '公告内容',
+        contentPlaceholder: '说明领取结果、使用期限或活动规则',
+        notifyMode: '提醒方式',
+        silent: '仅通知中心',
+        popup: '弹窗提醒',
+        bindingHint: '公告与本次发放绑定：发放成功后才可见；失败、冲突跳过或未参与活动的用户不会收到。',
+        enabled: '已开启',
+        disabled: '不发送'
       },
       preview: {
         title: '发放预览',
@@ -871,7 +907,7 @@ export default {
         title: '发放批次详情',
         granted: '已发放',
         failed: '失败',
-        window: '统计时间范围',
+        window: '活动 / 统计时间范围',
         statusFilter: '用户状态',
         allStatuses: '全部状态',
         user: '用户',
@@ -882,6 +918,7 @@ export default {
         loadFailed: '加载逐用户结果失败'
       },
       campaignStatus: {
+        scheduled: '待开始',
         running: '执行中',
         completed: '已完成',
         partial: '部分成功',

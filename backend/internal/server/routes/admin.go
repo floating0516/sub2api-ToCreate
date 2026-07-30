@@ -674,6 +674,7 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		benefitGrants.GET("", h.Admin.BenefitGrant.List)
 		benefitGrants.POST("/preview", h.Admin.BenefitGrant.Preview)
 		benefitGrants.POST("/execute", h.Admin.BenefitGrant.Execute)
+		benefitGrants.POST("/automatic", h.Admin.BenefitGrant.CreateAutomatic)
 		benefitGrants.GET("/:id", h.Admin.BenefitGrant.Get)
 		benefitGrants.GET("/:id/recipients", h.Admin.BenefitGrant.ListRecipients)
 		benefitGrants.POST("/:id/retry", h.Admin.BenefitGrant.Retry)

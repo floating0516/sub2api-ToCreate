@@ -16,6 +16,7 @@ type AnnouncementService struct {
 	readRepo         AnnouncementReadRepository
 	userRepo         UserRepository
 	userSubRepo      UserSubscriptionRepository
+	benefitGrantRepo BenefitGrantRepository
 }
 
 func NewAnnouncementService(
@@ -23,12 +24,14 @@ func NewAnnouncementService(
 	readRepo AnnouncementReadRepository,
 	userRepo UserRepository,
 	userSubRepo UserSubscriptionRepository,
+	benefitGrantRepo BenefitGrantRepository,
 ) *AnnouncementService {
 	return &AnnouncementService{
 		announcementRepo: announcementRepo,
 		readRepo:         readRepo,
 		userRepo:         userRepo,
 		userSubRepo:      userSubRepo,
+		benefitGrantRepo: benefitGrantRepo,
 	}
 }
 
@@ -236,6 +239,24 @@ func (s *AnnouncementService) ListForUser(ctx context.Context, userID int64, unr
 		return nil, fmt.Errorf("list active announcements: %w", err)
 	}
 
+	candidateIDs := make([]int64, 0, len(anns))
+	for i := range anns {
+		if anns[i].IsActiveAt(now) {
+			candidateIDs = append(candidateIDs, anns[i].ID)
+		}
+	}
+	grantAccess := make(map[int64]bool)
+	if s.benefitGrantRepo != nil && len(candidateIDs) > 0 {
+		grantAccess, err = s.benefitGrantRepo.ListAnnouncementGrantAccess(
+			ctx,
+			userID,
+			candidateIDs,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("list benefit grant announcement access: %w", err)
+		}
+	}
+
 	visible := make([]Announcement, 0, len(anns))
 	ids := make([]int64, 0, len(anns))
 	for i := range anns {
@@ -243,7 +264,11 @@ func (s *AnnouncementService) ListForUser(ctx context.Context, userID int64, unr
 		if !a.IsActiveAt(now) {
 			continue
 		}
-		if !a.Targeting.Matches(user.Balance, activeGroupIDs) {
+		granted, linkedToGrant := grantAccess[a.ID]
+		if linkedToGrant && !granted {
+			continue
+		}
+		if !linkedToGrant && !a.Targeting.Matches(user.Balance, activeGroupIDs) {
 			continue
 		}
 		visible = append(visible, a)
@@ -306,17 +331,37 @@ func (s *AnnouncementService) MarkRead(ctx context.Context, userID, announcement
 		return ErrAnnouncementNotFound
 	}
 
-	activeSubs, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("list active subscriptions: %w", err)
-	}
-	activeGroupIDs := make(map[int64]struct{}, len(activeSubs))
-	for i := range activeSubs {
-		activeGroupIDs[activeSubs[i].GroupID] = struct{}{}
+	linkedToGrant := false
+	if s.benefitGrantRepo != nil {
+		access, err := s.benefitGrantRepo.ListAnnouncementGrantAccess(
+			ctx,
+			userID,
+			[]int64{announcementID},
+		)
+		if err != nil {
+			return fmt.Errorf("get benefit grant announcement access: %w", err)
+		}
+		if granted, linked := access[announcementID]; linked {
+			linkedToGrant = true
+			if !granted {
+				return ErrAnnouncementNotFound
+			}
+		}
 	}
 
-	if !a.Targeting.Matches(user.Balance, activeGroupIDs) {
-		return ErrAnnouncementNotFound
+	if !linkedToGrant {
+		activeSubs, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("list active subscriptions: %w", err)
+		}
+		activeGroupIDs := make(map[int64]struct{}, len(activeSubs))
+		for i := range activeSubs {
+			activeGroupIDs[activeSubs[i].GroupID] = struct{}{}
+		}
+
+		if !a.Targeting.Matches(user.Balance, activeGroupIDs) {
+			return ErrAnnouncementNotFound
+		}
 	}
 
 	if err := s.readRepo.MarkRead(ctx, announcementID, userID, now); err != nil {
@@ -350,6 +395,23 @@ func (s *AnnouncementService) ListUserReadStatus(
 		userIDs = append(userIDs, users[i].ID)
 	}
 
+	linkedToGrant := false
+	grantedUserIDs := make(map[int64]struct{})
+	if s.benefitGrantRepo != nil {
+		linkedToGrant, grantedUserIDs, err =
+			s.benefitGrantRepo.ListAnnouncementGrantedUsers(
+				ctx,
+				announcementID,
+				userIDs,
+			)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"list benefit grant announcement recipients: %w",
+				err,
+			)
+		}
+	}
+
 	readMap, err := s.readRepo.GetReadMapByUsers(ctx, announcementID, userIDs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get read map: %w", err)
@@ -358,13 +420,22 @@ func (s *AnnouncementService) ListUserReadStatus(
 	out := make([]AnnouncementUserReadStatus, 0, len(users))
 	for i := range users {
 		u := users[i]
-		subs, err := s.userSubRepo.ListActiveByUserID(ctx, u.ID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("list active subscriptions: %w", err)
-		}
-		activeGroupIDs := make(map[int64]struct{}, len(subs))
-		for j := range subs {
-			activeGroupIDs[subs[j].GroupID] = struct{}{}
+		eligible := false
+		if linkedToGrant {
+			_, eligible = grantedUserIDs[u.ID]
+		} else {
+			subs, err := s.userSubRepo.ListActiveByUserID(ctx, u.ID)
+			if err != nil {
+				return nil, nil, fmt.Errorf("list active subscriptions: %w", err)
+			}
+			activeGroupIDs := make(map[int64]struct{}, len(subs))
+			for j := range subs {
+				activeGroupIDs[subs[j].GroupID] = struct{}{}
+			}
+			eligible = domain.AnnouncementTargeting(ann.Targeting).Matches(
+				u.Balance,
+				activeGroupIDs,
+			)
 		}
 
 		readAt, ok := readMap[u.ID]
@@ -379,7 +450,7 @@ func (s *AnnouncementService) ListUserReadStatus(
 			Email:    u.Email,
 			Username: u.Username,
 			Balance:  u.Balance,
-			Eligible: domain.AnnouncementTargeting(ann.Targeting).Matches(u.Balance, activeGroupIDs),
+			Eligible: eligible,
 			ReadAt:   ptr,
 		})
 	}

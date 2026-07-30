@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -17,8 +18,16 @@ func NewJWTAuthMiddleware(
 	userService *service.UserService,
 	settingService *service.SettingService,
 	auditService *service.AuditLogService,
+	benefitGrantService *service.BenefitGrantService,
 ) JWTAuthMiddleware {
-	return JWTAuthMiddleware(jwtAuth(authService, userService, userService, settingService, auditService))
+	return JWTAuthMiddleware(jwtAuth(
+		authService,
+		userService,
+		userService,
+		benefitGrantService,
+		settingService,
+		auditService,
+	))
 }
 
 type jwtUserReader interface {
@@ -29,11 +38,16 @@ type userActivityToucher interface {
 	TouchLastActiveForUser(ctx context.Context, user *service.User)
 }
 
+type authenticatedActivityProcessor interface {
+	ProcessAuthenticatedActivity(ctx context.Context, user *service.User) error
+}
+
 // jwtAuth JWT认证中间件实现
 func jwtAuth(
 	authService *service.AuthService,
 	userService jwtUserReader,
 	activityToucher userActivityToucher,
+	activityProcessor authenticatedActivityProcessor,
 	settingService *service.SettingService,
 	auditService *service.AuditLogService,
 ) gin.HandlerFunc {
@@ -108,6 +122,19 @@ func jwtAuth(
 		c.Set(ContextKeySessionID, claims.SessionID)
 		if activityToucher != nil {
 			activityToucher.TouchLastActiveForUser(c.Request.Context(), user)
+		}
+		if activityProcessor != nil && user.Role == service.RoleUser {
+			grantCtx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+			if err := activityProcessor.ProcessAuthenticatedActivity(grantCtx, user); err != nil {
+				slog.Warn(
+					"process authenticated activity benefit grants failed",
+					"user_id",
+					user.ID,
+					"error",
+					err,
+				)
+			}
+			cancel()
 		}
 
 		c.Next()

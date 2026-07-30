@@ -115,13 +115,16 @@ export default adminAPI
 export type { AuditLog, AuditLogQuery, AuditLogListResponse } from './audit'
 export type {
   BenefitGrantRequest,
+  AutomaticBenefitGrantRequest,
   BenefitGrantPreview,
   BenefitGrantCampaign,
   BenefitGrantRecipient,
   BenefitGrantResult,
   BenefitGrantAudienceType,
+  BenefitGrantDeliveryMode,
   BenefitGrantType,
   BenefitGrantConflictPolicy,
+  BenefitGrantAnnouncementNotifyMode,
   BenefitGrantCampaignStatus,
   BenefitGrantRecipientStatus
 } from './benefitGrants'

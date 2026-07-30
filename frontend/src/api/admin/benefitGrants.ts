@@ -7,10 +7,18 @@ export type BenefitGrantAudienceType =
   | 'today_active'
   | 'recent_active'
   | 'recent_registered'
+  | 'authenticated_activity'
 
+export type BenefitGrantDeliveryMode = 'snapshot' | 'activity_window'
 export type BenefitGrantType = 'subscription' | 'balance'
 export type BenefitGrantConflictPolicy = 'skip_active' | 'extend_active' | 'none'
-export type BenefitGrantCampaignStatus = 'running' | 'completed' | 'partial' | 'failed'
+export type BenefitGrantCampaignStatus =
+  | 'scheduled'
+  | 'running'
+  | 'completed'
+  | 'partial'
+  | 'failed'
+export type BenefitGrantAnnouncementNotifyMode = 'silent' | 'popup'
 export type BenefitGrantRecipientStatus =
   | 'pending'
   | 'processing'
@@ -30,6 +38,27 @@ export interface BenefitGrantRequest {
   validity_days?: number
   balance_amount?: number
   notes?: string
+  announcement_enabled?: boolean
+  announcement_title?: string
+  announcement_content?: string
+  announcement_notify_mode?: BenefitGrantAnnouncementNotifyMode
+}
+
+export interface AutomaticBenefitGrantRequest {
+  operation_key: string
+  timezone: string
+  window_start: number
+  window_end: number
+  benefit_type: BenefitGrantType
+  conflict_policy?: BenefitGrantConflictPolicy
+  group_id?: number
+  validity_days?: number
+  balance_amount?: number
+  notes?: string
+  announcement_enabled?: boolean
+  announcement_title?: string
+  announcement_content?: string
+  announcement_notify_mode?: BenefitGrantAnnouncementNotifyMode
 }
 
 export interface BenefitGrantPreview {
@@ -54,6 +83,7 @@ export interface BenefitGrantPreview {
 
 export interface BenefitGrantCampaign {
   id: number
+  delivery_mode: BenefitGrantDeliveryMode
   audience_type: BenefitGrantAudienceType
   audience_date: string
   audience_days: number
@@ -67,6 +97,10 @@ export interface BenefitGrantCampaign {
   validity_days?: number
   balance_amount?: number
   notes: string
+  announcement_id?: number
+  announcement_title?: string
+  announcement_content?: string
+  announcement_notify_mode?: BenefitGrantAnnouncementNotifyMode
   status: BenefitGrantCampaignStatus
   matched_count: number
   eligible_count: number
@@ -146,6 +180,22 @@ export async function execute(
   return data
 }
 
+export async function createAutomatic(
+  request: AutomaticBenefitGrantRequest
+): Promise<BenefitGrantCampaign> {
+  const { data } = await apiClient.post<BenefitGrantCampaign>(
+    '/admin/benefit-grants/automatic',
+    request,
+    {
+      headers: {
+        'Idempotency-Key': request.operation_key
+      },
+      timeout: benefitGrantExecutionTimeoutMs
+    }
+  )
+  return data
+}
+
 export async function list(
   page: number = 1,
   pageSize: number = 20
@@ -198,6 +248,7 @@ export async function retry(id: number, idempotencyKey: string): Promise<Benefit
 export const benefitGrantsAPI = {
   preview,
   execute,
+  createAutomatic,
   list,
   get,
   listRecipients,

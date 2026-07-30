@@ -50,6 +50,20 @@ func (r *recordingActivityToucher) TouchLastActiveForUser(_ context.Context, use
 	r.userIDs = append(r.userIDs, user.ID)
 }
 
+type recordingAuthenticatedActivityProcessor struct {
+	userIDs []int64
+}
+
+func (r *recordingAuthenticatedActivityProcessor) ProcessAuthenticatedActivity(
+	_ context.Context,
+	user *service.User,
+) error {
+	if user != nil {
+		r.userIDs = append(r.userIDs, user.ID)
+	}
+	return nil
+}
+
 // newJWTTestEnv 创建 JWT 认证中间件测试环境。
 // 返回 gin.Engine（已注册 JWT 中间件）和 AuthService（用于生成 Token）。
 func newJWTTestEnv(users map[int64]*service.User) (*gin.Engine, *service.AuthService) {
@@ -62,7 +76,7 @@ func newJWTTestEnv(users map[int64]*service.User) (*gin.Engine, *service.AuthSer
 	userRepo := &stubJWTUserRepo{users: users}
 	authSvc := service.NewAuthService(nil, userRepo, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil, nil)
 	userSvc := service.NewUserService(userRepo, nil, nil, nil)
-	mw := NewJWTAuthMiddleware(authSvc, userSvc, nil, nil)
+	mw := NewJWTAuthMiddleware(authSvc, userSvc, nil, nil, nil)
 
 	r := gin.New()
 	r.Use(gin.HandlerFunc(mw))
@@ -148,7 +162,7 @@ func TestJWTAuth_ValidToken_TouchesLastActive(t *testing.T) {
 	toucher := &recordingActivityToucher{}
 
 	r := gin.New()
-	r.Use(jwtAuth(authSvc, userSvc, toucher, nil, nil))
+	r.Use(jwtAuth(authSvc, userSvc, toucher, nil, nil, nil))
 	r.GET("/protected", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -163,6 +177,78 @@ func TestJWTAuth_ValidToken_TouchesLastActive(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, []int64{1}, toucher.userIDs)
+}
+
+func TestJWTAuth_ValidToken_ProcessesAuthenticatedActivity(t *testing.T) {
+	user := &service.User{
+		ID:           8,
+		Email:        "activity@example.com",
+		Role:         service.RoleUser,
+		Status:       service.StatusActive,
+		Concurrency:  5,
+		TokenVersion: 1,
+	}
+
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{}
+	cfg.JWT.Secret = "test-jwt-secret-32bytes-long!!!"
+	cfg.JWT.AccessTokenExpireMinutes = 60
+	userRepo := &stubJWTUserRepo{users: map[int64]*service.User{8: user}}
+	authSvc := service.NewAuthService(nil, userRepo, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil, nil)
+	userSvc := service.NewUserService(userRepo, nil, nil, nil)
+	processor := &recordingAuthenticatedActivityProcessor{}
+
+	r := gin.New()
+	r.Use(jwtAuth(authSvc, userSvc, nil, processor, nil, nil))
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := authSvc.GenerateToken(context.Background(), user)
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, []int64{8}, processor.userIDs)
+}
+
+func TestJWTAuth_AdminDoesNotProcessAuthenticatedActivity(t *testing.T) {
+	user := &service.User{
+		ID:           9,
+		Email:        "admin@example.com",
+		Role:         service.RoleAdmin,
+		Status:       service.StatusActive,
+		Concurrency:  5,
+		TokenVersion: 1,
+	}
+
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{}
+	cfg.JWT.Secret = "test-jwt-secret-32bytes-long!!!"
+	cfg.JWT.AccessTokenExpireMinutes = 60
+	userRepo := &stubJWTUserRepo{users: map[int64]*service.User{9: user}}
+	authSvc := service.NewAuthService(nil, userRepo, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil, nil)
+	userSvc := service.NewUserService(userRepo, nil, nil, nil)
+	processor := &recordingAuthenticatedActivityProcessor{}
+
+	r := gin.New()
+	r.Use(jwtAuth(authSvc, userSvc, nil, processor, nil, nil))
+	r.GET("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := authSvc.GenerateToken(context.Background(), user)
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Empty(t, processor.userIDs)
 }
 
 func TestJWTAuth_MissingAuthorizationHeader(t *testing.T) {

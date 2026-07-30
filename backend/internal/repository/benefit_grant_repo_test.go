@@ -27,7 +27,7 @@ func TestBenefitGrantCreateCampaignRollsBackBeforeConflictLookup(t *testing.T) {
 	campaign, created, err := repo.CreateCampaign(context.Background(), &service.BenefitGrantCampaign{
 		OperationKey: "benefit-grant-operation-1",
 		CreatedBy:    9,
-	}, nil)
+	}, nil, nil)
 
 	require.ErrorContains(t, err, "lookup after rollback")
 	require.False(t, created)
