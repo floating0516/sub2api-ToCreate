@@ -22,7 +22,7 @@ const (
 	BenefitGrantAudienceTodayActive      = "today_active"
 	BenefitGrantAudienceRecentActive     = "recent_active"
 	BenefitGrantAudienceRecentRegistered = "recent_registered"
-	BenefitGrantAudienceAuthenticated     = "authenticated_activity"
+	BenefitGrantAudienceAuthenticated    = "authenticated_activity"
 
 	BenefitGrantDeliverySnapshot       = "snapshot"
 	BenefitGrantDeliveryActivityWindow = "activity_window"
@@ -56,15 +56,15 @@ const (
 	BenefitGrantStatusPartial   = "partial"
 	BenefitGrantStatusFailed    = "failed"
 
-	benefitGrantNotesMaxRunes             = 1800
+	benefitGrantNotesMaxRunes               = 1800
 	benefitGrantAnnouncementContentMaxRunes = 20000
-	benefitGrantMaxAudienceDays           = 365
-	benefitGrantMaxAudienceUsers          = 100000
-	benefitGrantMaxBalanceAmount          = 1000000
-	benefitGrantBalanceScale              = 100000000
-	benefitGrantRetryStaleAfter           = 10 * time.Minute
-	benefitGrantActivityCampaignCacheTTL  = 5 * time.Second
-	benefitGrantMaxActivityWindow         = 365 * 24 * time.Hour
+	benefitGrantMaxAudienceDays             = 365
+	benefitGrantMaxAudienceUsers            = 100000
+	benefitGrantMaxBalanceAmount            = 1000000
+	benefitGrantBalanceScale                = 100000000
+	benefitGrantRetryStaleAfter             = 10 * time.Minute
+	benefitGrantActivityCampaignCacheTTL    = 5 * time.Second
+	benefitGrantMaxActivityWindow           = 365 * 24 * time.Hour
 )
 
 var (

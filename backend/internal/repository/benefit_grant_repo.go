@@ -1086,12 +1086,12 @@ type benefitGrantScanner interface {
 
 func scanBenefitGrantCampaign(scanner benefitGrantScanner) (*service.BenefitGrantCampaign, error) {
 	var (
-		campaign      service.BenefitGrantCampaign
-		groupID       sql.NullInt64
-		validityDays  sql.NullInt64
-		balanceAmount sql.NullFloat64
+		campaign       service.BenefitGrantCampaign
+		groupID        sql.NullInt64
+		validityDays   sql.NullInt64
+		balanceAmount  sql.NullFloat64
 		announcementID sql.NullInt64
-		completedAt   sql.NullTime
+		completedAt    sql.NullTime
 	)
 	err := scanner.Scan(
 		&campaign.ID,
