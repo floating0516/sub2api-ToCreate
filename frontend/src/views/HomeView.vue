@@ -479,15 +479,15 @@ onMounted(() => {
   border-radius: var(--nb-radius);
   box-shadow: var(--nb-shadow-lg);
   overflow: hidden;
-  transform: rotate(-1deg);
+  transform: rotate(-0.4deg);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
 }
 
 .terminal-window:hover {
-  transform: translate(-2px, -2px) rotate(-1deg);
-  box-shadow: 8px 8px 0 var(--nb-shadow-color);
+  transform: translateY(-1px) rotate(-0.4deg);
+  box-shadow: var(--nb-shadow-lg);
 }
 
 /* Terminal Header */
@@ -597,7 +597,7 @@ onMounted(() => {
   color: #174f2a;
   background: var(--nb-soft-green);
   padding: 2px 8px;
-  border: 1.5px solid var(--nb-fixed-ink);
+  border: 1px solid var(--nb-fixed-ink);
   border-radius: var(--nb-radius);
   font-weight: 600;
 }

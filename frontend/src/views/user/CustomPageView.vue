@@ -417,7 +417,7 @@ onUnmounted(() => {
     width: 70%;
     max-width: 240px;
     height: 100%;
-    box-shadow: 4px 0 0 var(--nb-shadow-color);
+    box-shadow: 2px 0 0 var(--nb-shadow-color);
   }
 }
 
@@ -512,11 +512,11 @@ onUnmounted(() => {
   right: 8px;
   padding: 4px 10px;
   font-size: 12px;
-  border: 2px solid var(--nb-fixed-ink);
+  border: 1.5px solid var(--nb-fixed-ink);
   border-radius: var(--nb-radius);
   background: var(--nb-paper);
   color: var(--nb-fixed-ink);
-  box-shadow: 2px 2px 0 var(--nb-fixed-ink);
+  box-shadow: var(--nb-shadow-sm);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s, background 0.2s;

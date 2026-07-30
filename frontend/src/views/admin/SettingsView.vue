@@ -12123,7 +12123,7 @@ watch(
 .settings-tab-active {
   @apply border-primary-200/80 bg-white text-primary-700 shadow-sm dark:border-primary-400/30 dark:bg-dark-700/95 dark:text-primary-200;
   border-color: var(--nb-ink);
-  background: var(--nb-yellow);
+  background: var(--nb-soft-yellow);
   color: var(--nb-fixed-ink);
   box-shadow: var(--nb-shadow-sm);
 }
@@ -12138,7 +12138,7 @@ watch(
   bottom: 0.25rem;
   left: 0.75rem;
   height: 3px;
-  border-radius: 0;
+  border-radius: 2px;
   content: "";
   background: var(--nb-orange);
 }

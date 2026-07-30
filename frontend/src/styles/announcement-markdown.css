@@ -83,8 +83,8 @@
 .markdown-body blockquote {
   position: relative;
   margin: 1.25rem 0;
-  border: 2px solid var(--nb-ink);
-  border-left: 7px solid var(--nb-blue);
+  border: 1.5px solid var(--nb-ink);
+  border-left: 5px solid var(--nb-blue);
   border-radius: var(--nb-radius);
   background: var(--nb-soft-blue);
   padding: 0.75rem 1rem;
@@ -123,7 +123,7 @@
 .markdown-body hr {
   margin: 2rem 0;
   border: 0;
-  border-top: 3px solid var(--nb-ink);
+  border-top: 2px solid var(--nb-ink);
 }
 
 .markdown-body table {
@@ -139,8 +139,8 @@
 
 .markdown-body th,
 .markdown-body td {
-  border-bottom: 2px solid var(--nb-ink);
-  border-right: 2px solid var(--nb-ink);
+  border-bottom: 1.5px solid var(--nb-ink);
+  border-right: 1.5px solid var(--nb-ink);
   padding: 0.75rem 1rem;
   text-align: left;
 }
@@ -155,7 +155,7 @@
 }
 
 .markdown-body th {
-  background: var(--nb-yellow);
+  background: var(--nb-soft-yellow);
   color: var(--nb-fixed-ink);
   font-weight: 800;
 }

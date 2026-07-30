@@ -70,17 +70,17 @@ const oracleRed = {
 }
 
 const oracleGray = {
-  50: '#fffef5',
-  100: '#fff8dc',
+  50: '#fffef8',
+  100: '#fff8e3',
   200: '#eadfbd',
   300: '#d1c49e',
   400: '#9b9077',
   500: '#706757',
   600: '#50483f',
   700: '#393137',
-  800: '#271f2d',
-  900: '#1a1423',
-  950: '#0f0b14'
+  800: '#342c3a',
+  900: '#2b2533',
+  950: '#17121d'
 }
 
 export default {
@@ -89,13 +89,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        white: '#fffef5',
-        black: '#1a1423',
-        cream: '#fffef5',
-        ink: '#1a1423',
+        white: '#fffef8',
+        black: '#2b2533',
+        cream: '#fffdf4',
+        ink: '#2b2533',
         nb: {
-          cream: '#fffef5',
-          ink: '#1a1423',
+          cream: '#fffdf4',
+          ink: '#2b2533',
           orange: '#ff6b35',
           yellow: '#ffd23f',
           blue: '#004e98',
@@ -129,7 +129,7 @@ export default {
         fuchsia: oracleRed,
         // Optional dark mode keeps the same ink-and-paper visual language.
         dark: {
-          50: '#fffef5',
+          50: '#fffef8',
           100: '#f4edd6',
           200: '#ded3b5',
           300: '#c4b791',
@@ -137,9 +137,9 @@ export default {
           500: '#716553',
           600: '#55485e',
           700: '#3a3042',
-          800: '#271f2f',
-          900: '#1a1423',
-          950: '#0f0b14'
+          800: '#302737',
+          900: '#211a27',
+          950: '#17121d'
         }
       },
       fontFamily: {
@@ -161,22 +161,22 @@ export default {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
       },
       boxShadow: {
-        xs: '1px 1px 0 var(--nb-shadow-color, #1a1423)',
-        sm: '2px 2px 0 var(--nb-shadow-color, #1a1423)',
-        DEFAULT: '2px 2px 0 var(--nb-shadow-color, #1a1423)',
-        md: '3px 3px 0 var(--nb-shadow-color, #1a1423)',
-        lg: '4px 4px 0 var(--nb-shadow-color, #1a1423)',
-        xl: '5px 5px 0 var(--nb-shadow-color, #1a1423)',
-        '2xl': '6px 6px 0 var(--nb-shadow-color, #1a1423)',
-        inner: 'inset 0 0 0 2px var(--nb-shadow-color, #1a1423)',
+        xs: '1px 1px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        sm: '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        DEFAULT: '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        md: '2px 2px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        lg: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        xl: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        '2xl': '4px 4px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        inner: 'inset 0 0 0 1px var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
         none: 'none',
-        glass: '4px 4px 0 var(--nb-shadow-color, #1a1423)',
-        'glass-sm': '2px 2px 0 var(--nb-shadow-color, #1a1423)',
-        glow: '3px 3px 0 var(--nb-shadow-color, #1a1423)',
-        'glow-lg': '5px 5px 0 var(--nb-shadow-color, #1a1423)',
-        card: '4px 4px 0 var(--nb-shadow-color, #1a1423)',
-        'card-hover': '6px 6px 0 var(--nb-shadow-color, #1a1423)',
-        'inner-glow': 'inset 0 0 0 2px var(--nb-shadow-color, #1a1423)'
+        glass: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        'glass-sm': '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        glow: '2px 2px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        'glow-lg': '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        card: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        'card-hover': '4px 4px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
+        'inner-glow': 'inset 0 0 0 1px var(--nb-shadow-color, rgb(43 37 51 / 0.62))'
       },
       backgroundImage: {
         'gradient-to-t':
@@ -198,8 +198,8 @@ export default {
         'gradient-radial':
           'radial-gradient(circle, var(--tw-gradient-from), var(--tw-gradient-from))',
         'gradient-primary': 'linear-gradient(#ff6b35, #ff6b35)',
-        'gradient-dark': 'linear-gradient(#1a1423, #1a1423)',
-        'gradient-glass': 'linear-gradient(#fffef5, #fffef5)',
+        'gradient-dark': 'linear-gradient(#211a27, #211a27)',
+        'gradient-glass': 'linear-gradient(#fffef8, #fffef8)',
         'mesh-gradient': 'none'
       },
       animation: {
@@ -256,22 +256,22 @@ export default {
       },
       borderRadius: {
         none: '0',
-        sm: '2px',
-        DEFAULT: '2px',
-        md: '2px',
-        lg: '2px',
-        xl: '2px',
-        '2xl': '2px',
-        '3xl': '2px',
-        '4xl': '2px',
+        sm: '4px',
+        DEFAULT: '5px',
+        md: '6px',
+        lg: '6px',
+        xl: '8px',
+        '2xl': '8px',
+        '3xl': '8px',
+        '4xl': '8px',
         full: '9999px'
       },
       borderWidth: {
-        DEFAULT: '2px',
+        DEFAULT: '1.5px',
         0: '0',
-        2: '2.5px',
-        4: '4px',
-        8: '8px'
+        2: '2px',
+        4: '3px',
+        8: '5px'
       },
       letterSpacing: {
         tighter: '0',

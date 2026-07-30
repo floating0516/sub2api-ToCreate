@@ -28,11 +28,11 @@ export const ORACLE_CHART_SERIES = {
 
 export function getOracleChartSurface(isDark: boolean) {
   return {
-    text: isDark ? '#fffef5' : '#393137',
+    text: isDark ? '#f7f0dc' : '#393137',
     mutedText: isDark ? '#c4b791' : '#706757',
     grid: isDark ? '#55485e' : '#eadfbd',
-    tooltipBackground: isDark ? '#271f2f' : '#fffef5',
-    tooltipTitle: isDark ? '#fffef5' : '#1a1423',
+    tooltipBackground: isDark ? '#211a27' : '#fffef8',
+    tooltipTitle: isDark ? '#f7f0dc' : '#2b2533',
     tooltipBody: isDark ? '#ded3b5' : '#50483f'
   }
 }

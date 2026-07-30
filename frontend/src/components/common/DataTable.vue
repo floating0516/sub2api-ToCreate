@@ -1049,10 +1049,10 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 6px;
+  width: 4px;
   transform: translateX(100%);
-  border-left: 2px solid var(--nb-ink);
-  background: var(--nb-yellow);
+  border-left: 1px solid var(--nb-ink);
+  background: var(--nb-soft-yellow);
   pointer-events: none;
 }
 
@@ -1063,10 +1063,10 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 6px;
+  width: 4px;
   transform: translateX(100%);
-  border-left: 2px solid var(--nb-ink);
-  background: var(--nb-yellow);
+  border-left: 1px solid var(--nb-ink);
+  background: var(--nb-soft-yellow);
   pointer-events: none;
 }
 
@@ -1077,21 +1077,21 @@ tbody tr:hover .sticky-col {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 6px;
+  width: 4px;
   transform: translateX(-100%);
-  border-right: 2px solid var(--nb-ink);
-  background: var(--nb-yellow);
+  border-right: 1px solid var(--nb-ink);
+  background: var(--nb-soft-yellow);
   pointer-events: none;
 }
 
 /* 暗色模式阴影 */
 .dark .is-scrollable .sticky-col-left::after,
 .dark .is-scrollable .sticky-col-left-second::after {
-  background: var(--nb-yellow);
+  background: var(--nb-soft-yellow);
 }
 
 .dark .is-scrollable .sticky-col-right::before {
-  background: var(--nb-yellow);
+  background: var(--nb-soft-yellow);
 }
 </style>
 
@@ -1126,9 +1126,9 @@ tbody tr:hover .sticky-col {
 
 /* 常驻、不透明的滑块，无视鼠标是否 hover 都在那！ */
 .table-wrapper::-webkit-scrollbar-thumb {
-  border: 2px solid var(--nb-ink) !important;
+  border: 1.5px solid var(--nb-ink) !important;
   border-radius: var(--nb-radius) !important;
-  background-color: var(--nb-yellow) !important;
+  background-color: var(--nb-soft-yellow) !important;
   background-clip: border-box !important;
   -webkit-appearance: none !important;
 }
@@ -1137,7 +1137,7 @@ tbody tr:hover .sticky-col {
 }
 
 .dark .table-wrapper::-webkit-scrollbar-thumb {
-  background-color: var(--nb-yellow) !important;
+  background-color: var(--nb-soft-yellow) !important;
 }
 .dark .table-wrapper::-webkit-scrollbar-thumb:hover {
   background-color: var(--nb-orange) !important;
@@ -1147,10 +1147,10 @@ tbody tr:hover .sticky-col {
 @supports (-moz-appearance:none) {
   .table-wrapper {
     scrollbar-width: thin !important;
-    scrollbar-color: var(--nb-yellow) var(--nb-paper-alt) !important;
+    scrollbar-color: var(--nb-soft-yellow) var(--nb-paper-alt) !important;
   }
   .dark .table-wrapper {
-    scrollbar-color: var(--nb-yellow) var(--nb-paper-alt) !important;
+    scrollbar-color: var(--nb-soft-yellow) var(--nb-paper-alt) !important;
   }
 }
 </style>
