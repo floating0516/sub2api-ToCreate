@@ -55,22 +55,6 @@ type BulkAssignSubscriptionRequest struct {
 	Notes        string  `json:"notes"`
 }
 
-type BenefitGrantRequest struct {
-	AudienceType string `json:"audience_type" binding:"required,oneof=today_active"`
-	AudienceDate string `json:"audience_date" binding:"omitempty,max=10"`
-	Timezone     string `json:"timezone" binding:"omitempty,max=64"`
-	BenefitType  string `json:"benefit_type" binding:"required,oneof=subscription"`
-	GroupID      int64  `json:"group_id" binding:"required,gt=0"`
-	ValidityDays int    `json:"validity_days" binding:"required,min=1,max=36500"`
-	Notes        string `json:"notes" binding:"max=1800"`
-}
-
-type ExecuteBenefitGrantRequest struct {
-	BenefitGrantRequest
-	ExpectedMatchedCount  *int `json:"expected_matched_count" binding:"required,min=0"`
-	ExpectedEligibleCount *int `json:"expected_eligible_count" binding:"required,min=0"`
-}
-
 // AdjustSubscriptionRequest represents adjust subscription request (extend or shorten)
 type AdjustSubscriptionRequest struct {
 	Days int `json:"days" binding:"required,min=-36500,max=36500"` // negative to shorten, positive to extend
@@ -231,69 +215,6 @@ func (h *SubscriptionHandler) BulkAssign(c *gin.Context) {
 	}
 
 	response.Success(c, dto.BulkAssignResultFromService(result))
-}
-
-// PreviewBenefitGrant resolves the current target audience without writing data.
-// POST /api/v1/admin/benefit-grants/preview
-func (h *SubscriptionHandler) PreviewBenefitGrant(c *gin.Context) {
-	middleware2.SkipAudit(c)
-
-	var req BenefitGrantRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	preview, err := h.subscriptionService.PreviewBenefitGrant(
-		c.Request.Context(),
-		benefitGrantInputFromRequest(req),
-	)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, preview)
-}
-
-// ExecuteBenefitGrant grants the selected benefit to the previewed audience.
-// POST /api/v1/admin/benefit-grants/execute
-func (h *SubscriptionHandler) ExecuteBenefitGrant(c *gin.Context) {
-	middleware2.SetAuditAction(c, "admin.benefit_grants.execute")
-
-	var req ExecuteBenefitGrantRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	adminID := getAdminIDFromContext(c)
-	executeAdminIdempotentJSON(
-		c,
-		"admin.benefit_grants.execute",
-		req,
-		24*time.Hour,
-		func(ctx context.Context) (any, error) {
-			input := benefitGrantInputFromRequest(req.BenefitGrantRequest)
-			return h.subscriptionService.ExecuteBenefitGrant(ctx, &service.ExecuteBenefitGrantInput{
-				BenefitGrantInput:     *input,
-				ExpectedMatchedCount:  *req.ExpectedMatchedCount,
-				ExpectedEligibleCount: *req.ExpectedEligibleCount,
-				AssignedBy:            adminID,
-			})
-		},
-	)
-}
-
-func benefitGrantInputFromRequest(req BenefitGrantRequest) *service.BenefitGrantInput {
-	return &service.BenefitGrantInput{
-		AudienceType: req.AudienceType,
-		AudienceDate: req.AudienceDate,
-		Timezone:     req.Timezone,
-		BenefitType:  req.BenefitType,
-		GroupID:      req.GroupID,
-		ValidityDays: req.ValidityDays,
-		Notes:        req.Notes,
-	}
 }
 
 // Extend handles adjusting a subscription (extend or shorten)

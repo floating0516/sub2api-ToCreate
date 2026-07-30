@@ -23,41 +23,6 @@ export interface SubscriptionRetentionEstimate {
   excluded_count: number
 }
 
-export interface BenefitGrantRequest {
-  audience_type: 'today_active'
-  audience_date: string
-  timezone: string
-  benefit_type: 'subscription'
-  group_id: number
-  validity_days: number
-  notes?: string
-}
-
-export interface BenefitGrantPreview {
-  audience_type: 'today_active'
-  audience_date: string
-  timezone: string
-  window_start: string
-  window_end: string
-  benefit_type: 'subscription'
-  group_id: number
-  validity_days: number
-  matched_count: number
-  eligible_count: number
-  already_granted_count: number
-  conflict_count: number
-}
-
-export interface BenefitGrantResult {
-  preview: BenefitGrantPreview
-  granted_count: number
-  created_count: number
-  renewed_count: number
-  failed_count: number
-  skipped_count: number
-  errors: string[]
-}
-
 /**
  * List all subscriptions with pagination
  * @param page - Page number (default: 1)
@@ -147,35 +112,6 @@ export async function bulkAssign(
   const { data } = await apiClient.post<UserSubscription[]>(
     '/admin/subscriptions/bulk-assign',
     request
-  )
-  return data
-}
-
-export async function previewBenefitGrant(
-  request: BenefitGrantRequest
-): Promise<BenefitGrantPreview> {
-  const { data } = await apiClient.post<BenefitGrantPreview>(
-    '/admin/benefit-grants/preview',
-    request
-  )
-  return data
-}
-
-export async function executeBenefitGrant(
-  request: BenefitGrantRequest & {
-    expected_matched_count: number
-    expected_eligible_count: number
-  },
-  idempotencyKey: string
-): Promise<BenefitGrantResult> {
-  const { data } = await apiClient.post<BenefitGrantResult>(
-    '/admin/benefit-grants/execute',
-    request,
-    {
-      headers: {
-        'Idempotency-Key': idempotencyKey
-      }
-    }
   )
   return data
 }
@@ -308,8 +244,6 @@ export const subscriptionsAPI = {
   getProgress,
   assign,
   bulkAssign,
-  previewBenefitGrant,
-  executeBenefitGrant,
   extend,
   revoke,
   restore,

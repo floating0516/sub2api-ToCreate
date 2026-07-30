@@ -607,32 +607,6 @@ export default {
       adjustSubscription: 'Adjust Subscription',
       revokeSubscription: 'Revoke Subscription',
       restoreSubscription: 'Restore Subscription',
-      benefitGrant: {
-        open: 'Bulk Grant',
-        title: 'Bulk Grant Benefits',
-        audience: 'Target users',
-        todayActive: 'Visited today',
-        benefitType: 'Benefit',
-        subscription: 'Subscription',
-        notes: 'Notes',
-        notesPlaceholder: 'Optional campaign note',
-        preview: 'Grant preview',
-        previewLoading: 'Counting users who visited today...',
-        previewFailed: 'Failed to load the grant preview',
-        previewRequired: 'Complete and refresh the grant preview first',
-        selectGroup: 'Select a subscription group to calculate the target audience.',
-        matched: 'Visited today',
-        eligible: 'Eligible',
-        alreadyGranted: 'Already granted',
-        conflicts: 'Conflicts',
-        conflictHint: 'Users with an active or suspended subscription in this group are skipped.',
-        grantCount: 'Grant to {count}',
-        granting: 'Granting...',
-        success: 'Granted to {granted}; skipped {skipped}',
-        partialSuccess: 'Granted to {granted}; {failed} failed',
-        audienceChanged: 'The audience changed after preview. Counts were refreshed; confirm again.',
-        failed: 'Bulk grant failed'
-      },
       allStatus: 'All Status',
       allGroups: 'All Groups',
       allPlatforms: 'All Platforms',
@@ -791,6 +765,132 @@ export default {
           revokeDesc: 'Immediately terminate the subscription (restorable from the revoked list)'
         },
         tip: 'Tip: Only groups with billing type "Subscription" and status "Active" appear in the group dropdown. If no options are available, create one in Group Management first.'
+      }
+    },
+
+    benefitGrants: {
+      title: 'Benefit Grant Center',
+      description: 'Grant subscriptions, balance, and future benefits to a selected audience',
+      tabs: {
+        create: 'New Grant',
+        history: 'Grant History'
+      },
+      units: {
+        days: 'days'
+      },
+      audience: {
+        section: 'Target Audience',
+        type: 'Audience',
+        days: 'Lookback',
+        todayActive: 'Visited today',
+        recentActive: 'Visited in the last N days',
+        recentRegistered: 'Registered in the last N days',
+        recentActiveDays: 'Visited in the last {days} days',
+        recentRegisteredDays: 'Registered in the last {days} days'
+      },
+      benefit: {
+        section: 'Benefit',
+        type: 'Benefit type',
+        subscription: 'Subscription',
+        balance: 'Gift balance',
+        group: 'Subscription group',
+        selectGroup: 'Select a subscription group',
+        validity: 'Validity',
+        conflictPolicy: 'Existing subscription',
+        balanceAmount: 'Balance per user',
+        balanceHint: 'Gift balance is not counted as a recharge and does not trigger affiliate rebates.',
+        groupsFailed: 'Failed to load subscription groups',
+        balanceValue: 'Gift balance {amount} per user',
+        subscriptionValue: '{group} · {days} days'
+      },
+      policy: {
+        skipActive: 'Skip active or suspended subscriptions',
+        extendActive: 'Extend active subscriptions and renew expired ones'
+      },
+      notes: {
+        section: 'Campaign Record',
+        label: 'Notes',
+        placeholder: 'Optional campaign name or grant reason'
+      },
+      preview: {
+        title: 'Grant Preview',
+        loading: 'Resolving target users...',
+        action: 'Generate Preview',
+        matched: 'Matched',
+        eligible: 'Eligible',
+        alreadyGranted: 'Already granted',
+        conflicts: 'Conflicts',
+        audience: 'Audience',
+        benefit: 'Benefit',
+        totalBalance: 'Estimated total',
+        policy: 'Conflict policy',
+        conflictHint: 'Conflicting users are left unchanged and their reasons are retained in the batch record.',
+        empty: 'Complete the configuration to generate a preview',
+        failed: 'Failed to load the grant preview'
+      },
+      execute: {
+        action: 'Grant to {count}',
+        running: 'Granting...',
+        success: 'Granted to {granted}; skipped {skipped}',
+        partial: 'Granted to {granted}; {failed} failed',
+        audienceChanged: 'The audience changed after preview. Review the refreshed preview and confirm again.',
+        failed: 'Benefit grant failed'
+      },
+      confirm: {
+        title: 'Confirm Grant',
+        message: 'This will grant the selected benefit to {count} users in the current snapshot.',
+        submit: 'Confirm Grant'
+      },
+      history: {
+        createdAt: 'Created',
+        audience: 'Audience',
+        benefit: 'Benefit',
+        result: 'Result',
+        status: 'Status',
+        actions: 'Actions',
+        failedCount: '{count} failed',
+        detail: 'View details',
+        retry: 'Retry failures',
+        empty: 'No grant history',
+        loadFailed: 'Failed to load grant history',
+        retryConfirm: 'Retry only failed, pending, or stale recipients from the original snapshot?',
+        retryDone: 'Retry complete: {granted} granted, {failed} still failed',
+        retryFailed: 'Failed to retry the grant'
+      },
+      detail: {
+        title: 'Grant Batch Details',
+        granted: 'Granted',
+        failed: 'Failed',
+        window: 'Audience window',
+        statusFilter: 'Recipient status',
+        allStatuses: 'All statuses',
+        user: 'User',
+        result: 'Result',
+        attempts: 'Attempts',
+        error: 'Error',
+        empty: 'No recipient records match this filter',
+        loadFailed: 'Failed to load recipient results'
+      },
+      campaignStatus: {
+        running: 'Running',
+        completed: 'Completed',
+        partial: 'Partial',
+        failed: 'Failed'
+      },
+      recipientStatus: {
+        pending: 'Pending',
+        processing: 'Processing',
+        granted: 'Granted',
+        skipped: 'Skipped',
+        failed: 'Failed'
+      },
+      resultType: {
+        created: 'Subscription created',
+        renewed: 'Expired subscription renewed',
+        extended: 'Active subscription extended',
+        balance_added: 'Balance added',
+        already_granted: 'Already granted in this batch',
+        conflict: 'Benefit conflict'
       }
     },
 

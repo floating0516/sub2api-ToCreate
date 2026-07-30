@@ -565,6 +565,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/benefit-grants',
+    name: 'AdminBenefitGrants',
+    component: () => import('@/views/admin/BenefitGrantsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Benefit Grant Center',
+      titleKey: 'admin.benefitGrants.title',
+      descriptionKey: 'admin.benefitGrants.description'
+    }
+  },
+  {
     path: '/admin/accounts',
     name: 'AdminAccounts',
     component: () => import('@/views/admin/AccountsView.vue'),
@@ -1004,6 +1016,7 @@ router.beforeEach(async (to, _from, next) => {
     const restrictedPaths = [
       '/admin/groups',
       '/admin/subscriptions',
+      '/admin/benefit-grants',
       '/admin/redeem',
       '/subscriptions',
       '/redeem'

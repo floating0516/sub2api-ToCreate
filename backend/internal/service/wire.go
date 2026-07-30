@@ -759,6 +759,7 @@ var ProviderSet = wire.NewSet(
 	ProvideEmailQueueService,
 	NewTurnstileService,
 	ProvideSubscriptionService,
+	NewBenefitGrantService,
 	wire.Bind(new(DefaultSubscriptionAssigner), new(*SubscriptionService)),
 	ProvideConcurrencyService,
 	ProvideUserMessageQueueService,

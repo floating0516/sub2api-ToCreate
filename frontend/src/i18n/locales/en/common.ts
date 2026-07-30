@@ -170,6 +170,7 @@ export default {
     availableChannels: 'Available Channels',
     modelPlaza: 'Model Plaza',
     subscriptions: 'Subscriptions',
+    benefitGrants: 'Benefit Grants',
     accounts: 'Accounts',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',

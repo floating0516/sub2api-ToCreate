@@ -607,32 +607,6 @@ export default {
       adjustSubscription: '调整订阅',
       revokeSubscription: '撤销订阅',
       restoreSubscription: '恢复订阅',
-      benefitGrant: {
-        open: '批量发放',
-        title: '批量发放权益',
-        audience: '目标用户',
-        todayActive: '今日访问用户',
-        benefitType: '发放内容',
-        subscription: '订阅权益',
-        notes: '备注',
-        notesPlaceholder: '可选，记录本次活动',
-        preview: '发放预览',
-        previewLoading: '正在统计今日访问用户...',
-        previewFailed: '加载发放预览失败',
-        previewRequired: '请先完成并刷新发放预览',
-        selectGroup: '选择订阅分组后将自动统计目标用户。',
-        matched: '今日访问',
-        eligible: '可发放',
-        alreadyGranted: '本次已发',
-        conflicts: '权益冲突',
-        conflictHint: '权益冲突表示用户已有该分组的有效或暂停订阅，本次会自动跳过。',
-        grantCount: '发放给 {count} 人',
-        granting: '发放中...',
-        success: '已发放给 {granted} 人，跳过 {skipped} 人',
-        partialSuccess: '已发放给 {granted} 人，另有 {failed} 人发放失败',
-        audienceChanged: '目标用户在预览后发生变化，已刷新人数，请重新确认。',
-        failed: '批量发放失败'
-      },
       allStatus: '全部状态',
       allGroups: '全部分组',
       allPlatforms: '全部平台',
@@ -789,6 +763,132 @@ export default {
           revokeDesc: '立即终止该用户的订阅，可在已撤销列表中恢复'
         },
         tip: '提示：订阅分组下拉列表中只会显示计费类型为「订阅」且状态为「正常」的分组。如果没有可选项，请先到分组管理中创建。'
+      }
+    },
+
+    benefitGrants: {
+      title: '权益发放中心',
+      description: '按目标用户统一发放订阅、余额和后续扩展权益',
+      tabs: {
+        create: '新建发放',
+        history: '发放记录'
+      },
+      units: {
+        days: '天'
+      },
+      audience: {
+        section: '目标用户',
+        type: '用户范围',
+        days: '统计天数',
+        todayActive: '今日访问用户',
+        recentActive: '近 N 天访问用户',
+        recentRegistered: '近 N 天注册用户',
+        recentActiveDays: '近 {days} 天访问用户',
+        recentRegisteredDays: '近 {days} 天注册用户'
+      },
+      benefit: {
+        section: '发放权益',
+        type: '权益类型',
+        subscription: '订阅权益',
+        balance: '赠送余额',
+        group: '订阅分组',
+        selectGroup: '选择订阅分组',
+        validity: '有效期',
+        conflictPolicy: '已有订阅处理',
+        balanceAmount: '每人赠送余额',
+        balanceHint: '赠送余额不会计入充值金额，也不会触发邀请返利。',
+        groupsFailed: '加载订阅分组失败',
+        balanceValue: '每人赠送余额 {amount}',
+        subscriptionValue: '{group} · {days} 天'
+      },
+      policy: {
+        skipActive: '跳过有效或暂停订阅',
+        extendActive: '有效订阅延长，过期订阅续期'
+      },
+      notes: {
+        section: '活动记录',
+        label: '备注',
+        placeholder: '可选，例如活动名称或发放原因'
+      },
+      preview: {
+        title: '发放预览',
+        loading: '正在统计目标用户...',
+        action: '生成预览',
+        matched: '符合范围',
+        eligible: '可发放',
+        alreadyGranted: '本批次已发',
+        conflicts: '冲突跳过',
+        audience: '目标用户',
+        benefit: '发放内容',
+        totalBalance: '预计发放总额',
+        policy: '冲突规则',
+        conflictHint: '冲突用户不会被修改，逐用户原因会保存在本次发放记录中。',
+        empty: '配置完成后生成预览',
+        failed: '加载发放预览失败'
+      },
+      execute: {
+        action: '发放给 {count} 人',
+        running: '发放中...',
+        success: '已发放给 {granted} 人，跳过 {skipped} 人',
+        partial: '已发放给 {granted} 人，另有 {failed} 人失败',
+        audienceChanged: '目标用户在预览后发生变化，已刷新预览，请重新确认。',
+        failed: '权益发放失败'
+      },
+      confirm: {
+        title: '确认发放',
+        message: '即将按当前快照为 {count} 名用户发放权益。',
+        submit: '确认发放'
+      },
+      history: {
+        createdAt: '创建时间',
+        audience: '目标用户',
+        benefit: '权益',
+        result: '发放结果',
+        status: '状态',
+        actions: '操作',
+        failedCount: '{count} 失败',
+        detail: '查看详情',
+        retry: '重试失败项',
+        empty: '暂无发放记录',
+        loadFailed: '加载发放记录失败',
+        retryConfirm: '只重试原始用户快照中的失败、待处理或超时项，确定继续吗？',
+        retryDone: '重试完成：已成功 {granted} 人，仍失败 {failed} 人',
+        retryFailed: '重试发放失败'
+      },
+      detail: {
+        title: '发放批次详情',
+        granted: '已发放',
+        failed: '失败',
+        window: '统计时间范围',
+        statusFilter: '用户状态',
+        allStatuses: '全部状态',
+        user: '用户',
+        result: '结果',
+        attempts: '尝试次数',
+        error: '失败原因',
+        empty: '没有符合条件的用户记录',
+        loadFailed: '加载逐用户结果失败'
+      },
+      campaignStatus: {
+        running: '执行中',
+        completed: '已完成',
+        partial: '部分成功',
+        failed: '失败'
+      },
+      recipientStatus: {
+        pending: '待处理',
+        processing: '处理中',
+        granted: '已发放',
+        skipped: '已跳过',
+        failed: '失败'
+      },
+      resultType: {
+        created: '新建订阅',
+        renewed: '续期过期订阅',
+        extended: '延长有效订阅',
+        balance_added: '余额已增加',
+        already_granted: '本批次已发放',
+        conflict: '权益冲突'
       }
     },
 
