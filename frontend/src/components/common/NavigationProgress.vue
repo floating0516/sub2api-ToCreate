@@ -34,36 +34,23 @@ const isVisible = computed(() => isLoading.value)
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 7px;
   z-index: 9999;
   overflow: hidden;
-  background: transparent;
+  border-bottom: 2px solid var(--nb-ink);
+  background: var(--nb-paper);
 }
 
 .navigation-progress-bar {
   height: 100%;
-  width: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    theme('colors.primary.400') 20%,
-    theme('colors.primary.500') 50%,
-    theme('colors.primary.400') 80%,
-    transparent 100%
-  );
+  width: 32%;
+  border-right: 2px solid var(--nb-ink);
+  background: var(--nb-orange);
   animation: progress-slide 1.5s ease-in-out infinite;
 }
 
-/* 暗色模式下的进度条颜色 */
 :root.dark .navigation-progress-bar {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    theme('colors.primary.500') 20%,
-    theme('colors.primary.400') 50%,
-    theme('colors.primary.500') 80%,
-    transparent 100%
-  );
+  background: var(--nb-orange);
 }
 
 /* 进度条滑动动画 */
@@ -72,7 +59,7 @@ const isVisible = computed(() => isLoading.value)
     transform: translateX(-100%);
   }
   100% {
-    transform: translateX(100%);
+    transform: translateX(320%);
   }
 }
 

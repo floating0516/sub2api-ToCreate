@@ -1025,20 +1025,20 @@ defineExpose({
 
 /* 表体 sticky 列背景 */
 tbody .sticky-col {
-  background-color: white;
+  background-color: var(--nb-paper);
 }
 
 .dark tbody .sticky-col {
-  background-color: rgb(17 24 39);
+  background-color: var(--nb-paper);
 }
 
 /* hover 状态保持 */
 tbody tr:hover .sticky-col {
-  background-color: rgb(249 250 251);
+  background-color: var(--nb-paper-alt);
 }
 
 .dark tbody tr:hover .sticky-col {
-  background-color: rgb(31 41 55);
+  background-color: var(--nb-paper-alt);
 }
 
 /* 阴影只在可滚动时显示 */
@@ -1049,9 +1049,10 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 10px;
+  width: 6px;
   transform: translateX(100%);
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+  border-left: 2px solid var(--nb-ink);
+  background: var(--nb-yellow);
   pointer-events: none;
 }
 
@@ -1062,9 +1063,10 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 10px;
+  width: 6px;
   transform: translateX(100%);
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+  border-left: 2px solid var(--nb-ink);
+  background: var(--nb-yellow);
   pointer-events: none;
 }
 
@@ -1075,20 +1077,21 @@ tbody tr:hover .sticky-col {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 10px;
+  width: 6px;
   transform: translateX(-100%);
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+  border-right: 2px solid var(--nb-ink);
+  background: var(--nb-yellow);
   pointer-events: none;
 }
 
 /* 暗色模式阴影 */
 .dark .is-scrollable .sticky-col-left::after,
 .dark .is-scrollable .sticky-col-left-second::after {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.2), transparent);
+  background: var(--nb-yellow);
 }
 
 .dark .is-scrollable .sticky-col-right::before {
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.2), transparent);
+  background: var(--nb-yellow);
 }
 </style>
 
@@ -1112,41 +1115,42 @@ tbody tr:hover .sticky-col {
 }
 
 .table-wrapper::-webkit-scrollbar-track {
-  background-color: rgba(0, 0, 0, 0.03) !important;
-  border-radius: 6px !important;
+  border: 1px solid var(--nb-ink) !important;
+  border-radius: var(--nb-radius) !important;
+  background-color: var(--nb-paper-alt) !important;
   margin: 0 4px !important;
 }
 .dark .table-wrapper::-webkit-scrollbar-track {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: var(--nb-paper-alt) !important;
 }
 
 /* 常驻、不透明的滑块，无视鼠标是否 hover 都在那！ */
 .table-wrapper::-webkit-scrollbar-thumb {
-  background-color: rgba(107, 114, 128, 0.75) !important; 
-  border-radius: 6px !important;
-  border: 2px solid transparent !important;
-  background-clip: padding-box !important;
+  border: 2px solid var(--nb-ink) !important;
+  border-radius: var(--nb-radius) !important;
+  background-color: var(--nb-yellow) !important;
+  background-clip: border-box !important;
   -webkit-appearance: none !important;
 }
 .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(75, 85, 99, 0.9) !important;
+  background-color: var(--nb-orange) !important;
 }
 
 .dark .table-wrapper::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.75) !important;
+  background-color: var(--nb-yellow) !important;
 }
 .dark .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(209, 213, 219, 0.9) !important;
+  background-color: var(--nb-orange) !important;
 }
 
 /* 3. 仅给真正的 Firefox 留的后路 */
 @supports (-moz-appearance:none) {
   .table-wrapper {
     scrollbar-width: thin !important;
-    scrollbar-color: rgba(156, 163, 175, 0.5) rgba(0, 0, 0, 0.03) !important;
+    scrollbar-color: var(--nb-yellow) var(--nb-paper-alt) !important;
   }
   .dark .table-wrapper {
-    scrollbar-color: rgba(75, 85, 99, 0.5) rgba(255, 255, 255, 0.05) !important;
+    scrollbar-color: var(--nb-yellow) var(--nb-paper-alt) !important;
   }
 }
 </style>

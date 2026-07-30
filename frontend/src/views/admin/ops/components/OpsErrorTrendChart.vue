@@ -18,6 +18,11 @@ import type { ChartState } from '../types'
 import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import {
+  getOracleChartSurface,
+  ORACLE_CHART_NEUTRAL,
+  ORACLE_CHART_SERIES
+} from '@/utils/oracleTheme'
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
@@ -36,13 +41,12 @@ const { t } = useI18n()
 
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
-  red: '#ef4444',
-  redAlpha: '#ef444420',
-  purple: '#8b5cf6',
-  purpleAlpha: '#8b5cf620',
-  gray: '#9ca3af',
-  grid: isDarkMode.value ? '#374151' : '#f3f4f6',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  ...getOracleChartSurface(isDarkMode.value),
+  red: ORACLE_CHART_SERIES.red,
+  redAlpha: `${ORACLE_CHART_SERIES.red}20`,
+  purple: ORACLE_CHART_SERIES.blue,
+  purpleAlpha: `${ORACLE_CHART_SERIES.blue}20`,
+  gray: ORACLE_CHART_NEUTRAL
 }))
 
 const totalRequestErrors = computed(() => sumNumbers(props.points.map((p) => p.error_count_sla ?? 0)))
@@ -119,11 +123,11 @@ const options = computed(() => {
         labels: { color: c.text, usePointStyle: true, boxWidth: 6, font: { size: 10 } }
       },
       tooltip: {
-        backgroundColor: isDarkMode.value ? '#1f2937' : '#ffffff',
-        titleColor: isDarkMode.value ? '#f3f4f6' : '#111827',
-        bodyColor: isDarkMode.value ? '#d1d5db' : '#4b5563',
-        borderColor: c.grid,
-        borderWidth: 1,
+        backgroundColor: colors.value.tooltipBackground,
+        titleColor: colors.value.tooltipTitle,
+        bodyColor: colors.value.tooltipBody,
+        borderColor: colors.value.text,
+        borderWidth: 2,
         padding: 10,
         displayColors: true
       }

@@ -441,9 +441,9 @@ const healthScoreColor = computed(() => {
   if (isSystemIdle.value) return '#9ca3af' // gray-400
   const score = healthScoreValue.value
   if (score == null) return '#9ca3af'
-  if (score >= 90) return '#10b981' // green
-  if (score >= 60) return '#f59e0b' // yellow
-  return '#ef4444' // red
+  if (score >= 90) return '#2d9b4e' // green
+  if (score >= 60) return '#ffd23f' // yellow
+  return '#e63946' // red
 })
 
 const healthScoreClass = computed(() => {
@@ -1186,7 +1186,7 @@ function handleToolbarRefresh() {
                   <path
                     d="M0 16 Q 20 16, 40 16 T 80 16 T 120 10 T 160 22 T 200 16 T 240 16 T 280 16"
                     fill="none"
-                    stroke="#3b82f6"
+                    stroke="#004e98"
                     stroke-width="2"
                     vector-effect="non-scaling-stroke"
                   >

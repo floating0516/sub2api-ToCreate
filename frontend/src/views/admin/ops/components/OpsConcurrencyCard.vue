@@ -614,11 +614,12 @@ watch(
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.3);
-  border-radius: 3px;
+  border: 1px solid var(--nb-ink);
+  border-radius: var(--nb-radius);
+  background-color: var(--nb-muted);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.5);
+  background-color: var(--nb-orange);
 }
 </style>

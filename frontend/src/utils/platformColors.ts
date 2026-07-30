@@ -53,16 +53,16 @@ const BORDER_STRONG_DEFAULT = 'border-gray-300 dark:border-dark-600'
 // ── Accent (single raw color per platform; consumers derive washes/tints
 //    from it via CSS color-mix, e.g. plaza paid-price zone) ──
 const ACCENT: Record<Platform, string> = {
-  anthropic: '#f97316', // orange-500
-  openai: '#22c55e', // green-500
-  antigravity: '#a855f7', // purple-500
-  gemini: '#3b82f6', // blue-500
-  grok: '#71717a', // zinc-500
-  composite: '#06b6d4', // cyan-500
+  anthropic: '#ff6b35', // Oracle orange
+  openai: '#2d9b4e', // Oracle green
+  antigravity: '#1e7fd0', // light Oracle blue
+  gemini: '#004e98', // Oracle blue
+  grok: '#706757', // warm neutral
+  composite: '#1e7fd0', // light Oracle blue
 }
-const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
+const ACCENT_DEFAULT = '#ff6b35' // Oracle orange
 
-// ── Accent bar (gradient) ───────────────────────────────────────────
+// ── Accent bar ──────────────────────────────────────────────────────
 const ACCENT_BAR: Record<Platform, string> = {
   anthropic: 'bg-gradient-to-r from-orange-400 to-orange-500',
   openai: 'bg-gradient-to-r from-emerald-400 to-emerald-500',

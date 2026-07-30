@@ -269,10 +269,12 @@ const iconInfo = computed(() => iconKey.value ? iconData[iconKey.value] : null)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: white;
-  font-weight: 600;
+  border: 1px solid var(--nb-ink);
+  border-radius: var(--nb-radius);
+  background: var(--nb-blue);
+  color: #fffef5;
+  box-shadow: 1px 1px 0 var(--nb-shadow-color);
+  font-weight: 700;
   flex-shrink: 0;
 }
 </style>

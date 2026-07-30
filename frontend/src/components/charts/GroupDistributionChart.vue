@@ -116,6 +116,10 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { GroupStat, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
+import {
+  getOracleChartSurface,
+  ORACLE_CHART_COLORS
+} from '@/utils/oracleTheme'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -175,18 +179,10 @@ const toggleBreakdown = async (type: string, id: number | string) => {
   }
 }
 
-const chartColors = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16'
-]
+const chartColors = ORACLE_CHART_COLORS
+const chartSurface = computed(() =>
+  getOracleChartSurface(document.documentElement.classList.contains('dark'))
+)
 
 const displayGroupStats = computed(() => {
   if (!props.groupStats?.length) return []
@@ -218,6 +214,11 @@ const doughnutOptions = computed(() => ({
       display: false
     },
     tooltip: {
+      backgroundColor: chartSurface.value.tooltipBackground,
+      titleColor: chartSurface.value.tooltipTitle,
+      bodyColor: chartSurface.value.tooltipBody,
+      borderColor: chartSurface.value.text,
+      borderWidth: 2,
       callbacks: {
         label: (context: any) => {
           const value = context.raw as number

@@ -363,6 +363,10 @@ import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import {
+  getOracleChartSurface,
+  ORACLE_CHART_COLORS
+} from '@/utils/oracleTheme'
 
 import {
   Chart as ChartJS,
@@ -442,10 +446,7 @@ const isDarkMode = computed(() => {
 })
 
 // Chart colors
-const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb'
-}))
+const chartColors = computed(() => getOracleChartSurface(isDarkMode.value))
 
 // Line chart options (for user trend chart)
 const lineOptions = computed(() => ({
@@ -469,6 +470,11 @@ const lineOptions = computed(() => ({
       }
     },
     tooltip: {
+      backgroundColor: chartColors.value.tooltipBackground,
+      titleColor: chartColors.value.tooltipTitle,
+      bodyColor: chartColors.value.tooltipBody,
+      borderColor: chartColors.value.text,
+      borderWidth: 2,
       itemSort: (a: any, b: any) => {
         const aValue = typeof a?.raw === 'number' ? a.raw : Number(a?.parsed?.y ?? 0)
         const bValue = typeof b?.raw === 'number' ? b.raw : Number(b?.parsed?.y ?? 0)
@@ -540,20 +546,7 @@ const userTrendChartData = computed(() => {
   })
 
   const sortedDates = Array.from(allDates).sort()
-  const colors = [
-    '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#f97316',
-    '#6366f1',
-    '#84cc16',
-    '#06b6d4',
-    '#a855f7'
-  ]
+  const colors = ORACLE_CHART_COLORS
 
   const datasets = Array.from(userGroups.values()).map((group, idx) => ({
     label: group.name,

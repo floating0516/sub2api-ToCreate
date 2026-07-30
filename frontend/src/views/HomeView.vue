@@ -15,29 +15,12 @@
   <!-- Default Home Page -->
   <div
     v-else
-    class="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
+    class="home-shell relative flex min-h-screen flex-col overflow-hidden bg-gray-50 dark:bg-dark-950"
   >
-    <!-- Background Decorations -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        class="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-primary-400/20 blur-3xl"
-      ></div>
-      <div
-        class="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-primary-500/15 blur-3xl"
-      ></div>
-      <div
-        class="absolute left-1/3 top-1/4 h-72 w-72 rounded-full bg-primary-300/10 blur-3xl"
-      ></div>
-      <div
-        class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"
-      ></div>
-      <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
-      ></div>
-    </div>
-
     <!-- Header -->
-    <header class="relative z-20 px-6 py-4">
+    <header
+      class="relative z-20 border-b-2 border-gray-900 bg-white px-6 py-4 shadow-md dark:border-gray-100 dark:bg-dark-900"
+    >
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <!-- Logo -->
         <div class="flex items-center">
@@ -77,10 +60,10 @@
           <router-link
             v-if="isAuthenticated"
             :to="dashboardPath"
-            class="inline-flex items-center gap-1.5 rounded-full bg-gray-900 py-1 pl-1 pr-2.5 transition-colors hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+            class="inline-flex items-center gap-1.5 rounded-sm border border-gray-900 bg-yellow-400 py-1 pl-1 pr-2.5 text-gray-900 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-gray-100 dark:bg-yellow-400 dark:text-gray-900"
           >
             <span
-              class="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-[10px] font-semibold text-white"
+              class="flex h-5 w-5 items-center justify-center rounded-sm border border-gray-900 bg-gradient-to-br from-primary-400 to-primary-600 text-[10px] font-semibold text-gray-900"
             >
               {{ userInitial }}
             </span>
@@ -102,7 +85,7 @@
           <router-link
             v-else
             to="/login"
-            class="inline-flex items-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+            class="inline-flex items-center rounded-sm border border-gray-900 bg-primary-500 px-3 py-1 text-xs font-bold text-gray-900 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-gray-100"
           >
             {{ t('home.login') }}
           </router-link>
@@ -179,7 +162,7 @@
         <!-- Feature Tags - Centered -->
         <div class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
           <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+            class="inline-flex items-center gap-2.5 rounded-sm border border-gray-900 bg-white px-5 py-2.5 shadow-sm dark:border-gray-100 dark:bg-dark-800"
           >
             <Icon name="swap" size="sm" class="text-primary-500" />
             <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
@@ -187,7 +170,7 @@
             }}</span>
           </div>
           <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+            class="inline-flex items-center gap-2.5 rounded-sm border border-gray-900 bg-white px-5 py-2.5 shadow-sm dark:border-gray-100 dark:bg-dark-800"
           >
             <Icon name="shield" size="sm" class="text-primary-500" />
             <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
@@ -195,7 +178,7 @@
             }}</span>
           </div>
           <div
-            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+            class="inline-flex items-center gap-2.5 rounded-sm border border-gray-900 bg-white px-5 py-2.5 shadow-sm dark:border-gray-100 dark:bg-dark-800"
           >
             <Icon name="chart" size="sm" class="text-primary-500" />
             <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
@@ -491,19 +474,20 @@ onMounted(() => {
 /* Terminal Window */
 .terminal-window {
   width: 420px;
-  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
-  border-radius: 14px;
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: var(--nb-soft-yellow);
+  border: var(--nb-border-width) solid var(--nb-ink);
+  border-radius: var(--nb-radius);
+  box-shadow: var(--nb-shadow-lg);
   overflow: hidden;
-  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg);
-  transition: transform 0.3s ease;
+  transform: rotate(-1deg);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .terminal-window:hover {
-  transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(-4px);
+  transform: translate(-2px, -2px) rotate(-1deg);
+  box-shadow: 8px 8px 0 var(--nb-shadow-color);
 }
 
 /* Terminal Header */
@@ -511,8 +495,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  background: rgba(30, 41, 59, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--nb-orange);
+  border-bottom: var(--nb-border-width) solid var(--nb-ink);
 }
 
 .terminal-buttons {
@@ -524,16 +508,17 @@ onMounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  border: 1.5px solid var(--nb-fixed-ink);
 }
 
 .btn-close {
-  background: #ef4444;
+  background: var(--nb-red);
 }
 .btn-minimize {
-  background: #eab308;
+  background: var(--nb-yellow);
 }
 .btn-maximize {
-  background: #22c55e;
+  background: var(--nb-green);
 }
 
 .terminal-title {
@@ -541,7 +526,8 @@ onMounted(() => {
   text-align: center;
   font-size: 12px;
   font-family: ui-monospace, monospace;
-  color: #64748b;
+  color: var(--nb-fixed-ink);
+  font-weight: 700;
   margin-right: 52px;
 }
 
@@ -551,6 +537,7 @@ onMounted(() => {
   font-family: ui-monospace, 'Fira Code', monospace;
   font-size: 14px;
   line-height: 2;
+  color: var(--nb-fixed-ink);
 }
 
 .code-line {
@@ -587,31 +574,36 @@ onMounted(() => {
 }
 
 .code-prompt {
-  color: #22c55e;
+  color: var(--nb-green);
   font-weight: bold;
 }
 .code-cmd {
-  color: #38bdf8;
+  color: var(--nb-blue);
+  font-weight: 700;
 }
 .code-flag {
-  color: #a78bfa;
+  color: var(--nb-orange);
+  font-weight: 700;
 }
 .code-url {
-  color: #14b8a6;
+  color: var(--nb-blue);
+  text-decoration: underline;
 }
 .code-comment {
-  color: #64748b;
+  color: #706757;
   font-style: italic;
 }
 .code-success {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.15);
+  color: #174f2a;
+  background: var(--nb-soft-green);
   padding: 2px 8px;
-  border-radius: 4px;
+  border: 1.5px solid var(--nb-fixed-ink);
+  border-radius: var(--nb-radius);
   font-weight: 600;
 }
 .code-response {
-  color: #fbbf24;
+  color: var(--nb-red);
+  font-weight: 700;
 }
 
 /* Blinking Cursor */
@@ -619,7 +611,7 @@ onMounted(() => {
   display: inline-block;
   width: 8px;
   height: 16px;
-  background: #22c55e;
+  background: var(--nb-orange);
   animation: blink 1s step-end infinite;
 }
 
@@ -634,12 +626,8 @@ onMounted(() => {
   }
 }
 
-/* Dark mode adjustments */
 :deep(.dark) .terminal-window {
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(20, 184, 166, 0.2),
-    0 0 40px rgba(20, 184, 166, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: var(--nb-soft-yellow);
+  box-shadow: var(--nb-shadow-lg);
 }
 </style>

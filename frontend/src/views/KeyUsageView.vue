@@ -527,10 +527,10 @@ function setDailyUsageDays(days: 7 | 30 | 90) {
 
 const CIRCUMFERENCE = 2 * Math.PI * 68
 const RING_GRADIENTS = [
-  { from: '#14b8a6', to: '#5eead4' },
-  { from: '#6366F1', to: '#A5B4FC' },
-  { from: '#10B981', to: '#6EE7B7' },
-  { from: '#F59E0B', to: '#FCD34D' },
+  { from: '#ff6b35', to: '#ff6b35' },
+  { from: '#004e98', to: '#004e98' },
+  { from: '#2d9b4e', to: '#2d9b4e' },
+  { from: '#ffd23f', to: '#ffd23f' },
 ]
 
 const ringAnimated = ref(false)
@@ -945,9 +945,10 @@ onUnmounted(() => {
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .input-ring:focus {
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
-  border-color: #14b8a6;
-  outline: none;
+  box-shadow: var(--nb-shadow-sm);
+  border-color: #ff6b35;
+  outline: 3px solid var(--nb-orange);
+  outline-offset: 2px;
 }
 
 /* Ring animation */
@@ -958,19 +959,19 @@ onUnmounted(() => {
 }
 
 /* Skeleton loading */
-@keyframes shimmer-kv {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes skeleton-pulse-kv {
+  0%,
+  100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
-  background-size: 200% 100%;
-  animation: shimmer-kv 1.8s ease-in-out infinite;
-  border-radius: 8px;
+  border: 1px solid var(--nb-ink);
+  border-radius: var(--nb-radius);
+  background: var(--nb-paper-alt);
+  animation: skeleton-pulse-kv 1.4s ease-in-out infinite;
 }
 :global(.dark) .skeleton {
-  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
-  background-size: 200% 100%;
+  background: var(--nb-paper-alt);
 }
 
 /* Fade up animation */
