@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -662,6 +663,32 @@ func TestTouchLastActive_SkipsWhenRecent(t *testing.T) {
 
 	require.Empty(t, repo.updateLastActiveUserIDs)
 	require.Empty(t, repo.updateLastActiveAt)
+}
+
+func TestUserLastActiveFresh_DoesNotCrossLocalDay(t *testing.T) {
+	location := timezone.Location()
+	lastActiveAt := time.Date(2026, time.July, 29, 23, 59, 0, 0, location)
+	now := time.Date(2026, time.July, 30, 0, 1, 0, 0, location)
+
+	require.False(t, userLastActiveFresh(&lastActiveAt, now))
+}
+
+func TestUserLastActiveTouchFresh_DoesNotCrossLocalDay(t *testing.T) {
+	location := timezone.Location()
+	attemptedAt := time.Date(2026, time.July, 29, 23, 59, 0, 0, location)
+	state := userLastActiveTouchState{
+		attemptedAt:   attemptedAt,
+		nextAllowedAt: attemptedAt.Add(userLastActiveMinTouch),
+	}
+
+	require.False(t, userLastActiveTouchFresh(
+		state,
+		time.Date(2026, time.July, 30, 0, 1, 0, 0, location),
+	))
+	require.True(t, userLastActiveTouchFresh(
+		state,
+		time.Date(2026, time.July, 29, 23, 59, 30, 0, location),
+	))
 }
 
 func TestUpdateBalance_RepoError_ReturnsError(t *testing.T) {

@@ -669,6 +669,12 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		subscriptions.DELETE("/:id", h.Admin.Subscription.Revoke)
 	}
 
+	benefitGrants := admin.Group("/benefit-grants")
+	{
+		benefitGrants.POST("/preview", h.Admin.Subscription.PreviewBenefitGrant)
+		benefitGrants.POST("/execute", h.Admin.Subscription.ExecuteBenefitGrant)
+	}
+
 	// 分组下的订阅列表
 	admin.GET("/groups/:id/subscriptions", h.Admin.Subscription.ListByGroup)
 

@@ -159,6 +159,10 @@
             >
               <Icon name="questionCircle" size="md" />
             </button>
+            <button @click="openBenefitGrantModal" class="btn btn-secondary">
+              <Icon name="gift" size="md" class="mr-2" />
+              {{ t('admin.subscriptions.benefitGrant.open') }}
+            </button>
             <button @click="showAssignModal = true" class="btn btn-primary">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.subscriptions.assignSubscription') }}
@@ -638,6 +642,215 @@
       </template>
     </BaseDialog>
 
+    <!-- Benefit Grant Modal -->
+    <BaseDialog
+      :show="showBenefitGrantModal"
+      :title="t('admin.subscriptions.benefitGrant.title')"
+      width="normal"
+      @close="closeBenefitGrantModal"
+    >
+      <form
+        id="benefit-grant-form"
+        class="space-y-5"
+        @submit.prevent="handleBenefitGrant"
+      >
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.benefitGrant.audience') }}</label>
+            <Select
+              :model-value="benefitGrantForm.audience_type"
+              :options="benefitAudienceOptions"
+              disabled
+            />
+          </div>
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.benefitGrant.benefitType') }}</label>
+            <Select
+              :model-value="benefitGrantForm.benefit_type"
+              :options="benefitTypeOptions"
+              disabled
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="input-label">{{ t('admin.subscriptions.form.group') }}</label>
+          <Select
+            v-model="benefitGrantForm.group_id"
+            :options="subscriptionGroupOptions"
+            :placeholder="t('admin.subscriptions.selectGroup')"
+          >
+            <template #selected="{ option }">
+              <GroupBadge
+                v-if="option"
+                :name="(option as unknown as GroupOption).label"
+                :platform="(option as unknown as GroupOption).platform"
+                :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                :rate-multiplier="(option as unknown as GroupOption).rate"
+              />
+              <span v-else class="text-gray-400">{{ t('admin.subscriptions.selectGroup') }}</span>
+            </template>
+            <template #option="{ option, selected }">
+              <GroupOptionItem
+                :name="(option as unknown as GroupOption).label"
+                :platform="(option as unknown as GroupOption).platform"
+                :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                :rate-multiplier="(option as unknown as GroupOption).rate"
+                :description="(option as unknown as GroupOption).description"
+                :selected="selected"
+              />
+            </template>
+          </Select>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.form.validityDays') }}</label>
+            <input
+              v-model.number="benefitGrantForm.validity_days"
+              type="number"
+              min="1"
+              max="36500"
+              class="input"
+            />
+          </div>
+          <div>
+            <label class="input-label">{{ t('admin.subscriptions.benefitGrant.notes') }}</label>
+            <input
+              v-model="benefitGrantForm.notes"
+              type="text"
+              maxlength="1800"
+              class="input"
+              :placeholder="t('admin.subscriptions.benefitGrant.notesPlaceholder')"
+            />
+          </div>
+        </div>
+
+        <div class="border-y border-gray-200 py-4 dark:border-dark-700">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ t('admin.subscriptions.benefitGrant.preview') }}
+              </p>
+              <p
+                v-if="benefitGrantPreview"
+                class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
+              >
+                {{ benefitGrantPreview.audience_date }} · {{ benefitGrantPreview.timezone }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-secondary px-2"
+              :disabled="benefitGrantPreviewLoading || !benefitGrantForm.group_id"
+              :title="t('common.refresh')"
+              @click="loadBenefitGrantPreview"
+            >
+              <Icon
+                name="refresh"
+                size="sm"
+                :class="benefitGrantPreviewLoading ? 'animate-spin' : ''"
+              />
+            </button>
+          </div>
+
+          <div
+            v-if="benefitGrantPreviewLoading"
+            class="py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+          >
+            {{ t('admin.subscriptions.benefitGrant.previewLoading') }}
+          </div>
+          <div
+            v-else-if="benefitGrantPreview"
+            class="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4"
+          >
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.subscriptions.benefitGrant.matched') }}
+              </p>
+              <p class="mt-1 text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                {{ benefitGrantPreview.matched_count }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.subscriptions.benefitGrant.eligible') }}
+              </p>
+              <p class="mt-1 text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {{ benefitGrantPreview.eligible_count }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.subscriptions.benefitGrant.alreadyGranted') }}
+              </p>
+              <p class="mt-1 text-lg font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                {{ benefitGrantPreview.already_granted_count }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.subscriptions.benefitGrant.conflicts') }}
+              </p>
+              <p
+                :class="[
+                  'mt-1 text-lg font-semibold tabular-nums',
+                  benefitGrantPreview.conflict_count > 0
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                ]"
+              >
+                {{ benefitGrantPreview.conflict_count }}
+              </p>
+            </div>
+          </div>
+          <p
+            v-else-if="benefitGrantPreviewError"
+            class="py-3 text-sm text-red-600 dark:text-red-400"
+          >
+            {{ benefitGrantPreviewError }}
+          </p>
+          <p v-else class="py-3 text-sm text-gray-500 dark:text-gray-400">
+            {{ t('admin.subscriptions.benefitGrant.selectGroup') }}
+          </p>
+
+          <p
+            v-if="benefitGrantPreview && benefitGrantPreview.conflict_count > 0"
+            class="mt-3 text-xs text-amber-700 dark:text-amber-300"
+          >
+            {{ t('admin.subscriptions.benefitGrant.conflictHint') }}
+          </p>
+        </div>
+      </form>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button type="button" class="btn btn-secondary" @click="closeBenefitGrantModal">
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="submit"
+            form="benefit-grant-form"
+            class="btn btn-primary"
+            :disabled="benefitGrantSubmitDisabled"
+          >
+            <Icon
+              :name="benefitGrantSubmitting ? 'refresh' : 'gift'"
+              size="sm"
+              :class="['mr-2', benefitGrantSubmitting ? 'animate-spin' : '']"
+            />
+            {{
+              benefitGrantSubmitting
+                ? t('admin.subscriptions.benefitGrant.granting')
+                : t('admin.subscriptions.benefitGrant.grantCount', {
+                    count: benefitGrantPreview?.eligible_count || 0
+                  })
+            }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
     <!-- Adjust Subscription Modal -->
     <BaseDialog
       :show="showExtendModal"
@@ -1044,11 +1257,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { SubscriptionRetentionEstimate } from '@/api/admin/subscriptions'
+import type {
+  BenefitGrantPreview,
+  BenefitGrantRequest,
+  SubscriptionRetentionEstimate
+} from '@/api/admin/subscriptions'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType, SubscriptionAddonPack } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
@@ -1279,6 +1496,7 @@ const pagination = reactive({
 })
 
 const showAssignModal = ref(false)
+const showBenefitGrantModal = ref(false)
 const showExtendModal = ref(false)
 const showRevokeDialog = ref(false)
 const showRestoreDialog = ref(false)
@@ -1293,6 +1511,13 @@ const restoringSubscription = ref<UserSubscription | null>(null)
 const addonSubscription = ref<UserSubscription | null>(null)
 const addonPacks = ref<SubscriptionAddonPack[]>([])
 const addonSubmitting = ref(false)
+const benefitGrantPreview = ref<BenefitGrantPreview | null>(null)
+const benefitGrantPreviewLoading = ref(false)
+const benefitGrantPreviewError = ref('')
+const benefitGrantSubmitting = ref(false)
+let benefitGrantPreviewTimer: ReturnType<typeof setTimeout> | null = null
+let benefitGrantPreviewSequence = 0
+let benefitGrantOperationKey = ''
 
 const addonQuickAmounts = [10, 20, 50, 100]
 const addonExpiryDayOptions: Exclude<AddonExpiryDays, null>[] = [1, 3, 7, 15, 30]
@@ -1369,6 +1594,14 @@ const assignForm = reactive({
   user_id: null as number | null,
   group_id: null as number | null,
   validity_days: 30
+})
+
+const benefitGrantForm = reactive({
+  audience_type: 'today_active' as const,
+  benefit_type: 'subscription' as const,
+  group_id: null as number | null,
+  validity_days: 1,
+  notes: ''
 })
 
 const extendForm = reactive({
@@ -1476,6 +1709,27 @@ const subscriptionGroupOptions = computed(() =>
       subscriptionType: g.subscription_type,
       rate: g.rate_multiplier
     }))
+)
+
+const benefitAudienceOptions = computed(() => [
+  {
+    value: 'today_active',
+    label: t('admin.subscriptions.benefitGrant.todayActive')
+  }
+])
+
+const benefitTypeOptions = computed(() => [
+  {
+    value: 'subscription',
+    label: t('admin.subscriptions.benefitGrant.subscription')
+  }
+])
+
+const benefitGrantSubmitDisabled = computed(() =>
+  benefitGrantSubmitting.value ||
+  benefitGrantPreviewLoading.value ||
+  !benefitGrantPreview.value ||
+  benefitGrantPreview.value.eligible_count <= 0
 )
 
 const applyFilters = () => {
@@ -1658,6 +1912,195 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   sortState.sort_order = order
   pagination.page = 1
   loadSubscriptions()
+}
+
+const getBrowserTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+  } catch {
+    return 'Asia/Shanghai'
+  }
+}
+
+const getDateInTimezone = (timezone: string) => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date())
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+    return `${values.year}-${values.month}-${values.day}`
+  } catch {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+}
+
+const createBenefitGrantOperationKey = () => {
+  const suffix = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `benefit-grant-${suffix}`
+}
+
+const buildBenefitGrantRequest = (): BenefitGrantRequest | null => {
+  const groupID = Number(benefitGrantForm.group_id)
+  const validityDays = Number(benefitGrantForm.validity_days)
+  if (!Number.isInteger(groupID) || groupID <= 0) return null
+  if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 36500) return null
+
+  const browserTimezone = getBrowserTimezone()
+  return {
+    audience_type: benefitGrantForm.audience_type,
+    audience_date: getDateInTimezone(browserTimezone),
+    timezone: browserTimezone,
+    benefit_type: benefitGrantForm.benefit_type,
+    group_id: groupID,
+    validity_days: validityDays,
+    notes: benefitGrantForm.notes.trim() || undefined
+  }
+}
+
+const openBenefitGrantModal = () => {
+  const availableGroups = subscriptionGroupOptions.value
+  benefitGrantForm.group_id = availableGroups.length === 1
+    ? Number(availableGroups[0].value)
+    : null
+  benefitGrantForm.validity_days = 1
+  benefitGrantForm.notes = ''
+  benefitGrantPreview.value = null
+  benefitGrantPreviewError.value = ''
+  benefitGrantOperationKey = createBenefitGrantOperationKey()
+  showBenefitGrantModal.value = true
+}
+
+const closeBenefitGrantModal = () => {
+  showBenefitGrantModal.value = false
+  benefitGrantPreviewSequence++
+  if (benefitGrantPreviewTimer) {
+    clearTimeout(benefitGrantPreviewTimer)
+    benefitGrantPreviewTimer = null
+  }
+  benefitGrantForm.group_id = null
+  benefitGrantForm.validity_days = 1
+  benefitGrantForm.notes = ''
+  benefitGrantPreview.value = null
+  benefitGrantPreviewError.value = ''
+  benefitGrantPreviewLoading.value = false
+  benefitGrantOperationKey = ''
+}
+
+const loadBenefitGrantPreview = async () => {
+  const request = buildBenefitGrantRequest()
+  if (!request || !showBenefitGrantModal.value) {
+    benefitGrantPreview.value = null
+    return
+  }
+
+  const sequence = ++benefitGrantPreviewSequence
+  benefitGrantPreviewLoading.value = true
+  benefitGrantPreviewError.value = ''
+  try {
+    const preview = await adminAPI.subscriptions.previewBenefitGrant(request)
+    if (sequence !== benefitGrantPreviewSequence) return
+    benefitGrantPreview.value = preview
+  } catch (error: any) {
+    if (sequence !== benefitGrantPreviewSequence) return
+    benefitGrantPreview.value = null
+    benefitGrantPreviewError.value =
+      error?.message || t('admin.subscriptions.benefitGrant.previewFailed')
+  } finally {
+    if (sequence === benefitGrantPreviewSequence) {
+      benefitGrantPreviewLoading.value = false
+    }
+  }
+}
+
+const scheduleBenefitGrantPreview = () => {
+  benefitGrantPreviewSequence++
+  benefitGrantPreview.value = null
+  benefitGrantPreviewError.value = ''
+  benefitGrantPreviewLoading.value = false
+  if (benefitGrantPreviewTimer) {
+    clearTimeout(benefitGrantPreviewTimer)
+    benefitGrantPreviewTimer = null
+  }
+  if (!showBenefitGrantModal.value || !buildBenefitGrantRequest()) return
+
+  benefitGrantPreviewTimer = setTimeout(() => {
+    benefitGrantPreviewTimer = null
+    loadBenefitGrantPreview()
+  }, 250)
+}
+
+watch(
+  [
+    () => showBenefitGrantModal.value,
+    () => benefitGrantForm.group_id,
+    () => benefitGrantForm.validity_days
+  ],
+  scheduleBenefitGrantPreview
+)
+
+const handleBenefitGrant = async () => {
+  const request = buildBenefitGrantRequest()
+  const preview = benefitGrantPreview.value
+  if (!request || !preview) {
+    appStore.showError(t('admin.subscriptions.benefitGrant.previewRequired'))
+    return
+  }
+  if (
+    preview.audience_date !== request.audience_date ||
+    preview.timezone !== request.timezone ||
+    preview.benefit_type !== request.benefit_type ||
+    preview.group_id !== request.group_id ||
+    preview.validity_days !== request.validity_days
+  ) {
+    scheduleBenefitGrantPreview()
+    appStore.showError(t('admin.subscriptions.benefitGrant.previewRequired'))
+    return
+  }
+
+  benefitGrantSubmitting.value = true
+  try {
+    const result = await adminAPI.subscriptions.executeBenefitGrant(
+      {
+        ...request,
+        expected_matched_count: preview.matched_count,
+        expected_eligible_count: preview.eligible_count
+      },
+      benefitGrantOperationKey
+    )
+
+    if (result.failed_count > 0) {
+      appStore.showError(t('admin.subscriptions.benefitGrant.partialSuccess', {
+        granted: result.granted_count,
+        failed: result.failed_count
+      }))
+    } else {
+      appStore.showSuccess(t('admin.subscriptions.benefitGrant.success', {
+        granted: result.granted_count,
+        skipped: result.skipped_count
+      }))
+    }
+    closeBenefitGrantModal()
+    await loadSubscriptions()
+  } catch (error: any) {
+    const reason = error?.reason || error?.code
+    if (reason === 'BENEFIT_GRANT_AUDIENCE_CHANGED') {
+      appStore.showError(t('admin.subscriptions.benefitGrant.audienceChanged'))
+      benefitGrantOperationKey = createBenefitGrantOperationKey()
+      await loadBenefitGrantPreview()
+    } else {
+      appStore.showError(error?.message || t('admin.subscriptions.benefitGrant.failed'))
+    }
+  } finally {
+    benefitGrantSubmitting.value = false
+  }
 }
 
 const closeAssignModal = () => {
@@ -2008,6 +2451,9 @@ onUnmounted(() => {
   }
   if (userSearchTimeout) {
     clearTimeout(userSearchTimeout)
+  }
+  if (benefitGrantPreviewTimer) {
+    clearTimeout(benefitGrantPreviewTimer)
   }
 })
 </script>

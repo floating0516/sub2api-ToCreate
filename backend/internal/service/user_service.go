@@ -10,6 +10,7 @@ import (
 	"fmt"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"image"
 	"image/color"
 	stddraw "image/draw"
@@ -63,6 +64,11 @@ var (
 	avatarScaleSteps   = []float64{1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36}
 	avatarQualitySteps = []int{88, 80, 72, 64, 56, 48, 40, 32}
 )
+
+type userLastActiveTouchState struct {
+	attemptedAt   time.Time
+	nextAllowedAt time.Time
+}
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
@@ -1084,27 +1090,29 @@ func (s *UserService) TouchLastActiveForUser(ctx context.Context, user *User) {
 	if userLastActiveFresh(user.LastActiveAt, now) {
 		return
 	}
-	if v, ok := s.lastActiveTouchL1.Load(user.ID); ok {
-		if nextAllowedAt, ok := v.(time.Time); ok && now.Before(nextAllowedAt) {
-			return
-		}
+	if v, ok := s.lastActiveTouchL1.Load(user.ID); ok && userLastActiveTouchFresh(v, now) {
+		return
 	}
 
 	_, err, _ := s.lastActiveTouchSF.Do(strconv.FormatInt(user.ID, 10), func() (any, error) {
 		latest := time.Now()
-		if v, ok := s.lastActiveTouchL1.Load(user.ID); ok {
-			if nextAllowedAt, ok := v.(time.Time); ok && latest.Before(nextAllowedAt) {
-				return nil, nil
-			}
+		if v, ok := s.lastActiveTouchL1.Load(user.ID); ok && userLastActiveTouchFresh(v, latest) {
+			return nil, nil
 		}
 		if userLastActiveFresh(user.LastActiveAt, latest) {
 			return nil, nil
 		}
 		if err := s.userRepo.UpdateUserLastActiveAt(ctx, user.ID, latest); err != nil {
-			s.lastActiveTouchL1.Store(user.ID, latest.Add(userLastActiveFailBackoff))
+			s.lastActiveTouchL1.Store(user.ID, userLastActiveTouchState{
+				attemptedAt:   latest,
+				nextAllowedAt: latest.Add(userLastActiveFailBackoff),
+			})
 			return nil, fmt.Errorf("touch user last active: %w", err)
 		}
-		s.lastActiveTouchL1.Store(user.ID, latest.Add(userLastActiveMinTouch))
+		s.lastActiveTouchL1.Store(user.ID, userLastActiveTouchState{
+			attemptedAt:   latest,
+			nextAllowedAt: latest.Add(userLastActiveMinTouch),
+		})
 		return nil, nil
 	})
 	if err != nil {
@@ -1116,7 +1124,21 @@ func userLastActiveFresh(lastActiveAt *time.Time, now time.Time) bool {
 	if lastActiveAt == nil {
 		return false
 	}
+	if !timezone.StartOfDay(*lastActiveAt).Equal(timezone.StartOfDay(now)) {
+		return false
+	}
 	return now.Before(lastActiveAt.Add(userLastActiveMinTouch))
+}
+
+func userLastActiveTouchFresh(value any, now time.Time) bool {
+	state, ok := value.(userLastActiveTouchState)
+	if !ok {
+		return false
+	}
+	if !timezone.StartOfDay(state.attemptedAt).Equal(timezone.StartOfDay(now)) {
+		return false
+	}
+	return now.Before(state.nextAllowedAt)
 }
 
 func (s *UserService) hydrateUserAvatar(ctx context.Context, user *User) error {
