@@ -28,6 +28,14 @@
           </button>
         </header>
 
+        <OfficialVersionStatus
+          class="mb-6"
+          :current-version="appStore.currentVersion"
+          :latest-version="appStore.latestVersion"
+          :has-update="appStore.hasUpdate"
+          :release-url="appStore.releaseInfo?.html_url"
+        />
+
         <div v-if="loading && !notes" class="flex min-h-[240px] items-center justify-center">
           <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
         </div>
@@ -83,9 +91,12 @@ import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import OfficialVersionStatus from '@/components/common/OfficialVersionStatus.vue'
 import { customBuildAPI, type CustomBuildNotes } from '@/api/admin/customBuild'
+import { useAppStore } from '@/stores'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 const loading = ref(false)
 const loadError = ref('')
 const notes = ref<CustomBuildNotes | null>(null)
@@ -195,6 +206,7 @@ watch(renderedHtml, async () => {
 
 onMounted(() => {
   loadNotes()
+  void appStore.fetchVersion(false)
   window.addEventListener('scroll', updateActiveHeading, { passive: true })
 })
 

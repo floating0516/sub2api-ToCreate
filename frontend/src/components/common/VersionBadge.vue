@@ -31,8 +31,7 @@
         <div
           v-if="dropdownOpen"
           ref="dropdownRef"
-          class="absolute left-0 z-50 mt-2 max-h-[calc(100vh-5rem)] overflow-x-hidden overflow-y-auto whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
-          :class="customUpdateAvailable || (rollbackPanelOpen && isReleaseBuild) ? 'w-80' : 'w-64'"
+          class="absolute left-0 z-50 mt-2 max-h-[calc(100vh-5rem)] w-80 max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
         >
           <!-- Header with refresh button -->
           <div
@@ -112,6 +111,15 @@
                       : t('version.upToDate')
                   }}
                 </p>
+              </div>
+
+              <div class="-mx-4 mb-3 px-4">
+                <OfficialVersionStatus
+                  :current-version="currentVersion"
+                  :latest-version="latestVersion"
+                  :has-update="hasUpdate"
+                  :release-url="releaseInfo?.html_url"
+                />
               </div>
 
               <div
@@ -907,9 +915,11 @@ import {
 } from '@/api/admin/customBuild'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
+import OfficialVersionStatus from '@/components/common/OfficialVersionStatus.vue'
+import { OFFICIAL_REPOSITORY } from '@/constants/version'
 import { resolveCustomUpdateSteps } from '@/utils/customUpdateSteps'
 
-const GITHUB_REPO = 'Wei-Shaw/sub2api'
+const GITHUB_REPO = OFFICIAL_REPOSITORY
 // Docker Hub image published by CI (tags carry no "v" prefix, e.g. weishaw/sub2api:0.1.146)
 const DOCKER_IMAGE = 'weishaw/sub2api'
 
