@@ -65,6 +65,26 @@ export default {
     dockerEditCompose: '修改 docker-compose.yml 中的镜像版本',
     dockerRecreate: '重新创建容器',
     customUpdateTitle: 'ToCreate 自定义更新',
+    customUpdateDemoTitle: '演示状态',
+    customUpdateDemoHint: '只替换当前页面显示，不会调用模型、写入源码或执行部署。',
+    customUpdateDemoExit: '退出演示',
+    customUpdateDemoScenarios: {
+      conflict: '1. 检测到合并冲突',
+      resolving: '2. Luna 正在处理',
+      review: '3. 中风险方案待审核',
+      review_high: '4. 高风险方案待审核',
+      failed: '5. 自动处理失败',
+      staged: '6. 18080 已准备完成'
+    },
+    customUpdateDemoReviewSummary:
+      '保留 ToCreate 的自定义菜单和订阅逻辑，同时适配官方新增的版本检查接口。',
+    customUpdateDemoHighRiskSummary:
+      '候选方案需要同时调整管理端路由、前端状态结构和主机更新脚本，影响范围较大。',
+    customUpdateDemoReviewWarning: '建议重点检查右上角版本弹层和自定义菜单顺序。',
+    customUpdateDemoHighRiskWarningPrimary: '管理端接口签名发生变化，需要确认旧客户端兼容性。',
+    customUpdateDemoHighRiskWarningSecondary: '部署脚本包含控制流程修改，接受前应人工查看完整差异。',
+    customUpdateDemoFailedError:
+      'Luna 返回的结构化结果未通过安全校验，候选 worktree 已保留，正式分支没有变化。',
     customUpdateOffline: '主机更新控制器未运行',
     customUpdateStage: '同步官方并部署到 18080',
     customUpdateRetry: '重新执行更新',

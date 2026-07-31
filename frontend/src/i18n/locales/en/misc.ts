@@ -67,6 +67,30 @@ export default {
     dockerEditCompose: 'Edit the image tag in docker-compose.yml',
     dockerRecreate: 'Recreate the container',
     customUpdateTitle: 'ToCreate Custom Update',
+    customUpdateDemoTitle: 'Demo state',
+    customUpdateDemoHint:
+      'Only the current page is simulated. No model call, source write, or deployment can run.',
+    customUpdateDemoExit: 'Exit demo',
+    customUpdateDemoScenarios: {
+      conflict: '1. Merge conflict detected',
+      resolving: '2. Luna is resolving',
+      review: '3. Medium-risk proposal review',
+      review_high: '4. High-risk proposal review',
+      failed: '5. Automatic resolution failed',
+      staged: '6. Port 18080 is ready'
+    },
+    customUpdateDemoReviewSummary:
+      'Preserve the ToCreate custom menu and subscription behavior while adapting to the new official version-check API.',
+    customUpdateDemoHighRiskSummary:
+      'The proposal changes admin routes, frontend status contracts, and the host update controller.',
+    customUpdateDemoReviewWarning:
+      'Review the top-right version panel and custom menu ordering closely.',
+    customUpdateDemoHighRiskWarningPrimary:
+      'The admin API signature changed and older client compatibility needs review.',
+    customUpdateDemoHighRiskWarningSecondary:
+      'The deployment controller flow changed; inspect the full diff before accepting it.',
+    customUpdateDemoFailedError:
+      'The structured Luna response failed safety validation. The candidate worktree remains isolated and the custom branch is unchanged.',
     customUpdateOffline: 'The host update controller is offline',
     customUpdateStage: 'Sync upstream and deploy to 18080',
     customUpdateRetry: 'Retry custom update',

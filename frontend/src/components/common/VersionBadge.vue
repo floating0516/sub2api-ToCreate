@@ -140,6 +140,49 @@
                 </div>
 
                 <div
+                  v-if="customUpdateDemoActive"
+                  data-testid="custom-update-demo-banner"
+                  class="mb-3 border border-blue-200 bg-blue-50 p-2.5 text-blue-900 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-100"
+                >
+                  <div class="flex items-start gap-2">
+                    <Icon
+                      name="infoCircle"
+                      size="xs"
+                      :stroke-width="2"
+                      class="mt-0.5 flex-shrink-0"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-semibold">{{ t('version.customUpdateDemoTitle') }}</p>
+                      <p class="mt-0.5 text-[10px] leading-4 text-blue-700 dark:text-blue-300">
+                        {{ t('version.customUpdateDemoHint') }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-100"
+                      :title="t('version.customUpdateDemoExit')"
+                      @click="exitCustomUpdateDemo"
+                    >
+                      <Icon name="x" size="xs" :stroke-width="2" />
+                    </button>
+                  </div>
+                  <select
+                    :value="customUpdateDemoScenario"
+                    class="mt-2 h-8 w-full border border-blue-200 bg-white px-2 text-xs text-gray-700 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-blue-800 dark:bg-dark-800 dark:text-dark-200"
+                    :aria-label="t('version.customUpdateDemoTitle')"
+                    @change="handleCustomUpdateDemoScenarioChange"
+                  >
+                    <option
+                      v-for="option in customUpdateDemoOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+
+                <div
                   v-if="!customUpdateControllerOnline"
                   class="flex items-start gap-2 bg-amber-50 px-2.5 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
                 >
@@ -337,7 +380,7 @@
                       <div v-if="!resolutionConfirmationVisible" class="grid grid-cols-2 gap-2">
                         <button
                           @click="handleCustomUpdateResolutionAbort"
-                          :disabled="customUpdateSubmitting"
+                          :disabled="customUpdateSubmitting || customUpdateDemoActive"
                           class="flex items-center justify-center gap-1.5 border border-red-200 bg-white px-2 py-2 font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-dark-800 dark:text-red-400 dark:hover:bg-red-900/20"
                         >
                           <Icon name="xCircle" size="xs" :stroke-width="2" />
@@ -345,7 +388,7 @@
                         </button>
                         <button
                           @click="resolutionConfirmationVisible = true"
-                          :disabled="customUpdateSubmitting"
+                          :disabled="customUpdateSubmitting || customUpdateDemoActive"
                           class="flex items-center justify-center gap-1.5 bg-amber-600 px-2 py-2 font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
                         >
                           <Icon name="check" size="xs" :stroke-width="2" />
@@ -363,7 +406,7 @@
                           </button>
                           <button
                             @click="handleCustomUpdateResolutionAccept"
-                            :disabled="customUpdateSubmitting"
+                            :disabled="customUpdateSubmitting || customUpdateDemoActive"
                             class="bg-amber-600 px-2 py-2 font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
                           >
                             {{ t('version.customUpdateConfirmResolution') }}
@@ -375,7 +418,7 @@
                     <button
                       v-else-if="customUpdateStatus?.state === 'resolution_failed'"
                       @click="handleCustomUpdateResolutionAbort"
-                      :disabled="customUpdateSubmitting"
+                      :disabled="customUpdateSubmitting || customUpdateDemoActive"
                       class="flex w-full items-center justify-center gap-1.5 border border-red-200 bg-white px-2 py-2 font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-dark-800 dark:text-red-400 dark:hover:bg-red-900/20"
                     >
                       <Icon name="xCircle" size="xs" :stroke-width="2" />
@@ -409,7 +452,8 @@
                     <button
                       v-if="!promotionConfirmationVisible"
                       @click="promotionConfirmationVisible = true"
-                      class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                      :disabled="customUpdateDemoActive"
+                      class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Icon name="server" size="sm" :stroke-width="2" />
                       {{ t('version.customUpdatePromote') }}
@@ -437,7 +481,7 @@
                         </button>
                         <button
                           @click="handleCustomUpdatePromotion"
-                          :disabled="customUpdateSubmitting"
+                          :disabled="customUpdateSubmitting || customUpdateDemoActive"
                           class="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                         >
                           <Icon name="check" size="xs" :stroke-width="2" />
@@ -1042,6 +1086,15 @@ import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
 import OfficialVersionStatus from '@/components/common/OfficialVersionStatus.vue'
 import { OFFICIAL_REPOSITORY } from '@/constants/version'
+import {
+  CUSTOM_UPDATE_DEMO_QUERY_PARAM,
+  CUSTOM_UPDATE_DEMO_SCENARIOS,
+  createCustomUpdateDemoStatus,
+  isCustomUpdateDemoScenario,
+  resolveCustomUpdateDemoScenario,
+  type CustomUpdateDemoCopy,
+  type CustomUpdateDemoScenario
+} from '@/utils/customUpdateDemo'
 import { resolveCustomUpdateSteps } from '@/utils/customUpdateSteps'
 
 const GITHUB_REPO = OFFICIAL_REPOSITORY
@@ -1089,6 +1142,13 @@ const customUpdateActionError = ref('')
 const promotionConfirmationVisible = ref(false)
 const resolutionConfirmationVisible = ref(false)
 let customUpdatePollingTimer: number | undefined
+const initialCustomUpdateDemoScenario =
+  typeof window === 'undefined'
+    ? null
+    : resolveCustomUpdateDemoScenario(window.location.search, window.location.port)
+const customUpdateDemoScenario = ref<CustomUpdateDemoScenario | null>(
+  initialCustomUpdateDemoScenario
+)
 
 // Rollback states
 const rollbackPanelOpen = ref(false)
@@ -1114,6 +1174,23 @@ const customUpdateBusyStates = new Set<CustomUpdateState>([
   'promoting'
 ])
 
+const customUpdateDemoActive = computed(() => customUpdateDemoScenario.value !== null)
+const customUpdateDemoOptions = computed(() =>
+  CUSTOM_UPDATE_DEMO_SCENARIOS.map((scenario) => ({
+    value: scenario,
+    label: t(`version.customUpdateDemoScenarios.${scenario}`)
+  }))
+)
+const customUpdateDemoCopy = computed<CustomUpdateDemoCopy>(() => ({
+  reviewSummary: t('version.customUpdateDemoReviewSummary'),
+  highRiskSummary: t('version.customUpdateDemoHighRiskSummary'),
+  reviewWarnings: [t('version.customUpdateDemoReviewWarning')],
+  highRiskWarnings: [
+    t('version.customUpdateDemoHighRiskWarningPrimary'),
+    t('version.customUpdateDemoHighRiskWarningSecondary')
+  ],
+  failedError: t('version.customUpdateDemoFailedError')
+}))
 const customUpdateAvailable = computed(() => customUpdateStatus.value?.enabled === true)
 const customUpdateControllerOnline = computed(
   () => customUpdateStatus.value?.controller_online === true
@@ -1123,6 +1200,7 @@ const customUpdateBusy = computed(() => {
   return state ? customUpdateBusyStates.has(state) : false
 })
 const customUpdateCanStage = computed(() => {
+  if (customUpdateDemoActive.value) return false
   if (!customUpdateControllerOnline.value) return false
   const state = customUpdateStatus.value?.state
   return (
@@ -1357,8 +1435,54 @@ async function handleUpdate() {
   }
 }
 
+function applyCustomUpdateDemoStatus() {
+  const scenario = customUpdateDemoScenario.value
+  if (!scenario) return
+  customUpdateStatus.value = createCustomUpdateDemoStatus(
+    scenario,
+    customUpdateDemoCopy.value
+  )
+  customUpdateLoadError.value = ''
+  customUpdateActionError.value = ''
+  customUpdateStatusChecked.value = true
+  promotionConfirmationVisible.value = false
+  resolutionConfirmationVisible.value = false
+}
+
+function replaceCustomUpdateDemoQuery(scenario: CustomUpdateDemoScenario | null) {
+  const url = new URL(window.location.href)
+  if (scenario) {
+    url.searchParams.set(CUSTOM_UPDATE_DEMO_QUERY_PARAM, scenario)
+  } else {
+    url.searchParams.delete(CUSTOM_UPDATE_DEMO_QUERY_PARAM)
+  }
+  window.history.replaceState(window.history.state, '', url.toString())
+}
+
+function handleCustomUpdateDemoScenarioChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (!isCustomUpdateDemoScenario(value)) return
+  customUpdateDemoScenario.value = value
+  replaceCustomUpdateDemoQuery(value)
+  applyCustomUpdateDemoStatus()
+}
+
+async function exitCustomUpdateDemo() {
+  customUpdateDemoScenario.value = null
+  replaceCustomUpdateDemoQuery(null)
+  customUpdateStatus.value = null
+  await refreshCustomUpdateStatus()
+  if (dropdownOpen.value) {
+    startCustomUpdatePolling()
+  }
+}
+
 async function refreshCustomUpdateStatus() {
   if (!isAdmin.value) return
+  if (customUpdateDemoActive.value) {
+    applyCustomUpdateDemoStatus()
+    return
+  }
   try {
     const status = await getCustomUpdateStatus()
     customUpdateStatus.value = status
@@ -1379,6 +1503,7 @@ async function refreshCustomUpdateStatus() {
 
 function startCustomUpdatePolling() {
   stopCustomUpdatePolling()
+  if (customUpdateDemoActive.value) return
   customUpdatePollingTimer = window.setInterval(() => {
     void refreshCustomUpdateStatus()
   }, 3000)
@@ -1392,7 +1517,13 @@ function stopCustomUpdatePolling() {
 }
 
 async function handleCustomUpdateStage() {
-  if (customUpdateSubmitting.value || !customUpdateCanStage.value) return
+  if (
+    customUpdateDemoActive.value ||
+    customUpdateSubmitting.value ||
+    !customUpdateCanStage.value
+  ) {
+    return
+  }
 
   customUpdateSubmitting.value = true
   customUpdateActionError.value = ''
@@ -1428,7 +1559,7 @@ async function handleCustomUpdateStage() {
 
 async function handleCustomUpdatePromotion() {
   const image = customUpdateStatus.value?.image
-  if (customUpdateSubmitting.value || !image) return
+  if (customUpdateDemoActive.value || customUpdateSubmitting.value || !image) return
 
   customUpdateSubmitting.value = true
   customUpdateActionError.value = ''
@@ -1457,7 +1588,7 @@ async function handleCustomUpdatePromotion() {
 
 async function handleCustomUpdateResolutionAccept() {
   const resolutionId = customUpdateStatus.value?.resolution_id
-  if (customUpdateSubmitting.value || !resolutionId) return
+  if (customUpdateDemoActive.value || customUpdateSubmitting.value || !resolutionId) return
 
   customUpdateSubmitting.value = true
   customUpdateActionError.value = ''
@@ -1493,7 +1624,7 @@ async function handleCustomUpdateResolutionAccept() {
 
 async function handleCustomUpdateResolutionAbort() {
   const resolutionId = customUpdateStatus.value?.resolution_id
-  if (customUpdateSubmitting.value || !resolutionId) return
+  if (customUpdateDemoActive.value || customUpdateSubmitting.value || !resolutionId) return
 
   customUpdateSubmitting.value = true
   customUpdateActionError.value = ''
