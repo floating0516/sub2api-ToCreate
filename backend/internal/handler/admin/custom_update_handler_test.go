@@ -65,13 +65,13 @@ func TestCustomUpdateStatusReturnsControllerSteps(t *testing.T) {
 	handler, controlDir := newCustomUpdateTestHandler(t)
 	markCustomUpdateControllerOnline(t, controlDir)
 	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
-		State:               "resolution_ready",
-		ResolutionID:        "0123456789abcdef0123456789abcdef",
-		ConflictFiles:       []string{
+		State:        "resolution_ready",
+		ResolutionID: "0123456789abcdef0123456789abcdef",
+		ConflictFiles: []string{
 			"frontend/src/example.ts",
 		},
 		ResolutionRiskLevel: "medium",
-		Steps:               []customUpdateStep{
+		Steps: []customUpdateStep{
 			{ID: "source_check", Status: "completed"},
 			{ID: "conflict_resolution", Status: "action_required"},
 		},

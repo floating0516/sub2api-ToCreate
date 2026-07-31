@@ -48,7 +48,7 @@ type customUpdateStatus struct {
 	Steps               []customUpdateStep `json:"steps,omitempty"`
 	ResolutionID        string             `json:"resolution_id,omitempty"`
 	ConflictFiles       []string           `json:"conflict_files,omitempty"`
-	ResolutionSummary  string             `json:"resolution_summary,omitempty"`
+	ResolutionSummary   string             `json:"resolution_summary,omitempty"`
 	ResolutionRiskLevel string             `json:"resolution_risk_level,omitempty"`
 	ResolutionWarnings  []string           `json:"resolution_warnings,omitempty"`
 	ResolutionDiffStat  string             `json:"resolution_diff_stat,omitempty"`
