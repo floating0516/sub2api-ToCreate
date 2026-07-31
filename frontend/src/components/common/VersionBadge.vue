@@ -176,14 +176,10 @@
                     </svg>
                     <Icon
                       v-else
-                      :name="customUpdateStatus?.state === 'failed' ? 'xCircle' : 'checkCircle'"
+                      :name="customUpdateStatusIcon"
                       size="xs"
                       :stroke-width="2"
-                      :class="
-                        customUpdateStatus?.state === 'failed'
-                          ? 'text-red-500'
-                          : 'text-green-500'
-                      "
+                      :class="customUpdateStatusIconClass"
                     />
                     <span>{{ customUpdateStatusLabel }}</span>
                   </div>
@@ -261,6 +257,132 @@
                     </p>
                   </div>
 
+                  <div
+                    v-if="customUpdateHasConflictResolution"
+                    class="mt-3 space-y-2 border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-100"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="font-medium">
+                          {{
+                            t('version.customUpdateConflictTitle', {
+                              count: customUpdateConflictFiles.length
+                            })
+                          }}
+                        </p>
+                        <p
+                          v-if="customUpdateStatus?.resolver_model"
+                          class="mt-0.5 text-[10px] text-amber-700 dark:text-amber-300"
+                        >
+                          {{
+                            t('version.customUpdateResolver', {
+                              model: customUpdateStatus.resolver_model
+                            })
+                          }}
+                        </p>
+                      </div>
+                      <span
+                        v-if="customUpdateStatus?.resolution_risk_level"
+                        class="flex-shrink-0 border px-1.5 py-0.5 text-[10px] font-medium"
+                        :class="customUpdateResolutionRiskClass"
+                      >
+                        {{
+                          t(
+                            `version.customUpdateResolutionRisk.${customUpdateStatus.resolution_risk_level}`
+                          )
+                        }}
+                      </span>
+                    </div>
+
+                    <ul
+                      class="max-h-24 space-y-0.5 overflow-y-auto border-l-2 border-amber-300 pl-2 font-mono text-[10px] leading-4 dark:border-amber-700"
+                    >
+                      <li
+                        v-for="path in customUpdateConflictFiles"
+                        :key="path"
+                        class="break-all"
+                      >
+                        {{ path }}
+                      </li>
+                    </ul>
+
+                    <div v-if="customUpdateStatus?.resolution_summary">
+                      <p class="font-medium">{{ t('version.customUpdateResolutionSummary') }}</p>
+                      <p class="mt-0.5 whitespace-pre-wrap leading-4">
+                        {{ customUpdateStatus.resolution_summary }}
+                      </p>
+                    </div>
+
+                    <div v-if="customUpdateStatus?.resolution_warnings?.length">
+                      <p class="font-medium">{{ t('version.customUpdateResolutionWarnings') }}</p>
+                      <ul class="mt-0.5 list-disc space-y-0.5 pl-4 leading-4">
+                        <li
+                          v-for="warning in customUpdateStatus.resolution_warnings"
+                          :key="warning"
+                        >
+                          {{ warning }}
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div v-if="customUpdateStatus?.resolution_diff_stat">
+                      <p class="font-medium">{{ t('version.customUpdateResolutionDiff') }}</p>
+                      <pre
+                        class="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-all bg-white/70 p-1.5 font-mono text-[10px] leading-4 text-gray-700 dark:bg-dark-800/70 dark:text-dark-200"
+                      >{{ customUpdateStatus.resolution_diff_stat }}</pre>
+                    </div>
+
+                    <template v-if="customUpdateStatus?.state === 'resolution_ready'">
+                      <p class="leading-4">{{ t('version.customUpdateResolutionReview') }}</p>
+                      <div v-if="!resolutionConfirmationVisible" class="grid grid-cols-2 gap-2">
+                        <button
+                          @click="handleCustomUpdateResolutionAbort"
+                          :disabled="customUpdateSubmitting"
+                          class="flex items-center justify-center gap-1.5 border border-red-200 bg-white px-2 py-2 font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-dark-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          <Icon name="xCircle" size="xs" :stroke-width="2" />
+                          {{ t('version.customUpdateAbortResolution') }}
+                        </button>
+                        <button
+                          @click="resolutionConfirmationVisible = true"
+                          :disabled="customUpdateSubmitting"
+                          class="flex items-center justify-center gap-1.5 bg-amber-600 px-2 py-2 font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          <Icon name="check" size="xs" :stroke-width="2" />
+                          {{ t('version.customUpdateAcceptResolution') }}
+                        </button>
+                      </div>
+                      <div v-else class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                          <button
+                            @click="resolutionConfirmationVisible = false"
+                            :disabled="customUpdateSubmitting"
+                            class="border border-amber-300 px-2 py-2 font-medium text-amber-800 disabled:opacity-50 dark:border-amber-700 dark:text-amber-200"
+                          >
+                            {{ t('common.cancel') }}
+                          </button>
+                          <button
+                            @click="handleCustomUpdateResolutionAccept"
+                            :disabled="customUpdateSubmitting"
+                            class="bg-amber-600 px-2 py-2 font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                          >
+                            {{ t('version.customUpdateConfirmResolution') }}
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+
+                    <button
+                      v-else-if="customUpdateStatus?.state === 'resolution_failed'"
+                      @click="handleCustomUpdateResolutionAbort"
+                      :disabled="customUpdateSubmitting"
+                      class="flex w-full items-center justify-center gap-1.5 border border-red-200 bg-white px-2 py-2 font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-dark-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                    >
+                      <Icon name="xCircle" size="xs" :stroke-width="2" />
+                      {{ t('version.customUpdateAbortResolution') }}
+                    </button>
+                  </div>
+
                   <p
                     v-if="customUpdateError"
                     class="mt-2 bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
@@ -333,7 +455,8 @@
                   >
                     <Icon name="sync" size="sm" :stroke-width="2" />
                     {{
-                      customUpdateStatus?.state === 'failed'
+                      customUpdateStatus?.state === 'failed' ||
+                      customUpdateStatus?.state === 'resolution_failed'
                         ? t('version.customUpdateRetry')
                         : t('version.customUpdateStage')
                     }}
@@ -908,6 +1031,8 @@ import {
 import {
   getCustomUpdateStatus,
   startCustomUpdate,
+  acceptCustomUpdateResolution,
+  abortCustomUpdateResolution,
   promoteCustomUpdate,
   type CustomUpdateState,
   type CustomUpdateStatus,
@@ -962,6 +1087,7 @@ const customUpdateSubmitting = ref(false)
 const customUpdateLoadError = ref('')
 const customUpdateActionError = ref('')
 const promotionConfirmationVisible = ref(false)
+const resolutionConfirmationVisible = ref(false)
 let customUpdatePollingTimer: number | undefined
 
 // Rollback states
@@ -979,6 +1105,8 @@ const customUpdateBusyStates = new Set<CustomUpdateState>([
   'queued',
   'checking',
   'merging',
+  'conflict_detected',
+  'ai_resolving',
   'pushing',
   'building',
   'staging',
@@ -997,8 +1125,31 @@ const customUpdateBusy = computed(() => {
 const customUpdateCanStage = computed(() => {
   if (!customUpdateControllerOnline.value) return false
   const state = customUpdateStatus.value?.state
-  return state === 'idle' || state === 'completed' || state === 'failed'
+  return (
+    state === 'idle' ||
+    state === 'completed' ||
+    state === 'failed' ||
+    state === 'resolution_failed' ||
+    state === 'aborted'
+  )
 })
+const customUpdateFailed = computed(
+  () =>
+    customUpdateStatus.value?.state === 'failed' ||
+    customUpdateStatus.value?.state === 'resolution_failed'
+)
+const customUpdateStatusIcon = computed(() => {
+  if (customUpdateStatus.value?.state === 'resolution_ready') return 'exclamationCircle' as const
+  return customUpdateFailed.value ? ('xCircle' as const) : ('checkCircle' as const)
+})
+const customUpdateStatusIconClass = computed(() => {
+  if (customUpdateStatus.value?.state === 'resolution_ready') return 'text-amber-500'
+  return customUpdateFailed.value ? 'text-red-500' : 'text-green-500'
+})
+const customUpdateConflictFiles = computed(() => customUpdateStatus.value?.conflict_files || [])
+const customUpdateHasConflictResolution = computed(
+  () => customUpdateConflictFiles.value.length > 0
+)
 const customUpdateStatusLabel = computed(() => {
   const state = customUpdateStatus.value?.state || 'idle'
   return t(`version.customUpdateStates.${state}`)
@@ -1014,13 +1165,18 @@ const customUpdateStatusDotClass = computed(() => {
   if (!customUpdateControllerOnline.value) return 'bg-gray-300 dark:bg-dark-500'
   switch (customUpdateStatus.value?.state) {
     case 'failed':
+    case 'resolution_failed':
       return 'bg-red-500'
+    case 'resolution_ready':
+      return 'bg-amber-500'
     case 'awaiting_approval':
     case 'completed':
       return 'bg-green-500'
     case 'queued':
     case 'checking':
     case 'merging':
+    case 'conflict_detected':
+    case 'ai_resolving':
     case 'pushing':
     case 'building':
     case 'staging':
@@ -1029,6 +1185,16 @@ const customUpdateStatusDotClass = computed(() => {
       return 'animate-pulse bg-primary-500'
     default:
       return 'bg-gray-400'
+  }
+})
+const customUpdateResolutionRiskClass = computed(() => {
+  switch (customUpdateStatus.value?.resolution_risk_level) {
+    case 'high':
+      return 'border-red-300 bg-red-100 text-red-700 dark:border-red-700 dark:bg-red-900/40 dark:text-red-300'
+    case 'medium':
+      return 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200'
+    default:
+      return 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300'
   }
 })
 const customUpdateImageDigestLabel = computed(() => {
@@ -1146,6 +1312,7 @@ function toggleDropdown() {
   } else {
     stopCustomUpdatePolling()
     promotionConfirmationVisible.value = false
+    resolutionConfirmationVisible.value = false
   }
 }
 
@@ -1153,6 +1320,7 @@ function closeDropdown() {
   dropdownOpen.value = false
   stopCustomUpdatePolling()
   promotionConfirmationVisible.value = false
+  resolutionConfirmationVisible.value = false
 }
 
 async function refreshVersion(force = true) {
@@ -1198,6 +1366,9 @@ async function refreshCustomUpdateStatus() {
     if (status.state !== 'awaiting_approval') {
       promotionConfirmationVisible.value = false
     }
+    if (status.state !== 'resolution_ready') {
+      resolutionConfirmationVisible.value = false
+    }
   } catch (error: unknown) {
     const err = error as { response?: { data?: { message?: string } }; message?: string }
     customUpdateLoadError.value = err.response?.data?.message || err.message || ''
@@ -1235,7 +1406,14 @@ async function handleCustomUpdateStage() {
         request_id: result.request_id,
         message: result.message,
         error: undefined,
-        steps: []
+        steps: [],
+        resolution_id: undefined,
+        conflict_files: [],
+        resolution_summary: undefined,
+        resolution_risk_level: undefined,
+        resolution_warnings: [],
+        resolution_diff_stat: undefined,
+        resolver_model: undefined
       }
     }
     startCustomUpdatePolling()
@@ -1267,6 +1445,78 @@ async function handleCustomUpdatePromotion() {
       }
     }
     promotionConfirmationVisible.value = false
+    startCustomUpdatePolling()
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    customUpdateActionError.value =
+      err.response?.data?.message || err.message || t('version.customUpdateRequestFailed')
+  } finally {
+    customUpdateSubmitting.value = false
+  }
+}
+
+async function handleCustomUpdateResolutionAccept() {
+  const resolutionId = customUpdateStatus.value?.resolution_id
+  if (customUpdateSubmitting.value || !resolutionId) return
+
+  customUpdateSubmitting.value = true
+  customUpdateActionError.value = ''
+  try {
+    const result = await acceptCustomUpdateResolution(resolutionId)
+    if (customUpdateStatus.value) {
+      customUpdateStatus.value = {
+        ...customUpdateStatus.value,
+        state: result.state,
+        action: result.action,
+        request_id: result.request_id,
+        message: result.message,
+        error: undefined,
+        resolution_id: undefined,
+        conflict_files: [],
+        resolution_summary: undefined,
+        resolution_risk_level: undefined,
+        resolution_warnings: [],
+        resolution_diff_stat: undefined,
+        resolver_model: undefined
+      }
+    }
+    resolutionConfirmationVisible.value = false
+    startCustomUpdatePolling()
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string }
+    customUpdateActionError.value =
+      err.response?.data?.message || err.message || t('version.customUpdateRequestFailed')
+  } finally {
+    customUpdateSubmitting.value = false
+  }
+}
+
+async function handleCustomUpdateResolutionAbort() {
+  const resolutionId = customUpdateStatus.value?.resolution_id
+  if (customUpdateSubmitting.value || !resolutionId) return
+
+  customUpdateSubmitting.value = true
+  customUpdateActionError.value = ''
+  try {
+    const result = await abortCustomUpdateResolution(resolutionId)
+    if (customUpdateStatus.value) {
+      customUpdateStatus.value = {
+        ...customUpdateStatus.value,
+        state: result.state,
+        action: result.action,
+        request_id: result.request_id,
+        message: result.message,
+        error: undefined,
+        resolution_id: undefined,
+        conflict_files: [],
+        resolution_summary: undefined,
+        resolution_risk_level: undefined,
+        resolution_warnings: [],
+        resolution_diff_stat: undefined,
+        resolver_model: undefined
+      }
+    }
+    resolutionConfirmationVisible.value = false
     startCustomUpdatePolling()
   } catch (error: unknown) {
     const err = error as { response?: { data?: { message?: string } }; message?: string }

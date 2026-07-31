@@ -11,17 +11,17 @@ describe('resolveCustomUpdateSteps', () => {
       ]
     })
 
-    expect(steps).toHaveLength(8)
+    expect(steps).toHaveLength(9)
     expect(steps[0]).toEqual({ id: 'source_check', status: 'completed' })
-    expect(steps[4]).toEqual({ id: 'image_build', status: 'running' })
-    expect(steps[7]).toEqual({ id: 'production_approval', status: 'pending' })
+    expect(steps[5]).toEqual({ id: 'image_build', status: 'running' })
+    expect(steps[8]).toEqual({ id: 'production_approval', status: 'pending' })
   })
 
-  it('maps an older awaiting-approval status to seven completed steps', () => {
+  it('maps an older awaiting-approval status to eight completed steps', () => {
     const steps = resolveCustomUpdateSteps({ state: 'awaiting_approval' })
 
-    expect(steps.slice(0, 7).every((step) => step.status === 'completed')).toBe(true)
-    expect(steps[7]).toEqual({
+    expect(steps.slice(0, 8).every((step) => step.status === 'completed')).toBe(true)
+    expect(steps[8]).toEqual({
       id: 'production_approval',
       status: 'action_required'
     })
@@ -30,7 +30,17 @@ describe('resolveCustomUpdateSteps', () => {
   it('shows source push as the active legacy step', () => {
     const steps = resolveCustomUpdateSteps({ state: 'pushing' })
 
+    expect(steps.slice(0, 4).every((step) => step.status === 'completed')).toBe(true)
+    expect(steps[4]).toEqual({ id: 'source_push', status: 'running' })
+  })
+
+  it('marks AI conflict resolution as requiring review', () => {
+    const steps = resolveCustomUpdateSteps({ state: 'resolution_ready' })
+
     expect(steps.slice(0, 3).every((step) => step.status === 'completed')).toBe(true)
-    expect(steps[3]).toEqual({ id: 'source_push', status: 'running' })
+    expect(steps[3]).toEqual({
+      id: 'conflict_resolution',
+      status: 'action_required'
+    })
   })
 })

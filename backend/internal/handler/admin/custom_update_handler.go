@@ -17,34 +17,42 @@ import (
 )
 
 const (
-	customUpdateRequestFile   = "request.json"
-	customUpdateStatusFile    = "status.json"
-	customUpdateHeartbeatFile = "heartbeat"
-	maxCustomUpdateFileBytes  = 64 << 10
-	controllerHeartbeatMaxAge = 15 * time.Second
+	customUpdateRequestFile    = "request.json"
+	customUpdateProcessingFile = "processing.json"
+	customUpdateStatusFile     = "status.json"
+	customUpdateHeartbeatFile  = "heartbeat"
+	maxCustomUpdateFileBytes   = 64 << 10
+	controllerHeartbeatMaxAge  = 15 * time.Second
 )
 
 type customUpdateStatus struct {
-	Enabled          bool               `json:"enabled"`
-	ControllerOnline bool               `json:"controller_online"`
-	HeartbeatAt      string             `json:"heartbeat_at,omitempty"`
-	State            string             `json:"state"`
-	Action           string             `json:"action,omitempty"`
-	RequestID        string             `json:"request_id,omitempty"`
-	Message          string             `json:"message,omitempty"`
-	Image            string             `json:"image,omitempty"`
-	ImageDigest      string             `json:"image_digest,omitempty"`
-	AppVersion       string             `json:"app_version,omitempty"`
-	UpstreamCommit   string             `json:"upstream_commit,omitempty"`
-	SourceCommit     string             `json:"source_commit,omitempty"`
-	StartedAt        string             `json:"started_at,omitempty"`
-	UpdatedAt        string             `json:"updated_at,omitempty"`
-	CompletedAt      string             `json:"completed_at,omitempty"`
-	Error            string             `json:"error,omitempty"`
-	LogFile          string             `json:"log_file,omitempty"`
-	StagingURL       string             `json:"staging_url,omitempty"`
-	ProductionURL    string             `json:"production_url,omitempty"`
-	Steps            []customUpdateStep `json:"steps,omitempty"`
+	Enabled             bool               `json:"enabled"`
+	ControllerOnline    bool               `json:"controller_online"`
+	HeartbeatAt         string             `json:"heartbeat_at,omitempty"`
+	State               string             `json:"state"`
+	Action              string             `json:"action,omitempty"`
+	RequestID           string             `json:"request_id,omitempty"`
+	Message             string             `json:"message,omitempty"`
+	Image               string             `json:"image,omitempty"`
+	ImageDigest         string             `json:"image_digest,omitempty"`
+	AppVersion          string             `json:"app_version,omitempty"`
+	UpstreamCommit      string             `json:"upstream_commit,omitempty"`
+	SourceCommit        string             `json:"source_commit,omitempty"`
+	StartedAt           string             `json:"started_at,omitempty"`
+	UpdatedAt           string             `json:"updated_at,omitempty"`
+	CompletedAt         string             `json:"completed_at,omitempty"`
+	Error               string             `json:"error,omitempty"`
+	LogFile             string             `json:"log_file,omitempty"`
+	StagingURL          string             `json:"staging_url,omitempty"`
+	ProductionURL       string             `json:"production_url,omitempty"`
+	Steps               []customUpdateStep `json:"steps,omitempty"`
+	ResolutionID        string             `json:"resolution_id,omitempty"`
+	ConflictFiles       []string           `json:"conflict_files,omitempty"`
+	ResolutionSummary  string             `json:"resolution_summary,omitempty"`
+	ResolutionRiskLevel string             `json:"resolution_risk_level,omitempty"`
+	ResolutionWarnings  []string           `json:"resolution_warnings,omitempty"`
+	ResolutionDiffStat  string             `json:"resolution_diff_stat,omitempty"`
+	ResolverModel       string             `json:"resolver_model,omitempty"`
 }
 
 type customUpdateStep struct {
@@ -53,10 +61,11 @@ type customUpdateStep struct {
 }
 
 type customUpdateRequest struct {
-	ID          string `json:"id"`
-	Action      string `json:"action"`
-	Image       string `json:"image,omitempty"`
-	RequestedAt string `json:"requested_at"`
+	ID           string `json:"id"`
+	Action       string `json:"action"`
+	Image        string `json:"image,omitempty"`
+	ResolutionID string `json:"resolution_id,omitempty"`
+	RequestedAt  string `json:"requested_at"`
 }
 
 func (h *CustomBuildHandler) GetCustomUpdateStatus(c *gin.Context) {
@@ -86,7 +95,7 @@ func (h *CustomBuildHandler) StartCustomUpdate(c *gin.Context) {
 		return
 	}
 
-	req, err := h.enqueueCustomUpdateRequest("stage", "")
+	req, err := h.enqueueCustomUpdateRequest("stage", "", "")
 	if err != nil {
 		h.writeEnqueueError(c, err)
 		return
@@ -135,7 +144,7 @@ func (h *CustomBuildHandler) PromoteCustomUpdate(c *gin.Context) {
 		return
 	}
 
-	req, err := h.enqueueCustomUpdateRequest("promote", body.Image)
+	req, err := h.enqueueCustomUpdateRequest("promote", body.Image, "")
 	if err != nil {
 		h.writeEnqueueError(c, err)
 		return
@@ -147,6 +156,72 @@ func (h *CustomBuildHandler) PromoteCustomUpdate(c *gin.Context) {
 		"request_id": req.ID,
 		"image":      req.Image,
 		"message":    "Custom image promotion queued",
+	})
+}
+
+func (h *CustomBuildHandler) AcceptCustomUpdateResolution(c *gin.Context) {
+	h.handleCustomUpdateResolutionAction(c, "accept_resolution")
+}
+
+func (h *CustomBuildHandler) AbortCustomUpdateResolution(c *gin.Context) {
+	h.handleCustomUpdateResolutionAction(c, "abort_resolution")
+}
+
+func (h *CustomBuildHandler) handleCustomUpdateResolutionAction(c *gin.Context, action string) {
+	var body struct {
+		ResolutionID string `json:"resolution_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "Invalid request body")
+		return
+	}
+	body.ResolutionID = strings.TrimSpace(body.ResolutionID)
+	if len(body.ResolutionID) != 32 {
+		response.BadRequest(c, "Resolution ID is invalid")
+		return
+	}
+	if _, err := hex.DecodeString(body.ResolutionID); err != nil {
+		response.BadRequest(c, "Resolution ID is invalid")
+		return
+	}
+
+	h.updateMu.Lock()
+	defer h.updateMu.Unlock()
+
+	status, err := h.readCustomUpdateStatus()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !status.Enabled || !status.ControllerOnline {
+		response.Error(c, http.StatusServiceUnavailable, "Custom update controller is offline")
+		return
+	}
+	stateAllowed := status.State == "resolution_ready"
+	if action == "abort_resolution" {
+		stateAllowed = stateAllowed || status.State == "resolution_failed"
+	}
+	if !stateAllowed || status.ResolutionID == "" {
+		response.Error(c, http.StatusConflict, "No matching conflict resolution is awaiting review")
+		return
+	}
+	if body.ResolutionID != status.ResolutionID {
+		response.Error(c, http.StatusConflict, "Conflict resolution ID does not match the pending proposal")
+		return
+	}
+
+	req, err := h.enqueueCustomUpdateRequest(action, "", body.ResolutionID)
+	if err != nil {
+		h.writeEnqueueError(c, err)
+		return
+	}
+
+	response.Accepted(c, gin.H{
+		"state":         "queued",
+		"action":        req.Action,
+		"request_id":    req.ID,
+		"resolution_id": req.ResolutionID,
+		"message":       "Conflict resolution review action queued",
 	})
 }
 
@@ -199,11 +274,13 @@ func (h *CustomBuildHandler) readCustomUpdateStatus() (customUpdateStatus, error
 	return status, nil
 }
 
-func (h *CustomBuildHandler) enqueueCustomUpdateRequest(action, image string) (*customUpdateRequest, error) {
-	if _, err := os.Stat(filepath.Join(h.updateControlDir, customUpdateRequestFile)); err == nil {
-		return nil, os.ErrExist
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+func (h *CustomBuildHandler) enqueueCustomUpdateRequest(action, image, resolutionID string) (*customUpdateRequest, error) {
+	for _, name := range []string{customUpdateRequestFile, customUpdateProcessingFile} {
+		if _, err := os.Stat(filepath.Join(h.updateControlDir, name)); err == nil {
+			return nil, os.ErrExist
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
 	}
 
 	id, err := newCustomUpdateRequestID()
@@ -211,10 +288,11 @@ func (h *CustomBuildHandler) enqueueCustomUpdateRequest(action, image string) (*
 		return nil, err
 	}
 	req := &customUpdateRequest{
-		ID:          id,
-		Action:      action,
-		Image:       image,
-		RequestedAt: time.Now().UTC().Format(time.RFC3339),
+		ID:           id,
+		Action:       action,
+		Image:        image,
+		ResolutionID: resolutionID,
+		RequestedAt:  time.Now().UTC().Format(time.RFC3339),
 	}
 
 	tempFile, err := os.CreateTemp(h.updateControlDir, ".request-*.json")
@@ -261,7 +339,7 @@ func (h *CustomBuildHandler) writeEnqueueError(c *gin.Context, err error) {
 
 func customUpdateBlocksStage(state string) bool {
 	switch state {
-	case "queued", "checking", "merging", "pushing", "building", "staging", "validating", "awaiting_approval", "promoting":
+	case "queued", "checking", "merging", "conflict_detected", "ai_resolving", "resolution_ready", "pushing", "building", "staging", "validating", "awaiting_approval", "promoting":
 		return true
 	default:
 		return false

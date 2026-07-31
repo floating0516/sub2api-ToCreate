@@ -12,6 +12,10 @@ export type CustomUpdateState =
   | 'queued'
   | 'checking'
   | 'merging'
+  | 'conflict_detected'
+  | 'ai_resolving'
+  | 'resolution_ready'
+  | 'resolution_failed'
   | 'pushing'
   | 'building'
   | 'staging'
@@ -19,12 +23,20 @@ export type CustomUpdateState =
   | 'awaiting_approval'
   | 'promoting'
   | 'completed'
+  | 'aborted'
   | 'failed'
+
+export type CustomUpdateAction =
+  | 'stage'
+  | 'accept_resolution'
+  | 'abort_resolution'
+  | 'promote'
 
 export type CustomUpdateStepID =
   | 'source_check'
   | 'upstream_fetch'
   | 'upstream_merge'
+  | 'conflict_resolution'
   | 'source_push'
   | 'image_build'
   | 'staging_deploy'
@@ -49,7 +61,7 @@ export interface CustomUpdateStatus {
   controller_online: boolean
   heartbeat_at?: string
   state: CustomUpdateState
-  action?: 'stage' | 'promote'
+  action?: CustomUpdateAction
   request_id?: string
   message?: string
   image?: string
@@ -65,13 +77,21 @@ export interface CustomUpdateStatus {
   staging_url?: string
   production_url?: string
   steps?: CustomUpdateStep[]
+  resolution_id?: string
+  conflict_files?: string[]
+  resolution_summary?: string
+  resolution_risk_level?: 'low' | 'medium' | 'high'
+  resolution_warnings?: string[]
+  resolution_diff_stat?: string
+  resolver_model?: string
 }
 
 export interface CustomUpdateRequestResult {
   state: 'queued'
-  action: 'stage' | 'promote'
+  action: CustomUpdateAction
   request_id: string
   image?: string
+  resolution_id?: string
   message: string
 }
 
@@ -100,10 +120,32 @@ export async function promoteCustomUpdate(image: string): Promise<CustomUpdateRe
   return data
 }
 
+export async function acceptCustomUpdateResolution(
+  resolutionId: string
+): Promise<CustomUpdateRequestResult> {
+  const { data } = await apiClient.post<CustomUpdateRequestResult>(
+    '/admin/custom-build/update/resolution/accept',
+    { resolution_id: resolutionId }
+  )
+  return data
+}
+
+export async function abortCustomUpdateResolution(
+  resolutionId: string
+): Promise<CustomUpdateRequestResult> {
+  const { data } = await apiClient.post<CustomUpdateRequestResult>(
+    '/admin/custom-build/update/resolution/abort',
+    { resolution_id: resolutionId }
+  )
+  return data
+}
+
 export const customBuildAPI = {
   getNotes: getCustomBuildNotes,
   getUpdateStatus: getCustomUpdateStatus,
   startUpdate: startCustomUpdate,
+  acceptResolution: acceptCustomUpdateResolution,
+  abortResolution: abortCustomUpdateResolution,
   promoteUpdate: promoteCustomUpdate
 }
 

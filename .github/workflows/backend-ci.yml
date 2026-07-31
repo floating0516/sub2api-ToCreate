@@ -21,6 +21,15 @@ jobs:
           /bin/sh deploy/tests/docker-runtime-resources-test.sh
           /bin/sh deploy/test-caddyfile-cache.sh
 
+  controller-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test custom update controller
+        run: |
+          /bin/bash -n deploy/tocreate-update-controller.sh
+          /bin/bash deploy/tests/tocreate-update-controller-test.sh
+
   test:
     runs-on: ubuntu-latest
     steps:

@@ -78,7 +78,22 @@ export default {
     customUpdateConfirmPromote: 'Confirm promotion',
     customUpdateCommit: 'source {commit}',
     customUpdateRequestFailed: 'Failed to submit the custom update request',
-    customUpdateProgress: 'Progress {completed}/8',
+    customUpdateProgress: 'Progress {completed}/9',
+    customUpdateConflictTitle: '{count} conflicted file(s) detected',
+    customUpdateResolver: 'Resolver: {model}',
+    customUpdateResolutionSummary: 'Resolution summary',
+    customUpdateResolutionWarnings: 'Review warnings',
+    customUpdateResolutionDiff: 'Conflict file diff stat',
+    customUpdateResolutionReview:
+      'The proposal remains in an isolated worktree. Accept it before the custom branch can be updated or remotely built.',
+    customUpdateAcceptResolution: 'Accept proposed resolution',
+    customUpdateConfirmResolution: 'Confirm and continue build',
+    customUpdateAbortResolution: 'Discard proposed resolution',
+    customUpdateResolutionRisk: {
+      low: 'Low risk',
+      medium: 'Medium risk',
+      high: 'High risk'
+    },
     customUpdateStepStatuses: {
       pending: 'Waiting',
       running: 'Running',
@@ -91,6 +106,7 @@ export default {
       source_check: 'Check local source',
       upstream_fetch: 'Fetch official source',
       upstream_merge: 'Merge official update',
+      conflict_resolution: 'Resolve merge conflicts with AI',
       source_push: 'Push custom branch',
       image_build: 'Build image with GitHub Actions',
       staging_deploy: 'Deploy image to port 18080',
@@ -103,6 +119,10 @@ export default {
       queued: 'Update request queued',
       checking: 'Checking source and official updates',
       merging: 'Merging official source',
+      conflict_detected: 'Merge conflicts detected',
+      ai_resolving: 'The model is preparing a conflict resolution',
+      resolution_ready: 'Proposed resolution is awaiting review',
+      resolution_failed: 'Automatic conflict resolution stopped',
       pushing: 'Pushing the custom branch',
       building: 'GitHub Actions is building the image',
       staging: 'Deploying to port 18080',
@@ -110,6 +130,7 @@ export default {
       awaiting_approval: 'Waiting for production approval',
       promoting: 'Atomically switching production',
       completed: 'Production is on the current custom version',
+      aborted: 'The conflict resolution was discarded',
       failed: 'Custom update failed'
     }
   },

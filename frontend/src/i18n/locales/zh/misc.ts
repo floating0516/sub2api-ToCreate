@@ -75,7 +75,22 @@ export default {
     customUpdateConfirmPromote: '确认推广',
     customUpdateCommit: '源码 {commit}',
     customUpdateRequestFailed: '提交自定义更新请求失败',
-    customUpdateProgress: '执行进度 {completed}/8',
+    customUpdateProgress: '执行进度 {completed}/9',
+    customUpdateConflictTitle: '检测到 {count} 个冲突文件',
+    customUpdateResolver: '修复模型：{model}',
+    customUpdateResolutionSummary: '修复摘要',
+    customUpdateResolutionWarnings: '复核提醒',
+    customUpdateResolutionDiff: '冲突文件变更统计',
+    customUpdateResolutionReview:
+      '候选修复仍在隔离 worktree 中，接受后才会写入自定义分支并继续远程构建。',
+    customUpdateAcceptResolution: '接受候选修复',
+    customUpdateConfirmResolution: '确认并继续构建',
+    customUpdateAbortResolution: '放弃候选修复',
+    customUpdateResolutionRisk: {
+      low: '低风险',
+      medium: '中风险',
+      high: '高风险'
+    },
     customUpdateStepStatuses: {
       pending: '等待',
       running: '进行中',
@@ -88,6 +103,7 @@ export default {
       source_check: '检查本地源码',
       upstream_fetch: '拉取官方源码',
       upstream_merge: '合并官方更新',
+      conflict_resolution: 'AI 修复合并冲突',
       source_push: '推送自定义分支',
       image_build: 'GitHub Actions 构建镜像',
       staging_deploy: '部署镜像到 18080',
@@ -100,6 +116,10 @@ export default {
       queued: '更新请求已排队',
       checking: '正在检查源码和官方更新',
       merging: '正在合并官方代码',
+      conflict_detected: '已检测到合并冲突',
+      ai_resolving: '模型正在生成冲突修复',
+      resolution_ready: '候选修复等待人工确认',
+      resolution_failed: '自动冲突修复已停止',
       pushing: '正在推送自定义分支',
       building: 'GitHub Actions 正在构建镜像',
       staging: '正在部署到 18080',
@@ -107,6 +127,7 @@ export default {
       awaiting_approval: '等待正式推广确认',
       promoting: '正在原子切换正式环境',
       completed: '正式环境已是当前自定义版本',
+      aborted: '已放弃本次冲突修复',
       failed: '自定义更新失败'
     }
   },

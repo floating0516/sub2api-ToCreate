@@ -10,6 +10,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/sub2api-deploy
 Environment=HOME=/home/ubuntu
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-/home/ubuntu/sub2api-deploy/tocreate-update-controller.env
 ExecStart=/home/ubuntu/sub2api-src/deploy/tocreate-update-controller.sh
 Restart=on-failure
 RestartSec=10
