@@ -53,14 +53,14 @@ var (
 		SupportsPromptCaching:               true,
 	}
 	openAIGPT56TerraFallbackPricing = &LiteLLMModelPricing{
-		InputCostPerToken:                   2.5e-06,
-		InputCostPerTokenPriority:           5e-06,
-		OutputCostPerToken:                  1.5e-05,
-		OutputCostPerTokenPriority:          3e-05,
-		CacheCreationInputTokenCost:         3.125e-06,
-		CacheCreationInputTokenCostPriority: 6.25e-06,
-		CacheReadInputTokenCost:             2.5e-07,
-		CacheReadInputTokenCostPriority:     5e-07,
+		InputCostPerToken:                   2e-06,
+		InputCostPerTokenPriority:           4e-06,
+		OutputCostPerToken:                  1.2e-05,
+		OutputCostPerTokenPriority:          2.4e-05,
+		CacheCreationInputTokenCost:         2.5e-06,
+		CacheCreationInputTokenCostPriority: 5e-06,
+		CacheReadInputTokenCost:             2e-07,
+		CacheReadInputTokenCostPriority:     4e-07,
 		LongContextInputTokenThreshold:      openAIGPT54LongContextInputThreshold,
 		LongContextInputCostMultiplier:      openAIGPT54LongContextInputMultiplier,
 		LongContextOutputCostMultiplier:     openAIGPT54LongContextOutputMultiplier,
@@ -70,14 +70,14 @@ var (
 		SupportsPromptCaching:               true,
 	}
 	openAIGPT56LunaFallbackPricing = &LiteLLMModelPricing{
-		InputCostPerToken:                   1e-06,
-		InputCostPerTokenPriority:           2e-06,
-		OutputCostPerToken:                  6e-06,
-		OutputCostPerTokenPriority:          1.2e-05,
-		CacheCreationInputTokenCost:         1.25e-06,
-		CacheCreationInputTokenCostPriority: 2.5e-06,
-		CacheReadInputTokenCost:             1e-07,
-		CacheReadInputTokenCostPriority:     2e-07,
+		InputCostPerToken:                   2e-07,
+		InputCostPerTokenPriority:           4e-07,
+		OutputCostPerToken:                  1.2e-06,
+		OutputCostPerTokenPriority:          2.4e-06,
+		CacheCreationInputTokenCost:         2.5e-07,
+		CacheCreationInputTokenCostPriority: 5e-07,
+		CacheReadInputTokenCost:             2e-08,
+		CacheReadInputTokenCostPriority:     4e-08,
 		LongContextInputTokenThreshold:      openAIGPT54LongContextInputThreshold,
 		LongContextInputCostMultiplier:      openAIGPT54LongContextInputMultiplier,
 		LongContextOutputCostMultiplier:     openAIGPT54LongContextOutputMultiplier,
@@ -103,6 +103,55 @@ var (
 		SupportsPromptCaching:   true,
 	}
 )
+
+func applyOpenAIGPT56OfficialPricingCorrections(data map[string]*LiteLLMModelPricing) int {
+	corrections := []struct {
+		model        string
+		legacyInput  float64
+		legacyOutput float64
+		current      *LiteLLMModelPricing
+	}{
+		{
+			model:        "gpt-5.6-terra",
+			legacyInput:  2.5e-06,
+			legacyOutput: 1.5e-05,
+			current:      openAIGPT56TerraFallbackPricing,
+		},
+		{
+			model:        "gpt-5.6-luna",
+			legacyInput:  1e-06,
+			legacyOutput: 6e-06,
+			current:      openAIGPT56LunaFallbackPricing,
+		},
+	}
+
+	corrected := 0
+	for _, correction := range corrections {
+		pricing := data[correction.model]
+		if pricing == nil ||
+			pricing.InputCostPerToken != correction.legacyInput ||
+			pricing.OutputCostPerToken != correction.legacyOutput {
+			continue
+		}
+
+		pricing.InputCostPerToken = correction.current.InputCostPerToken
+		pricing.InputCostPerTokenPriority = correction.current.InputCostPerTokenPriority
+		pricing.OutputCostPerToken = correction.current.OutputCostPerToken
+		pricing.OutputCostPerTokenPriority = correction.current.OutputCostPerTokenPriority
+		pricing.CacheCreationInputTokenCost = correction.current.CacheCreationInputTokenCost
+		pricing.CacheCreationInputTokenCostPriority = correction.current.CacheCreationInputTokenCostPriority
+		pricing.CacheReadInputTokenCost = correction.current.CacheReadInputTokenCost
+		pricing.CacheReadInputTokenCostPriority = correction.current.CacheReadInputTokenCostPriority
+		pricing.LongContextInputTokenThreshold = correction.current.LongContextInputTokenThreshold
+		pricing.LongContextInputCostMultiplier = correction.current.LongContextInputCostMultiplier
+		pricing.LongContextOutputCostMultiplier = correction.current.LongContextOutputCostMultiplier
+		pricing.SupportsServiceTier = correction.current.SupportsServiceTier
+		pricing.SupportsPromptCaching = correction.current.SupportsPromptCaching
+		corrected++
+	}
+
+	return corrected
+}
 
 // LiteLLMModelPricing LiteLLM价格数据结构
 // 只保留我们需要的字段，使用指针来处理可能缺失的值
@@ -142,8 +191,10 @@ type PricingRemoteClient interface {
 // LiteLLMRawEntry 用于解析原始JSON数据
 type LiteLLMRawEntry struct {
 	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
+	InputCostPerTokenAbove272kTokens    *float64 `json:"input_cost_per_token_above_272k_tokens"`
 	InputCostPerTokenPriority           *float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  *float64 `json:"output_cost_per_token"`
+	OutputCostPerTokenAbove272kTokens   *float64 `json:"output_cost_per_token_above_272k_tokens"`
 	OutputCostPerTokenPriority          *float64 `json:"output_cost_per_token_priority"`
 	CacheCreationInputTokenCost         *float64 `json:"cache_creation_input_token_cost"`
 	CacheCreationInputTokenCostPriority *float64 `json:"cache_creation_input_token_cost_priority"`
@@ -490,6 +541,19 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		if entry.LongContextOutputCostMultiplier != nil {
 			pricing.LongContextOutputCostMultiplier = *entry.LongContextOutputCostMultiplier
 		}
+		if pricing.LongContextInputTokenThreshold == 0 &&
+			entry.InputCostPerTokenAbove272kTokens != nil &&
+			entry.InputCostPerToken != nil &&
+			*entry.InputCostPerToken > 0 {
+			pricing.LongContextInputTokenThreshold = openAIGPT54LongContextInputThreshold
+			pricing.LongContextInputCostMultiplier = *entry.InputCostPerTokenAbove272kTokens / *entry.InputCostPerToken
+		}
+		if pricing.LongContextOutputCostMultiplier == 0 &&
+			entry.OutputCostPerTokenAbove272kTokens != nil &&
+			entry.OutputCostPerToken != nil &&
+			*entry.OutputCostPerToken > 0 {
+			pricing.LongContextOutputCostMultiplier = *entry.OutputCostPerTokenAbove272kTokens / *entry.OutputCostPerToken
+		}
 		if entry.OutputCostPerImage != nil {
 			pricing.OutputCostPerImage = *entry.OutputCostPerImage
 		}
@@ -552,18 +616,24 @@ func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelP
 	if data == nil {
 		data = make(map[string]*LiteLLMModelPricing)
 	}
-	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
+	finalize := func() map[string]*LiteLLMModelPricing {
+		if corrected := applyOpenAIGPT56OfficialPricingCorrections(data); corrected > 0 {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Corrected %d legacy GPT-5.6 pricing entries", corrected)
+		}
 		return data
+	}
+	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
+		return finalize()
 	}
 	fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
 	if err != nil {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Fallback merge skipped: %v", err)
-		return data
+		return finalize()
 	}
 	fallbackData, err := s.parsePricingData(fallbackBody)
 	if err != nil {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Fallback merge parse skipped: %v", err)
-		return data
+		return finalize()
 	}
 	merged := 0
 	for modelName, pricing := range fallbackData {
@@ -576,7 +646,7 @@ func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelP
 	if merged > 0 {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Merged %d fallback-only models", merged)
 	}
-	return data
+	return finalize()
 }
 
 // useFallbackPricing 使用回退价格文件
