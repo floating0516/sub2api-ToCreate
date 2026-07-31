@@ -62,9 +62,15 @@ function resolveReportedSteps(steps: CustomUpdateStep[]): CustomUpdateStep[] {
     }
   }
 
+  const legacyConflictStepMissing =
+    !reported.has('conflict_resolution') &&
+    CUSTOM_UPDATE_STEP_IDS.slice(4).some((id) => reported.has(id))
+
   return CUSTOM_UPDATE_STEP_IDS.map((id) => ({
     id,
-    status: reported.get(id) || 'pending'
+    status:
+      reported.get(id) ||
+      (id === 'conflict_resolution' && legacyConflictStepMissing ? 'skipped' : 'pending')
   }))
 }
 
