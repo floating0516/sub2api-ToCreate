@@ -443,7 +443,7 @@
             </div>
 
             <template v-if="selectedInstallMethod === 'command'">
-              <div class="quickstart-command-panel mt-5 overflow-hidden rounded-lg border border-gray-800 bg-gray-950">
+              <div class="mt-5 overflow-hidden rounded-lg border border-gray-800 bg-gray-950">
                 <div class="flex items-center justify-between border-b border-gray-800 px-3 py-2">
                   <div class="inline-flex rounded-md bg-gray-900 p-1" role="tablist">
                     <button

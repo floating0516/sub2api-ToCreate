@@ -54,11 +54,6 @@ import {
 import { Line } from 'vue-chartjs'
 import type { OpenAIQuotaSample } from '@/api/admin/accounts'
 import { formatCurrency, formatDateTime } from '@/utils/format'
-import {
-  getOracleChartSurface,
-  ORACLE_CHART_NEUTRAL,
-  ORACLE_CHART_SERIES
-} from '@/utils/oracleTheme'
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -86,12 +81,13 @@ const isDarkMode = computed(() =>
 )
 
 const colors = computed(() => ({
-  ...getOracleChartSurface(isDarkMode.value),
-  line: isDarkMode.value ? ORACLE_CHART_SERIES.lightBlue : ORACLE_CHART_SERIES.blue,
-  fill: isDarkMode.value ? 'rgba(80, 164, 245, 0.12)' : 'rgba(0, 78, 152, 0.10)',
-  manualReset: isDarkMode.value ? ORACLE_CHART_SERIES.lightGreen : ORACLE_CHART_SERIES.green,
-  providerReset: isDarkMode.value ? ORACLE_CHART_SERIES.lightRed : ORACLE_CHART_SERIES.red,
-  unknownReset: ORACLE_CHART_NEUTRAL
+  line: isDarkMode.value ? '#60a5fa' : '#2563eb',
+  fill: isDarkMode.value ? 'rgba(96, 165, 250, 0.12)' : 'rgba(37, 99, 235, 0.10)',
+  manualReset: isDarkMode.value ? '#4ade80' : '#16a34a',
+  providerReset: isDarkMode.value ? '#f87171' : '#dc2626',
+  unknownReset: isDarkMode.value ? '#9ca3af' : '#6b7280',
+  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
+  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
 }))
 
 type QuotaChartPoint = {
@@ -180,11 +176,11 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: colors.value.tooltipBackground,
-      titleColor: colors.value.tooltipTitle,
-      bodyColor: colors.value.tooltipBody,
-      borderColor: colors.value.text,
-      borderWidth: 2,
+      backgroundColor: isDarkMode.value ? '#1f2937' : '#ffffff',
+      titleColor: isDarkMode.value ? '#f3f4f6' : '#111827',
+      bodyColor: isDarkMode.value ? '#d1d5db' : '#4b5563',
+      borderColor: colors.value.grid,
+      borderWidth: 1,
       padding: 10,
       displayColors: false,
       callbacks: {

@@ -34,11 +34,6 @@ import {
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { DailyPaymentStats } from '@/types/payment'
-import {
-  getOracleChartSurface,
-  ORACLE_CHART_COLORS,
-  ORACLE_CHART_SERIES
-} from '@/utils/oracleTheme'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -50,10 +45,10 @@ const props = defineProps<{
 }>()
 
 const colors = [
-  [ORACLE_CHART_COLORS[0], `${ORACLE_CHART_COLORS[0]}1a`],
-  [ORACLE_CHART_COLORS[1], `${ORACLE_CHART_COLORS[1]}1a`],
-  [ORACLE_CHART_COLORS[2], `${ORACLE_CHART_COLORS[2]}1a`],
-  [ORACLE_CHART_COLORS[4], `${ORACLE_CHART_COLORS[4]}1a`]
+  ['rgb(59, 130, 246)', 'rgba(59, 130, 246, 0.1)'],
+  ['rgb(168, 85, 247)', 'rgba(168, 85, 247, 0.1)'],
+  ['rgb(245, 158, 11)', 'rgba(245, 158, 11, 0.1)'],
+  ['rgb(239, 68, 68)', 'rgba(239, 68, 68, 0.1)'],
 ]
 
 const chartData = computed(() => {
@@ -78,8 +73,8 @@ const chartData = computed(() => {
       {
         label: t('payment.admin.orderCount'),
         data: props.data.map(d => d.count),
-        borderColor: ORACLE_CHART_SERIES.green,
-        backgroundColor: `${ORACLE_CHART_SERIES.green}1a`,
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         fill: false,
         tension: 0.3,
         pointRadius: 3,
@@ -90,47 +85,27 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = computed(() => {
-  const surface = getOracleChartSurface(document.documentElement.classList.contains('dark'))
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index' as const, intersect: false },
-    scales: {
-      y: {
-        type: 'linear' as const,
-        display: true,
-        position: 'left' as const,
-        title: { display: true, text: t('payment.admin.revenue'), color: surface.text },
-        grid: { color: surface.grid },
-        ticks: { color: surface.text }
-      },
-      y1: {
-        type: 'linear' as const,
-        display: true,
-        position: 'right' as const,
-        title: { display: true, text: t('payment.admin.orderCount'), color: surface.text },
-        grid: { drawOnChartArea: false },
-        ticks: { color: surface.text }
-      },
-      x: {
-        grid: { color: surface.grid },
-        ticks: { color: surface.text }
-      }
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index' as const, intersect: false },
+  scales: {
+    y: {
+      type: 'linear' as const,
+      display: true,
+      position: 'left' as const,
+      title: { display: true, text: t('payment.admin.revenue') },
     },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: { color: surface.text }
-      },
-      tooltip: {
-        backgroundColor: surface.tooltipBackground,
-        titleColor: surface.tooltipTitle,
-        bodyColor: surface.tooltipBody,
-        borderColor: surface.text,
-        borderWidth: 2
-      }
+    y1: {
+      type: 'linear' as const,
+      display: true,
+      position: 'right' as const,
+      title: { display: true, text: t('payment.admin.orderCount') },
+      grid: { drawOnChartArea: false },
     }
+  },
+  plugins: {
+    legend: { position: 'top' as const },
   }
-})
+}
 </script>

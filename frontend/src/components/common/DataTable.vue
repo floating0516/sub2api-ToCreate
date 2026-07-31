@@ -1,7 +1,7 @@
 <template>
-  <div v-if="!isDesktopViewport" class="data-table-mobile-list space-y-3">
+  <div v-if="!isDesktopViewport" class="space-y-3">
     <template v-if="loading">
-      <div v-for="i in 5" :key="i" class="data-table-mobile-card rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
+      <div v-for="i in 5" :key="i" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
         <div class="space-y-3">
           <div v-for="column in dataColumns" :key="column.key" class="flex justify-between">
             <div class="h-4 w-20 animate-pulse rounded bg-gray-200 dark:bg-dark-700"></div>
@@ -15,7 +15,7 @@
     </template>
 
     <template v-else-if="!data || data.length === 0">
-      <div class="data-table-mobile-card rounded-lg border border-gray-200 bg-white p-12 text-center dark:border-dark-700 dark:bg-dark-900">
+      <div class="rounded-lg border border-gray-200 bg-white p-12 text-center dark:border-dark-700 dark:bg-dark-900">
         <slot name="empty">
           <div class="flex flex-col items-center">
             <Icon
@@ -48,10 +48,10 @@
       <div
         v-for="(row, index) in sortedData"
         :key="resolveRowKey(row, index)"
-        class="data-table-mobile-card rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
+        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
         :class="{
           'cursor-pointer': clickableRows,
-          'data-table-mobile-card-selected border-primary-300 bg-primary-50/40 dark:border-primary-700 dark:bg-primary-900/10': selectable && isRowSelected(row, index)
+          'border-primary-300 bg-primary-50/40 dark:border-primary-700 dark:bg-primary-900/10': selectable && isRowSelected(row, index)
         }"
         @click="clickableRows && emit('rowClick', row)"
       >
@@ -99,7 +99,7 @@
       'is-scrollable': isScrollable
     }"
   >
-    <table class="table w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
+    <table class="w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
       <thead class="table-header bg-gray-50 dark:bg-dark-800">
         <tr>
           <th
@@ -1025,20 +1025,20 @@ defineExpose({
 
 /* 表体 sticky 列背景 */
 tbody .sticky-col {
-  background-color: var(--nb-paper);
+  background-color: white;
 }
 
 .dark tbody .sticky-col {
-  background-color: var(--nb-paper);
+  background-color: rgb(17 24 39);
 }
 
 /* hover 状态保持 */
 tbody tr:hover .sticky-col {
-  background-color: var(--nb-paper-alt);
+  background-color: rgb(249 250 251);
 }
 
 .dark tbody tr:hover .sticky-col {
-  background-color: var(--nb-paper-alt);
+  background-color: rgb(31 41 55);
 }
 
 /* 阴影只在可滚动时显示 */
@@ -1049,10 +1049,9 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 4px;
+  width: 10px;
   transform: translateX(100%);
-  border-left: 1px solid var(--nb-ink);
-  background: var(--nb-soft-yellow);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
   pointer-events: none;
 }
 
@@ -1063,10 +1062,9 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 4px;
+  width: 10px;
   transform: translateX(100%);
-  border-left: 1px solid var(--nb-ink);
-  background: var(--nb-soft-yellow);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
   pointer-events: none;
 }
 
@@ -1077,21 +1075,20 @@ tbody tr:hover .sticky-col {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 4px;
+  width: 10px;
   transform: translateX(-100%);
-  border-right: 1px solid var(--nb-ink);
-  background: var(--nb-soft-yellow);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
   pointer-events: none;
 }
 
 /* 暗色模式阴影 */
 .dark .is-scrollable .sticky-col-left::after,
 .dark .is-scrollable .sticky-col-left-second::after {
-  background: var(--nb-soft-yellow);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.2), transparent);
 }
 
 .dark .is-scrollable .sticky-col-right::before {
-  background: var(--nb-soft-yellow);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.2), transparent);
 }
 </style>
 
@@ -1115,42 +1112,41 @@ tbody tr:hover .sticky-col {
 }
 
 .table-wrapper::-webkit-scrollbar-track {
-  border: 1px solid var(--nb-ink) !important;
-  border-radius: var(--nb-radius) !important;
-  background-color: var(--nb-paper-alt) !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-radius: 6px !important;
   margin: 0 4px !important;
 }
 .dark .table-wrapper::-webkit-scrollbar-track {
-  background-color: var(--nb-paper-alt) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 /* 常驻、不透明的滑块，无视鼠标是否 hover 都在那！ */
 .table-wrapper::-webkit-scrollbar-thumb {
-  border: 1.5px solid var(--nb-ink) !important;
-  border-radius: var(--nb-radius) !important;
-  background-color: var(--nb-soft-yellow) !important;
-  background-clip: border-box !important;
+  background-color: rgba(107, 114, 128, 0.75) !important;
+  border-radius: 6px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
   -webkit-appearance: none !important;
 }
 .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: var(--nb-orange) !important;
+  background-color: rgba(75, 85, 99, 0.9) !important;
 }
 
 .dark .table-wrapper::-webkit-scrollbar-thumb {
-  background-color: var(--nb-soft-yellow) !important;
+  background-color: rgba(156, 163, 175, 0.75) !important;
 }
 .dark .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: var(--nb-orange) !important;
+  background-color: rgba(209, 213, 219, 0.9) !important;
 }
 
 /* 3. 仅给真正的 Firefox 留的后路 */
 @supports (-moz-appearance:none) {
   .table-wrapper {
     scrollbar-width: thin !important;
-    scrollbar-color: var(--nb-soft-yellow) var(--nb-paper-alt) !important;
+    scrollbar-color: rgba(156, 163, 175, 0.5) rgba(0, 0, 0, 0.03) !important;
   }
   .dark .table-wrapper {
-    scrollbar-color: var(--nb-soft-yellow) var(--nb-paper-alt) !important;
+    scrollbar-color: rgba(75, 85, 99, 0.5) rgba(255, 255, 255, 0.05) !important;
   }
 }
 </style>

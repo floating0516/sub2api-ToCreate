@@ -38,7 +38,7 @@
                 </button>
                 <div
                   v-if="showAutoRefreshDropdown"
-                  class="dropdown absolute right-0 z-50 mt-2 w-56 origin-top-right overflow-hidden"
+                  class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
                 >
                   <div class="p-2">
                     <button
@@ -78,7 +78,7 @@
                 <Teleport to="body">
                   <div
                     v-if="showAccountToolsDropdown"
-                    class="dropdown fixed z-[9999] origin-top-right overflow-hidden"
+                    class="fixed z-[9999] origin-top-right overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800"
                     :style="accountToolsDropdownStyle"
                     @click.stop
                   >
@@ -1357,13 +1357,13 @@ function getOpenAICompactMeta(row: any): { label: string; className: string; dot
       return {
         label: t('admin.accounts.openai.compactSupported'),
         className: 'text-emerald-600 dark:text-emerald-300',
-        dotClass: 'bg-emerald-500 ring-2 ring-gray-900 dark:ring-gray-100'
+        dotClass: 'bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.14)]'
       }
     case 'blocked':
       return {
         label: t('admin.accounts.openai.compactUnsupported'),
         className: 'text-rose-600 dark:text-rose-300',
-        dotClass: 'bg-rose-500 ring-2 ring-gray-900 dark:ring-gray-100'
+        dotClass: 'bg-rose-500 shadow-[0_0_0_2px_rgba(244,63,94,0.14)]'
       }
     case 'auto':
       return {

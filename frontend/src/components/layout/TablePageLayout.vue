@@ -12,14 +12,14 @@
     </div>
 
     <!-- 固定区域：搜索和过滤器 -->
-    <div v-if="$slots.filters" class="layout-section-fixed layout-section-filters">
+    <div v-if="$slots.filters" class="layout-section-fixed">
       <slot name="filters" />
     </div>
 
     <!-- 内容区域：表格内部滚动，卡片跟随页面滚动 -->
     <div class="layout-section-scrollable">
       <div
-        :class="contentVariant === 'cards' ? 'card-list-scroll-container' : 'card table-page-frame table-scroll-container'"
+        :class="contentVariant === 'cards' ? 'card-list-scroll-container' : 'card table-scroll-container'"
       >
         <slot name="table" />
       </div>
@@ -68,30 +68,13 @@ onUnmounted(() => {
   @apply flex-shrink-0;
 }
 
-.layout-section-filters {
-  padding: 0.875rem;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-paper);
-  box-shadow: var(--nb-shadow);
-}
-
 .layout-section-scrollable {
   @apply flex-1 min-h-0 flex flex-col;
 }
 
-.table-page-layout.content-variant-table .layout-section-scrollable {
-  padding-right: 5px;
-  padding-bottom: 5px;
-}
-
 /* 表格滚动容器 - 增强版表体滚动方案 */
 .table-scroll-container {
-  @apply flex h-full flex-col overflow-hidden;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-paper);
-  box-shadow: var(--nb-shadow);
+  @apply flex flex-col overflow-hidden h-full bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 shadow-sm;
 }
 
 .card-list-scroll-container {
@@ -145,7 +128,7 @@ onUnmounted(() => {
 }
 
 .table-page-layout.mobile-mode .table-scroll-container {
-  @apply h-auto overflow-visible;
+  @apply h-auto overflow-visible border-none shadow-none bg-transparent;
 }
 
 .table-page-layout.mobile-mode .card-list-scroll-container {
@@ -160,22 +143,5 @@ onUnmounted(() => {
   @apply flex-none;
   display: table;
   min-width: 100%;
-}
-
-@media (max-width: 767px) {
-  .layout-section-filters {
-    padding: 0.75rem;
-  }
-
-  .table-page-layout.content-variant-table .layout-section-scrollable {
-    padding-right: 3px;
-    padding-bottom: 3px;
-  }
-
-  .table-page-layout.mobile-mode .table-scroll-container {
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
 }
 </style>

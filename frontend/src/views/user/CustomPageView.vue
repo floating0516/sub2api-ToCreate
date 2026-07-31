@@ -417,7 +417,7 @@ onUnmounted(() => {
     width: 70%;
     max-width: 240px;
     height: 100%;
-    box-shadow: 2px 0 0 var(--nb-shadow-color);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -512,16 +512,15 @@ onUnmounted(() => {
   right: 8px;
   padding: 4px 10px;
   font-size: 12px;
-  border: 1.5px solid var(--nb-fixed-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-paper);
-  color: var(--nb-fixed-ink);
-  box-shadow: var(--nb-shadow-sm);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s, background 0.2s;
   font-family: inherit;
 }
-.copy-btn:hover { background: var(--nb-orange); }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.25); }
 pre:hover .copy-btn { opacity: 1; }
 </style>

@@ -456,20 +456,19 @@ watch(
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  border: 1px solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-muted);
+  background: linear-gradient(to bottom, #cbd5e1, #94a3b8);
+  border-radius: 4px;
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: var(--nb-muted);
+  background: linear-gradient(to bottom, #4b5563, #374151);
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: var(--nb-orange);
+  background: linear-gradient(to bottom, #94a3b8, #64748b);
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: var(--nb-orange);
+  background: linear-gradient(to bottom, #6b7280, #4b5563);
 }
 </style>

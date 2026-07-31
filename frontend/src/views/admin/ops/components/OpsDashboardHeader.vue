@@ -441,9 +441,9 @@ const healthScoreColor = computed(() => {
   if (isSystemIdle.value) return '#9ca3af' // gray-400
   const score = healthScoreValue.value
   if (score == null) return '#9ca3af'
-  if (score >= 90) return '#2d9b4e' // green
-  if (score >= 60) return '#ffd23f' // yellow
-  return '#e63946' // red
+  if (score >= 90) return '#10b981' // green
+  if (score >= 60) return '#f59e0b' // yellow
+  return '#ef4444' // red
 })
 
 const healthScoreClass = computed(() => {
@@ -1004,7 +1004,7 @@ function handleToolbarRefresh() {
             <div
               class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 md:left-full md:top-0 md:ml-2 md:mt-0 md:translate-x-0"
             >
-              <div class="dropdown p-4">
+              <div class="rounded-xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10">
                 <h4 class="mb-3 border-b border-gray-100 pb-2 text-sm font-bold text-gray-900 dark:border-dark-700 dark:text-white flex items-center gap-2">
                   <Icon name="brain" size="sm" class="text-blue-500" />
                   {{ t('admin.ops.diagnosis.title') }}
@@ -1186,7 +1186,7 @@ function handleToolbarRefresh() {
                   <path
                     d="M0 16 Q 20 16, 40 16 T 80 16 T 120 10 T 160 22 T 200 16 T 240 16 T 280 16"
                     fill="none"
-                    stroke="#004e98"
+                    stroke="#3b82f6"
                     stroke-width="2"
                     vector-effect="non-scaling-stroke"
                   >

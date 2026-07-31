@@ -1,151 +1,55 @@
 /** @type {import('tailwindcss').Config} */
-const oracleOrange = {
-  50: '#fff4ed',
-  100: '#ffe2d3',
-  200: '#ffc4a8',
-  300: '#ffa079',
-  400: '#ff8152',
-  500: '#ff6b35',
-  600: '#e95220',
-  700: '#bd3d16',
-  800: '#963219',
-  900: '#7a2d1a',
-  950: '#42150a'
-}
-
-const oracleYellow = {
-  50: '#fffceb',
-  100: '#fff7c2',
-  200: '#ffed85',
-  300: '#ffe05c',
-  400: '#ffd746',
-  500: '#ffd23f',
-  600: '#d9a900',
-  700: '#a87900',
-  800: '#815c08',
-  900: '#694b0c',
-  950: '#3d2804'
-}
-
-const oracleBlue = {
-  50: '#eef7ff',
-  100: '#d8ecff',
-  200: '#b9dcff',
-  300: '#89c5ff',
-  400: '#50a4f5',
-  500: '#1e7fd0',
-  600: '#075fae',
-  700: '#004e98',
-  800: '#073f76',
-  900: '#0b365f',
-  950: '#07213d'
-}
-
-const oracleGreen = {
-  50: '#effaf1',
-  100: '#dff3df',
-  200: '#bfe7c4',
-  300: '#91d49e',
-  400: '#5dbd72',
-  500: '#2d9b4e',
-  600: '#247f40',
-  700: '#206536',
-  800: '#1c512e',
-  900: '#174326',
-  950: '#0b2514'
-}
-
-const oracleRed = {
-  50: '#fff1f2',
-  100: '#ffe0e3',
-  200: '#ffc6cc',
-  300: '#ff9aa6',
-  400: '#f46170',
-  500: '#e63946',
-  600: '#c62433',
-  700: '#a51e2c',
-  800: '#891e29',
-  900: '#741f28',
-  950: '#400b10'
-}
-
-const oracleGray = {
-  50: '#fffef8',
-  100: '#fff8e3',
-  200: '#eadfbd',
-  300: '#d1c49e',
-  400: '#9b9077',
-  500: '#706757',
-  600: '#50483f',
-  700: '#393137',
-  800: '#342c3a',
-  900: '#2b2533',
-  950: '#17121d'
-}
-
 export default {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        white: '#fffef8',
-        black: '#2b2533',
-        cream: '#fffdf4',
-        ink: '#2b2533',
-        nb: {
-          cream: '#fffdf4',
-          ink: '#2b2533',
-          orange: '#ff6b35',
-          yellow: '#ffd23f',
-          blue: '#004e98',
-          green: '#2d9b4e',
-          red: '#e63946'
+        // 主色调 - Teal/Cyan 青色系
+        primary: {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
+          950: '#042f2e'
         },
-        gray: oracleGray,
-        slate: oracleGray,
-        zinc: oracleGray,
-        neutral: oracleGray,
-        stone: oracleGray,
-        // Oracle UI semantic palettes.
-        primary: oracleOrange,
-        accent: oracleBlue,
-        orange: oracleOrange,
-        amber: oracleYellow,
-        yellow: oracleYellow,
-        blue: oracleBlue,
-        sky: oracleBlue,
-        cyan: oracleBlue,
-        indigo: oracleBlue,
-        purple: oracleBlue,
-        pink: oracleRed,
-        rose: oracleRed,
-        red: oracleRed,
-        green: oracleGreen,
-        emerald: oracleGreen,
-        lime: oracleGreen,
-        teal: oracleGreen,
-        violet: oracleBlue,
-        fuchsia: oracleRed,
-        // Optional dark mode keeps the same ink-and-paper visual language.
+        // 辅助色 - 深蓝灰
+        accent: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617'
+        },
+        // 深色模式背景
         dark: {
-          50: '#fffef8',
-          100: '#f4edd6',
-          200: '#ded3b5',
-          300: '#c4b791',
-          400: '#9b8e75',
-          500: '#716553',
-          600: '#55485e',
-          700: '#3a3042',
-          800: '#302737',
-          900: '#211a27',
-          950: '#17121d'
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617'
         }
       },
       fontFamily: {
         sans: [
-          'Sora',
-          'Noto Sans SC',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',
@@ -161,46 +65,22 @@ export default {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
       },
       boxShadow: {
-        xs: '1px 1px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        sm: '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        DEFAULT: '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        md: '2px 2px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        lg: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        xl: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        '2xl': '4px 4px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        inner: 'inset 0 0 0 1px var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        none: 'none',
-        glass: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        'glass-sm': '1.5px 1.5px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        glow: '2px 2px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        'glow-lg': '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        card: '3px 3px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        'card-hover': '4px 4px 0 var(--nb-shadow-color, rgb(43 37 51 / 0.62))',
-        'inner-glow': 'inset 0 0 0 1px var(--nb-shadow-color, rgb(43 37 51 / 0.62))'
+        glass: '0 8px 32px rgba(0, 0, 0, 0.08)',
+        'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.06)',
+        glow: '0 0 20px rgba(20, 184, 166, 0.25)',
+        'glow-lg': '0 0 40px rgba(20, 184, 166, 0.35)',
+        card: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        'card-hover': '0 10px 40px rgba(0, 0, 0, 0.08)',
+        'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
       },
       backgroundImage: {
-        'gradient-to-t':
-          'linear-gradient(to top, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-tr':
-          'linear-gradient(to top right, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-r':
-          'linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-br':
-          'linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-b':
-          'linear-gradient(to bottom, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-bl':
-          'linear-gradient(to bottom left, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-l':
-          'linear-gradient(to left, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-to-tl':
-          'linear-gradient(to top left, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-radial':
-          'radial-gradient(circle, var(--tw-gradient-from), var(--tw-gradient-from))',
-        'gradient-primary': 'linear-gradient(#ff6b35, #ff6b35)',
-        'gradient-dark': 'linear-gradient(#211a27, #211a27)',
-        'gradient-glass': 'linear-gradient(#fffef8, #fffef8)',
-        'mesh-gradient': 'none'
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        'gradient-glass':
+          'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+        'mesh-gradient':
+          'radial-gradient(at 40% 20%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(20, 184, 166, 0.08) 0px, transparent 50%)'
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -243,43 +123,10 @@ export default {
         }
       },
       backdropBlur: {
-        none: '0',
-        0: '0',
-        xs: '0',
-        sm: '0',
-        DEFAULT: '0',
-        md: '0',
-        lg: '0',
-        xl: '0',
-        '2xl': '0',
-        '3xl': '0'
+        xs: '2px'
       },
       borderRadius: {
-        none: '0',
-        sm: '4px',
-        DEFAULT: '5px',
-        md: '6px',
-        lg: '6px',
-        xl: '8px',
-        '2xl': '8px',
-        '3xl': '8px',
-        '4xl': '8px',
-        full: '9999px'
-      },
-      borderWidth: {
-        DEFAULT: '1.5px',
-        0: '0',
-        2: '2px',
-        4: '3px',
-        8: '5px'
-      },
-      letterSpacing: {
-        tighter: '0',
-        tight: '0',
-        normal: '0',
-        wide: '0',
-        wider: '0',
-        widest: '0'
+        '4xl': '2rem'
       }
     }
   },

@@ -35,10 +35,6 @@ import {
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { TrendDataPoint } from '@/types'
-import {
-  getOracleChartSurface,
-  ORACLE_CHART_SERIES
-} from '@/utils/oracleTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -63,12 +59,13 @@ const isDarkMode = computed(() => {
 })
 
 const chartColors = computed(() => ({
-  ...getOracleChartSurface(isDarkMode.value),
-  input: ORACLE_CHART_SERIES.blue,
-  output: ORACLE_CHART_SERIES.green,
-  cacheCreation: ORACLE_CHART_SERIES.yellow,
-  cacheRead: ORACLE_CHART_SERIES.lightBlue,
-  cacheHitRate: ORACLE_CHART_SERIES.orange
+  text: isDarkMode.value ? '#e5e7eb' : '#374151',
+  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
+  input: '#3b82f6',
+  output: '#10b981',
+  cacheCreation: '#f59e0b',
+  cacheRead: '#06b6d4',
+  cacheHitRate: '#8b5cf6'
 }))
 
 const chartData = computed(() => {
@@ -147,11 +144,6 @@ const lineOptions = computed(() => ({
       }
     },
     tooltip: {
-      backgroundColor: chartColors.value.tooltipBackground,
-      titleColor: chartColors.value.tooltipTitle,
-      bodyColor: chartColors.value.tooltipBody,
-      borderColor: chartColors.value.text,
-      borderWidth: 2,
       callbacks: {
         label: (context: any) => {
           if (context.dataset.yAxisID === 'yPercent') {

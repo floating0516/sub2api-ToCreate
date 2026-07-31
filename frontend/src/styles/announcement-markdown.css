@@ -1,183 +1,113 @@
-/* Shared rich-text styles for announcement popup and detail content. */
+/* Shared rich-text styles for announcement popup and bell detail content. */
 .markdown-body {
-  color: var(--nb-ink);
-  font-size: 15px;
-  line-height: 1.75;
-}
-
-.markdown-body h1,
-.markdown-body h2 {
-  border-bottom: 2px solid var(--nb-ink);
-  color: var(--nb-ink);
-  font-weight: 800;
+  @apply text-[15px] leading-[1.75];
+  @apply text-gray-700 dark:text-gray-300;
 }
 
 .markdown-body h1 {
-  margin-bottom: 1.5rem;
-  margin-top: 2rem;
-  padding-bottom: 0.75rem;
-  font-size: 1.875rem;
+  @apply mb-6 mt-8 border-b border-gray-200 pb-3 text-3xl font-bold text-gray-900 dark:border-dark-600 dark:text-white;
 }
 
 .markdown-body h2 {
-  margin-bottom: 1rem;
-  margin-top: 1.75rem;
-  padding-bottom: 0.5rem;
-  font-size: 1.5rem;
-}
-
-.markdown-body h3,
-.markdown-body h4 {
-  color: var(--nb-ink);
-  font-weight: 800;
+  @apply mb-4 mt-7 border-b border-gray-100 pb-2 text-2xl font-bold text-gray-900 dark:border-dark-700 dark:text-white;
 }
 
 .markdown-body h3 {
-  margin-bottom: 0.75rem;
-  margin-top: 1.5rem;
-  font-size: 1.25rem;
+  @apply mb-3 mt-6 text-xl font-semibold text-gray-900 dark:text-white;
 }
 
 .markdown-body h4 {
-  margin-bottom: 0.5rem;
-  margin-top: 1.25rem;
-  font-size: 1.125rem;
+  @apply mb-2 mt-5 text-lg font-semibold text-gray-900 dark:text-white;
 }
 
 .markdown-body p {
-  margin-bottom: 1rem;
+  @apply mb-4 leading-relaxed;
 }
 
 .markdown-body a {
-  color: var(--nb-blue);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+  @apply font-medium text-blue-600 underline decoration-blue-600/30 decoration-2 underline-offset-2 transition-all hover:decoration-blue-600 dark:text-blue-400 dark:decoration-blue-400/30 dark:hover:decoration-blue-400;
 }
 
 .markdown-body ul,
 .markdown-body ol {
-  margin-bottom: 1rem;
-  margin-left: 1.5rem;
+  @apply mb-4 ml-6 space-y-2;
 }
 
 .markdown-body ul {
-  list-style: disc;
+  @apply list-disc;
 }
 
 .markdown-body ol {
-  list-style: decimal;
+  @apply list-decimal;
 }
 
 .markdown-body li {
-  margin-top: 0.5rem;
-  padding-left: 0.5rem;
+  @apply pl-2 leading-relaxed;
 }
 
 .markdown-body li::marker {
-  color: var(--nb-orange);
-  font-weight: 800;
+  @apply text-blue-600 dark:text-blue-400;
 }
 
 .markdown-body blockquote {
-  position: relative;
-  margin: 1.25rem 0;
-  border: 1.5px solid var(--nb-ink);
-  border-left: 5px solid var(--nb-blue);
-  border-radius: var(--nb-radius);
-  background: var(--nb-soft-blue);
-  padding: 0.75rem 1rem;
-  color: var(--nb-fixed-ink);
-  font-style: normal;
-  box-shadow: var(--nb-shadow-sm);
+  @apply relative my-5 border-l-4 border-blue-500 bg-blue-50/50 py-3 pl-5 pr-4 italic text-gray-700 dark:border-blue-400 dark:bg-blue-900/10 dark:text-gray-300;
+}
+
+.markdown-body blockquote::before {
+  content: '"';
+  @apply absolute -left-1 top-0 font-serif text-5xl text-blue-500/20 dark:text-blue-400/20;
 }
 
 .markdown-body code {
-  border: 1px solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-paper-alt);
-  padding: 0.15rem 0.4rem;
-  color: var(--nb-blue);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
+  @apply rounded-lg bg-gray-100 px-2 py-1 font-mono text-[13px] text-pink-600 dark:bg-dark-700 dark:text-pink-400;
 }
 
 .markdown-body pre {
-  margin: 1.25rem 0;
-  overflow-x: auto;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  background: var(--nb-soft-yellow);
-  padding: 1.25rem;
-  box-shadow: var(--nb-shadow);
+  @apply my-5 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-dark-600 dark:bg-dark-900/50;
 }
 
 .markdown-body pre code {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: var(--nb-fixed-ink);
+  @apply bg-transparent p-0 text-[13px] text-gray-800 dark:text-gray-200;
 }
 
 .markdown-body hr {
-  margin: 2rem 0;
-  border: 0;
-  border-top: 2px solid var(--nb-ink);
+  @apply my-8 border-0 border-t-2 border-gray-200 dark:border-dark-700;
 }
 
 .markdown-body table {
-  margin-bottom: 1.25rem;
-  width: 100%;
-  overflow: hidden;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  border-collapse: separate;
-  border-spacing: 0;
-  box-shadow: var(--nb-shadow-sm);
+  @apply mb-5 w-full overflow-hidden rounded-lg border border-gray-200 dark:border-dark-600;
 }
 
 .markdown-body th,
 .markdown-body td {
-  border-bottom: 1.5px solid var(--nb-ink);
-  border-right: 1.5px solid var(--nb-ink);
-  padding: 0.75rem 1rem;
-  text-align: left;
+  @apply border-b border-r border-gray-200 px-4 py-3 text-left dark:border-dark-600;
 }
 
 .markdown-body th:last-child,
 .markdown-body td:last-child {
-  border-right: 0;
+  @apply border-r-0;
 }
 
 .markdown-body tr:last-child td {
-  border-bottom: 0;
+  @apply border-b-0;
 }
 
 .markdown-body th {
-  background: var(--nb-soft-yellow);
-  color: var(--nb-fixed-ink);
-  font-weight: 800;
+  @apply bg-gradient-to-br from-blue-50 to-indigo-50 font-semibold text-gray-900 dark:from-blue-900/20 dark:to-indigo-900/10 dark:text-white;
 }
 
-.markdown-body tbody tr:hover td {
-  background: var(--nb-paper-alt);
+.markdown-body tbody tr {
+  @apply transition-colors hover:bg-gray-50 dark:hover:bg-dark-700/30;
 }
 
 .markdown-body img {
-  margin: 1.25rem 0;
-  max-width: 100%;
-  border: var(--nb-border-width) solid var(--nb-ink);
-  border-radius: var(--nb-radius);
-  box-shadow: var(--nb-shadow);
+  @apply my-5 max-w-full rounded-xl border border-gray-200 shadow-md dark:border-dark-600;
 }
 
 .markdown-body strong {
-  color: var(--nb-ink);
-  font-weight: 800;
+  @apply font-semibold text-gray-900 dark:text-white;
 }
 
 .markdown-body em {
-  color: var(--nb-muted);
-  font-style: italic;
+  @apply italic text-gray-600 dark:text-gray-400;
 }

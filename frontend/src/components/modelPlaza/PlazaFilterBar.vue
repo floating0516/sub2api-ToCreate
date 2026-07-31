@@ -174,44 +174,39 @@ function chipClass(active: boolean): string {
 /* 平台/分组 chip 的配色统一从 --chip-accent(平台主色)派生,新增平台无需扩展样式。
    激活态与非激活态在模板上互斥挂载,避免选择器优先级互相覆盖。 */
 .chip-tinted {
-  border: 2px solid var(--nb-ink);
-  color: var(--nb-ink);
-  background-color: color-mix(in srgb, var(--chip-accent) 14%, var(--nb-paper));
-  box-shadow: 1px 1px 0 var(--nb-shadow-color);
+  color: var(--chip-accent);
+  color: color-mix(in srgb, var(--chip-accent) 78%, black);
+  background-color: color-mix(in srgb, var(--chip-accent) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip-accent) 25%, transparent);
 }
 
 .chip-tinted:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--chip-accent) 24%, var(--nb-paper));
-  transform: translate(-1px, -1px);
-  box-shadow: 2px 2px 0 var(--nb-shadow-color);
+  background-color: color-mix(in srgb, var(--chip-accent) 16%, transparent);
 }
 
 .dark .chip-tinted {
-  color: var(--nb-ink);
-  background-color: color-mix(in srgb, var(--chip-accent) 18%, var(--nb-paper));
-  box-shadow: 1px 1px 0 var(--nb-shadow-color);
+  color: color-mix(in srgb, var(--chip-accent) 72%, white);
+  background-color: color-mix(in srgb, var(--chip-accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip-accent) 30%, transparent);
 }
 
 .dark .chip-tinted:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--chip-accent) 28%, var(--nb-paper));
+  background-color: color-mix(in srgb, var(--chip-accent) 18%, transparent);
 }
 
 .chip-tinted-active {
-  border: 2px solid var(--nb-ink);
-  color: var(--nb-fixed-ink);
+  color: #fff;
   background-color: var(--chip-accent);
-  box-shadow: 2px 2px 0 var(--nb-shadow-color);
+  background-color: color-mix(in srgb, var(--chip-accent) 85%, black);
+  box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--chip-accent) 35%, transparent);
 }
 
 .chip-tinted-active:not(:disabled):hover {
-  background-color: var(--chip-accent);
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 var(--nb-shadow-color);
+  background-color: color-mix(in srgb, var(--chip-accent) 75%, black);
 }
 
 .dark .chip-tinted-active {
-  color: var(--nb-fixed-ink);
-  background-color: var(--chip-accent);
+  background-color: color-mix(in srgb, var(--chip-accent) 80%, transparent);
 }
 
 .dark .chip-tinted-active:not(:disabled):hover {

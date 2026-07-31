@@ -38,9 +38,9 @@
     <template v-else>
       <!-- Amount -->
       <div class="card overflow-hidden">
-        <div class="border-b-2 border-gray-900 bg-primary-500 px-6 py-5 text-center dark:border-gray-100">
-          <p class="text-sm font-bold text-gray-900">{{ t('payment.actualPay') }}</p>
-          <p class="mt-1 text-3xl font-bold text-gray-900">{{ paymentAmountSymbol }}{{ payAmount.toFixed(2) }}</p>
+        <div class="bg-gradient-to-br from-[#635bff] to-[#4f46e5] px-6 py-5 text-center">
+          <p class="text-sm font-medium text-indigo-200">{{ t('payment.actualPay') }}</p>
+          <p class="mt-1 text-3xl font-bold text-white">{{ paymentAmountSymbol }}{{ payAmount.toFixed(2) }}</p>
         </div>
       </div>
       <!-- Stripe Payment Element -->

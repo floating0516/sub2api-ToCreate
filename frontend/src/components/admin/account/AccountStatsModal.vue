@@ -491,7 +491,6 @@ import EndpointDistributionChart from '@/components/charts/EndpointDistributionC
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
 import type { Account, AccountUsageStatsResponse } from '@/types'
-import { getOracleChartSurface } from '@/utils/oracleTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -524,7 +523,10 @@ const isDarkMode = computed(() => {
 })
 
 // Chart colors
-const chartColors = computed(() => getOracleChartSurface(isDarkMode.value))
+const chartColors = computed(() => ({
+  text: isDarkMode.value ? '#e5e7eb' : '#374151',
+  grid: isDarkMode.value ? '#374151' : '#e5e7eb'
+}))
 
 // Line chart data
 const trendChartData = computed(() => {
@@ -536,8 +538,8 @@ const trendChartData = computed(() => {
       {
         label: t('usage.accountBilled') + ' (USD)',
         data: stats.value.history.map((h) => h.actual_cost),
-        borderColor: '#004e98',
-        backgroundColor: 'rgba(0, 78, 152, 0.1)',
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
         tension: 0.3,
         yAxisID: 'y'
@@ -545,8 +547,8 @@ const trendChartData = computed(() => {
       {
         label: t('usage.userBilled') + ' (USD)',
         data: stats.value.history.map((h) => h.user_cost),
-        borderColor: '#2d9b4e',
-        backgroundColor: 'rgba(45, 155, 78, 0.08)',
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
         fill: false,
         tension: 0.3,
         borderDash: [5, 5],
@@ -555,8 +557,8 @@ const trendChartData = computed(() => {
       {
         label: t('admin.accounts.stats.requests'),
         data: stats.value.history.map((h) => h.requests),
-        borderColor: '#ff6b35',
-        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+        borderColor: '#f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
         fill: false,
         tension: 0.3,
         yAxisID: 'y1'
@@ -591,8 +593,8 @@ const capacityChartData = computed(() => {
     {
       label: t('admin.accounts.stats.peakConcurrent'),
       data: trend.map((p) => p.peak_concurrent),
-      borderColor: '#004e98',
-      backgroundColor: 'rgba(0, 78, 152, 0.12)',
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.12)',
       fill: true,
       tension: 0.25,
       pointRadius: 0,
@@ -601,8 +603,8 @@ const capacityChartData = computed(() => {
     {
       label: t('admin.accounts.stats.avgConcurrent'),
       data: trend.map((p) => p.avg_concurrent),
-      borderColor: '#ff6b35',
-      backgroundColor: 'rgba(255, 107, 53, 0.08)',
+      borderColor: '#14b8a6',
+      backgroundColor: 'rgba(20, 184, 166, 0.08)',
       fill: false,
       tension: 0.25,
       pointRadius: 0,
@@ -614,8 +616,8 @@ const capacityChartData = computed(() => {
     datasets.push({
       label: t('admin.accounts.stats.capacityLimit'),
       data: trend.map((p) => p.max_concurrency || capacityLimit.value),
-      borderColor: '#e63946',
-      backgroundColor: 'rgba(230, 57, 70, 0.08)',
+      borderColor: '#ef4444',
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
       fill: false,
       tension: 0,
       pointRadius: 0,
@@ -686,7 +688,7 @@ const lineChartOptions = computed(() => ({
         color: chartColors.value.grid
       },
       ticks: {
-        color: '#004e98',
+        color: '#3b82f6',
         font: {
           size: 10
         },
@@ -695,7 +697,7 @@ const lineChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('usage.accountBilled') + ' (USD)',
-        color: '#004e98',
+        color: '#3b82f6',
         font: {
           size: 11
         }
@@ -709,7 +711,7 @@ const lineChartOptions = computed(() => ({
         drawOnChartArea: false
       },
       ticks: {
-        color: '#ff6b35',
+        color: '#f97316',
         font: {
           size: 10
         },
@@ -718,7 +720,7 @@ const lineChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('admin.accounts.stats.requests'),
-        color: '#ff6b35',
+        color: '#f97316',
         font: {
           size: 11
         }
@@ -794,7 +796,7 @@ const capacityChartOptions = computed(() => ({
         color: chartColors.value.grid
       },
       ticks: {
-        color: '#004e98',
+        color: '#2563eb',
         font: {
           size: 10
         },
@@ -803,7 +805,7 @@ const capacityChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('admin.accounts.stats.concurrentUsage'),
-        color: '#004e98',
+        color: '#2563eb',
         font: {
           size: 11
         }
