@@ -18,6 +18,8 @@ func newCustomUpdateTestRouter(handler *CustomBuildHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/status", handler.GetCustomUpdateStatus)
+	router.GET("/resolver-config", handler.GetCustomUpdateResolverConfig)
+	router.PUT("/resolver-config", handler.UpdateCustomUpdateResolverConfig)
 	router.POST("/stage", handler.StartCustomUpdate)
 	router.POST("/resolution/accept", handler.AcceptCustomUpdateResolution)
 	router.POST("/resolution/abort", handler.AbortCustomUpdateResolution)

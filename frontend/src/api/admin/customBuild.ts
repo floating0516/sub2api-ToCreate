@@ -95,6 +95,23 @@ export interface CustomUpdateRequestResult {
   message: string
 }
 
+export interface CustomUpdateResolverConfig {
+  base_url: string
+  model: string
+  reasoning_effort: string
+  api_key_configured: boolean
+  saved: boolean
+  updated_at?: string
+  default_base_url: string
+  default_model: string
+}
+
+export interface UpdateCustomUpdateResolverConfigRequest {
+  base_url: string
+  model: string
+  api_key?: string
+}
+
 export async function getCustomBuildNotes(): Promise<CustomBuildNotes> {
   const { data } = await apiClient.get<CustomBuildNotes>('/admin/custom-build/notes')
   return data
@@ -102,6 +119,23 @@ export async function getCustomBuildNotes(): Promise<CustomBuildNotes> {
 
 export async function getCustomUpdateStatus(): Promise<CustomUpdateStatus> {
   const { data } = await apiClient.get<CustomUpdateStatus>('/admin/custom-build/update/status')
+  return data
+}
+
+export async function getCustomUpdateResolverConfig(): Promise<CustomUpdateResolverConfig> {
+  const { data } = await apiClient.get<CustomUpdateResolverConfig>(
+    '/admin/custom-build/update/resolver-config'
+  )
+  return data
+}
+
+export async function updateCustomUpdateResolverConfig(
+  config: UpdateCustomUpdateResolverConfigRequest
+): Promise<CustomUpdateResolverConfig> {
+  const { data } = await apiClient.put<CustomUpdateResolverConfig>(
+    '/admin/custom-build/update/resolver-config',
+    config
+  )
   return data
 }
 
@@ -143,6 +177,8 @@ export async function abortCustomUpdateResolution(
 export const customBuildAPI = {
   getNotes: getCustomBuildNotes,
   getUpdateStatus: getCustomUpdateStatus,
+  getResolverConfig: getCustomUpdateResolverConfig,
+  updateResolverConfig: updateCustomUpdateResolverConfig,
   startUpdate: startCustomUpdate,
   acceptResolution: acceptCustomUpdateResolution,
   abortResolution: abortCustomUpdateResolution,

@@ -31,11 +31,17 @@ CONFLICT_RESOLVER_BASE_URL="${CONFLICT_RESOLVER_BASE_URL:-https://api.lihe.chat}
 CONFLICT_RESOLVER_MODEL="${CONFLICT_RESOLVER_MODEL:-gpt-5.6-luna}"
 CONFLICT_RESOLVER_REASONING_EFFORT="${CONFLICT_RESOLVER_REASONING_EFFORT:-max}"
 CONFLICT_RESOLVER_API_KEY_FILE="${CONFLICT_RESOLVER_API_KEY_FILE:-$DEPLOY_DIR/secrets/conflict-resolver-api-key}"
+CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="${CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE:-$CONTROL_DIR/resolver-config.json}"
+CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="${CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE:-$CONTROL_DIR/resolver-api-key}"
 CONFLICT_RESOLVER_TIMEOUT_SECONDS="${CONFLICT_RESOLVER_TIMEOUT_SECONDS:-900}"
 CONFLICT_RESOLVER_MAX_FILES="${CONFLICT_RESOLVER_MAX_FILES:-12}"
 CONFLICT_RESOLVER_MAX_FILE_BYTES="${CONFLICT_RESOLVER_MAX_FILE_BYTES:-196608}"
 CONFLICT_RESOLVER_MAX_TOTAL_BYTES="${CONFLICT_RESOLVER_MAX_TOTAL_BYTES:-1048576}"
 CONFLICT_RESOLVER_MAX_OUTPUT_TOKENS="${CONFLICT_RESOLVER_MAX_OUTPUT_TOKENS:-65536}"
+CONFLICT_RESOLVER_FALLBACK_BASE_URL="$CONFLICT_RESOLVER_BASE_URL"
+CONFLICT_RESOLVER_FALLBACK_MODEL="$CONFLICT_RESOLVER_MODEL"
+CONFLICT_RESOLVER_FALLBACK_REASONING_EFFORT="$CONFLICT_RESOLVER_REASONING_EFFORT"
+CONFLICT_RESOLVER_FALLBACK_API_KEY_FILE="$CONFLICT_RESOLVER_API_KEY_FILE"
 
 REQUEST_FILE="$CONTROL_DIR/request.json"
 PROCESSING_FILE="$CONTROL_DIR/processing.json"
@@ -525,6 +531,63 @@ preferred_conflict_mode() {
   esac
 }
 
+load_conflict_resolver_config() {
+  local runtime_base_url=""
+  local runtime_model=""
+  local runtime_reasoning_effort=""
+
+  CONFLICT_RESOLVER_BASE_URL="$CONFLICT_RESOLVER_FALLBACK_BASE_URL"
+  CONFLICT_RESOLVER_MODEL="$CONFLICT_RESOLVER_FALLBACK_MODEL"
+  CONFLICT_RESOLVER_REASONING_EFFORT="$CONFLICT_RESOLVER_FALLBACK_REASONING_EFFORT"
+  CONFLICT_RESOLVER_API_KEY_FILE="$CONFLICT_RESOLVER_FALLBACK_API_KEY_FILE"
+
+  if [ -e "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE" ] \
+    || [ -L "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE" ]; then
+    CONFLICT_RESOLVER_API_KEY_FILE="$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
+  fi
+  if [ ! -e "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" ] \
+    && [ ! -L "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" ]; then
+    return 0
+  fi
+  [ -f "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" ] \
+    && [ ! -L "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" ] \
+    && [ -r "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" ] || {
+    resolution_error="Conflict resolver runtime config is not a readable regular file"
+    return 1
+  }
+  if [ "$(stat -c '%s' "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" 2>/dev/null)" -gt 65536 ]; then
+    resolution_error="Conflict resolver runtime config is too large"
+    return 1
+  fi
+  if ! jq -e '
+    type == "object" and
+    (.base_url | type == "string") and
+    (.base_url | length > 0 and length <= 2048) and
+    (.model | type == "string") and
+    (.model | length > 0 and length <= 128) and
+    (.reasoning_effort | type == "string") and
+    (
+      .reasoning_effort == "none" or
+      .reasoning_effort == "minimal" or
+      .reasoning_effort == "low" or
+      .reasoning_effort == "medium" or
+      .reasoning_effort == "high" or
+      .reasoning_effort == "xhigh" or
+      .reasoning_effort == "max"
+    )
+  ' "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" >/dev/null 2>&1; then
+    resolution_error="Conflict resolver runtime config is invalid"
+    return 1
+  fi
+
+  runtime_base_url="$(jq -r '.base_url' "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE")"
+  runtime_model="$(jq -r '.model' "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE")"
+  runtime_reasoning_effort="$(jq -r '.reasoning_effort' "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE")"
+  CONFLICT_RESOLVER_BASE_URL="$runtime_base_url"
+  CONFLICT_RESOLVER_MODEL="$runtime_model"
+  CONFLICT_RESOLVER_REASONING_EFFORT="$runtime_reasoning_effort"
+}
+
 validate_resolver_config() {
   case "$CONFLICT_RESOLVER_BASE_URL" in
     https://*) ;;
@@ -969,7 +1032,6 @@ resolve_merge_conflicts() {
   )" || return 1
   current_resolution_risk_level="low"
   current_resolution_warnings="[]"
-  current_resolver_model="$CONFLICT_RESOLVER_MODEL"
   for path in "${conflict_paths[@]}"; do
     path_risk="$(conflict_path_risk_level "$path")"
     raise_resolution_risk "$path_risk"
@@ -978,6 +1040,12 @@ resolve_merge_conflicts() {
     append_resolution_warning \
       "One or more conflicts affect authentication, billing, migrations, routing, CI, or deployment code; review is mandatory."
   fi
+
+  if ! load_conflict_resolver_config; then
+    write_resolution_failure "$resolution_error"
+    return 1
+  fi
+  current_resolver_model="$CONFLICT_RESOLVER_MODEL"
 
   begin_stage_step "conflict_resolution"
   current_message="Merge conflicts detected; preparing automatic resolution"

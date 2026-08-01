@@ -126,17 +126,36 @@
                 v-if="customUpdateAvailable"
                 class="-mx-4 mb-3 border-y border-gray-100 px-4 py-3 dark:border-dark-700"
               >
-                <div class="mb-2 flex items-center justify-between gap-3">
+                <div class="mb-2 flex items-center justify-between gap-2">
                   <span
                     class="flex min-w-0 items-center gap-2 text-sm font-medium text-gray-700 dark:text-dark-200"
                   >
                     <Icon name="sync" size="sm" :stroke-width="2" />
                     <span>{{ t('version.customUpdateTitle') }}</span>
                   </span>
-                  <span
-                    class="h-2 w-2 flex-shrink-0 rounded-full"
-                    :class="customUpdateStatusDotClass"
-                  ></span>
+                  <span class="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      class="flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      :class="
+                        resolverSettingsVisible
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-dark-400 dark:hover:bg-dark-700 dark:hover:text-dark-100'
+                      "
+                      :disabled="customUpdateDemoActive"
+                      :title="t('version.customUpdateResolverSettings')"
+                      :aria-label="t('version.customUpdateResolverSettings')"
+                      :aria-expanded="resolverSettingsVisible"
+                      @click="resolverSettingsVisible = !resolverSettingsVisible"
+                    >
+                      <Icon name="cog" size="xs" :stroke-width="2" />
+                      <span>{{ t('version.customUpdateResolverSettings') }}</span>
+                    </button>
+                    <span
+                      class="h-2 w-2 rounded-full"
+                      :class="customUpdateStatusDotClass"
+                    ></span>
+                  </span>
                 </div>
 
                 <div
@@ -181,6 +200,10 @@
                     </option>
                   </select>
                 </div>
+
+                <CustomUpdateResolverSettings
+                  v-if="resolverSettingsVisible && !customUpdateDemoActive"
+                />
 
                 <div
                   v-if="!customUpdateControllerOnline"
@@ -1085,6 +1108,7 @@ import {
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
 import OfficialVersionStatus from '@/components/common/OfficialVersionStatus.vue'
+import CustomUpdateResolverSettings from '@/components/common/CustomUpdateResolverSettings.vue'
 import { OFFICIAL_REPOSITORY } from '@/constants/version'
 import {
   CUSTOM_UPDATE_DEMO_QUERY_PARAM,
@@ -1141,6 +1165,7 @@ const customUpdateLoadError = ref('')
 const customUpdateActionError = ref('')
 const promotionConfirmationVisible = ref(false)
 const resolutionConfirmationVisible = ref(false)
+const resolverSettingsVisible = ref(false)
 let customUpdatePollingTimer: number | undefined
 const initialCustomUpdateDemoScenario =
   typeof window === 'undefined'
@@ -1391,6 +1416,7 @@ function toggleDropdown() {
     stopCustomUpdatePolling()
     promotionConfirmationVisible.value = false
     resolutionConfirmationVisible.value = false
+    resolverSettingsVisible.value = false
   }
 }
 
@@ -1399,6 +1425,7 @@ function closeDropdown() {
   stopCustomUpdatePolling()
   promotionConfirmationVisible.value = false
   resolutionConfirmationVisible.value = false
+  resolverSettingsVisible.value = false
 }
 
 async function refreshVersion(force = true) {
@@ -1447,6 +1474,7 @@ function applyCustomUpdateDemoStatus() {
   customUpdateStatusChecked.value = true
   promotionConfirmationVisible.value = false
   resolutionConfirmationVisible.value = false
+  resolverSettingsVisible.value = false
 }
 
 function replaceCustomUpdateDemoQuery(scenario: CustomUpdateDemoScenario | null) {

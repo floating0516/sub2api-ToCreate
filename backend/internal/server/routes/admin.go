@@ -156,6 +156,8 @@ func registerCustomBuildRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		customBuild.GET("/notes", h.Admin.CustomBuild.GetNotes)
 		customBuild.GET("/update/status", h.Admin.CustomBuild.GetCustomUpdateStatus)
+		customBuild.GET("/update/resolver-config", h.Admin.CustomBuild.GetCustomUpdateResolverConfig)
+		customBuild.PUT("/update/resolver-config", h.Admin.CustomBuild.UpdateCustomUpdateResolverConfig)
 		customBuild.POST("/update/stage", h.Admin.CustomBuild.StartCustomUpdate)
 		customBuild.POST("/update/resolution/accept", h.Admin.CustomBuild.AcceptCustomUpdateResolution)
 		customBuild.POST("/update/resolution/abort", h.Admin.CustomBuild.AbortCustomUpdateResolution)

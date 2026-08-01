@@ -22,6 +22,58 @@ assert_eq() {
   [ "$expected" = "$actual" ] || fail "$message (expected=$expected actual=$actual)"
 }
 
+test_runtime_resolver_config_loading() {
+  local original_runtime_config_file="$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
+  local original_runtime_api_key_file="$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
+  local original_base_url="$CONFLICT_RESOLVER_BASE_URL"
+  local original_model="$CONFLICT_RESOLVER_MODEL"
+  local original_reasoning_effort="$CONFLICT_RESOLVER_REASONING_EFFORT"
+  local original_api_key_file="$CONFLICT_RESOLVER_API_KEY_FILE"
+  local config_dir="$TEST_ROOT/runtime-config"
+
+  mkdir -p "$config_dir"
+  CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="$config_dir/resolver-config.json"
+  CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="$config_dir/resolver-api-key"
+  jq -n '{
+    base_url: "https://gateway.example.com/v1",
+    model: "gpt-5.6-terra",
+    reasoning_effort: "max"
+  }' > "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
+  printf 'test-api-key\n' > "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
+  chmod 0600 "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
+
+  load_conflict_resolver_config
+  validate_resolver_config
+  assert_eq \
+    "https://gateway.example.com/v1" \
+    "$CONFLICT_RESOLVER_BASE_URL" \
+    "runtime resolver base URL was not loaded"
+  assert_eq \
+    "gpt-5.6-terra" \
+    "$CONFLICT_RESOLVER_MODEL" \
+    "runtime resolver model was not loaded"
+  assert_eq \
+    "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE" \
+    "$CONFLICT_RESOLVER_API_KEY_FILE" \
+    "runtime resolver API key file was not selected"
+
+  jq '.base_url = "http://insecure.example.com"' \
+    "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" > "$config_dir/invalid.json"
+  mv "$config_dir/invalid.json" "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
+  load_conflict_resolver_config
+  if validate_resolver_config; then
+    fail "resolver accepted an insecure runtime base URL"
+  fi
+
+  CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="$original_runtime_config_file"
+  CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="$original_runtime_api_key_file"
+  CONFLICT_RESOLVER_BASE_URL="$original_base_url"
+  CONFLICT_RESOLVER_MODEL="$original_model"
+  CONFLICT_RESOLVER_REASONING_EFFORT="$original_reasoning_effort"
+  CONFLICT_RESOLVER_API_KEY_FILE="$original_api_key_file"
+  resolution_error=""
+}
+
 test_structured_response_validation() {
   local response_file="$TEST_ROOT/response.json"
   local resolution_file="$TEST_ROOT/resolution.json"
@@ -183,6 +235,7 @@ test_isolated_merge_resolution_commit() {
     "proposal commit was not persisted"
 }
 
+test_runtime_resolver_config_loading
 test_structured_response_validation
 test_resolution_status_metadata
 test_isolated_merge_resolution_commit

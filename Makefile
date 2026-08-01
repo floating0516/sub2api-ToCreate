@@ -6,7 +6,9 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/user/__tests__/PaymentView.spec.ts \
 	src/views/user/__tests__/PaymentResultView.spec.ts \
 	src/api/__tests__/admin.benefitGrants.spec.ts \
+	src/api/__tests__/admin.customBuildResolverConfig.spec.ts \
 	src/api/__tests__/admin.paymentAddonProducts.spec.ts \
+	src/components/common/__tests__/CustomUpdateResolverSettings.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/utils/__tests__/subscriptionColors.spec.ts \
 	src/utils/__tests__/customUpdateSteps.spec.ts \
