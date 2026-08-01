@@ -143,6 +143,7 @@ type BackupService struct {
 	cronEntryID cron.EntryID
 
 	wg           sync.WaitGroup     // 追踪活跃的备份/恢复 goroutine
+	stopOnce     sync.Once
 	shuttingDown atomic.Bool        // 阻止新备份启动
 	bgCtx        context.Context    // 所有后台操作的 parent context
 	bgCancel     context.CancelFunc // 取消所有活跃后台操作
@@ -220,36 +221,41 @@ func (s *BackupService) recoverStaleRecords() {
 
 // Stop 停止定时备份并等待活跃操作完成
 func (s *BackupService) Stop() {
-	s.shuttingDown.Store(true)
-
-	s.cronMu.Lock()
-	if s.cronSched != nil {
-		s.cronSched.Stop()
+	if s == nil {
+		return
 	}
-	s.cronMu.Unlock()
+	s.stopOnce.Do(func() {
+		s.shuttingDown.Store(true)
 
-	// 等待活跃备份/恢复完成（最多 5 分钟）
-	done := make(chan struct{})
-	go func() {
-		s.wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-		logger.LegacyPrintf("service.backup", "[Backup] all active operations finished")
-	case <-time.After(5 * time.Minute):
-		logger.LegacyPrintf("service.backup", "[Backup] shutdown timeout after 5min, cancelling active operations")
-		if s.bgCancel != nil {
-			s.bgCancel() // 取消所有后台操作
+		s.cronMu.Lock()
+		if s.cronSched != nil {
+			s.cronSched.Stop()
 		}
-		// 给 goroutine 时间响应取消并完成清理
+		s.cronMu.Unlock()
+
+		// 等待活跃备份/恢复完成（最多 5 分钟）
+		done := make(chan struct{})
+		go func() {
+			s.wg.Wait()
+			close(done)
+		}()
 		select {
 		case <-done:
-			logger.LegacyPrintf("service.backup", "[Backup] active operations cancelled and cleaned up")
-		case <-time.After(10 * time.Second):
-			logger.LegacyPrintf("service.backup", "[Backup] goroutine cleanup timed out")
+			logger.LegacyPrintf("service.backup", "[Backup] all active operations finished")
+		case <-time.After(5 * time.Minute):
+			logger.LegacyPrintf("service.backup", "[Backup] shutdown timeout after 5min, cancelling active operations")
+			if s.bgCancel != nil {
+				s.bgCancel() // 取消所有后台操作
+			}
+			// 给 goroutine 时间响应取消并完成清理
+			select {
+			case <-done:
+				logger.LegacyPrintf("service.backup", "[Backup] active operations cancelled and cleaned up")
+			case <-time.After(10 * time.Second):
+				logger.LegacyPrintf("service.backup", "[Backup] goroutine cleanup timed out")
+			}
 		}
-	}
+	})
 }
 
 // ─── S3 配置管理 ───
