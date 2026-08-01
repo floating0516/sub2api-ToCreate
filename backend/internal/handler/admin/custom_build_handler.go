@@ -21,9 +21,10 @@ const (
 )
 
 type CustomBuildHandler struct {
-	notesPath        string
-	updateControlDir string
-	updateMu         sync.Mutex
+	notesPath          string
+	updateControlDir   string
+	resolverHTTPClient *http.Client
+	updateMu           sync.Mutex
 }
 
 func NewCustomBuildHandler() *CustomBuildHandler {
@@ -36,8 +37,9 @@ func NewCustomBuildHandler() *CustomBuildHandler {
 		updateControlDir = defaultCustomUpdateDir
 	}
 	return &CustomBuildHandler{
-		notesPath:        path,
-		updateControlDir: updateControlDir,
+		notesPath:          path,
+		updateControlDir:   updateControlDir,
+		resolverHTTPClient: &http.Client{Timeout: defaultResolverTestTimeout},
 	}
 }
 

@@ -55,7 +55,7 @@
           class="input h-9 w-full text-xs"
           :placeholder="defaultBaseURL"
           required
-          @input="clearSaveFeedback"
+          @input="clearFormFeedback"
         />
       </label>
 
@@ -94,7 +94,7 @@
                 ? t('version.customUpdateResolverAPIKeyKeepPlaceholder')
                 : t('version.customUpdateResolverAPIKeyPlaceholder')
             "
-            @input="clearSaveFeedback"
+            @input="clearFormFeedback"
           />
           <button
             type="button"
@@ -123,7 +123,7 @@
         <select
           v-model="selectedModel"
           class="input h-9 w-full text-xs"
-          @change="clearSaveFeedback"
+          @change="clearFormFeedback"
         >
           <option value="gpt-5.6-luna">
             {{ t('version.customUpdateResolverModelLuna') }}
@@ -149,7 +149,7 @@
           class="input h-9 w-full font-mono text-xs"
           :placeholder="defaultModel"
           required
-          @input="clearSaveFeedback"
+          @input="clearFormFeedback"
         />
       </label>
 
@@ -172,23 +172,59 @@
         {{ t('version.customUpdateResolverSaveSuccess') }}
       </p>
 
-      <button
-        type="submit"
-        class="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary-500 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="saveDisabled"
+      <p
+        v-if="testError"
+        class="bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
       >
-        <Icon
-          :name="saving ? 'refresh' : 'check'"
-          size="xs"
-          :stroke-width="2"
-          :class="{ 'animate-spin': saving }"
-        />
-        {{
-          saving
-            ? t('common.saving')
-            : t('version.customUpdateResolverSaveDefault')
-        }}
-      </button>
+        {{ testError }}
+      </p>
+      <p
+        v-else-if="testSuccess"
+        class="flex items-center gap-1.5 bg-green-50 px-2.5 py-2 text-xs text-green-700 dark:bg-green-900/20 dark:text-green-300"
+      >
+        <Icon name="checkCircle" size="xs" :stroke-width="2" />
+        {{ t('version.customUpdateResolverTestSuccess', { latency: testLatencyMS }) }}
+      </p>
+
+      <div class="flex items-stretch gap-2">
+        <button
+          type="button"
+          data-testid="custom-update-resolver-test"
+          class="flex h-9 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
+          :disabled="testDisabled"
+          @click="testConnection"
+        >
+          <Icon
+            :name="testingConnection ? 'refresh' : 'beaker'"
+            size="xs"
+            :stroke-width="2"
+            :class="{ 'animate-spin': testingConnection }"
+          />
+          {{
+            testingConnection
+              ? t('version.customUpdateResolverTesting')
+              : t('version.customUpdateResolverTestConnection')
+          }}
+        </button>
+
+        <button
+          type="submit"
+          class="flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-500 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="saveDisabled"
+        >
+          <Icon
+            :name="saving ? 'refresh' : 'check'"
+            size="xs"
+            :stroke-width="2"
+            :class="{ 'animate-spin': saving }"
+          />
+          {{
+            saving
+              ? t('common.saving')
+              : t('version.customUpdateResolverSaveDefault')
+          }}
+        </button>
+      </div>
     </form>
   </section>
 </template>
@@ -199,8 +235,10 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import {
   getCustomUpdateResolverConfig,
+  testCustomUpdateResolverConfig,
   updateCustomUpdateResolverConfig,
   type CustomUpdateResolverConfig,
+  type CustomUpdateResolverTestResult,
   type UpdateCustomUpdateResolverConfigRequest
 } from '@/api/admin/customBuild'
 
@@ -214,9 +252,13 @@ const presetModels = new Set(['gpt-5.6-luna', 'gpt-5.6-terra'])
 
 const loading = ref(true)
 const saving = ref(false)
+const testingConnection = ref(false)
 const loadError = ref('')
 const saveError = ref('')
 const saveSuccess = ref(false)
+const testError = ref('')
+const testSuccess = ref(false)
+const testLatencyMS = ref(0)
 const configSaved = ref(false)
 const apiKeyConfigured = ref(false)
 const defaultBaseURL = ref('https://api.lihe.chat')
@@ -235,8 +277,18 @@ const resolvedModel = computed(() =>
 const saveDisabled = computed(
   () =>
     saving.value ||
+    testingConnection.value ||
     baseURL.value.trim() === '' ||
     resolvedModel.value === ''
+)
+
+const testDisabled = computed(
+  () =>
+    testingConnection.value ||
+    saving.value ||
+    baseURL.value.trim() === '' ||
+    resolvedModel.value === '' ||
+    (apiKey.value.trim() === '' && !apiKeyConfigured.value)
 )
 
 function applyConfig(config: CustomUpdateResolverConfig) {
@@ -261,6 +313,17 @@ function applyConfig(config: CustomUpdateResolverConfig) {
 function clearSaveFeedback() {
   saveError.value = ''
   saveSuccess.value = false
+}
+
+function clearTestFeedback() {
+  testError.value = ''
+  testSuccess.value = false
+  testLatencyMS.value = 0
+}
+
+function clearFormFeedback() {
+  clearSaveFeedback()
+  clearTestFeedback()
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -298,8 +361,7 @@ async function saveConfig() {
   if (saveDisabled.value) return
 
   saving.value = true
-  saveError.value = ''
-  saveSuccess.value = false
+  clearFormFeedback()
   const payload: UpdateCustomUpdateResolverConfigRequest = {
     base_url: baseURL.value.trim(),
     model: resolvedModel.value
@@ -320,6 +382,33 @@ async function saveConfig() {
     )
   } finally {
     saving.value = false
+  }
+}
+
+async function testConnection() {
+  if (testDisabled.value) return
+
+  testingConnection.value = true
+  clearFormFeedback()
+  const payload: UpdateCustomUpdateResolverConfigRequest = {
+    base_url: baseURL.value.trim(),
+    model: resolvedModel.value
+  }
+  if (apiKey.value.trim() !== '') {
+    payload.api_key = apiKey.value
+  }
+
+  try {
+    const result: CustomUpdateResolverTestResult = await testCustomUpdateResolverConfig(payload)
+    testLatencyMS.value = result.latency_ms
+    testSuccess.value = true
+  } catch (error: unknown) {
+    testError.value = errorMessage(
+      error,
+      t('version.customUpdateResolverTestFailed')
+    )
+  } finally {
+    testingConnection.value = false
   }
 }
 

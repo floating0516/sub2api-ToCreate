@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const { getConfig, updateConfig } = vi.hoisted(() => ({
+const { getConfig, updateConfig, testConfig } = vi.hoisted(() => ({
   getConfig: vi.fn(),
-  updateConfig: vi.fn()
+  updateConfig: vi.fn(),
+  testConfig: vi.fn()
 }))
 
 vi.mock('@/api/admin/customBuild', () => ({
   getCustomUpdateResolverConfig: getConfig,
+  testCustomUpdateResolverConfig: testConfig,
   updateCustomUpdateResolverConfig: updateConfig
 }))
 
@@ -31,6 +33,7 @@ describe('CustomUpdateResolverSettings', () => {
   beforeEach(() => {
     getConfig.mockReset()
     updateConfig.mockReset()
+    testConfig.mockReset()
     getConfig.mockResolvedValue({ ...defaultConfig })
   })
 
@@ -80,5 +83,75 @@ describe('CustomUpdateResolverSettings', () => {
       base_url: 'https://api.lihe.chat',
       model: 'gpt-5.6-luna'
     })
+  })
+
+  it('tests a newly entered key without clearing the input', async () => {
+    testConfig.mockResolvedValue({
+      ok: true,
+      model: 'gpt-5.6-luna',
+      latency_ms: 248
+    })
+    const wrapper = mount(CustomUpdateResolverSettings)
+    await flushPromises()
+
+    const input = wrapper.get('input[type="password"]')
+    await input.setValue('sk-current-secret')
+    await wrapper.get('[data-testid="custom-update-resolver-test"]').trigger('click')
+    await flushPromises()
+
+    expect(testConfig).toHaveBeenCalledWith({
+      base_url: 'https://api.lihe.chat',
+      model: 'gpt-5.6-luna',
+      api_key: 'sk-current-secret'
+    })
+    expect((input.element as HTMLInputElement).value).toBe('sk-current-secret')
+    expect(wrapper.text()).toContain('version.customUpdateResolverTestSuccess')
+  })
+
+  it('uses the saved key when the API key field is blank', async () => {
+    getConfig.mockResolvedValue({
+      ...defaultConfig,
+      api_key_configured: true,
+      saved: true
+    })
+    testConfig.mockResolvedValue({
+      ok: true,
+      model: 'gpt-5.6-luna',
+      latency_ms: 91
+    })
+    const wrapper = mount(CustomUpdateResolverSettings)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-update-resolver-test"]').trigger('click')
+    await flushPromises()
+
+    expect(testConfig).toHaveBeenCalledWith({
+      base_url: 'https://api.lihe.chat',
+      model: 'gpt-5.6-luna'
+    })
+  })
+
+  it('disables connection testing until an API key is available', async () => {
+    const wrapper = mount(CustomUpdateResolverSettings)
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-testid="custom-update-resolver-test"]').attributes('disabled')
+    ).toBeDefined()
+  })
+
+  it('shows a safe connection failure message', async () => {
+    testConfig.mockRejectedValue({
+      response: { data: { message: 'The API key was rejected by the upstream service' } }
+    })
+    const wrapper = mount(CustomUpdateResolverSettings)
+    await flushPromises()
+
+    await wrapper.get('input[type="password"]').setValue('sk-rejected-secret')
+    await wrapper.get('[data-testid="custom-update-resolver-test"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The API key was rejected by the upstream service')
+    expect(wrapper.html()).not.toContain('sk-rejected-secret')
   })
 })

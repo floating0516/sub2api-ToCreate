@@ -112,6 +112,12 @@ export interface UpdateCustomUpdateResolverConfigRequest {
   api_key?: string
 }
 
+export interface CustomUpdateResolverTestResult {
+  ok: boolean
+  model: string
+  latency_ms: number
+}
+
 export async function getCustomBuildNotes(): Promise<CustomBuildNotes> {
   const { data } = await apiClient.get<CustomBuildNotes>('/admin/custom-build/notes')
   return data
@@ -135,6 +141,17 @@ export async function updateCustomUpdateResolverConfig(
   const { data } = await apiClient.put<CustomUpdateResolverConfig>(
     '/admin/custom-build/update/resolver-config',
     config
+  )
+  return data
+}
+
+export async function testCustomUpdateResolverConfig(
+  config: UpdateCustomUpdateResolverConfigRequest
+): Promise<CustomUpdateResolverTestResult> {
+  const { data } = await apiClient.post<CustomUpdateResolverTestResult>(
+    '/admin/custom-build/update/resolver-config/test',
+    config,
+    { timeout: 65000 }
   )
   return data
 }
@@ -179,6 +196,7 @@ export const customBuildAPI = {
   getUpdateStatus: getCustomUpdateStatus,
   getResolverConfig: getCustomUpdateResolverConfig,
   updateResolverConfig: updateCustomUpdateResolverConfig,
+  testResolverConfig: testCustomUpdateResolverConfig,
   startUpdate: startCustomUpdate,
   acceptResolution: acceptCustomUpdateResolution,
   abortResolution: abortCustomUpdateResolution,
