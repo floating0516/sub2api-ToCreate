@@ -1796,6 +1796,9 @@ function handleClickOutside(event: MouseEvent) {
 
 onMounted(() => {
   if (isAdmin.value) {
+    if (customUpdateDemoActive.value) {
+      dropdownOpen.value = true
+    }
     // Use cached version if available, otherwise fetch
     appStore.fetchVersion(false)
     void refreshCustomUpdateStatus()
