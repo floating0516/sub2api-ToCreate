@@ -36,6 +36,9 @@ server:
   # Keep-alive idle timeout in seconds.
   # Keep-Alive 空闲连接超时（秒）。
   idle_timeout: 120
+  # Maximum time to drain in-flight requests during graceful shutdown.
+  # 优雅停机时等待进行中请求完成的最长时间（秒）。
+  shutdown_timeout: 900
   # Trusted proxies used when security.trust_forwarded_ip_for_api_key_acl is false.
   # List only the exact proxy addresses that connect directly to Sub2API.
   # Set [] explicitly to disable forwarded-IP trust in high-security mode.

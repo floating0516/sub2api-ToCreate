@@ -27,6 +27,7 @@ import (
 type Application struct {
 	Server      *http.Server
 	PromptAudit *securityaudit.PromptService
+	DrainStop   DrainStop
 	Cleanup     func()
 }
 
@@ -53,10 +54,11 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		provideServiceBuildInfo,
 
 		// Cleanup function provider
+		provideDrainStop,
 		provideCleanup,
 
 		// Application struct
-		wire.Struct(new(Application), "Server", "PromptAudit", "Cleanup"),
+		wire.Struct(new(Application), "Server", "PromptAudit", "DrainStop", "Cleanup"),
 	)
 	return nil, nil
 }

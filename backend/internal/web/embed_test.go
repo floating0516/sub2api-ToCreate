@@ -693,6 +693,10 @@ func TestEmbeddedFrontendBypassesBareVideoAPIRoutes(t *testing.T) {
 	}
 }
 
+func TestEmbeddedFrontendBypassesReadinessRoute(t *testing.T) {
+	require.True(t, shouldBypassEmbeddedFrontend("/ready"))
+}
+
 func TestEmbeddedFrontendOIDCRouting(t *testing.T) {
 	protocolRoutes := []struct {
 		method string

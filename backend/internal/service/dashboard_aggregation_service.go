@@ -114,6 +114,14 @@ func (s *DashboardAggregationService) Start() {
 	}
 }
 
+// Stop prevents this instance from starting another scheduled aggregation while draining.
+func (s *DashboardAggregationService) Stop() {
+	if s == nil || s.timingWheel == nil {
+		return
+	}
+	s.timingWheel.Cancel("dashboard:aggregation")
+}
+
 // TriggerBackfill 触发回填（异步）。
 func (s *DashboardAggregationService) TriggerBackfill(start, end time.Time) error {
 	if s == nil || s.repo == nil {

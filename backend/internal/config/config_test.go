@@ -55,6 +55,7 @@ func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 10, cfg.Server.ReadHeaderTimeout)
 	require.Equal(t, 64*1024, cfg.Server.MaxHeaderBytes)
+	require.Equal(t, 900, cfg.Server.ShutdownTimeout)
 	require.Empty(t, cfg.Server.TrustedProxies)
 	require.False(t, cfg.Server.TrustedProxiesConfigured)
 	require.True(t, cfg.TrustForwardedIPForAPIKeyACL())
@@ -62,6 +63,15 @@ func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	require.True(t, cfg.APIKeyAuth.InvalidAbuse.Enabled)
 	require.Equal(t, 120, cfg.APIKeyAuth.InvalidAbuse.Threshold)
 	require.Equal(t, 16384, cfg.APIKeyAuth.InvalidAbuse.Capacity)
+}
+
+func TestLoadServerShutdownTimeoutFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SERVER_SHUTDOWN_TIMEOUT", "45")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 45, cfg.Server.ShutdownTimeout)
 }
 
 func TestNormalizeForwardedClientIPHeaders(t *testing.T) {
@@ -1512,6 +1522,11 @@ func TestValidateConfigErrors(t *testing.T) {
 			name:    "server max request body size",
 			mutate:  func(c *Config) { c.Server.MaxRequestBodySize = -1 },
 			wantErr: "server.max_request_body_size",
+		},
+		{
+			name:    "server shutdown timeout",
+			mutate:  func(c *Config) { c.Server.ShutdownTimeout = 0 },
+			wantErr: "server.shutdown_timeout",
 		},
 		{
 			name: "h2c zero concurrent streams",
