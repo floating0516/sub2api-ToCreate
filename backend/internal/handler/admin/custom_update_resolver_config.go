@@ -285,14 +285,14 @@ func (h *CustomBuildHandler) writeCustomUpdateControlFile(
 func normalizeCustomUpdateResolverBaseURL(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" || len(value) > maxResolverBaseURLBytes {
-		return "", fmt.Errorf("Base URL is required and must not exceed %d characters", maxResolverBaseURLBytes)
+		return "", fmt.Errorf("base URL is required and must not exceed %d characters", maxResolverBaseURLBytes)
 	}
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return "", fmt.Errorf("Base URL must be a valid HTTPS URL")
+		return "", fmt.Errorf("base URL must be a valid HTTPS URL")
 	}
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" {
-		return "", fmt.Errorf("Base URL must not contain credentials, query parameters, or fragments")
+		return "", fmt.Errorf("base URL must not contain credentials, query parameters, or fragments")
 	}
 	return strings.TrimRight(value, "/"), nil
 }
@@ -300,7 +300,7 @@ func normalizeCustomUpdateResolverBaseURL(value string) (string, error) {
 func normalizeCustomUpdateResolverModel(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" || len(value) > maxResolverModelBytes || !customUpdateResolverModelPattern.MatchString(value) {
-		return "", fmt.Errorf("Model must use letters, numbers, dots, underscores, colons, slashes, or hyphens")
+		return "", fmt.Errorf("model must use letters, numbers, dots, underscores, colons, slashes, or hyphens")
 	}
 	return value, nil
 }
