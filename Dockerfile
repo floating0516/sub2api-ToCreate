@@ -52,15 +52,8 @@ RUN pnpm run build
 # build (emulated networking here was dropping module fetches with EOF).
 FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS backend-builder
 
-# Build arguments for version info (set by CI)
-ARG VERSION=
-ARG COMMIT=docker
-ARG DATE
 ARG GOPROXY
 ARG GOSUMDB
-# Populated by buildx from the --platform target (e.g. linux/amd64).
-ARG TARGETOS
-ARG TARGETARCH
 
 ENV GOPROXY=${GOPROXY}
 ENV GOSUMDB=${GOSUMDB}
@@ -82,6 +75,15 @@ COPY backend/ ./
 
 # Copy frontend dist from previous stage (must be after backend copy to avoid being overwritten)
 COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
+
+# Keep volatile release metadata below dependency installation and source copies.
+# Otherwise a new COMMIT or DATE invalidates apk and go mod download layers too.
+ARG VERSION=
+ARG COMMIT=docker
+ARG DATE
+# Populated by buildx from the --platform target (e.g. linux/amd64).
+ARG TARGETOS
+ARG TARGETARCH
 
 # Build the binary (BuildType=release for CI builds, embed frontend)
 # Version precedence: build arg VERSION > exact git tag > cmd/server/VERSION

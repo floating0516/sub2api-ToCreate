@@ -30,6 +30,10 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+frontend/*.tsbuildinfo
+frontend/.vite/
+.pnpm-store/
+frontend/.pnpm-store/
 
 # Node modules (will be installed in container)
 frontend/node_modules/
@@ -40,7 +44,14 @@ backend/vendor/
 
 # Test files
 *_test.go
+**/*_test.go
 **/*.test.js
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.js
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
 coverage/
 .nyc_output/
 
@@ -62,13 +73,15 @@ tmp/
 temp/
 *.tmp
 
-# Deploy files (not needed in image)
-deploy/install.sh
-deploy/sub2api.service
-deploy/sub2api-sudoers
-deploy/data/
-deploy/postgres_data/
-deploy/redis_data/
+# Only the runtime entrypoint is copied from deploy/ by the Dockerfile.
+deploy/*
+!deploy/docker-entrypoint.sh
+
+# Repository-only content not referenced by the Dockerfile
+assets/
+openspec/
+skills/
+tools/
 
 # GoReleaser
 .goreleaser.yaml
