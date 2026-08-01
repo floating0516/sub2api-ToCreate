@@ -4,6 +4,7 @@ export default {
       title: '自定义构建说明',
       description: '查看当前自定义镜像、版本命名、部署流程和历史变更记录。',
       updatedAt: '文档更新时间：{time}',
+      demoLauncherTitle: '更新冲突演示（仅 18080）',
       toc: '目录',
       empty: '暂无构建说明',
       loadFailed: '加载构建说明失败'

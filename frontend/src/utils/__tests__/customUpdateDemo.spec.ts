@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CUSTOM_UPDATE_DEMO_SCENARIOS,
+  createCustomUpdateDemoUrl,
   createCustomUpdateDemoStatus,
   resolveCustomUpdateDemoScenario,
   type CustomUpdateDemoCopy
@@ -19,6 +20,15 @@ describe('custom update demo fixtures', () => {
     expect(resolveCustomUpdateDemoScenario('?custom_update_demo=review', '18080')).toBe('review')
     expect(resolveCustomUpdateDemoScenario('?custom_update_demo=unknown', '18080')).toBeNull()
     expect(resolveCustomUpdateDemoScenario('?custom_update_demo=review', '8080')).toBeNull()
+  })
+
+  it('builds a clean staging demo URL for a selected scenario', () => {
+    expect(
+      createCustomUpdateDemoUrl(
+        'http://example.test:18080/admin/custom-build?old=value#section',
+        'review_high'
+      )
+    ).toBe('http://example.test:18080/admin/custom-build?custom_update_demo=review_high')
   })
 
   it('creates enabled, online status fixtures for every scenario', () => {

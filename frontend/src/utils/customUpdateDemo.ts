@@ -49,6 +49,18 @@ export function resolveCustomUpdateDemoScenario(
   return isCustomUpdateDemoScenario(value) ? value : null
 }
 
+export function createCustomUpdateDemoUrl(
+  href: string,
+  scenario: CustomUpdateDemoScenario
+): string {
+  const url = new URL(href)
+  url.pathname = '/admin/custom-build'
+  url.search = ''
+  url.searchParams.set(CUSTOM_UPDATE_DEMO_QUERY_PARAM, scenario)
+  url.hash = ''
+  return url.toString()
+}
+
 export function createCustomUpdateDemoStatus(
   scenario: CustomUpdateDemoScenario,
   copy: CustomUpdateDemoCopy,
