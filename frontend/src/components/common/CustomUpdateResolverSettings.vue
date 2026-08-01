@@ -1,39 +1,59 @@
 <template>
   <section
     data-testid="custom-update-resolver-settings"
-    class="mb-3 border-y border-gray-100 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900/45"
+    class="mb-2 border-y border-gray-100 bg-gray-50 px-2.5 py-2 dark:border-dark-700 dark:bg-dark-900/45"
   >
-    <div class="mb-3 flex items-start gap-2">
+    <div class="mb-2 flex min-w-0 items-center gap-2">
       <span
-        class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300"
+        class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300"
       >
         <Icon name="sparkles" size="xs" :stroke-width="2" />
       </span>
-      <div class="min-w-0 flex-1">
-        <p class="text-xs font-semibold text-gray-800 dark:text-dark-100">
-          {{ t('version.customUpdateResolverSettingsTitle') }}
-        </p>
-        <p class="mt-0.5 text-[10px] leading-4 text-gray-500 dark:text-dark-400">
-          {{
-            configSaved
-              ? t('version.customUpdateResolverConfigSaved')
-              : t('version.customUpdateResolverUsingDefaults')
-          }}
-        </p>
-      </div>
+      <p class="min-w-0 truncate text-xs font-semibold text-gray-800 dark:text-dark-100">
+        {{ t('version.customUpdateResolverSettingsTitle') }}
+      </p>
+      <span
+        class="flex-shrink-0 rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-medium text-gray-600 dark:bg-dark-700 dark:text-dark-300"
+        :title="t('version.customUpdateResolverReasoningMax')"
+      >
+        {{ t('version.customUpdateResolverReasoningMaxShort') }}
+      </span>
+      <span
+        class="ml-auto flex flex-shrink-0 items-center gap-1 text-[9px]"
+        :class="
+          configSaved
+            ? 'text-green-600 dark:text-green-400'
+            : 'text-gray-500 dark:text-dark-400'
+        "
+        :title="
+          configSaved
+            ? t('version.customUpdateResolverConfigSaved')
+            : t('version.customUpdateResolverUsingDefaults')
+        "
+      >
+        <span
+          class="h-1.5 w-1.5 rounded-full"
+          :class="configSaved ? 'bg-green-500' : 'bg-gray-400 dark:bg-dark-500'"
+        ></span>
+        {{
+          configSaved
+            ? t('version.customUpdateResolverConfigSavedShort')
+            : t('version.customUpdateResolverUsingDefaultsShort')
+        }}
+      </span>
     </div>
 
-    <div v-if="loading" class="flex min-h-24 items-center justify-center">
+    <div v-if="loading" class="flex min-h-16 items-center justify-center">
       <Icon name="refresh" size="sm" :stroke-width="2" class="animate-spin text-primary-500" />
     </div>
 
-    <div v-else-if="loadError" class="space-y-2">
-      <p class="bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+    <div v-else-if="loadError" class="space-y-1.5">
+      <p class="bg-red-50 px-2 py-1.5 text-[11px] leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
         {{ loadError }}
       </p>
       <button
         type="button"
-        class="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
+        class="flex h-7 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
         @click="loadConfig"
       >
         <Icon name="refresh" size="xs" :stroke-width="2" />
@@ -41,29 +61,55 @@
       </button>
     </div>
 
-    <form v-else class="space-y-3" @submit.prevent="saveConfig">
-      <label class="block">
-        <span class="mb-1 block text-[11px] font-medium text-gray-600 dark:text-dark-300">
-          {{ t('version.customUpdateResolverBaseURL') }}
-        </span>
-        <input
-          v-model="baseURL"
-          type="url"
-          inputmode="url"
-          autocomplete="url"
-          spellcheck="false"
-          class="input h-9 w-full text-xs"
-          :placeholder="defaultBaseURL"
-          required
-          @input="clearFormFeedback"
-        />
-      </label>
+    <form v-else class="space-y-2" @submit.prevent="saveConfig">
+      <div
+        data-testid="custom-update-resolver-primary-row"
+        class="grid grid-cols-[minmax(0,1fr)_7.75rem] gap-2"
+      >
+        <label class="min-w-0">
+          <span class="mb-0.5 block text-[10px] font-medium text-gray-600 dark:text-dark-300">
+            {{ t('version.customUpdateResolverBaseURL') }}
+          </span>
+          <input
+            v-model="baseURL"
+            type="url"
+            inputmode="url"
+            autocomplete="url"
+            spellcheck="false"
+            class="input h-8 w-full text-[11px]"
+            :placeholder="defaultBaseURL"
+            required
+            @input="clearFormFeedback"
+          />
+        </label>
+
+        <label class="min-w-0">
+          <span class="mb-0.5 block text-[10px] font-medium text-gray-600 dark:text-dark-300">
+            {{ t('version.customUpdateResolverModel') }}
+          </span>
+          <select
+            v-model="selectedModel"
+            class="input h-8 w-full text-[11px]"
+            @change="clearFormFeedback"
+          >
+            <option value="gpt-5.6-luna">
+              {{ t('version.customUpdateResolverModelLuna') }}
+            </option>
+            <option value="gpt-5.6-terra">
+              {{ t('version.customUpdateResolverModelTerra') }}
+            </option>
+            <option :value="customModelOption">
+              {{ t('version.customUpdateResolverModelCustom') }}
+            </option>
+          </select>
+        </label>
+      </div>
 
       <label class="block">
-        <span class="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-gray-600 dark:text-dark-300">
+        <span class="mb-0.5 flex items-center justify-between gap-2 text-[10px] font-medium text-gray-600 dark:text-dark-300">
           <span>{{ t('version.customUpdateResolverAPIKey') }}</span>
           <span
-            class="flex items-center gap-1 text-[10px] font-normal"
+            class="flex items-center gap-1 text-[9px] font-normal"
             :class="
               apiKeyConfigured
                 ? 'text-green-600 dark:text-green-400'
@@ -88,7 +134,7 @@
             :type="showAPIKey ? 'text' : 'password'"
             autocomplete="new-password"
             spellcheck="false"
-            class="input h-9 w-full pr-9 text-xs"
+            class="input h-8 w-full pr-8 text-[11px]"
             :placeholder="
               apiKeyConfigured
                 ? t('version.customUpdateResolverAPIKeyKeepPlaceholder')
@@ -98,7 +144,7 @@
           />
           <button
             type="button"
-            class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-dark-100"
+            class="absolute inset-y-0 right-0 flex w-8 items-center justify-center text-gray-400 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-dark-100"
             :title="
               showAPIKey
                 ? t('version.customUpdateResolverHideAPIKey')
@@ -116,29 +162,8 @@
         </span>
       </label>
 
-      <label class="block">
-        <span class="mb-1 block text-[11px] font-medium text-gray-600 dark:text-dark-300">
-          {{ t('version.customUpdateResolverModel') }}
-        </span>
-        <select
-          v-model="selectedModel"
-          class="input h-9 w-full text-xs"
-          @change="clearFormFeedback"
-        >
-          <option value="gpt-5.6-luna">
-            {{ t('version.customUpdateResolverModelLuna') }}
-          </option>
-          <option value="gpt-5.6-terra">
-            {{ t('version.customUpdateResolverModelTerra') }}
-          </option>
-          <option :value="customModelOption">
-            {{ t('version.customUpdateResolverModelCustom') }}
-          </option>
-        </select>
-      </label>
-
       <label v-if="selectedModel === customModelOption" class="block">
-        <span class="mb-1 block text-[11px] font-medium text-gray-600 dark:text-dark-300">
+        <span class="mb-0.5 block text-[10px] font-medium text-gray-600 dark:text-dark-300">
           {{ t('version.customUpdateResolverCustomModel') }}
         </span>
         <input
@@ -146,27 +171,22 @@
           type="text"
           autocomplete="off"
           spellcheck="false"
-          class="input h-9 w-full font-mono text-xs"
+          class="input h-8 w-full font-mono text-[11px]"
           :placeholder="defaultModel"
           required
           @input="clearFormFeedback"
         />
       </label>
 
-      <div class="flex items-center justify-between gap-3 text-[10px] text-gray-500 dark:text-dark-400">
-        <span>{{ t('version.customUpdateResolverReasoningMax') }}</span>
-        <span v-if="updatedAt">{{ formatUpdatedAt(updatedAt) }}</span>
-      </div>
-
       <p
         v-if="saveError"
-        class="bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+        class="bg-red-50 px-2 py-1.5 text-[11px] leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
       >
         {{ saveError }}
       </p>
       <p
         v-else-if="saveSuccess"
-        class="flex items-center gap-1.5 bg-green-50 px-2.5 py-2 text-xs text-green-700 dark:bg-green-900/20 dark:text-green-300"
+        class="flex items-center gap-1.5 bg-green-50 px-2 py-1.5 text-[11px] text-green-700 dark:bg-green-900/20 dark:text-green-300"
       >
         <Icon name="checkCircle" size="xs" :stroke-width="2" />
         {{ t('version.customUpdateResolverSaveSuccess') }}
@@ -174,13 +194,13 @@
 
       <p
         v-if="testError"
-        class="bg-red-50 px-2.5 py-2 text-xs leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+        class="bg-red-50 px-2 py-1.5 text-[11px] leading-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
       >
         {{ testError }}
       </p>
       <p
         v-else-if="testSuccess"
-        class="flex items-center gap-1.5 bg-green-50 px-2.5 py-2 text-xs text-green-700 dark:bg-green-900/20 dark:text-green-300"
+        class="flex items-center gap-1.5 bg-green-50 px-2 py-1.5 text-[11px] text-green-700 dark:bg-green-900/20 dark:text-green-300"
       >
         <Icon name="checkCircle" size="xs" :stroke-width="2" />
         {{ t('version.customUpdateResolverTestSuccess', { latency: testLatencyMS }) }}
@@ -190,7 +210,7 @@
         <button
           type="button"
           data-testid="custom-update-resolver-test"
-          class="flex h-9 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
+          class="flex h-8 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
           :disabled="testDisabled"
           @click="testConnection"
         >
@@ -209,7 +229,7 @@
 
         <button
           type="submit"
-          class="flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-500 px-3 text-xs font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-500 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="saveDisabled"
         >
           <Icon
@@ -268,7 +288,6 @@ const apiKey = ref('')
 const showAPIKey = ref(false)
 const selectedModel = ref('gpt-5.6-luna')
 const customModel = ref('')
-const updatedAt = ref('')
 
 const resolvedModel = computed(() =>
   selectedModel.value === customModelOption ? customModel.value.trim() : selectedModel.value
@@ -297,7 +316,6 @@ function applyConfig(config: CustomUpdateResolverConfig) {
   defaultBaseURL.value = config.default_base_url
   defaultModel.value = config.default_model
   baseURL.value = config.base_url
-  updatedAt.value = config.updated_at || ''
   apiKey.value = ''
   showAPIKey.value = false
 
@@ -329,17 +347,6 @@ function clearFormFeedback() {
 function errorMessage(error: unknown, fallback: string): string {
   const value = error as { response?: { data?: { message?: string } }; message?: string }
   return value.response?.data?.message || value.message || fallback
-}
-
-function formatUpdatedAt(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat(undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
 }
 
 async function loadConfig() {

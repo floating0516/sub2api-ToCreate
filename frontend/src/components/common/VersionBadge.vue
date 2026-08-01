@@ -206,7 +206,7 @@
                 />
 
                 <div
-                  v-if="!customUpdateControllerOnline"
+                  v-else-if="!customUpdateControllerOnline"
                   class="flex items-start gap-2 bg-amber-50 px-2.5 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
                 >
                   <Icon

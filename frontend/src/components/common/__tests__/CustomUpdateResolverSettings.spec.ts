@@ -140,6 +140,17 @@ describe('CustomUpdateResolverSettings', () => {
     ).toBeDefined()
   })
 
+  it('keeps the primary resolver controls in a compact row', async () => {
+    const wrapper = mount(CustomUpdateResolverSettings)
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="custom-update-resolver-primary-row"]')
+    expect(row.classes()).toContain('grid')
+    expect(wrapper.get('input[type="url"]').classes()).toContain('h-8')
+    expect(wrapper.get('select').classes()).toContain('h-8')
+    expect(wrapper.text()).toContain('version.customUpdateResolverUsingDefaultsShort')
+  })
+
   it('shows a safe connection failure message', async () => {
     testConfig.mockRejectedValue({
       response: { data: { message: 'The API key was rejected by the upstream service' } }
