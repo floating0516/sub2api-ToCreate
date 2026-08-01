@@ -142,7 +142,7 @@ type BackupService struct {
 	cronSched   *cron.Cron
 	cronEntryID cron.EntryID
 
-	wg           sync.WaitGroup     // 追踪活跃的备份/恢复 goroutine
+	wg           sync.WaitGroup // 追踪活跃的备份/恢复 goroutine
 	stopOnce     sync.Once
 	shuttingDown atomic.Bool        // 阻止新备份启动
 	bgCtx        context.Context    // 所有后台操作的 parent context
