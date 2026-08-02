@@ -53,6 +53,11 @@ type customUpdateStatus struct {
 	ResolutionWarnings  []string           `json:"resolution_warnings,omitempty"`
 	ResolutionDiffStat  string             `json:"resolution_diff_stat,omitempty"`
 	ResolverModel       string             `json:"resolver_model,omitempty"`
+	ReleaseStatus       string             `json:"release_status,omitempty"`
+	ReleaseTag          string             `json:"release_tag,omitempty"`
+	ReleaseURL          string             `json:"release_url,omitempty"`
+	ReleasePublishedAt  string             `json:"release_published_at,omitempty"`
+	ReleaseError        string             `json:"release_error,omitempty"`
 }
 
 type customUpdateStep struct {

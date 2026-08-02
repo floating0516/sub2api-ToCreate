@@ -250,7 +250,31 @@
                     <span>{{ customUpdateStatusLabel }}</span>
                   </div>
 
-                  <div class="mt-3 border-t border-gray-100 pt-2.5 dark:border-dark-700">
+                  <ol
+                    v-if="customUpdateCompactFlowVisible"
+                    data-testid="custom-update-compact-flow"
+                    class="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center border-y border-gray-100 py-2 text-[10px] font-medium leading-4 text-gray-500 dark:border-dark-700 dark:text-dark-400"
+                  >
+                    <li class="min-w-0 text-center">
+                      <span class="block text-gray-400 dark:text-dark-500">1</span>
+                      <span>{{ t('version.customUpdateFlowMerge') }}</span>
+                    </li>
+                    <Icon name="chevronRight" size="xs" :stroke-width="2" class="text-gray-300" />
+                    <li class="min-w-0 text-center">
+                      <span class="block text-gray-400 dark:text-dark-500">2</span>
+                      <span>{{ t('version.customUpdateFlowStage') }}</span>
+                    </li>
+                    <Icon name="chevronRight" size="xs" :stroke-width="2" class="text-gray-300" />
+                    <li class="min-w-0 text-center">
+                      <span class="block text-gray-400 dark:text-dark-500">3</span>
+                      <span>{{ t('version.customUpdateFlowPromote') }}</span>
+                    </li>
+                  </ol>
+
+                  <div
+                    v-else
+                    class="mt-3 border-t border-gray-100 pt-2.5 dark:border-dark-700"
+                  >
                     <div
                       class="mb-1.5 flex items-center justify-between text-[11px] text-gray-400 dark:text-dark-500"
                     >
@@ -321,6 +345,45 @@
                       <span v-if="customUpdateImageDigestLabel && customUpdateCommitLabel"> · </span>
                       {{ customUpdateCommitLabel }}
                     </p>
+                  </div>
+
+                  <a
+                    v-if="customUpdateReleaseURL"
+                    data-testid="custom-update-release-link"
+                    :href="customUpdateReleaseURL"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-2 flex min-w-0 items-center gap-2 border border-green-200 bg-green-50 px-2.5 py-2 text-green-700 transition-colors hover:bg-green-100 dark:border-green-800/60 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30"
+                  >
+                    <Icon name="badge" size="sm" :stroke-width="2" class="flex-shrink-0" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-[10px] font-medium">
+                        {{ t('version.customUpdateRelease') }}
+                      </span>
+                      <span class="block truncate font-mono text-[10px] opacity-80">
+                        {{ customUpdateStatus?.release_tag }}
+                      </span>
+                    </span>
+                    <Icon name="externalLink" size="xs" :stroke-width="2" class="flex-shrink-0" />
+                  </a>
+
+                  <div
+                    v-else-if="customUpdateStatus?.release_status === 'failed'"
+                    data-testid="custom-update-release-error"
+                    class="mt-2 flex items-start gap-2 bg-amber-50 px-2.5 py-2 text-xs leading-4 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                  >
+                    <Icon
+                      name="exclamationTriangle"
+                      size="xs"
+                      :stroke-width="2"
+                      class="mt-0.5 flex-shrink-0"
+                    />
+                    <span>
+                      {{ t('version.customUpdateReleaseFailed') }}
+                      <span v-if="customUpdateStatus.release_error" class="block text-[10px] opacity-80">
+                        {{ customUpdateStatus.release_error }}
+                      </span>
+                    </span>
                   </div>
 
                   <div
@@ -1120,6 +1183,7 @@ import {
   type CustomUpdateDemoScenario
 } from '@/utils/customUpdateDemo'
 import { resolveCustomUpdateSteps } from '@/utils/customUpdateSteps'
+import { resolveCustomUpdateReleaseURL } from '@/utils/customUpdateRelease'
 
 const GITHUB_REPO = OFFICIAL_REPOSITORY
 // Docker Hub image published by CI (tags carry no "v" prefix, e.g. weishaw/sub2api:0.1.146)
@@ -1258,6 +1322,10 @@ const customUpdateStatusLabel = computed(() => {
   return t(`version.customUpdateStates.${state}`)
 })
 const customUpdateSteps = computed(() => resolveCustomUpdateSteps(customUpdateStatus.value))
+const customUpdateCompactFlowVisible = computed(() => {
+  const state = customUpdateStatus.value?.state
+  return state === 'idle' || state === 'completed'
+})
 const customUpdateCompletedStepCount = computed(
   () =>
     customUpdateSteps.value.filter(
@@ -1308,6 +1376,9 @@ const customUpdateCommitLabel = computed(() => {
   const commit = customUpdateStatus.value?.source_commit
   return commit ? t('version.customUpdateCommit', { commit: commit.slice(0, 8) }) : ''
 })
+const customUpdateReleaseURL = computed(() =>
+  resolveCustomUpdateReleaseURL(customUpdateStatus.value)
+)
 const customUpdateError = computed(
   () =>
     customUpdateStatus.value?.error ||

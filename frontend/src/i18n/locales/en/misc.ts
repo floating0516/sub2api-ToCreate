@@ -121,8 +121,11 @@ export default {
     customUpdateDemoFailedError:
       'The structured Luna response failed safety validation. The candidate worktree remains isolated and the custom branch is unchanged.',
     customUpdateOffline: 'The host update controller is offline',
-    customUpdateStage: 'Sync upstream and deploy to 18080',
+    customUpdateStage: 'Check upstream and deploy to 18080',
     customUpdateRetry: 'Retry custom update',
+    customUpdateFlowMerge: 'Merge upstream',
+    customUpdateFlowStage: 'Validate 18080',
+    customUpdateFlowPromote: 'Approve 8080',
     customUpdateStagingReady:
       'Port 18080 passed health, version, menu, and page asset validation',
     customUpdatePromote: 'Promote to production',
@@ -130,6 +133,8 @@ export default {
       'This switches port 8080 to the exact image shown above. PostgreSQL and Redis are preserved.',
     customUpdateConfirmPromote: 'Confirm promotion',
     customUpdateCommit: 'source {commit}',
+    customUpdateRelease: 'Custom release',
+    customUpdateReleaseFailed: 'Production is running, but the GitHub Release failed',
     customUpdateRequestFailed: 'Failed to submit the custom update request',
     customUpdateProgress: 'Progress {completed}/9',
     customUpdateConflictTitle: '{count} conflicted file(s) detected',

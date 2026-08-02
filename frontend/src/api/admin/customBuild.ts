@@ -84,6 +84,11 @@ export interface CustomUpdateStatus {
   resolution_warnings?: string[]
   resolution_diff_stat?: string
   resolver_model?: string
+  release_status?: 'published' | 'failed'
+  release_tag?: string
+  release_url?: string
+  release_published_at?: string
+  release_error?: string
 }
 
 export interface CustomUpdateRequestResult {

@@ -91,6 +91,28 @@ func TestCustomUpdateStatusReturnsControllerSteps(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"resolution_risk_level":"medium"`)
 }
 
+func TestCustomUpdateStatusReturnsReleaseMetadata(t *testing.T) {
+	handler, controlDir := newCustomUpdateTestHandler(t)
+	markCustomUpdateControllerOnline(t, controlDir)
+	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
+		State:              "completed",
+		ReleaseStatus:      "published",
+		ReleaseTag:         "tocreate-v0.1.169-tc1.24",
+		ReleaseURL:         "https://github.com/floating0516/sub2api-ToCreate/releases/tag/tocreate-v0.1.169-tc1.24",
+		ReleasePublishedAt: "2026-08-02T06:11:04Z",
+	})
+	router := newCustomUpdateTestRouter(handler)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/status", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"release_status":"published"`)
+	require.Contains(t, recorder.Body.String(), `"release_tag":"tocreate-v0.1.169-tc1.24"`)
+	require.Contains(t, recorder.Body.String(), `"release_url":"https://github.com/floating0516/sub2api-ToCreate/releases/tag/tocreate-v0.1.169-tc1.24"`)
+	require.Contains(t, recorder.Body.String(), `"release_published_at":"2026-08-02T06:11:04Z"`)
+}
+
 func TestStartCustomUpdateQueuesOnlyOneFixedStageAction(t *testing.T) {
 	handler, controlDir := newCustomUpdateTestHandler(t)
 	markCustomUpdateControllerOnline(t, controlDir)
