@@ -429,7 +429,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			promptCacheKey = codexResult.PromptCacheKey
 		}
 	}
-	codexImageArtifactFallbackEnabled := false
 	if codexImageGenerationBridgeEnabled && reqBody != nil {
 		codexImageArtifactFallbackEnabled =
 			hasOpenAINativeImageGenerationTool(reqBody) &&

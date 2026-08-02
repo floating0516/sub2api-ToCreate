@@ -33,7 +33,7 @@ func (r *activateWindowUserSubRepo) ActivateWindows(_ context.Context, _ int64, 
 	return nil
 }
 
-func TestDelayedFirstUseAnchorsMonthlyWindowAtActivation(t *testing.T) {
+func TestDelayedFirstUseAnchorsMonthlyWindowAtSubscriptionStart(t *testing.T) {
 	repo := &activateWindowUserSubRepo{}
 	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
 	startsAt := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
@@ -47,12 +47,12 @@ func TestDelayedFirstUseAnchorsMonthlyWindowAtActivation(t *testing.T) {
 
 	require.NoError(t, svc.CheckAndActivateWindow(context.Background(), sub))
 
-	require.Equal(t, activatedAt, repo.windowStart)
+	require.Equal(t, startsAt, repo.windowStart)
 	monthlyWindowStart := repo.windowStart
-	resetAt, ok := sub.automaticWindowStartAt(&monthlyWindowStart, 30*24*time.Hour, activatedAt.Add(30*24*time.Hour))
+	resetAt, ok := sub.automaticWindowStartAt(&monthlyWindowStart, 30*24*time.Hour, startsAt.Add(30*24*time.Hour))
 	require.True(t, ok)
-	require.Equal(t, activatedAt.Add(30*24*time.Hour), resetAt)
-	require.NotEqual(t, startsAt.Add(30*24*time.Hour), resetAt)
+	require.Equal(t, startsAt.Add(30*24*time.Hour), resetAt)
+	require.NotEqual(t, activatedAt.Add(30*24*time.Hour), resetAt)
 }
 
 func TestThirtyDaySubscriptionDoesNotResetMonthlyQuotaBeforeExpiry(t *testing.T) {

@@ -1080,6 +1080,12 @@ func normalizeSubscriptionStatus(subs []UserSubscription) {
 	}
 }
 
+// startOfDay preserves compatibility with subscriptions whose initial window
+// was stored at midnight before rolling windows were anchored to StartsAt.
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
 // currentRollingWindowStart returns the start of the rolling quota window that contains now.
 func currentRollingWindowStart(anchor, now time.Time, period time.Duration) time.Time {
 	if anchor.IsZero() {
@@ -1121,7 +1127,11 @@ func (s *SubscriptionService) checkAndActivateWindowAt(ctx context.Context, sub 
 		return nil
 	}
 
-	return s.userSubRepo.ActivateWindows(ctx, sub.ID, now)
+	windowStart := subscriptionWindowAnchor(sub)
+	if windowStart.IsZero() {
+		windowStart = now
+	}
+	return s.userSubRepo.ActivateWindows(ctx, sub.ID, windowStart)
 }
 
 // AdminResetQuota manually resets the daily, weekly, and/or monthly usage windows.
