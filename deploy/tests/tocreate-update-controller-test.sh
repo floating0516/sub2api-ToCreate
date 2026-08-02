@@ -26,6 +26,8 @@ test_runtime_resolver_config_loading() {
   local original_runtime_config_file="$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
   local original_runtime_api_key_file="$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
   local original_base_url="$CONFLICT_RESOLVER_BASE_URL"
+  local original_internal_base_url="$CONFLICT_RESOLVER_INTERNAL_BASE_URL"
+  local original_internal_match_base_url="$CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL"
   local original_model="$CONFLICT_RESOLVER_MODEL"
   local original_reasoning_effort="$CONFLICT_RESOLVER_REASONING_EFFORT"
   local original_api_key_file="$CONFLICT_RESOLVER_API_KEY_FILE"
@@ -43,6 +45,8 @@ test_runtime_resolver_config_loading() {
   chmod 0600 "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
 
   load_conflict_resolver_config
+  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080"
+  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://gateway.example.com/v1"
   validate_resolver_config
   assert_eq \
     "https://gateway.example.com/v1" \
@@ -56,6 +60,23 @@ test_runtime_resolver_config_loading() {
     "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE" \
     "$CONFLICT_RESOLVER_API_KEY_FILE" \
     "runtime resolver API key file was not selected"
+  assert_eq \
+    "http://127.0.0.1:8080" \
+    "$(conflict_resolver_request_base_url)" \
+    "internal resolver transport was not selected"
+
+  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://another.example.com"
+  assert_eq \
+    "https://gateway.example.com/v1" \
+    "$(conflict_resolver_request_base_url)" \
+    "internal resolver transport ignored its configured match URL"
+  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://gateway.example.com/v1"
+
+  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080@external.example.com"
+  if validate_resolver_config; then
+    fail "resolver accepted a non-loopback internal transport URL"
+  fi
+  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080"
 
   jq '.base_url = "http://insecure.example.com"' \
     "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" > "$config_dir/invalid.json"
@@ -68,6 +89,8 @@ test_runtime_resolver_config_loading() {
   CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="$original_runtime_config_file"
   CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="$original_runtime_api_key_file"
   CONFLICT_RESOLVER_BASE_URL="$original_base_url"
+  CONFLICT_RESOLVER_INTERNAL_BASE_URL="$original_internal_base_url"
+  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="$original_internal_match_base_url"
   CONFLICT_RESOLVER_MODEL="$original_model"
   CONFLICT_RESOLVER_REASONING_EFFORT="$original_reasoning_effort"
   CONFLICT_RESOLVER_API_KEY_FILE="$original_api_key_file"

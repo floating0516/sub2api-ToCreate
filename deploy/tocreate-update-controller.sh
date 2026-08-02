@@ -31,6 +31,8 @@ BLUEGREEN_STATE_FILE="${BLUEGREEN_STATE_FILE:-$DEPLOY_DIR/state/blue-green/activ
 MERGE_WORKTREE_ROOT="${MERGE_WORKTREE_ROOT:-$STATE_DIR/merge-worktrees}"
 RESOLUTION_CONTEXT_FILE="${RESOLUTION_CONTEXT_FILE:-$STATE_DIR/resolution-context.json}"
 CONFLICT_RESOLVER_BASE_URL="${CONFLICT_RESOLVER_BASE_URL:-https://api.lihe.chat}"
+CONFLICT_RESOLVER_INTERNAL_BASE_URL="${CONFLICT_RESOLVER_INTERNAL_BASE_URL:-}"
+CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="${CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL:-}"
 CONFLICT_RESOLVER_MODEL="${CONFLICT_RESOLVER_MODEL:-gpt-5.6-luna}"
 CONFLICT_RESOLVER_REASONING_EFFORT="${CONFLICT_RESOLVER_REASONING_EFFORT:-max}"
 CONFLICT_RESOLVER_API_KEY_FILE="${CONFLICT_RESOLVER_API_KEY_FILE:-$DEPLOY_DIR/secrets/conflict-resolver-api-key}"
@@ -635,6 +637,25 @@ validate_resolver_config() {
       return 1
       ;;
   esac
+  if [ -n "$CONFLICT_RESOLVER_INTERNAL_BASE_URL" ]; then
+    case "${CONFLICT_RESOLVER_INTERNAL_BASE_URL%/}" in
+      http://127.0.0.1:8080|http://127.0.0.1:8080/v1) ;;
+      *)
+        resolution_error="Conflict resolver internal base URL must use the local production gateway"
+        return 1
+        ;;
+    esac
+    case "$CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL" in
+      https://*) ;;
+      *)
+        resolution_error="Conflict resolver internal transport requires an HTTPS match URL"
+        return 1
+        ;;
+    esac
+  elif [ -n "$CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL" ]; then
+    resolution_error="Conflict resolver internal match URL requires an internal base URL"
+    return 1
+  fi
   [ -n "$CONFLICT_RESOLVER_MODEL" ] || {
     resolution_error="Conflict resolver model is not configured"
     return 1
@@ -667,6 +688,16 @@ validate_resolver_config() {
     resolution_error="Conflict resolver API key file must have mode 600"
     return 1
   fi
+}
+
+conflict_resolver_request_base_url() {
+  if [ -n "$CONFLICT_RESOLVER_INTERNAL_BASE_URL" ] \
+    && [ "${CONFLICT_RESOLVER_BASE_URL%/}" = \
+      "${CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL%/}" ]; then
+    printf '%s\n' "$CONFLICT_RESOLVER_INTERNAL_BASE_URL"
+    return
+  fi
+  printf '%s\n' "$CONFLICT_RESOLVER_BASE_URL"
 }
 
 build_conflict_resolver_request() {
@@ -822,9 +853,12 @@ call_conflict_resolver() {
   local request_file="$1"
   local response_file="$2"
   local api_key=""
-  local base_url="${CONFLICT_RESOLVER_BASE_URL%/}"
+  local base_url=""
   local endpoint=""
   local http_code=""
+
+  base_url="$(conflict_resolver_request_base_url)"
+  base_url="${base_url%/}"
 
   api_key="$(tr -d '\r\n' < "$CONFLICT_RESOLVER_API_KEY_FILE")"
   if [ -z "$api_key" ] || [ "${#api_key}" -gt 4096 ]; then
