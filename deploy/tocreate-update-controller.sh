@@ -1283,9 +1283,11 @@ upstream_commit_for_release() {
 }
 
 reconcile_completed_status_with_production() {
+  local verify_digest="${1:-0}"
   local status_state=""
   local status_image=""
   local status_image_digest=""
+  local active_image=""
   local prod_image=""
   local prod_image_digest=""
   local prod_health=""
@@ -1299,6 +1301,15 @@ reconcile_completed_status_with_production() {
 
   status_image="$(status_value '.image')"
   status_image_digest="$(status_value '.image_digest')"
+  if [ -f "$BLUEGREEN_STATE_FILE" ]; then
+    [ "$(bluegreen_state_value PHASE)" = "active" ] || return 1
+    [ "$(bluegreen_state_value ACTIVE_CONTAINER)" = "$PROD_CONTAINER_NAME" ] || return 1
+    active_image="$(bluegreen_state_value ACTIVE_IMAGE)"
+    [ -n "$active_image" ] || return 1
+    if [ "$verify_digest" != "1" ] && [ "$active_image" = "$status_image" ]; then
+      return 0
+    fi
+  fi
   prod_image="$(production_image)"
   [ -n "$prod_image" ] || return 1
   case "$prod_image" in
@@ -1911,7 +1922,7 @@ main() {
     current_message="Ready for a custom update request"
     write_status "idle" "$current_message"
   fi
-  if ! reconcile_completed_status_with_production; then
+  if ! reconcile_completed_status_with_production 1; then
     log "Could not reconcile the completed update status with production"
   fi
 

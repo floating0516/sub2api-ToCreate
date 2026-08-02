@@ -288,6 +288,13 @@ test_completed_status_runtime_reconciliation() (
   assert_eq "2026-08-01T16:04:17Z" "$(jq -r '.completed_at' "$STATUS_FILE")" \
     "blue-green activation time was not preserved"
 
+  jq --arg digest "${prod_digest}stale" '.image_digest = $digest' \
+    "$STATUS_FILE" > "$status_dir/stale-digest.json"
+  mv "$status_dir/stale-digest.json" "$STATUS_FILE"
+  reconcile_completed_status_with_production 1
+  assert_eq "$prod_digest" "$(jq -r '.image_digest' "$STATUS_FILE")" \
+    "forced startup reconciliation did not repair a stale digest"
+
   jq -n --arg image "$old_image" '{
     state: "awaiting_approval",
     image: $image,
