@@ -36,10 +36,7 @@ const legacyStateProgress: Record<
   queued: { completed: 0 },
   checking: { completed: 0, active: 0, activeStatus: 'running' },
   merging: { completed: 2, active: 2, activeStatus: 'running' },
-  conflict_detected: { completed: 3, active: 3, activeStatus: 'running' },
-  ai_resolving: { completed: 3, active: 3, activeStatus: 'running' },
-  resolution_ready: { completed: 3, active: 3, activeStatus: 'action_required' },
-  resolution_failed: { completed: 3, active: 3, activeStatus: 'failed' },
+  conflict_detected: { completed: 3, active: 3, activeStatus: 'action_required' },
   pushing: { completed: 4, active: 4, activeStatus: 'running' },
   building: { completed: 5, active: 5, activeStatus: 'running' },
   staging: { completed: 6, active: 6, activeStatus: 'running' },
@@ -47,7 +44,6 @@ const legacyStateProgress: Record<
   awaiting_approval: { completed: 8, active: 8, activeStatus: 'action_required' },
   promoting: { completed: 9 },
   completed: { completed: 9 },
-  aborted: { completed: 3 },
   failed: { completed: 0 }
 }
 

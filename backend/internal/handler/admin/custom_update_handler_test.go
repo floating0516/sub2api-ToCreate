@@ -18,12 +18,7 @@ func newCustomUpdateTestRouter(handler *CustomBuildHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/status", handler.GetCustomUpdateStatus)
-	router.GET("/resolver-config", handler.GetCustomUpdateResolverConfig)
-	router.PUT("/resolver-config", handler.UpdateCustomUpdateResolverConfig)
-	router.POST("/resolver-config/test", handler.TestCustomUpdateResolverConfig)
 	router.POST("/stage", handler.StartCustomUpdate)
-	router.POST("/resolution/accept", handler.AcceptCustomUpdateResolution)
-	router.POST("/resolution/abort", handler.AbortCustomUpdateResolution)
 	router.POST("/promote", handler.PromoteCustomUpdate)
 	return router
 }
@@ -68,12 +63,10 @@ func TestCustomUpdateStatusReturnsControllerSteps(t *testing.T) {
 	handler, controlDir := newCustomUpdateTestHandler(t)
 	markCustomUpdateControllerOnline(t, controlDir)
 	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
-		State:        "resolution_ready",
-		ResolutionID: "0123456789abcdef0123456789abcdef",
+		State: "conflict_detected",
 		ConflictFiles: []string{
 			"frontend/src/example.ts",
 		},
-		ResolutionRiskLevel: "medium",
 		Steps: []customUpdateStep{
 			{ID: "source_check", Status: "completed"},
 			{ID: "conflict_resolution", Status: "action_required"},
@@ -88,7 +81,6 @@ func TestCustomUpdateStatusReturnsControllerSteps(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"id":"source_check","status":"completed"`)
 	require.Contains(t, recorder.Body.String(), `"id":"conflict_resolution","status":"action_required"`)
 	require.Contains(t, recorder.Body.String(), `"conflict_files":["frontend/src/example.ts"]`)
-	require.Contains(t, recorder.Body.String(), `"resolution_risk_level":"medium"`)
 }
 
 func TestCustomUpdateStatusReturnsReleaseMetadata(t *testing.T) {
@@ -179,59 +171,6 @@ func TestPromoteCustomUpdateRequiresExactStagedImage(t *testing.T) {
 	require.Equal(t, stagedImage, request.Image)
 }
 
-func TestAcceptCustomUpdateResolutionRequiresExactPendingID(t *testing.T) {
-	handler, controlDir := newCustomUpdateTestHandler(t)
-	markCustomUpdateControllerOnline(t, controlDir)
-	const resolutionID = "0123456789abcdef0123456789abcdef"
-	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
-		State:         "resolution_ready",
-		ResolutionID:  resolutionID,
-		ConflictFiles: []string{"frontend/src/example.ts"},
-	})
-	router := newCustomUpdateTestRouter(handler)
-
-	recorder := httptest.NewRecorder()
-	body := bytes.NewBufferString(`{"resolution_id":"ffffffffffffffffffffffffffffffff"}`)
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/resolution/accept", body))
-	require.Equal(t, http.StatusConflict, recorder.Code)
-
-	recorder = httptest.NewRecorder()
-	body = bytes.NewBufferString(`{"resolution_id":"` + resolutionID + `"}`)
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/resolution/accept", body))
-	require.Equal(t, http.StatusAccepted, recorder.Code)
-
-	requestData, err := os.ReadFile(filepath.Join(controlDir, customUpdateRequestFile))
-	require.NoError(t, err)
-	var request customUpdateRequest
-	require.NoError(t, json.Unmarshal(requestData, &request))
-	require.Equal(t, "accept_resolution", request.Action)
-	require.Equal(t, resolutionID, request.ResolutionID)
-	require.Empty(t, request.Image)
-}
-
-func TestAbortCustomUpdateResolutionAllowsResolverFailure(t *testing.T) {
-	handler, controlDir := newCustomUpdateTestHandler(t)
-	markCustomUpdateControllerOnline(t, controlDir)
-	const resolutionID = "abcdef0123456789abcdef0123456789"
-	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{
-		State:        "resolution_failed",
-		ResolutionID: resolutionID,
-	})
-	router := newCustomUpdateTestRouter(handler)
-
-	recorder := httptest.NewRecorder()
-	body := bytes.NewBufferString(`{"resolution_id":"` + resolutionID + `"}`)
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/resolution/abort", body))
-	require.Equal(t, http.StatusAccepted, recorder.Code)
-
-	requestData, err := os.ReadFile(filepath.Join(controlDir, customUpdateRequestFile))
-	require.NoError(t, err)
-	var request customUpdateRequest
-	require.NoError(t, json.Unmarshal(requestData, &request))
-	require.Equal(t, "abort_resolution", request.Action)
-	require.Equal(t, resolutionID, request.ResolutionID)
-}
-
 func TestStartCustomUpdateRejectsOfflineController(t *testing.T) {
 	handler, _ := newCustomUpdateTestHandler(t)
 	router := newCustomUpdateTestRouter(handler)
@@ -254,14 +193,14 @@ func TestStartCustomUpdateRejectsWhileSourcePushIsActive(t *testing.T) {
 	require.Equal(t, http.StatusConflict, recorder.Code)
 }
 
-func TestStartCustomUpdateRejectsWhileResolutionAwaitsReview(t *testing.T) {
+func TestStartCustomUpdateAllowsRetryAfterConflictStop(t *testing.T) {
 	handler, controlDir := newCustomUpdateTestHandler(t)
 	markCustomUpdateControllerOnline(t, controlDir)
-	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{State: "resolution_ready"})
+	writeCustomUpdateTestStatus(t, controlDir, customUpdateStatus{State: "conflict_detected"})
 	router := newCustomUpdateTestRouter(handler)
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/stage", nil))
 
-	require.Equal(t, http.StatusConflict, recorder.Code)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
 }

@@ -18,13 +18,13 @@ describe('resolveCustomUpdateSteps', () => {
     expect(steps[8]).toEqual({ id: 'production_approval', status: 'pending' })
   })
 
-  it('preserves the reported conflict-resolution state from the new controller', () => {
+  it('preserves the reported manual conflict stop from the controller', () => {
     const steps = resolveCustomUpdateSteps({
-      state: 'ai_resolving',
-      steps: [{ id: 'conflict_resolution', status: 'running' }]
+      state: 'conflict_detected',
+      steps: [{ id: 'conflict_resolution', status: 'action_required' }]
     })
 
-    expect(steps[3]).toEqual({ id: 'conflict_resolution', status: 'running' })
+    expect(steps[3]).toEqual({ id: 'conflict_resolution', status: 'action_required' })
   })
 
   it('maps an older awaiting-approval status to eight completed steps', () => {
@@ -44,8 +44,8 @@ describe('resolveCustomUpdateSteps', () => {
     expect(steps[4]).toEqual({ id: 'source_push', status: 'running' })
   })
 
-  it('marks AI conflict resolution as requiring review', () => {
-    const steps = resolveCustomUpdateSteps({ state: 'resolution_ready' })
+  it('marks a detected conflict as requiring manual action', () => {
+    const steps = resolveCustomUpdateSteps({ state: 'conflict_detected' })
 
     expect(steps.slice(0, 3).every((step) => step.status === 'completed')).toBe(true)
     expect(steps[3]).toEqual({

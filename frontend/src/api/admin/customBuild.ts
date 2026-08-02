@@ -13,9 +13,6 @@ export type CustomUpdateState =
   | 'checking'
   | 'merging'
   | 'conflict_detected'
-  | 'ai_resolving'
-  | 'resolution_ready'
-  | 'resolution_failed'
   | 'pushing'
   | 'building'
   | 'staging'
@@ -23,14 +20,9 @@ export type CustomUpdateState =
   | 'awaiting_approval'
   | 'promoting'
   | 'completed'
-  | 'aborted'
   | 'failed'
 
-export type CustomUpdateAction =
-  | 'stage'
-  | 'accept_resolution'
-  | 'abort_resolution'
-  | 'promote'
+export type CustomUpdateAction = 'stage' | 'promote'
 
 export type CustomUpdateStepID =
   | 'source_check'
@@ -77,13 +69,7 @@ export interface CustomUpdateStatus {
   staging_url?: string
   production_url?: string
   steps?: CustomUpdateStep[]
-  resolution_id?: string
   conflict_files?: string[]
-  resolution_summary?: string
-  resolution_risk_level?: 'low' | 'medium' | 'high'
-  resolution_warnings?: string[]
-  resolution_diff_stat?: string
-  resolver_model?: string
   release_status?: 'published' | 'failed'
   release_tag?: string
   release_url?: string
@@ -96,31 +82,7 @@ export interface CustomUpdateRequestResult {
   action: CustomUpdateAction
   request_id: string
   image?: string
-  resolution_id?: string
   message: string
-}
-
-export interface CustomUpdateResolverConfig {
-  base_url: string
-  model: string
-  reasoning_effort: string
-  api_key_configured: boolean
-  saved: boolean
-  updated_at?: string
-  default_base_url: string
-  default_model: string
-}
-
-export interface UpdateCustomUpdateResolverConfigRequest {
-  base_url: string
-  model: string
-  api_key?: string
-}
-
-export interface CustomUpdateResolverTestResult {
-  ok: boolean
-  model: string
-  latency_ms: number
 }
 
 export async function getCustomBuildNotes(): Promise<CustomBuildNotes> {
@@ -130,34 +92,6 @@ export async function getCustomBuildNotes(): Promise<CustomBuildNotes> {
 
 export async function getCustomUpdateStatus(): Promise<CustomUpdateStatus> {
   const { data } = await apiClient.get<CustomUpdateStatus>('/admin/custom-build/update/status')
-  return data
-}
-
-export async function getCustomUpdateResolverConfig(): Promise<CustomUpdateResolverConfig> {
-  const { data } = await apiClient.get<CustomUpdateResolverConfig>(
-    '/admin/custom-build/update/resolver-config'
-  )
-  return data
-}
-
-export async function updateCustomUpdateResolverConfig(
-  config: UpdateCustomUpdateResolverConfigRequest
-): Promise<CustomUpdateResolverConfig> {
-  const { data } = await apiClient.put<CustomUpdateResolverConfig>(
-    '/admin/custom-build/update/resolver-config',
-    config
-  )
-  return data
-}
-
-export async function testCustomUpdateResolverConfig(
-  config: UpdateCustomUpdateResolverConfigRequest
-): Promise<CustomUpdateResolverTestResult> {
-  const { data } = await apiClient.post<CustomUpdateResolverTestResult>(
-    '/admin/custom-build/update/resolver-config/test',
-    config,
-    { timeout: 65000 }
-  )
   return data
 }
 
@@ -176,35 +110,10 @@ export async function promoteCustomUpdate(image: string): Promise<CustomUpdateRe
   return data
 }
 
-export async function acceptCustomUpdateResolution(
-  resolutionId: string
-): Promise<CustomUpdateRequestResult> {
-  const { data } = await apiClient.post<CustomUpdateRequestResult>(
-    '/admin/custom-build/update/resolution/accept',
-    { resolution_id: resolutionId }
-  )
-  return data
-}
-
-export async function abortCustomUpdateResolution(
-  resolutionId: string
-): Promise<CustomUpdateRequestResult> {
-  const { data } = await apiClient.post<CustomUpdateRequestResult>(
-    '/admin/custom-build/update/resolution/abort',
-    { resolution_id: resolutionId }
-  )
-  return data
-}
-
 export const customBuildAPI = {
   getNotes: getCustomBuildNotes,
   getUpdateStatus: getCustomUpdateStatus,
-  getResolverConfig: getCustomUpdateResolverConfig,
-  updateResolverConfig: updateCustomUpdateResolverConfig,
-  testResolverConfig: testCustomUpdateResolverConfig,
   startUpdate: startCustomUpdate,
-  acceptResolution: acceptCustomUpdateResolution,
-  abortResolution: abortCustomUpdateResolution,
   promoteUpdate: promoteCustomUpdate
 }
 

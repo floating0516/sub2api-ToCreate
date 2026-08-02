@@ -22,391 +22,111 @@ assert_eq() {
   [ "$expected" = "$actual" ] || fail "$message (expected=$expected actual=$actual)"
 }
 
-test_runtime_resolver_config_loading() {
-  local original_runtime_config_file="$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
-  local original_runtime_api_key_file="$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
-  local original_base_url="$CONFLICT_RESOLVER_BASE_URL"
-  local original_internal_base_url="$CONFLICT_RESOLVER_INTERNAL_BASE_URL"
-  local original_internal_match_base_url="$CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL"
-  local original_model="$CONFLICT_RESOLVER_MODEL"
-  local original_reasoning_effort="$CONFLICT_RESOLVER_REASONING_EFFORT"
-  local original_api_key_file="$CONFLICT_RESOLVER_API_KEY_FILE"
-  local config_dir="$TEST_ROOT/runtime-config"
-
-  mkdir -p "$config_dir"
-  CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="$config_dir/resolver-config.json"
-  CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="$config_dir/resolver-api-key"
-  jq -n '{
-    base_url: "https://gateway.example.com/v1",
-    model: "gpt-5.6-terra",
-    reasoning_effort: "max"
-  }' > "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
-  printf 'test-api-key\n' > "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
-  chmod 0600 "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE"
-
-  load_conflict_resolver_config
-  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080"
-  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://gateway.example.com/v1"
-  validate_resolver_config
-  assert_eq \
-    "https://gateway.example.com/v1" \
-    "$CONFLICT_RESOLVER_BASE_URL" \
-    "runtime resolver base URL was not loaded"
-  assert_eq \
-    "gpt-5.6-terra" \
-    "$CONFLICT_RESOLVER_MODEL" \
-    "runtime resolver model was not loaded"
-  assert_eq \
-    "$CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE" \
-    "$CONFLICT_RESOLVER_API_KEY_FILE" \
-    "runtime resolver API key file was not selected"
-  assert_eq \
-    "http://127.0.0.1:8080" \
-    "$(conflict_resolver_request_base_url)" \
-    "internal resolver transport was not selected"
-
-  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://another.example.com"
-  assert_eq \
-    "https://gateway.example.com/v1" \
-    "$(conflict_resolver_request_base_url)" \
-    "internal resolver transport ignored its configured match URL"
-  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="https://gateway.example.com/v1"
-
-  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080@external.example.com"
-  if validate_resolver_config; then
-    fail "resolver accepted a non-loopback internal transport URL"
-  fi
-  CONFLICT_RESOLVER_INTERNAL_BASE_URL="http://127.0.0.1:8080"
-
-  jq '.base_url = "http://insecure.example.com"' \
-    "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE" > "$config_dir/invalid.json"
-  mv "$config_dir/invalid.json" "$CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE"
-  load_conflict_resolver_config
-  if validate_resolver_config; then
-    fail "resolver accepted an insecure runtime base URL"
-  fi
-
-  CONFLICT_RESOLVER_RUNTIME_CONFIG_FILE="$original_runtime_config_file"
-  CONFLICT_RESOLVER_RUNTIME_API_KEY_FILE="$original_runtime_api_key_file"
-  CONFLICT_RESOLVER_BASE_URL="$original_base_url"
-  CONFLICT_RESOLVER_INTERNAL_BASE_URL="$original_internal_base_url"
-  CONFLICT_RESOLVER_INTERNAL_MATCH_BASE_URL="$original_internal_match_base_url"
-  CONFLICT_RESOLVER_MODEL="$original_model"
-  CONFLICT_RESOLVER_REASONING_EFFORT="$original_reasoning_effort"
-  CONFLICT_RESOLVER_API_KEY_FILE="$original_api_key_file"
-  resolution_error=""
-}
-
-test_structured_response_validation() {
-  local response_file="$TEST_ROOT/response.json"
-  local resolution_file="$TEST_ROOT/resolution.json"
-  local resolution_text=""
-
-  resolution_text="$(jq -cn '{
-    summary: "Preserved the custom validation and incorporated the official field.",
-    risk_level: "medium",
-    warnings: [],
-    files: [{
-      path: "frontend/src/example.ts",
-      action: "write",
-      content: "export const value = 1\n",
-      rationale: "Combined both sides"
-    }]
-  }')"
-  jq -n --arg text "$resolution_text" '{
-    status: "completed",
-    output: [
-      {type: "reasoning", summary: []},
-      {type: "message", content: [{type: "output_text", text: $text}]}
-    ]
-  }' > "$response_file"
-
-  extract_conflict_resolution "$response_file" "$resolution_file"
-  current_resolution_risk_level="low"
-  current_resolution_warnings='[]'
-  validate_conflict_resolution "$resolution_file" "frontend/src/example.ts"
-  assert_eq "medium" "$current_resolution_risk_level" "model risk should raise local risk"
-
-  if validate_conflict_resolution "$resolution_file" "frontend/src/other.ts"; then
-    fail "validator accepted a changed path set"
-  fi
-  if conflict_path_is_safe "pnpm-lock.yaml"; then
-    fail "lockfiles must not be model-edited"
-  fi
-  if conflict_path_is_safe "deploy/.env.production"; then
-    fail "environment files must not be sent to the resolver"
-  fi
-
-  jq '.files[0].content = "invalid\u0000content"' "$resolution_file" > "$response_file"
-  if validate_conflict_resolution "$response_file" "frontend/src/example.ts"; then
-    fail "validator accepted NUL content"
+assert_status_has_no_resolver_metadata() {
+  if jq -e '
+    has("resolution_id") or
+    has("resolution_summary") or
+    has("resolution_risk_level") or
+    has("resolution_warnings") or
+    has("resolution_diff_stat") or
+    has("resolver_model")
+  ' "$STATUS_FILE" >/dev/null; then
+    fail "status retained retired conflict resolver metadata"
   fi
 }
 
-test_batched_conflict_resolution() (
-  local batch_root="$TEST_ROOT/batched-resolution"
-  local calls_file="$batch_root/calls.txt"
-  local applied_file="$batch_root/applied.json"
-
-  mkdir -p "$batch_root/control" "$batch_root/logs"
-  STATE_DIR="$batch_root"
-  CONTROL_DIR="$batch_root/control"
-  STATUS_FILE="$CONTROL_DIR/status.json"
-  LOG_DIR="$batch_root/logs"
-  current_action="stage"
-  current_request_id="11111111111111111111111111111111"
-  current_started_at="2026-08-02T00:00:00Z"
-  current_upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  current_log_file="batched-resolution.log"
-  CONFLICT_RESOLVER_MODEL="gpt-5.6-luna"
-  initialize_stage_steps
-
-  load_conflict_resolver_config() { return 0; }
-  validate_resolver_config() { return 0; }
-  build_conflict_resolver_request() {
-    local request_file="$2"
-    shift 3
-    [ "$#" -eq 1 ] || fail "resolver batch included more than one conflict file"
-    printf '%s\n' "$1" >> "$calls_file"
-    jq -n --arg path "$1" '{test_path: $path}' > "$request_file"
-    chmod 0600 "$request_file"
-  }
-  call_conflict_resolver() {
-    local request_file="$1"
-    local response_file="$2"
-    local path=""
-    local resolution_text=""
-
-    path="$(jq -r '.test_path' "$request_file")"
-    resolution_text="$(jq -cn --arg path "$path" '{
-      summary: ("Resolved " + $path),
-      risk_level: "medium",
-      warnings: ["Review the combined proposal."],
-      files: [{
-        path: $path,
-        action: "write",
-        content: ("resolved " + $path + "\n"),
-        rationale: "Combined the custom and official versions"
-      }]
-    }')"
-    jq -n --arg text "$resolution_text" '{
-      status: "completed",
-      output: [{
-        type: "message",
-        content: [{type: "output_text", text: $text}]
-      }]
-    }' > "$response_file"
-  }
-  apply_conflict_resolution() {
-    local resolution_file="$4"
-    cp "$resolution_file" "$applied_file"
-  }
-
-  resolve_merge_conflicts \
-    "$batch_root/worktree" \
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
-    "tocreate/official-merge-$current_request_id" \
-    "frontend/src/one.ts" \
-    "frontend/src/two.ts"
-
-  assert_eq "2" "$(wc -l < "$calls_file")" \
-    "resolver did not make one request per conflict file"
-  assert_eq "2" "$(jq '.files | length' "$applied_file")" \
-    "resolver did not combine all successful batches"
-  assert_eq "2" "$(jq '[.files[].path] | unique | length' "$applied_file")" \
-    "combined resolution did not preserve the path set"
-  assert_eq "resolution_ready" "$(jq -r '.state' "$STATUS_FILE")" \
-    "batched resolver did not stop for administrator review"
-)
-
-test_batched_conflict_resolution_is_atomic() (
-  local batch_root="$TEST_ROOT/batched-resolution-failure"
-  local calls_file="$batch_root/calls.txt"
-  local applied_marker="$batch_root/applied"
-
-  mkdir -p "$batch_root/control" "$batch_root/logs"
-  STATE_DIR="$batch_root"
-  CONTROL_DIR="$batch_root/control"
-  STATUS_FILE="$CONTROL_DIR/status.json"
-  LOG_DIR="$batch_root/logs"
-  current_action="stage"
-  current_request_id="22222222222222222222222222222222"
-  current_started_at="2026-08-02T00:00:00Z"
-  current_upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  current_log_file="batched-resolution-failure.log"
-  CONFLICT_RESOLVER_MODEL="gpt-5.6-luna"
-  initialize_stage_steps
-
-  load_conflict_resolver_config() { return 0; }
-  validate_resolver_config() { return 0; }
-  build_conflict_resolver_request() {
-    local request_file="$2"
-    shift 3
-    printf '%s\n' "$1" >> "$calls_file"
-    jq -n --arg path "$1" '{test_path: $path}' > "$request_file"
-  }
-  call_conflict_resolver() {
-    local request_file="$1"
-    local response_file="$2"
-    local path=""
-    local resolution_text=""
-
-    path="$(jq -r '.test_path' "$request_file")"
-    if [ "$path" = "frontend/src/two.ts" ]; then
-      resolution_error="Conflict resolver API returned HTTP 502: upstream request failed"
-      return 1
-    fi
-    resolution_text="$(jq -cn --arg path "$path" '{
-      summary: ("Resolved " + $path),
-      risk_level: "medium",
-      warnings: [],
-      files: [{
-        path: $path,
-        action: "write",
-        content: ("resolved " + $path + "\n"),
-        rationale: "Combined both versions"
-      }]
-    }')"
-    jq -n --arg text "$resolution_text" '{
-      status: "completed",
-      output: [{
-        type: "message",
-        content: [{type: "output_text", text: $text}]
-      }]
-    }' > "$response_file"
-  }
-  apply_conflict_resolution() { : > "$applied_marker"; }
-
-  if resolve_merge_conflicts \
-    "$batch_root/worktree" \
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
-    "tocreate/official-merge-$current_request_id" \
-    "frontend/src/one.ts" \
-    "frontend/src/two.ts"; then
-    fail "resolver accepted a partially failed batch set"
-  fi
-
-  [ ! -e "$applied_marker" ] || fail "resolver applied a partial proposal"
-  assert_eq "resolution_failed" "$(jq -r '.state' "$STATUS_FILE")" \
-    "failed batch did not preserve the review stop"
-  assert_eq "true" "$(jq -r '.error | contains("frontend/src/two.ts")' "$STATUS_FILE")" \
-    "failed batch did not identify the conflicted path"
-)
-
-test_resolution_status_metadata() {
-  local status_dir="$TEST_ROOT/status"
-
-  mkdir -p "$status_dir"
-  CONTROL_DIR="$status_dir"
-  STATUS_FILE="$CONTROL_DIR/status.json"
-  current_action="stage"
-  current_request_id="0123456789abcdef0123456789abcdef"
-  current_started_at="2026-07-31T00:00:00Z"
-  current_resolution_id="$current_request_id"
-  current_conflict_files='["frontend/src/example.ts"]'
-  current_resolution_summary="Combined the custom and official behavior."
-  current_resolution_risk_level="medium"
-  current_resolution_warnings='["Review the API contract."]'
-  current_resolution_diff_stat="1 file changed, 2 insertions(+), 1 deletion(-)"
-  current_resolver_model="gpt-5.6-luna"
-  initialize_stage_steps
-  set_step_status "conflict_resolution" "action_required"
-
-  write_status "resolution_ready" "Review the proposed resolution"
-  assert_eq \
-    "$current_resolution_id" \
-    "$(jq -r '.resolution_id' "$STATUS_FILE")" \
-    "status omitted the resolution ID"
-  assert_eq \
-    "frontend/src/example.ts" \
-    "$(jq -r '.conflict_files[0]' "$STATUS_FILE")" \
-    "status omitted conflict files"
-  assert_eq \
-    "gpt-5.6-luna" \
-    "$(jq -r '.resolver_model' "$STATUS_FILE")" \
-    "status omitted the resolver model"
-}
-
-test_isolated_merge_resolution_commit() {
-  local request_id="0123456789abcdef0123456789abcdef"
-  local repo="$TEST_ROOT/state/worktrees/$request_id"
-  local proposal_branch="tocreate/official-merge-$request_id"
+test_merge_conflict_pauses_without_source_changes() (
+  local test_dir="$TEST_ROOT/manual-conflict"
+  local repo="$test_dir/repo"
+  local upstream_repo="$test_dir/upstream.git"
   local base_commit=""
-  local upstream_commit=""
-  local resolution_file="$TEST_ROOT/git-resolution.json"
-  local request_dir="$TEST_ROOT/request"
-  local request_file="$request_dir/request.json"
+  local source_commit=""
+  local request_id="0123456789abcdef0123456789abcdef"
+  local merge_branch="tocreate/official-merge-$request_id"
 
-  mkdir -p "$repo" "$TEST_ROOT/state/logs" "$TEST_ROOT/state/worktrees"
-  git -C "$repo" init -q
+  mkdir -p "$repo"
+  git -C "$repo" init -q -b main
   git -C "$repo" config user.name "Controller Test"
   git -C "$repo" config user.email "controller-test@example.invalid"
   printf 'mode=base\n' > "$repo/config.txt"
   git -C "$repo" add config.txt
   git -C "$repo" commit -qm base
-  git -C "$repo" branch official
-
-  git -C "$repo" checkout -qb "$proposal_branch"
-  printf 'mode=custom\n' > "$repo/config.txt"
-  git -C "$repo" commit -qam custom
   base_commit="$(git -C "$repo" rev-parse HEAD)"
 
-  git -C "$repo" checkout -q official
+  git -C "$repo" checkout -qb official
   printf 'mode=official\n' > "$repo/config.txt"
   git -C "$repo" commit -qam official
-  upstream_commit="$(git -C "$repo" rev-parse HEAD)"
-  git -C "$repo" checkout -q "$proposal_branch"
-  if git -C "$repo" merge --no-edit "$upstream_commit" >/dev/null 2>&1; then
-    fail "test repository did not create a merge conflict"
-  fi
+  git init --bare -q "$upstream_repo"
+  git -C "$repo" push -q "$upstream_repo" official:main
 
-  jq -n '{
-    summary: "Kept the custom mode and documented the official option.",
-    risk_level: "low",
-    warnings: [],
-    files: [{
-      path: "config.txt",
-      action: "write",
-      content: "mode=custom\nofficial_mode=available\n",
-      rationale: "Preserve the deployment default while retaining the official capability"
-    }]
-  }' > "$resolution_file"
+  git -C "$repo" checkout -qb custom "$base_commit"
+  printf 'mode=custom\n' > "$repo/config.txt"
+  git -C "$repo" commit -qam custom
+  source_commit="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" remote add upstream "$upstream_repo"
 
   SRC_DIR="$repo"
-  STATE_DIR="$TEST_ROOT/state"
+  BRANCH="custom"
+  UPSTREAM_REMOTE="upstream"
+  UPSTREAM_REF="main"
+  CONTROL_DIR="$test_dir/control"
+  STATE_DIR="$test_dir/state"
+  STATUS_FILE="$CONTROL_DIR/status.json"
   LOG_DIR="$STATE_DIR/logs"
-  MERGE_WORKTREE_ROOT="$STATE_DIR/worktrees"
-  RESOLUTION_CONTEXT_FILE="$STATE_DIR/resolution-context.json"
-  current_log_file="controller-test.log"
-  current_resolution_id="$request_id"
-  current_upstream_commit="$upstream_commit"
-  current_resolution_risk_level="low"
-  current_resolution_warnings='[]'
+  MERGE_WORKTREE_ROOT="$STATE_DIR/merge-worktrees"
+  current_request_id="$request_id"
+  mkdir -p "$CONTROL_DIR" "$LOG_DIR" "$MERGE_WORKTREE_ROOT"
 
-  mkdir -p "$request_dir"
-  write_resolution_context \
-    "$request_id" "$repo" "$proposal_branch" "$base_commit" "$upstream_commit"
-  build_conflict_resolver_request "$repo" "$request_file" "$request_dir" config.txt
-  assert_eq "gpt-5.6-luna" "$(jq -r '.model' "$request_file")" "resolver model is incorrect"
-  assert_eq "max" "$(jq -r '.reasoning.effort' "$request_file")" "reasoning effort is incorrect"
-  assert_eq \
-    "json_schema" \
-    "$(jq -r '.text.format.type' "$request_file")" \
-    "structured output format is missing"
+  stage_update
 
-  validate_conflict_resolution "$resolution_file" config.txt
-  apply_conflict_resolution \
-    "$repo" "$base_commit" "$proposal_branch" "$resolution_file" config.txt
+  assert_eq "conflict_detected" "$(jq -r '.state' "$STATUS_FILE")" \
+    "merge conflicts did not pause the update"
+  assert_eq "config.txt" "$(jq -r '.conflict_files[0]' "$STATUS_FILE")" \
+    "status omitted the conflicted path"
+  assert_eq "action_required" \
+    "$(jq -r '.steps[] | select(.id == "conflict_resolution") | .status' "$STATUS_FILE")" \
+    "conflict check was not marked for manual action"
+  assert_eq "$source_commit" "$(git -C "$repo" rev-parse HEAD)" \
+    "source branch changed after a conflicted merge"
+  [ -z "$(git -C "$repo" status --porcelain)" ] || \
+    fail "source worktree became dirty after a conflicted merge"
+  [ ! -e "$MERGE_WORKTREE_ROOT/$request_id" ] || \
+    fail "isolated conflict worktree was not removed"
+  if git -C "$repo" show-ref --verify --quiet "refs/heads/$merge_branch"; then
+    fail "isolated conflict branch was not removed"
+  fi
+  assert_status_has_no_resolver_metadata
+)
 
-  assert_eq "mode=custom" "$(sed -n '1p' "$repo/config.txt")" "custom behavior was not preserved"
-  assert_eq "official_mode=available" "$(sed -n '2p' "$repo/config.txt")" "official behavior was not incorporated"
-  [ -z "$(git -C "$repo" status --porcelain)" ] || fail "proposal worktree is dirty"
-  resolution_context_is_valid || fail "proposal context is invalid"
-  assert_eq \
-    "$(git -C "$repo" rev-parse HEAD)" \
-    "$(jq -r '.proposal_commit' "$RESOLUTION_CONTEXT_FILE")" \
-    "proposal commit was not persisted"
-}
+test_retired_resolution_action_is_rejected() (
+  local test_dir="$TEST_ROOT/retired-action"
+
+  CONTROL_DIR="$test_dir/control"
+  STATE_DIR="$test_dir/state"
+  STATUS_FILE="$CONTROL_DIR/status.json"
+  PROCESSING_FILE="$CONTROL_DIR/processing.json"
+  REQUEST_ARCHIVE_DIR="$STATE_DIR/requests"
+  mkdir -p "$CONTROL_DIR" "$REQUEST_ARCHIVE_DIR"
+  jq -n '{state: "completed"}' > "$STATUS_FILE"
+  jq -n '{
+    id: "11111111111111111111111111111111",
+    action: "accept_resolution",
+    resolution_id: "22222222222222222222222222222222"
+  }' > "$PROCESSING_FILE"
+
+  if ! process_request; then
+    :
+  fi
+
+  assert_eq "failed" "$(jq -r '.state' "$STATUS_FILE")" \
+    "retired resolver action was not rejected"
+  assert_eq "invalid" "$(jq -r '.action' "$STATUS_FILE")" \
+    "retired resolver action was not classified as invalid"
+  [ ! -e "$PROCESSING_FILE" ] || fail "rejected request was not archived"
+  assert_eq "1" "$(find "$REQUEST_ARCHIVE_DIR" -maxdepth 1 -type f | wc -l | tr -d ' ')" \
+    "rejected request archive was not created"
+  assert_status_has_no_resolver_metadata
+)
 
 test_completed_status_runtime_reconciliation() (
   local status_dir="$TEST_ROOT/runtime-status"
@@ -422,7 +142,6 @@ test_completed_status_runtime_reconciliation() (
   STATUS_FILE="$CONTROL_DIR/status.json"
   REQUEST_FILE="$CONTROL_DIR/request.json"
   PROCESSING_FILE="$CONTROL_DIR/processing.json"
-  RESOLUTION_CONTEXT_FILE="$TEST_ROOT/runtime-resolution-context.json"
   BLUEGREEN_STATE_FILE="$bluegreen_dir/active.env"
   PROD_CONTAINER_NAME="sub2api"
 
@@ -526,12 +245,8 @@ test_release_publication_metadata() (
   [ -n "$current_release_error" ] || fail "controller omitted the release publication error"
 )
 
-test_runtime_resolver_config_loading
-test_structured_response_validation
-test_batched_conflict_resolution
-test_batched_conflict_resolution_is_atomic
-test_resolution_status_metadata
-test_isolated_merge_resolution_commit
+test_merge_conflict_pauses_without_source_changes
+test_retired_resolution_action_is_rejected
 test_completed_status_runtime_reconciliation
 test_release_publication_metadata
 printf 'tocreate update controller tests passed\n'

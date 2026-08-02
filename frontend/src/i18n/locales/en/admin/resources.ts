@@ -4,7 +4,6 @@ export default {
       title: 'Custom Build Notes',
       description: 'Review the current custom image, version naming, deployment workflow, and change history.',
       updatedAt: 'Document updated: {time}',
-      demoLauncherTitle: 'Update conflict demos (18080 only)',
       toc: 'Contents',
       empty: 'No build notes yet',
       loadFailed: 'Failed to load build notes'

@@ -28,41 +28,6 @@
           </button>
         </header>
 
-        <section
-          v-if="customUpdateDemoLauncherVisible"
-          data-testid="custom-update-demo-launcher"
-          class="-mx-5 mb-6 border-y border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-700/60 dark:bg-amber-900/15 sm:-mx-6 sm:px-6"
-        >
-          <div class="flex items-start gap-3">
-            <span
-              class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-amber-300 bg-white text-amber-700 dark:border-amber-700 dark:bg-dark-900 dark:text-amber-300"
-            >
-              <Icon name="beaker" size="sm" :stroke-width="2" />
-            </span>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-950 dark:text-white">
-                {{ t('admin.customBuild.demoLauncherTitle') }}
-              </p>
-              <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-dark-300">
-                {{ t('version.customUpdateDemoHint') }}
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <button
-              v-for="scenario in customUpdateDemoScenarios"
-              :key="scenario"
-              type="button"
-              class="flex min-h-10 w-full items-center justify-between gap-2 border border-amber-300 bg-white px-3 py-2 text-left text-xs font-medium leading-5 text-gray-800 transition-colors hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:border-amber-700 dark:bg-dark-900 dark:text-dark-100 dark:hover:border-primary-500 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-              @click="openCustomUpdateDemo(scenario)"
-            >
-              <span>{{ t(`version.customUpdateDemoScenarios.${scenario}`) }}</span>
-              <Icon name="play" size="xs" :stroke-width="2" class="flex-shrink-0" />
-            </button>
-          </div>
-        </section>
-
         <OfficialVersionStatus
           class="mb-6"
           :current-version="appStore.currentVersion"
@@ -129,11 +94,6 @@ import Icon from '@/components/icons/Icon.vue'
 import OfficialVersionStatus from '@/components/common/OfficialVersionStatus.vue'
 import { customBuildAPI, type CustomBuildNotes } from '@/api/admin/customBuild'
 import { useAppStore } from '@/stores'
-import {
-  CUSTOM_UPDATE_DEMO_SCENARIOS,
-  createCustomUpdateDemoUrl,
-  type CustomUpdateDemoScenario
-} from '@/utils/customUpdateDemo'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -143,9 +103,6 @@ const notes = ref<CustomBuildNotes | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
 const activeHeadingId = ref('')
 let scrollRafId = 0
-const customUpdateDemoScenarios = CUSTOM_UPDATE_DEMO_SCENARIOS
-const customUpdateDemoLauncherVisible =
-  typeof window !== 'undefined' && window.location.port === '18080'
 
 interface TocItem {
   id: string
@@ -228,10 +185,6 @@ function formatUpdatedAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString()
-}
-
-function openCustomUpdateDemo(scenario: CustomUpdateDemoScenario) {
-  window.location.assign(createCustomUpdateDemoUrl(window.location.href, scenario))
 }
 
 async function loadNotes() {
