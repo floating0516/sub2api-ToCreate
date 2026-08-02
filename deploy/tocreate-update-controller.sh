@@ -22,6 +22,7 @@ LOCK_FILE="${LOCK_FILE:-/tmp/sub2api-custom-update-controller.lock}"
 UPDATE_SCRIPT="${UPDATE_SCRIPT:-$DEPLOY_DIR/update-custom-sub2api.sh}"
 STAGING_SCRIPT="${STAGING_SCRIPT:-$DEPLOY_DIR/deploy-custom-sub2api-staging.sh}"
 PROMOTE_SCRIPT="${PROMOTE_SCRIPT:-$DEPLOY_DIR/promote-custom-sub2api.sh}"
+RELEASE_SCRIPT="${RELEASE_SCRIPT:-$SRC_DIR/deploy/publish-tocreate-release.sh}"
 STAGING_CONTAINER_NAME="${STAGING_CONTAINER_NAME:-sub2api-test}"
 PROD_CONTAINER_NAME="${PROD_CONTAINER_NAME:-sub2api}"
 STAGING_BASE_URL="${STAGING_BASE_URL:-http://127.0.0.1:18080}"
@@ -77,6 +78,11 @@ current_resolution_risk_level=""
 current_resolution_warnings="[]"
 current_resolution_diff_stat=""
 current_resolver_model=""
+current_release_status=""
+current_release_tag=""
+current_release_url=""
+current_release_published_at=""
+current_release_error=""
 previous_resolution_id=""
 previous_conflict_files="[]"
 previous_resolution_summary=""
@@ -84,6 +90,11 @@ previous_resolution_risk_level=""
 previous_resolution_warnings="[]"
 previous_resolution_diff_stat=""
 previous_resolver_model=""
+previous_release_status=""
+previous_release_tag=""
+previous_release_url=""
+previous_release_published_at=""
+previous_release_error=""
 resolution_error=""
 active_resolver_temp_dir=""
 
@@ -132,6 +143,11 @@ write_status() {
     --arg resolution_risk_level "$current_resolution_risk_level" \
     --arg resolution_diff_stat "$current_resolution_diff_stat" \
     --arg resolver_model "$current_resolver_model" \
+    --arg release_status "$current_release_status" \
+    --arg release_tag "$current_release_tag" \
+    --arg release_url "$current_release_url" \
+    --arg release_published_at "$current_release_published_at" \
+    --arg release_error "$current_release_error" \
     --argjson steps "$current_steps" \
     --argjson conflict_files "$current_conflict_files" \
     --argjson resolution_warnings "$current_resolution_warnings" \
@@ -159,7 +175,12 @@ write_status() {
       resolution_risk_level: $resolution_risk_level,
       resolution_warnings: $resolution_warnings,
       resolution_diff_stat: $resolution_diff_stat,
-      resolver_model: $resolver_model
+      resolver_model: $resolver_model,
+      release_status: $release_status,
+      release_tag: $release_tag,
+      release_url: $release_url,
+      release_published_at: $release_published_at,
+      release_error: $release_error
     } | with_entries(select(.value != "" and .value != []))' > "$temporary"; then
     rm -f -- "$temporary"
     return 1
@@ -260,6 +281,22 @@ reset_resolution_metadata() {
   current_resolution_warnings="[]"
   current_resolution_diff_stat=""
   current_resolver_model=""
+}
+
+reset_release_metadata() {
+  current_release_status=""
+  current_release_tag=""
+  current_release_url=""
+  current_release_published_at=""
+  current_release_error=""
+}
+
+restore_release_metadata() {
+  current_release_status="$previous_release_status"
+  current_release_tag="$previous_release_tag"
+  current_release_url="$previous_release_url"
+  current_release_published_at="$previous_release_published_at"
+  current_release_error="$previous_release_error"
 }
 
 restore_resolution_metadata() {
@@ -1282,11 +1319,63 @@ upstream_commit_for_release() {
   printf '%s\n' "$upstream_commit"
 }
 
+publish_current_github_release() {
+  local deployed_at="$1"
+  local image_tag="${current_image#"$IMAGE_REPO:"}"
+  local expected_tag="tocreate-v$image_tag"
+  local expected_url="https://github.com/$CUSTOM_REPO/releases/tag/$expected_tag"
+  local release_json=""
+  local release_log="$LOG_DIR/${current_log_file:-release-publication.log}"
+
+  reset_release_metadata
+  if [ ! -x "$RELEASE_SCRIPT" ]; then
+    current_release_status="failed"
+    current_release_error="GitHub Release publisher is unavailable"
+    log "$current_release_error"
+    return 1
+  fi
+
+  if ! release_json="$(
+    "$RELEASE_SCRIPT" \
+      "$current_image" \
+      "$current_image_digest" \
+      "$current_source_commit" \
+      "$current_upstream_commit" \
+      "$deployed_at" 2>>"$release_log"
+  )"; then
+    current_release_status="failed"
+    current_release_error="GitHub Release publication failed; review the promotion log"
+    log "$current_release_error"
+    return 1
+  fi
+  if ! jq -e \
+    --arg tag "$expected_tag" \
+    --arg url "$expected_url" \
+    '.status == "published" and .tag == $tag and .url == $url and
+     (.published_at | type == "string" and length > 0)' \
+    <<<"$release_json" >/dev/null 2>&1; then
+    current_release_status="failed"
+    current_release_error="GitHub Release publisher returned invalid metadata"
+    log "$current_release_error"
+    return 1
+  fi
+
+  current_release_status="published"
+  current_release_tag="$(jq -r '.tag' <<<"$release_json")"
+  current_release_url="$(jq -r '.url' <<<"$release_json")"
+  current_release_published_at="$(jq -r '.published_at' <<<"$release_json")"
+  current_release_error=""
+  log "Published GitHub Release $current_release_tag"
+}
+
 reconcile_completed_status_with_production() {
   local verify_digest="${1:-0}"
   local status_state=""
   local status_image=""
   local status_image_digest=""
+  local status_source_commit=""
+  local status_upstream_commit=""
+  local status_matches_production=0
   local active_image=""
   local prod_image=""
   local prod_image_digest=""
@@ -1320,7 +1409,17 @@ reconcile_completed_status_with_production() {
   [ -n "$prod_image_digest" ] || return 1
   if [ "$prod_image" = "$status_image" ] \
     && [ "$prod_image_digest" = "$status_image_digest" ]; then
-    return 0
+    status_matches_production=1
+    if [ "$verify_digest" != "1" ]; then
+      return 0
+    fi
+    if [ "$(status_value '.release_status')" = "published" ] \
+      && [ "$(status_value '.release_tag')" = "tocreate-v${prod_image#"$IMAGE_REPO:"}" ] \
+      && [ "$(status_value '.release_url')" = \
+        "https://github.com/$CUSTOM_REPO/releases/tag/tocreate-v${prod_image#"$IMAGE_REPO:"}" ] \
+      && [ -n "$(status_value '.release_published_at')" ]; then
+      return 0
+    fi
   fi
 
   prod_health="$(production_container_health)"
@@ -1338,9 +1437,27 @@ reconcile_completed_status_with_production() {
   current_source_commit="$(
     source_commit_from_release_tag "$prod_image" "$current_image_digest"
   )"
+  if [ -z "$current_source_commit" ] && [ "$status_matches_production" = "1" ]; then
+    status_source_commit="$(status_value '.source_commit')"
+    if [[ "$status_source_commit" =~ ^[0-9a-f]{40}$ ]] \
+      && git -C "$SRC_DIR" cat-file -e "$status_source_commit^{commit}" 2>/dev/null \
+      && git -C "$SRC_DIR" merge-base --is-ancestor \
+        "$status_source_commit" "$BRANCH" 2>/dev/null; then
+      current_source_commit="$status_source_commit"
+    fi
+  fi
   current_upstream_commit="$(
     upstream_commit_for_release "$current_app_version" "$current_source_commit"
   )"
+  if [ -z "$current_upstream_commit" ] && [ "$status_matches_production" = "1" ]; then
+    status_upstream_commit="$(status_value '.upstream_commit')"
+    if [[ "$status_upstream_commit" =~ ^[0-9a-f]{40}$ ]] \
+      && [ -n "$current_source_commit" ] \
+      && git -C "$SRC_DIR" merge-base --is-ancestor \
+        "$status_upstream_commit" "$current_source_commit" 2>/dev/null; then
+      current_upstream_commit="$status_upstream_commit"
+    fi
+  fi
   current_steps="$(jq -c '.steps // []' "$STATUS_FILE" 2>/dev/null || printf '[]')"
   if ! jq -e 'type == "array" and length > 0' <<<"$current_steps" >/dev/null 2>&1; then
     initialize_stage_steps
@@ -1356,6 +1473,7 @@ reconcile_completed_status_with_production() {
   fi
   active_stage_step=""
   reset_resolution_metadata
+  reset_release_metadata
   current_log_file=""
   synced_at="$(bluegreen_state_value UPDATED_AT)"
   if [[ ! "$synced_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
@@ -1363,6 +1481,11 @@ reconcile_completed_status_with_production() {
   fi
   current_started_at="$synced_at"
 
+  if publish_current_github_release "$synced_at"; then
+    current_message="Production status and GitHub Release synchronized from the active runtime"
+  else
+    current_message="Production status synchronized; GitHub Release publication needs attention"
+  fi
   write_status "completed" "$current_message" "" "$synced_at" || return 1
   log "Synchronized completed update status to $current_image"
 }
@@ -1384,6 +1507,7 @@ continue_stage_after_merge() {
   if [ "$previous_state" = "completed" ] \
     && [ "$previous_source_commit" = "$current_source_commit" ] \
     && [ "$previous_image" = "$prod_image" ]; then
+    restore_release_metadata
     current_image="$prod_image"
     current_image_digest="$(image_digest "$prod_image")"
     skip_stage_step "source_push"
@@ -1485,6 +1609,7 @@ stage_update() {
   current_upstream_commit=""
   current_source_commit=""
   reset_resolution_metadata
+  reset_release_metadata
   initialize_stage_steps
   begin_stage_step "source_check"
   current_message="Checking source and official upstream"
@@ -1587,6 +1712,7 @@ accept_conflict_resolution() {
   current_log_file="accept-resolution-${current_request_id}-$(date '+%Y%m%d%H%M%S').log"
   restore_or_initialize_stage_steps
   restore_resolution_metadata
+  restore_release_metadata
   current_image="$previous_image"
   current_image_digest="$(status_value '.image_digest')"
   current_app_version="$(status_value '.app_version')"
@@ -1658,6 +1784,7 @@ abort_conflict_resolution() {
   current_log_file="abort-resolution-${current_request_id}-$(date '+%Y%m%d%H%M%S').log"
   restore_or_initialize_stage_steps
   restore_resolution_metadata
+  restore_release_metadata
   current_upstream_commit="$(status_value '.upstream_commit')"
   current_source_commit="$(status_value '.source_commit')"
 
@@ -1685,12 +1812,15 @@ promote_update() {
   local staged_image=""
   local staged_health=""
   local prod_image=""
+  local prod_image_digest=""
+  local completed_at=""
 
   current_action="promote"
   current_started_at="$(utc_now)"
   current_log_file="promote-${current_request_id}-$(date '+%Y%m%d%H%M%S').log"
   restore_or_initialize_stage_steps
   restore_resolution_metadata
+  restore_release_metadata
   set_step_status "production_approval" "completed" || return 1
   current_image="$previous_image"
   current_image_digest="$(status_value '.image_digest')"
@@ -1732,9 +1862,23 @@ promote_update() {
     write_failure "Production health endpoint failed after promotion"
     return 1
   fi
+  if ! curl -fsS "$PROD_BASE_URL/ready" >/dev/null; then
+    write_failure "Production readiness endpoint failed after promotion"
+    return 1
+  fi
+  prod_image_digest="$(image_digest "$prod_image")"
+  if [ -z "$prod_image_digest" ] || [ "$prod_image_digest" != "$current_image_digest" ]; then
+    write_failure "Production image digest does not match the approved staged image"
+    return 1
+  fi
 
-  current_message="Production is running the approved ToCreate image"
-  write_status "completed" "$current_message" "" "$(utc_now)"
+  completed_at="$(utc_now)"
+  if publish_current_github_release "$completed_at"; then
+    current_message="Production is running the approved image; GitHub Release is published"
+  else
+    current_message="Production is healthy; GitHub Release publication needs attention"
+  fi
+  write_status "completed" "$current_message" "" "$completed_at"
   log "Promoted $current_image to production"
 }
 
@@ -1761,6 +1905,11 @@ process_request() {
   previous_resolution_warnings="$(jq -c '.resolution_warnings // []' "$STATUS_FILE" 2>/dev/null || printf '[]')"
   previous_resolution_diff_stat="$(status_value '.resolution_diff_stat')"
   previous_resolver_model="$(status_value '.resolver_model')"
+  previous_release_status="$(status_value '.release_status')"
+  previous_release_tag="$(status_value '.release_tag')"
+  previous_release_url="$(status_value '.release_url')"
+  previous_release_published_at="$(status_value '.release_published_at')"
+  previous_release_error="$(status_value '.release_error')"
 
   if ! jq -e '
     (.id | type == "string" and test("^[0-9a-f]{32}$")) and
@@ -1779,6 +1928,7 @@ process_request() {
     current_steps="[]"
     active_stage_step=""
     reset_resolution_metadata
+    reset_release_metadata
     current_action="invalid"
     current_request_id="invalid"
     current_started_at="$(utc_now)"
@@ -1877,6 +2027,10 @@ main() {
   }
   [ -x "$PROMOTE_SCRIPT" ] || {
     log "Promotion script is not executable: $PROMOTE_SCRIPT"
+    exit 1
+  }
+  [ -x "$RELEASE_SCRIPT" ] || {
+    log "Release publisher is not executable: $RELEASE_SCRIPT"
     exit 1
   }
 

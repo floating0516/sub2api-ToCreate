@@ -273,6 +273,13 @@ test_completed_status_runtime_reconciliation() (
   image_digest() { printf '%s\n' "$prod_digest"; }
   source_commit_from_release_tag() { printf '%s\n' "$source_commit"; }
   upstream_commit_for_release() { printf '%s\n' "$upstream_commit"; }
+  publish_current_github_release() {
+    reset_release_metadata
+    current_release_status="published"
+    current_release_tag="tocreate-v0.1.169-tc1.24"
+    current_release_url="https://github.com/floating0516/sub2api-ToCreate/releases/tag/$current_release_tag"
+    current_release_published_at="2026-08-02T06:11:04Z"
+  }
 
   reconcile_completed_status_with_production
   assert_eq "$expected_prod_image" "$(jq -r '.image' "$STATUS_FILE")" \
@@ -307,9 +314,49 @@ test_completed_status_runtime_reconciliation() (
     "active update state was overwritten"
 )
 
+test_release_publication_metadata() (
+  local release_dir="$TEST_ROOT/release-metadata"
+  local fake_publisher="$release_dir/publisher.sh"
+  local expected_tag="tocreate-v0.1.200-tc2.1"
+  local expected_url="https://github.com/floating0516/sub2api-ToCreate/releases/tag/$expected_tag"
+
+  mkdir -p "$release_dir/logs"
+  LOG_DIR="$release_dir/logs"
+  current_log_file="release-test.log"
+  RELEASE_SCRIPT="$fake_publisher"
+  current_image="ghcr.io/floating0516/sub2api-tocreate:0.1.200-tc2.1"
+  current_image_digest="ghcr.io/floating0516/sub2api-tocreate@sha256:$(printf 'a%.0s' {1..64})"
+  current_source_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  current_upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    "printf '%s\\n' '{\"status\":\"published\",\"tag\":\"$expected_tag\",\"url\":\"$expected_url\",\"published_at\":\"2026-08-02T07:00:00Z\"}'" \
+    > "$fake_publisher"
+  chmod 0755 "$fake_publisher"
+
+  publish_current_github_release '2026-08-02T07:00:00Z'
+  assert_eq "published" "$current_release_status" \
+    "controller did not retain the published release status"
+  assert_eq "$expected_tag" "$current_release_tag" \
+    "controller did not retain the release tag"
+  assert_eq "$expected_url" "$current_release_url" \
+    "controller did not retain the release URL"
+
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "$fake_publisher"
+  chmod 0755 "$fake_publisher"
+  if publish_current_github_release '2026-08-02T07:00:00Z'; then
+    fail "controller accepted a failed GitHub Release publication"
+  fi
+  assert_eq "failed" "$current_release_status" \
+    "controller did not retain the failed release status"
+  [ -n "$current_release_error" ] || fail "controller omitted the release publication error"
+)
+
 test_runtime_resolver_config_loading
 test_structured_response_validation
 test_resolution_status_metadata
 test_isolated_merge_resolution_commit
 test_completed_status_runtime_reconciliation
+test_release_publication_metadata
 printf 'tocreate update controller tests passed\n'
