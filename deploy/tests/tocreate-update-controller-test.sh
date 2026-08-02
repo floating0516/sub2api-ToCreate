@@ -143,6 +143,156 @@ test_structured_response_validation() {
   fi
 }
 
+test_batched_conflict_resolution() (
+  local batch_root="$TEST_ROOT/batched-resolution"
+  local calls_file="$batch_root/calls.txt"
+  local applied_file="$batch_root/applied.json"
+
+  mkdir -p "$batch_root/control" "$batch_root/logs"
+  STATE_DIR="$batch_root"
+  CONTROL_DIR="$batch_root/control"
+  STATUS_FILE="$CONTROL_DIR/status.json"
+  LOG_DIR="$batch_root/logs"
+  current_action="stage"
+  current_request_id="11111111111111111111111111111111"
+  current_started_at="2026-08-02T00:00:00Z"
+  current_upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  current_log_file="batched-resolution.log"
+  CONFLICT_RESOLVER_MODEL="gpt-5.6-luna"
+  initialize_stage_steps
+
+  load_conflict_resolver_config() { return 0; }
+  validate_resolver_config() { return 0; }
+  build_conflict_resolver_request() {
+    local request_file="$2"
+    shift 3
+    [ "$#" -eq 1 ] || fail "resolver batch included more than one conflict file"
+    printf '%s\n' "$1" >> "$calls_file"
+    jq -n --arg path "$1" '{test_path: $path}' > "$request_file"
+    chmod 0600 "$request_file"
+  }
+  call_conflict_resolver() {
+    local request_file="$1"
+    local response_file="$2"
+    local path=""
+    local resolution_text=""
+
+    path="$(jq -r '.test_path' "$request_file")"
+    resolution_text="$(jq -cn --arg path "$path" '{
+      summary: ("Resolved " + $path),
+      risk_level: "medium",
+      warnings: ["Review the combined proposal."],
+      files: [{
+        path: $path,
+        action: "write",
+        content: ("resolved " + $path + "\n"),
+        rationale: "Combined the custom and official versions"
+      }]
+    }')"
+    jq -n --arg text "$resolution_text" '{
+      status: "completed",
+      output: [{
+        type: "message",
+        content: [{type: "output_text", text: $text}]
+      }]
+    }' > "$response_file"
+  }
+  apply_conflict_resolution() {
+    local resolution_file="$4"
+    cp "$resolution_file" "$applied_file"
+  }
+
+  resolve_merge_conflicts \
+    "$batch_root/worktree" \
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    "tocreate/official-merge-$current_request_id" \
+    "frontend/src/one.ts" \
+    "frontend/src/two.ts"
+
+  assert_eq "2" "$(wc -l < "$calls_file")" \
+    "resolver did not make one request per conflict file"
+  assert_eq "2" "$(jq '.files | length' "$applied_file")" \
+    "resolver did not combine all successful batches"
+  assert_eq "2" "$(jq '[.files[].path] | unique | length' "$applied_file")" \
+    "combined resolution did not preserve the path set"
+  assert_eq "resolution_ready" "$(jq -r '.state' "$STATUS_FILE")" \
+    "batched resolver did not stop for administrator review"
+)
+
+test_batched_conflict_resolution_is_atomic() (
+  local batch_root="$TEST_ROOT/batched-resolution-failure"
+  local calls_file="$batch_root/calls.txt"
+  local applied_marker="$batch_root/applied"
+
+  mkdir -p "$batch_root/control" "$batch_root/logs"
+  STATE_DIR="$batch_root"
+  CONTROL_DIR="$batch_root/control"
+  STATUS_FILE="$CONTROL_DIR/status.json"
+  LOG_DIR="$batch_root/logs"
+  current_action="stage"
+  current_request_id="22222222222222222222222222222222"
+  current_started_at="2026-08-02T00:00:00Z"
+  current_upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  current_log_file="batched-resolution-failure.log"
+  CONFLICT_RESOLVER_MODEL="gpt-5.6-luna"
+  initialize_stage_steps
+
+  load_conflict_resolver_config() { return 0; }
+  validate_resolver_config() { return 0; }
+  build_conflict_resolver_request() {
+    local request_file="$2"
+    shift 3
+    printf '%s\n' "$1" >> "$calls_file"
+    jq -n --arg path "$1" '{test_path: $path}' > "$request_file"
+  }
+  call_conflict_resolver() {
+    local request_file="$1"
+    local response_file="$2"
+    local path=""
+    local resolution_text=""
+
+    path="$(jq -r '.test_path' "$request_file")"
+    if [ "$path" = "frontend/src/two.ts" ]; then
+      resolution_error="Conflict resolver API returned HTTP 502: upstream request failed"
+      return 1
+    fi
+    resolution_text="$(jq -cn --arg path "$path" '{
+      summary: ("Resolved " + $path),
+      risk_level: "medium",
+      warnings: [],
+      files: [{
+        path: $path,
+        action: "write",
+        content: ("resolved " + $path + "\n"),
+        rationale: "Combined both versions"
+      }]
+    }')"
+    jq -n --arg text "$resolution_text" '{
+      status: "completed",
+      output: [{
+        type: "message",
+        content: [{type: "output_text", text: $text}]
+      }]
+    }' > "$response_file"
+  }
+  apply_conflict_resolution() { : > "$applied_marker"; }
+
+  if resolve_merge_conflicts \
+    "$batch_root/worktree" \
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    "tocreate/official-merge-$current_request_id" \
+    "frontend/src/one.ts" \
+    "frontend/src/two.ts"; then
+    fail "resolver accepted a partially failed batch set"
+  fi
+
+  [ ! -e "$applied_marker" ] || fail "resolver applied a partial proposal"
+  assert_eq "resolution_failed" "$(jq -r '.state' "$STATUS_FILE")" \
+    "failed batch did not preserve the review stop"
+  assert_eq "true" "$(jq -r '.error | contains("frontend/src/two.ts")' "$STATUS_FILE")" \
+    "failed batch did not identify the conflicted path"
+)
+
 test_resolution_status_metadata() {
   local status_dir="$TEST_ROOT/status"
 
@@ -378,6 +528,8 @@ test_release_publication_metadata() (
 
 test_runtime_resolver_config_loading
 test_structured_response_validation
+test_batched_conflict_resolution
+test_batched_conflict_resolution_is_atomic
 test_resolution_status_metadata
 test_isolated_merge_resolution_commit
 test_completed_status_runtime_reconciliation

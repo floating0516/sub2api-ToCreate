@@ -856,6 +856,7 @@ call_conflict_resolver() {
   local base_url=""
   local endpoint=""
   local http_code=""
+  local upstream_error=""
 
   base_url="$(conflict_resolver_request_base_url)"
   base_url="${base_url%/}"
@@ -891,6 +892,17 @@ call_conflict_resolver() {
 
   if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
     resolution_error="Conflict resolver API returned HTTP $http_code"
+    upstream_error="$(
+      jq -r \
+        '(.error.message? // .error? // .message? // empty) |
+         select(type == "string")' \
+        "$response_file" 2>/dev/null \
+        | tr '\r\n\t' '   ' \
+        | cut -c1-500
+    )"
+    if [ -n "$upstream_error" ]; then
+      resolution_error="$resolution_error: $upstream_error"
+    fi
     return 1
   fi
 }
@@ -929,14 +941,43 @@ extract_conflict_resolution() {
   rm -f -- "$output_text_file"
 }
 
-validate_conflict_resolution() {
+combine_conflict_resolutions() {
+  local combined_file="$1"
+  shift
+
+  [ "$#" -gt 0 ] || {
+    resolution_error="Conflict resolver returned no resolution batches"
+    return 1
+  }
+  if ! jq -s '
+    [.[].risk_level] as $risk_levels |
+    {
+      summary: (
+        ([.[].summary] | join(" ")) |
+        if length > 4000 then .[0:3997] + "..." else . end
+      ),
+      risk_level: (
+        if ($risk_levels | index("high")) != null then "high"
+        elif ($risk_levels | index("medium")) != null then "medium"
+        else "low"
+        end
+      ),
+      warnings: ([.[].warnings[]] | unique | .[0:20]),
+      files: [.[].files[]]
+    }
+  ' "$@" > "$combined_file"; then
+    resolution_error="Could not combine conflict resolver batches"
+    return 1
+  fi
+  chmod 0600 "$combined_file"
+}
+
+validate_conflict_resolution_payload() {
   local resolution_file="$1"
   shift
   local conflict_paths=("$@")
   local expected_paths=""
   local actual_paths=""
-  local model_risk=""
-  local model_warnings="[]"
 
   if ! jq -e \
     --argjson conflict_count "${#conflict_paths[@]}" \
@@ -971,6 +1012,18 @@ validate_conflict_resolution() {
   actual_paths="$(jq -r '.files[].path' "$resolution_file" | LC_ALL=C sort)"
   if [ "$expected_paths" != "$actual_paths" ]; then
     resolution_error="Conflict resolver changed the requested path set"
+    return 1
+  fi
+}
+
+validate_conflict_resolution() {
+  local resolution_file="$1"
+  shift
+  local conflict_paths=("$@")
+  local model_risk=""
+  local model_warnings="[]"
+
+  if ! validate_conflict_resolution_payload "$resolution_file" "${conflict_paths[@]}"; then
     return 1
   fi
 
@@ -1093,6 +1146,11 @@ resolve_merge_conflicts() {
   shift 3
   local conflict_paths=("$@")
   local temporary_dir=""
+  local batch_dir=""
+  local batch_count="${#conflict_paths[@]}"
+  local batch_index=0
+  local batch_resolution_file=""
+  local batch_resolution_files=()
   local request_file=""
   local response_file=""
   local resolution_file=""
@@ -1141,26 +1199,66 @@ resolve_merge_conflicts() {
   }
   active_resolver_temp_dir="$temporary_dir"
   chmod 0700 "$temporary_dir"
-  request_file="$temporary_dir/request.json"
-  response_file="$temporary_dir/response.json"
   resolution_file="$temporary_dir/resolution.json"
-  : > "$response_file"
-  chmod 0600 "$response_file"
 
-  if ! build_conflict_resolver_request \
-    "$worktree" "$request_file" "$temporary_dir" "${conflict_paths[@]}"; then
-    rm -rf -- "$temporary_dir"
-    active_resolver_temp_dir=""
-    write_resolution_failure "$resolution_error"
-    return 1
-  fi
-  if ! call_conflict_resolver "$request_file" "$response_file"; then
-    rm -rf -- "$temporary_dir"
-    active_resolver_temp_dir=""
-    write_resolution_failure "$resolution_error"
-    return 1
-  fi
-  if ! extract_conflict_resolution "$response_file" "$resolution_file"; then
+  for path in "${conflict_paths[@]}"; do
+    batch_index=$((batch_index + 1))
+    batch_dir="$temporary_dir/batch-$batch_index"
+    if ! mkdir -p "$batch_dir"; then
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      write_resolution_failure "Could not create resolver batch storage"
+      return 1
+    fi
+    chmod 0700 "$batch_dir"
+    request_file="$batch_dir/request.json"
+    response_file="$batch_dir/response.json"
+    batch_resolution_file="$batch_dir/resolution.json"
+    batch_resolution_files+=("$batch_resolution_file")
+    : > "$response_file"
+    chmod 0600 "$response_file"
+
+    current_message="Resolving merge conflict $batch_index/$batch_count with $CONFLICT_RESOLVER_MODEL: $path"
+    if ! write_status "ai_resolving" "$current_message"; then
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      return 1
+    fi
+    if ! build_conflict_resolver_request \
+      "$worktree" "$request_file" "$batch_dir" "$path"; then
+      resolution_error="Conflict resolver failed for $path: $resolution_error"
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      write_resolution_failure "$resolution_error"
+      return 1
+    fi
+    if ! call_conflict_resolver "$request_file" "$response_file"; then
+      resolution_error="Conflict resolver failed for $path: $resolution_error"
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      write_resolution_failure "$resolution_error"
+      return 1
+    fi
+    if ! extract_conflict_resolution \
+      "$response_file" "$batch_resolution_file"; then
+      resolution_error="Conflict resolver failed for $path: $resolution_error"
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      write_resolution_failure "$resolution_error"
+      return 1
+    fi
+    if ! validate_conflict_resolution_payload \
+      "$batch_resolution_file" "$path"; then
+      resolution_error="Conflict resolver failed for $path: $resolution_error"
+      rm -rf -- "$temporary_dir"
+      active_resolver_temp_dir=""
+      write_resolution_failure "$resolution_error"
+      return 1
+    fi
+  done
+
+  if ! combine_conflict_resolutions \
+    "$resolution_file" "${batch_resolution_files[@]}"; then
     rm -rf -- "$temporary_dir"
     active_resolver_temp_dir=""
     write_resolution_failure "$resolution_error"
