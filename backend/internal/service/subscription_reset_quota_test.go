@@ -186,7 +186,27 @@ func TestAdminResetQuota_ResetDailyUsageError(t *testing.T) {
 
 	require.ErrorIs(t, err, dbErr)
 	require.True(t, stub.resetDailyCalled)
-	require.False(t, stub.resetWeeklyCalled, "日窗口重置失败后不应继续重置周窗口")
+	require.True(t, stub.resetWeeklyCalled, "无 StartsAt 的旧记录应在一次原子调用中提交所选窗口")
+}
+
+func TestAdminResetQuota_StartsAtResetDailyUsageErrorStopsFollowingWindows(t *testing.T) {
+	dbErr := errors.New("db error")
+	stub := &resetQuotaUserSubRepoStub{
+		sub: &UserSubscription{
+			ID:       11,
+			UserID:   10,
+			GroupID:  20,
+			StartsAt: time.Date(2026, 7, 1, 15, 0, 0, 0, time.UTC),
+		},
+		resetDailyErr: dbErr,
+	}
+	svc := newResetQuotaSvc(stub)
+
+	_, err := svc.AdminResetQuota(context.Background(), 11, true, true, false)
+
+	require.ErrorIs(t, err, dbErr)
+	require.True(t, stub.resetDailyCalled)
+	require.False(t, stub.resetWeeklyCalled, "StartsAt 路径在日窗口失败后不应继续重置周窗口")
 }
 
 func TestAdminResetQuota_ResetWeeklyUsageError(t *testing.T) {
