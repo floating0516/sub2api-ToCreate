@@ -73,6 +73,7 @@ function buildPublicSettings(overrides: Partial<WeChatPublicSettings> = {}): WeC
     contact_info: '',
     doc_url: '',
     home_content: '',
+    compact_home_enabled: false,
     hide_ccs_import_button: false,
     quick_start_installer_enabled: false,
     payment_enabled: false,
