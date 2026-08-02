@@ -17,6 +17,7 @@ IMAGE_REPO="${IMAGE_REPO:-ghcr.io/floating0516/sub2api-tocreate}"
 CONTROL_DIR="${CONTROL_DIR:-$DEPLOY_DIR/data/custom-update}"
 STATE_DIR="${STATE_DIR:-$DEPLOY_DIR/state/custom-update}"
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-2}"
+RUNTIME_SYNC_INTERVAL_SECONDS="${RUNTIME_SYNC_INTERVAL_SECONDS:-30}"
 LOCK_FILE="${LOCK_FILE:-/tmp/sub2api-custom-update-controller.lock}"
 UPDATE_SCRIPT="${UPDATE_SCRIPT:-$DEPLOY_DIR/update-custom-sub2api.sh}"
 STAGING_SCRIPT="${STAGING_SCRIPT:-$DEPLOY_DIR/deploy-custom-sub2api-staging.sh}"
@@ -25,6 +26,7 @@ STAGING_CONTAINER_NAME="${STAGING_CONTAINER_NAME:-sub2api-test}"
 PROD_CONTAINER_NAME="${PROD_CONTAINER_NAME:-sub2api}"
 STAGING_BASE_URL="${STAGING_BASE_URL:-http://127.0.0.1:18080}"
 PROD_BASE_URL="${PROD_BASE_URL:-http://127.0.0.1:8080}"
+BLUEGREEN_STATE_FILE="${BLUEGREEN_STATE_FILE:-$DEPLOY_DIR/state/blue-green/active.env}"
 MERGE_WORKTREE_ROOT="${MERGE_WORKTREE_ROOT:-$STATE_DIR/merge-worktrees}"
 RESOLUTION_CONTEXT_FILE="${RESOLUTION_CONTEXT_FILE:-$STATE_DIR/resolution-context.json}"
 CONFLICT_RESOLVER_BASE_URL="${CONFLICT_RESOLVER_BASE_URL:-https://api.lihe.chat}"
@@ -1188,6 +1190,172 @@ image_digest() {
       '[.[] | select(startswith($repo + "@"))][0] // empty' 2>/dev/null
 }
 
+production_container_health() {
+  sudo docker inspect "$PROD_CONTAINER_NAME" \
+    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+    2>/dev/null
+}
+
+production_endpoints_are_ready() {
+  curl -fsS "$PROD_BASE_URL/health" >/dev/null \
+    && curl -fsS "$PROD_BASE_URL/ready" >/dev/null
+}
+
+bluegreen_state_value() {
+  local key="$1"
+  [ -f "$BLUEGREEN_STATE_FILE" ] || return 0
+  awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' \
+    "$BLUEGREEN_STATE_FILE"
+}
+
+bluegreen_state_matches_production() {
+  local image="$1"
+  local phase=""
+  local active_container=""
+  local active_image=""
+
+  [ -f "$BLUEGREEN_STATE_FILE" ] || return 0
+  phase="$(bluegreen_state_value PHASE)"
+  active_container="$(bluegreen_state_value ACTIVE_CONTAINER)"
+  active_image="$(bluegreen_state_value ACTIVE_IMAGE)"
+  [ "$phase" = "active" ] \
+    && [ "$active_container" = "$PROD_CONTAINER_NAME" ] \
+    && [ "$active_image" = "$image" ]
+}
+
+app_version_from_image() {
+  local image="$1"
+  local tag=""
+
+  case "$image" in
+    "$IMAGE_REPO":*) tag="${image#"$IMAGE_REPO:"}" ;;
+    *) return 1 ;;
+  esac
+  if [[ "$tag" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-tc[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
+source_commit_from_release_tag() {
+  local image="$1"
+  local image_digest_value="$2"
+  local image_tag="${image#"$IMAGE_REPO:"}"
+  local release_tag="tocreate-v$image_tag"
+  local recorded_digest=""
+  local source_commit=""
+
+  recorded_digest="$(
+    git -C "$SRC_DIR" for-each-ref \
+      --format='%(contents)' "refs/tags/$release_tag" 2>/dev/null \
+      | sed -n 's/^OCI digest: //p' \
+      | head -n 1
+  )"
+  [ -n "$recorded_digest" ] || return 0
+  [ "$recorded_digest" = "${image_digest_value#*@}" ] || return 0
+
+  source_commit="$(
+    git -C "$SRC_DIR" rev-parse --verify "$release_tag^{commit}" 2>/dev/null
+  )"
+  [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || return 0
+  if ! git -C "$SRC_DIR" merge-base --is-ancestor "$source_commit" "$BRANCH" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\n' "$source_commit"
+}
+
+upstream_commit_for_release() {
+  local app_version="$1"
+  local source_commit="$2"
+  local upstream_commit=""
+
+  [ -n "$source_commit" ] || return 0
+  upstream_commit="$(
+    git -C "$SRC_DIR" rev-parse --verify "v$app_version^{commit}" 2>/dev/null
+  )"
+  [[ "$upstream_commit" =~ ^[0-9a-f]{40}$ ]] || return 0
+  if ! git -C "$SRC_DIR" merge-base --is-ancestor \
+    "$upstream_commit" "$source_commit" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\n' "$upstream_commit"
+}
+
+reconcile_completed_status_with_production() {
+  local status_state=""
+  local status_image=""
+  local status_image_digest=""
+  local prod_image=""
+  local prod_image_digest=""
+  local prod_health=""
+  local synced_at=""
+
+  [ ! -f "$REQUEST_FILE" ] || return 0
+  [ ! -f "$PROCESSING_FILE" ] || return 0
+  [ ! -f "$RESOLUTION_CONTEXT_FILE" ] || return 0
+  status_state="$(status_value '.state')"
+  [ "$status_state" = "completed" ] || return 0
+
+  status_image="$(status_value '.image')"
+  status_image_digest="$(status_value '.image_digest')"
+  prod_image="$(production_image)"
+  [ -n "$prod_image" ] || return 1
+  case "$prod_image" in
+    "$IMAGE_REPO":*) ;;
+    *) return 1 ;;
+  esac
+  prod_image_digest="$(image_digest "$prod_image")"
+  [ -n "$prod_image_digest" ] || return 1
+  if [ "$prod_image" = "$status_image" ] \
+    && [ "$prod_image_digest" = "$status_image_digest" ]; then
+    return 0
+  fi
+
+  prod_health="$(production_container_health)"
+  [ "$prod_health" = "healthy" ] || return 1
+  bluegreen_state_matches_production "$prod_image" || return 1
+  production_endpoints_are_ready || return 1
+
+  current_action="promote"
+  current_request_id=""
+  current_message="Production status synchronized from the active runtime"
+  current_image="$prod_image"
+  current_image_digest="$prod_image_digest"
+  current_app_version="$(app_version_from_image "$prod_image")"
+  [ -n "$current_app_version" ] || return 1
+  current_source_commit="$(
+    source_commit_from_release_tag "$prod_image" "$current_image_digest"
+  )"
+  current_upstream_commit="$(
+    upstream_commit_for_release "$current_app_version" "$current_source_commit"
+  )"
+  current_steps="$(jq -c '.steps // []' "$STATUS_FILE" 2>/dev/null || printf '[]')"
+  if ! jq -e 'type == "array" and length > 0' <<<"$current_steps" >/dev/null 2>&1; then
+    initialize_stage_steps
+    current_steps="$(
+      jq -c 'map(.status = if .id == "conflict_resolution" then "skipped" else "completed" end)' \
+        <<<"$current_steps"
+    )" || return 1
+  else
+    current_steps="$(
+      jq -c 'map(if .id == "production_approval" then .status = "completed" else . end)' \
+        <<<"$current_steps"
+    )" || return 1
+  fi
+  active_stage_step=""
+  reset_resolution_metadata
+  current_log_file=""
+  synced_at="$(bluegreen_state_value UPDATED_AT)"
+  if [[ ! "$synced_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+    synced_at="$(utc_now)"
+  fi
+  current_started_at="$synced_at"
+
+  write_status "completed" "$current_message" "" "$synced_at" || return 1
+  log "Synchronized completed update status to $current_image"
+}
+
 continue_stage_after_merge() {
   local prod_image=""
   local suffix=""
@@ -1652,6 +1820,7 @@ process_request() {
 
 main() {
   local recovered_state=""
+  local next_runtime_sync=0
 
   need_cmd git
   need_cmd gh
@@ -1667,9 +1836,21 @@ main() {
   need_cmd grep
   need_cmd sort
   need_cmd sed
+  need_cmd head
   need_cmd tr
   need_cmd wc
   need_cmd find
+
+  case "$RUNTIME_SYNC_INTERVAL_SECONDS" in
+    ''|*[!0-9]*)
+      log "RUNTIME_SYNC_INTERVAL_SECONDS must be a positive integer"
+      exit 1
+      ;;
+  esac
+  if [ "$RUNTIME_SYNC_INTERVAL_SECONDS" -lt 1 ]; then
+    log "RUNTIME_SYNC_INTERVAL_SECONDS must be a positive integer"
+    exit 1
+  fi
 
   [ -d "$SRC_DIR/.git" ] || {
     log "Source repository not found: $SRC_DIR"
@@ -1730,6 +1911,9 @@ main() {
     current_message="Ready for a custom update request"
     write_status "idle" "$current_message"
   fi
+  if ! reconcile_completed_status_with_production; then
+    log "Could not reconcile the completed update status with production"
+  fi
 
   trap shutdown INT TERM
   trap cleanup EXIT
@@ -1740,6 +1924,12 @@ main() {
   while true; do
     if [ -f "$REQUEST_FILE" ] && mv -- "$REQUEST_FILE" "$PROCESSING_FILE" 2>/dev/null; then
       process_request
+    fi
+    if [ "$SECONDS" -ge "$next_runtime_sync" ]; then
+      if ! reconcile_completed_status_with_production; then
+        log "Could not reconcile the completed update status with production"
+      fi
+      next_runtime_sync=$((SECONDS + RUNTIME_SYNC_INTERVAL_SECONDS))
     fi
     sleep "$POLL_INTERVAL_SECONDS"
   done

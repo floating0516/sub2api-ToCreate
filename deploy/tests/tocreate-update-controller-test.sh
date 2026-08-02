@@ -235,8 +235,74 @@ test_isolated_merge_resolution_commit() {
     "proposal commit was not persisted"
 }
 
+test_completed_status_runtime_reconciliation() (
+  local status_dir="$TEST_ROOT/runtime-status"
+  local bluegreen_dir="$TEST_ROOT/blue-green"
+  local old_image="ghcr.io/floating0516/sub2api-tocreate:0.1.168-tc1.23.1"
+  local expected_prod_image="ghcr.io/floating0516/sub2api-tocreate:0.1.169-tc1.24"
+  local prod_digest="ghcr.io/floating0516/sub2api-tocreate@sha256:1234"
+  local source_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  local upstream_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+  mkdir -p "$status_dir" "$bluegreen_dir"
+  CONTROL_DIR="$status_dir"
+  STATUS_FILE="$CONTROL_DIR/status.json"
+  REQUEST_FILE="$CONTROL_DIR/request.json"
+  PROCESSING_FILE="$CONTROL_DIR/processing.json"
+  RESOLUTION_CONTEXT_FILE="$TEST_ROOT/runtime-resolution-context.json"
+  BLUEGREEN_STATE_FILE="$bluegreen_dir/active.env"
+  PROD_CONTAINER_NAME="sub2api"
+
+  jq -n --arg image "$old_image" '{
+    state: "completed",
+    image: $image,
+    steps: [
+      {id: "source_check", status: "completed"},
+      {id: "production_approval", status: "completed"}
+    ]
+  }' > "$STATUS_FILE"
+  printf '%s\n' \
+    'ACTIVE_CONTAINER=sub2api' \
+    "ACTIVE_IMAGE=$expected_prod_image" \
+    'PHASE=active' \
+    'UPDATED_AT=2026-08-01T16:04:17Z' > "$BLUEGREEN_STATE_FILE"
+
+  production_image() { printf '%s\n' "$expected_prod_image"; }
+  production_container_health() { printf 'healthy\n'; }
+  production_endpoints_are_ready() { return 0; }
+  image_digest() { printf '%s\n' "$prod_digest"; }
+  source_commit_from_release_tag() { printf '%s\n' "$source_commit"; }
+  upstream_commit_for_release() { printf '%s\n' "$upstream_commit"; }
+
+  reconcile_completed_status_with_production
+  assert_eq "$expected_prod_image" "$(jq -r '.image' "$STATUS_FILE")" \
+    "runtime image was not synchronized"
+  assert_eq "$prod_digest" "$(jq -r '.image_digest' "$STATUS_FILE")" \
+    "runtime digest was not synchronized"
+  assert_eq "0.1.169" "$(jq -r '.app_version' "$STATUS_FILE")" \
+    "application version was not derived from the image"
+  assert_eq "$source_commit" "$(jq -r '.source_commit' "$STATUS_FILE")" \
+    "release source commit was not synchronized"
+  assert_eq "$upstream_commit" "$(jq -r '.upstream_commit' "$STATUS_FILE")" \
+    "upstream commit was not synchronized"
+  assert_eq "2026-08-01T16:04:17Z" "$(jq -r '.completed_at' "$STATUS_FILE")" \
+    "blue-green activation time was not preserved"
+
+  jq -n --arg image "$old_image" '{
+    state: "awaiting_approval",
+    image: $image,
+    steps: [{id: "production_approval", status: "action_required"}]
+  }' > "$STATUS_FILE"
+  reconcile_completed_status_with_production
+  assert_eq "$old_image" "$(jq -r '.image' "$STATUS_FILE")" \
+    "active update status was overwritten"
+  assert_eq "awaiting_approval" "$(jq -r '.state' "$STATUS_FILE")" \
+    "active update state was overwritten"
+)
+
 test_runtime_resolver_config_loading
 test_structured_response_validation
 test_resolution_status_metadata
 test_isolated_merge_resolution_commit
+test_completed_status_runtime_reconciliation
 printf 'tocreate update controller tests passed\n'
