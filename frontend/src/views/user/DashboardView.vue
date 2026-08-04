@@ -38,6 +38,19 @@
         </article>
       </section>
 
+      <section class="dashboard-card dashboard-calendar-card">
+        <header class="dashboard-calendar-header">
+          <h2>{{ t('dashboard.overview.dailyTokenUsage') }}</h2>
+          <span>{{ t('dashboard.overview.recentYear') }}</span>
+        </header>
+        <DashboardUsageCalendar
+          :data="calendarData"
+          :start-date="calendarStartDate"
+          :end-date="calendarEndDate"
+          :loading="loadingCalendar"
+        />
+      </section>
+
       <section class="dashboard-card dashboard-trend-card">
         <header class="dashboard-chart-header">
           <div class="dashboard-chart-heading">
@@ -98,91 +111,6 @@
 
         <DashboardTrendChart :labels="chartLabels" :series="chartSeries" :loading="loadingChart" />
       </section>
-
-      <section class="dashboard-table-grid">
-        <article class="dashboard-card dashboard-table-card">
-          <header class="dashboard-table-header">
-            <h2>{{ t('dashboard.overview.modelTokenUsage') }}</h2>
-            <span>{{ selectedRangeLabel }}</span>
-          </header>
-          <div class="dashboard-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t('dashboard.model') }}</th>
-                  <th>{{ t('dashboard.tokens') }}</th>
-                  <th>{{ t('dashboard.overview.share') }}</th>
-                  <th class="dashboard-spark-column">{{ t('dashboard.overview.trend') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in modelRows" :key="row.name">
-                  <td>
-                    <span class="dashboard-entity" :title="row.name">
-                      <i :style="{ backgroundColor: row.color }" />
-                      <strong>{{ row.name }}</strong>
-                    </span>
-                  </td>
-                  <td>{{ formatTokens(row.tokens) }}</td>
-                  <td>{{ formatPercent(row.share) }}</td>
-                  <td class="dashboard-spark-column">
-                    <DashboardSparkline :values="row.trend" :color="row.color" />
-                  </td>
-                </tr>
-                <tr v-if="!loadingOverview && modelRows.length === 0">
-                  <td colspan="4" class="dashboard-empty-row">{{ t('dashboard.noDataAvailable') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <RouterLink to="/usage" class="dashboard-table-action">
-            {{ t('dashboard.overview.viewAllModels') }}
-            <Icon name="arrowRight" size="sm" />
-          </RouterLink>
-        </article>
-
-        <article class="dashboard-card dashboard-table-card">
-          <header class="dashboard-table-header">
-            <h2>{{ t('dashboard.overview.platformRanking') }}</h2>
-            <span>{{ t('dashboard.overview.cumulative') }}</span>
-          </header>
-          <div class="dashboard-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t('dashboard.overview.platform') }}</th>
-                  <th>{{ t('dashboard.overview.spend') }}</th>
-                  <th>{{ t('dashboard.tokens') }}</th>
-                  <th>{{ t('dashboard.overview.share') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in platformRows" :key="row.platform">
-                  <td>
-                    <span class="dashboard-entity" :title="platformLabel(row.platform)">
-                      <span class="dashboard-platform-icon" :class="`dashboard-platform-${row.platform}`">
-                        <Icon v-if="row.isOther" name="grid" size="sm" />
-                        <PlatformIcon v-else :platform="asPlatform(row.platform)" size="md" />
-                      </span>
-                      <strong>{{ platformLabel(row.platform) }}</strong>
-                    </span>
-                  </td>
-                  <td>{{ formatCurrency(row.cost) }}</td>
-                  <td>{{ formatTokens(row.tokens) }}</td>
-                  <td>{{ formatPercent(row.share) }}</td>
-                </tr>
-                <tr v-if="!loadingOverview && platformRows.length === 0">
-                  <td colspan="4" class="dashboard-empty-row">{{ t('dashboard.noDataAvailable') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <RouterLink to="/usage" class="dashboard-table-action">
-            {{ t('dashboard.overview.viewAllPlatforms') }}
-            <Icon name="arrowRight" size="sm" />
-          </RouterLink>
-        </article>
-      </section>
     </div>
   </AppLayout>
 </template>
@@ -192,9 +120,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import DashboardDateRangePicker from '@/components/user/dashboard/DashboardDateRangePicker.vue'
-import DashboardSparkline from '@/components/user/dashboard/DashboardSparkline.vue'
+import DashboardUsageCalendar, {
+  type DashboardCalendarPoint
+} from '@/components/user/dashboard/DashboardUsageCalendar.vue'
 import DashboardTrendChart, {
   type DashboardTrendSeries
 } from '@/components/user/dashboard/DashboardTrendChart.vue'
@@ -203,7 +132,6 @@ import { keysAPI } from '@/api/keys'
 import { maskQuickStartKey } from '@/utils/quickstart'
 import type {
   ApiKey,
-  GroupPlatform,
   ModelStat,
   TrendDataPoint,
   UsageStatsResponse
@@ -232,22 +160,6 @@ interface MetricDetail {
   value: string
 }
 
-interface ModelRow {
-  name: string
-  tokens: number
-  share: number
-  color: string
-  trend: number[]
-}
-
-interface PlatformRow {
-  platform: string
-  cost: number
-  tokens: number
-  share: number
-  isOther?: boolean
-}
-
 const MODEL_COLOR_PALETTE = [
   '#22a06b',
   '#3b82f6',
@@ -263,10 +175,9 @@ const MODEL_COLOR_PALETTE = [
   '#729b24'
 ]
 const MAX_CHART_MODEL_SERIES = 8
-const MODEL_TABLE_ROW_COUNT = 3
 const API_KEY_COLOR = '#22a06b'
-const OTHER_COLOR = '#9ca3af'
 const DAY_MS = 86_400_000
+const CALENDAR_DAY_COUNT = 365
 
 const { t, locale } = useI18n()
 const endDate = ref(formatDateLocalInput(new Date()))
@@ -282,11 +193,13 @@ const modelStats = ref<ModelStat[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const chartLabels = ref<string[]>([])
 const chartSeries = ref<DashboardTrendSeries[]>([])
-const modelTrendCache = ref<Record<string, number[]>>({})
+const calendarData = ref<DashboardCalendarPoint[]>([])
 const loadingOverview = ref(true)
 const loadingChart = ref(true)
+const loadingCalendar = ref(true)
 const errorMessage = ref('')
 let chartRequestID = 0
+let calendarRequestID = 0
 
 const numberLocale = computed(() => (locale.value.startsWith('zh') ? 'zh-CN' : 'en-US'))
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -309,7 +222,8 @@ const previousRange = computed(() => {
   return { start: addDays(end, -(days - 1)), end }
 })
 
-const selectedRangeLabel = computed(() => `${startDate.value} ～ ${endDate.value}`)
+const calendarStartDate = computed(() => addDays(endDate.value, -(CALENDAR_DAY_COUNT - 1)))
+const calendarEndDate = computed(() => endDate.value)
 const chartScopeLabel = computed(() => {
   if (granularity.value === 'hour') {
     return t('dashboard.overview.hourlyScope', { date: endDate.value })
@@ -344,8 +258,6 @@ const formatDuration = (value: number): string => {
   if (value < 1000) return `${Math.round(value)}ms`
   return `${(value / 1000).toFixed(2)}s`
 }
-
-const formatPercent = (value: number): string => `${(value || 0).toFixed(1)}%`
 
 const apiKeyLabel = (key: ApiKey): string => `${key.name} · ${maskQuickStartKey(key.key)}`
 
@@ -486,73 +398,6 @@ const visibleModelColors = computed<Record<string, string>>(() => {
   return colors
 })
 
-const modelRows = computed<ModelRow[]>(() => {
-  const totalTokens = sortedModels.value.reduce((sum, item) => sum + item.total_tokens, 0)
-  const topModels = sortedModels.value.slice(0, MODEL_TABLE_ROW_COUNT)
-  const rows = topModels.map((item) => ({
-    name: item.model,
-    tokens: item.total_tokens,
-    share: totalTokens ? (item.total_tokens / totalTokens) * 100 : 0,
-    color: visibleModelColors.value[item.model] || MODEL_COLOR_PALETTE[0],
-    trend: modelTrendCache.value[item.model] || []
-  }))
-  const others = sortedModels.value.slice(MODEL_TABLE_ROW_COUNT)
-  if (others.length) {
-    const otherTokens = others.reduce((sum, item) => sum + item.total_tokens, 0)
-    rows.push({
-      name: t('dashboard.overview.otherModels'),
-      tokens: otherTokens,
-      share: totalTokens ? (otherTokens / totalTokens) * 100 : 0,
-      color: OTHER_COLOR,
-      trend: modelTrendCache.value.__other__ || []
-    })
-  }
-  return rows
-})
-
-const platformRows = computed<PlatformRow[]>(() => {
-  const items = [...(dashboardStats.value?.by_platform || [])].sort(
-    (left, right) => right.total_actual_cost - left.total_actual_cost
-  )
-  const totalCost = dashboardStats.value?.total_actual_cost || 0
-  const rows: PlatformRow[] = items.slice(0, 3).map((item) => ({
-    platform: item.platform,
-    cost: item.total_actual_cost,
-    tokens: item.total_tokens,
-    share: totalCost ? (item.total_actual_cost / totalCost) * 100 : 0
-  }))
-  const others = items.slice(3)
-  const listedCost = items.reduce((sum, item) => sum + item.total_actual_cost, 0)
-  const unassignedCost = Math.max(0, totalCost - listedCost)
-  if (others.length || unassignedCost > 0.0001) {
-    const otherCost = others.reduce((sum, item) => sum + item.total_actual_cost, unassignedCost)
-    const otherTokens = others.reduce((sum, item) => sum + item.total_tokens, 0)
-    rows.push({
-      platform: '__other__',
-      cost: otherCost,
-      tokens: otherTokens,
-      share: totalCost ? (otherCost / totalCost) * 100 : 0,
-      isOther: true
-    })
-  }
-  return rows
-})
-
-const platformLabel = (platform: string): string => {
-  const labels: Record<string, string> = {
-    openai: 'OpenAI',
-    anthropic: 'Claude',
-    grok: 'Grok',
-    gemini: 'Gemini',
-    antigravity: 'Antigravity',
-    composite: t('dashboard.overview.compositePlatform'),
-    __other__: t('dashboard.overview.otherPlatforms')
-  }
-  return labels[platform] || platform
-}
-
-const asPlatform = (platform: string): GroupPlatform => platform as GroupPlatform
-
 const buildBucketKeys = (): string[] => {
   if (granularity.value === 'hour') {
     return Array.from({ length: 24 }, (_, hour) => `${endDate.value} ${String(hour).padStart(2, '0')}:00`)
@@ -596,35 +441,46 @@ const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
       color: MODEL_COLOR_PALETTE[0],
       values
     }]
-    modelTrendCache.value = {}
     return
   }
 
-  const responses = await Promise.all([
-    ...models.map((model) => usageAPI.getDashboardTrend(trendParams({ model: model.model }))),
-    usageAPI.getDashboardTrend(trendParams())
-  ])
+  const responses = await Promise.all(
+    models.map((model) => usageAPI.getDashboardTrend(trendParams({ model: model.model })))
+  )
   if (requestID !== chartRequestID) return
 
   const modelValues = responses.slice(0, models.length).map((response) =>
     normalizeTrend(response.trend || [], buckets)
   )
-  const totalValues = normalizeTrend(responses[responses.length - 1].trend || [], buckets)
   chartSeries.value = models.map((model, index) => ({
     label: model.model,
     color: visibleModelColors.value[model.model] || MODEL_COLOR_PALETTE[index],
     values: modelValues[index]
   }))
+}
 
-  const cache: Record<string, number[]> = {}
-  models.forEach((model, index) => {
-    cache[model.model] = modelValues[index]
-  })
-  const tableModelValues = modelValues.slice(0, MODEL_TABLE_ROW_COUNT)
-  cache.__other__ = totalValues.map((value, index) =>
-    Math.max(0, value - tableModelValues.reduce((sum, points) => sum + (points[index] || 0), 0))
-  )
-  modelTrendCache.value = cache
+const loadCalendarUsage = async () => {
+  const requestID = ++calendarRequestID
+  loadingCalendar.value = true
+  try {
+    const response = await usageAPI.getDashboardTrend({
+      start_date: calendarStartDate.value,
+      end_date: calendarEndDate.value,
+      granularity: 'day',
+      timezone: browserTimezone
+    })
+    if (requestID !== calendarRequestID) return
+    calendarData.value = (response.trend || []).map((point) => ({
+      day: point.date,
+      value: point.total_tokens
+    }))
+  } catch (error) {
+    if (requestID !== calendarRequestID) return
+    console.error('Failed to load dashboard calendar:', error)
+    calendarData.value = []
+  } finally {
+    if (requestID === calendarRequestID) loadingCalendar.value = false
+  }
 }
 
 const loadApiKeyTrendSeries = async (requestID: number, buckets: string[]) => {
@@ -664,7 +520,6 @@ const loadTrendSeries = async () => {
 const refreshDashboard = async () => {
   loadingOverview.value = true
   errorMessage.value = ''
-  modelTrendCache.value = {}
   try {
     const [dashboard, current, previous, models, keys] = await Promise.all([
       usageAPI.getDashboardStats(),
@@ -688,7 +543,7 @@ const refreshDashboard = async () => {
   } finally {
     loadingOverview.value = false
   }
-  await loadTrendSeries()
+  await Promise.all([loadTrendSeries(), loadCalendarUsage()])
 }
 
 const setGranularity = async (value: Granularity) => {
@@ -715,9 +570,6 @@ onMounted(refreshDashboard)
   --dashboard-surface-subtle: #f7f8f9;
   --dashboard-surface-active: #fff;
   --dashboard-divider: #eff1f3;
-  --dashboard-body-text: #4f5660;
-  --dashboard-strong-text: #30343a;
-  --dashboard-icon-surface: #f3f4f6;
   --dashboard-skeleton: #f0f1f3;
   display: grid;
   gap: 20px;
@@ -884,9 +736,23 @@ onMounted(refreshDashboard)
   margin-top: 8px;
 }
 
+.dashboard-calendar-card,
 .dashboard-trend-card {
   min-width: 0;
   padding: 22px 24px 24px;
+}
+
+.dashboard-calendar-card {
+  overflow: hidden;
+  padding-bottom: 12px;
+}
+
+.dashboard-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
 }
 
 .dashboard-chart-header {
@@ -909,7 +775,7 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-title-row h2,
-.dashboard-table-header h2 {
+.dashboard-calendar-header h2 {
   color: var(--dashboard-text);
   font-size: 15px;
   font-weight: 650;
@@ -922,7 +788,7 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-chart-scope,
-.dashboard-table-header span {
+.dashboard-calendar-header span {
   color: var(--dashboard-subtle);
   font-size: 12px;
 }
@@ -951,8 +817,7 @@ onMounted(refreshDashboard)
   font-size: 12px;
 }
 
-.dashboard-legend i,
-.dashboard-entity > i {
+.dashboard-legend i {
   flex: 0 0 auto;
   width: 7px;
   height: 7px;
@@ -1046,145 +911,6 @@ onMounted(refreshDashboard)
   width: 230px;
 }
 
-.dashboard-table-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-
-.dashboard-table-card {
-  display: flex;
-  min-width: 0;
-  min-height: 330px;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dashboard-table-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 20px 22px 10px;
-}
-
-.dashboard-table-header span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  padding: 0 22px;
-}
-
-.dashboard-table-wrap table {
-  width: 100%;
-  min-width: 500px;
-  border-collapse: collapse;
-}
-
-.dashboard-table-wrap th {
-  height: 42px;
-  color: #858c96;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: right;
-}
-
-.dashboard-table-wrap th:first-child,
-.dashboard-table-wrap td:first-child {
-  text-align: left;
-}
-
-.dashboard-table-wrap td {
-  height: 51px;
-  border-top: 1px solid var(--dashboard-divider);
-  color: var(--dashboard-body-text);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.dashboard-entity {
-  display: inline-flex;
-  max-width: 210px;
-  align-items: center;
-  gap: 9px;
-  vertical-align: middle;
-}
-
-.dashboard-entity strong {
-  overflow: hidden;
-  color: var(--dashboard-strong-text);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-platform-icon {
-  display: grid;
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 7px;
-  background: var(--dashboard-icon-surface);
-  color: #32363c;
-}
-
-.dashboard-platform-anthropic {
-  background: #fff1e8;
-  color: #d97738;
-}
-
-.dashboard-platform-gemini {
-  background: #edf4ff;
-  color: #3478ce;
-}
-
-.dashboard-platform-antigravity {
-  background: #edf8f5;
-  color: #237d69;
-}
-
-.dashboard-platform-__other__ {
-  color: #7b828c;
-}
-
-.dashboard-spark-column {
-  width: 98px;
-}
-
-.dashboard-spark-column svg {
-  margin-left: auto;
-}
-
-.dashboard-empty-row {
-  height: 112px !important;
-  color: var(--dashboard-subtle) !important;
-  text-align: center !important;
-}
-
-.dashboard-table-action {
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  gap: 6px;
-  margin: auto 0 16px;
-  padding-top: 12px;
-  color: #5d6570;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.dashboard-table-action:hover {
-  color: #111318;
-}
-
 @keyframes dashboard-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
@@ -1199,9 +925,6 @@ onMounted(refreshDashboard)
   --dashboard-surface-subtle: #172130;
   --dashboard-surface-active: #263142;
   --dashboard-divider: #283342;
-  --dashboard-body-text: #b5bdc8;
-  --dashboard-strong-text: #e5e7eb;
-  --dashboard-icon-surface: #263142;
   --dashboard-skeleton: #263142;
   color-scheme: dark;
 }
@@ -1235,33 +958,10 @@ onMounted(refreshDashboard)
   border-color: var(--dashboard-divider);
 }
 
-:global(html.dark .dashboard-table-action:hover) {
-  color: #f9fafb;
-}
-
 :global(html.dark .dashboard-error) {
   border-color: #7f1d1d;
   background: #2b171b;
   color: #fca5a5;
-}
-
-:global(html.dark .dashboard-platform-icon) {
-  color: #d1d5db;
-}
-
-:global(html.dark .dashboard-platform-anthropic) {
-  background: #34251e;
-  color: #f29d65;
-}
-
-:global(html.dark .dashboard-platform-gemini) {
-  background: #1d2d43;
-  color: #76a9fa;
-}
-
-:global(html.dark .dashboard-platform-antigravity) {
-  background: #18332e;
-  color: #5eead4;
 }
 
 @media (max-width: 1180px) {
@@ -1279,12 +979,6 @@ onMounted(refreshDashboard)
   }
 }
 
-@media (max-width: 900px) {
-  .dashboard-table-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 640px) {
   .dashboard-page {
     gap: 16px;
@@ -1299,6 +993,7 @@ onMounted(refreshDashboard)
     height: 154px;
   }
 
+  .dashboard-calendar-card,
   .dashboard-trend-card {
     padding: 18px 14px 18px;
   }
@@ -1319,10 +1014,10 @@ onMounted(refreshDashboard)
     grid-column: 1 / -1;
   }
 
-  .dashboard-table-header,
-  .dashboard-table-wrap {
-    padding-left: 16px;
-    padding-right: 16px;
+  .dashboard-calendar-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 }
 </style>

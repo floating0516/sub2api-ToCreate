@@ -148,15 +148,6 @@ const chartOption = computed<EChartsOption>(() => {
       type: 'value',
       min: 0,
       splitNumber: 6,
-      name: 'Token',
-      nameLocation: 'end',
-      nameGap: 14,
-      nameTextStyle: {
-        color: axisColor,
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: 11,
-        align: 'right'
-      },
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
@@ -183,7 +174,7 @@ const chartOption = computed<EChartsOption>(() => {
       showSymbol: showSymbols,
       symbol: 'circle',
       symbolSize: 5,
-      smooth: 0.12,
+      smooth: 0.32,
       smoothMonotone: 'x',
       connectNulls: true,
       clip: true,
@@ -217,7 +208,7 @@ const chartOption = computed<EChartsOption>(() => {
         }
       },
       tooltip: {
-        valueFormatter: (value: unknown) => `${formatTokens(Number(value))} Token`
+        valueFormatter: (value: unknown) => formatTokens(Number(value))
       }
     }))
   }
