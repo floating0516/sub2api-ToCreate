@@ -766,6 +766,8 @@ onMounted(refreshDashboard)
 
 .dashboard-chart-heading {
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .dashboard-title-row {
@@ -802,13 +804,21 @@ onMounted(refreshDashboard)
 .dashboard-legend {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px 18px;
   margin-top: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.dashboard-legend::-webkit-scrollbar {
+  display: none;
 }
 
 .dashboard-legend span {
   display: flex;
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 220px;
   align-items: center;
@@ -962,6 +972,95 @@ onMounted(refreshDashboard)
   border-color: #7f1d1d;
   background: #2b171b;
   color: #fca5a5;
+}
+
+@media (min-width: 1181px) and (max-height: 1050px) {
+  .dashboard-page {
+    gap: 14px;
+    margin-block: -8px;
+  }
+
+  .dashboard-toolbar {
+    min-height: 40px;
+  }
+
+  .dashboard-metric-grid {
+    gap: 14px;
+  }
+
+  .dashboard-metric-card {
+    height: 148px;
+    padding: 14px 18px 12px;
+  }
+
+  .dashboard-metric-details {
+    padding-top: 7px;
+  }
+
+  .dashboard-calendar-card {
+    padding: 16px 20px 9px;
+  }
+
+  .dashboard-trend-card {
+    padding: 16px 20px 18px;
+  }
+
+  .dashboard-chart-header {
+    margin-bottom: 12px;
+  }
+
+  .dashboard-legend {
+    margin-top: 8px;
+  }
+
+  .dashboard-segmented,
+  .dashboard-select-shell {
+    height: 36px;
+  }
+
+  .dashboard-segmented button {
+    height: 28px;
+  }
+
+  .dashboard-select-shell > svg {
+    top: 10px;
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 940px) {
+  .dashboard-page {
+    gap: 12px;
+    margin-block: -12px;
+  }
+
+  .dashboard-toolbar {
+    min-height: 38px;
+  }
+
+  .dashboard-metric-grid {
+    gap: 12px;
+  }
+
+  .dashboard-metric-card {
+    height: 144px;
+    padding: 13px 16px 10px;
+  }
+
+  .dashboard-calendar-card {
+    padding: 14px 18px 8px;
+  }
+
+  .dashboard-trend-card {
+    padding: 14px 18px 16px;
+  }
+
+  .dashboard-chart-header {
+    margin-bottom: 10px;
+  }
+
+  .dashboard-legend {
+    margin-top: 6px;
+  }
 }
 
 @media (max-width: 1180px) {

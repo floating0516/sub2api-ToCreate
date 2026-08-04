@@ -122,9 +122,9 @@ const chartOption = computed<EChartsOption>(() => {
       inRange: { color: colors }
     },
     calendar: {
-      top: 28,
+      top: 20,
       right: 12,
-      bottom: 42,
+      bottom: 24,
       left: 34,
       range: [props.startDate, props.endDate],
       cellSize: ['auto', 14],
@@ -139,13 +139,13 @@ const chartOption = computed<EChartsOption>(() => {
         nameMap: locale.value.startsWith('zh') ? 'ZH' : 'EN',
         color: text,
         fontSize: 10,
-        margin: 9
+        margin: 8
       },
       monthLabel: {
         nameMap: locale.value.startsWith('zh') ? 'ZH' : 'EN',
         color: text,
         fontSize: 10,
-        margin: 10
+        margin: 8
       },
       yearLabel: { show: false }
     },
@@ -238,6 +238,20 @@ onUnmounted(() => {
 
 :global(html.dark .dashboard-calendar-loading) {
   background: rgb(17 24 39 / 64%);
+}
+
+@media (min-width: 1181px) and (max-height: 1050px) {
+  .dashboard-calendar-stage {
+    height: 154px;
+    min-height: 154px;
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 940px) {
+  .dashboard-calendar-stage {
+    height: 140px;
+    min-height: 140px;
+  }
 }
 
 @media (max-width: 720px) {

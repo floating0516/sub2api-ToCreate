@@ -379,6 +379,18 @@ onUnmounted(() => {
   color: #111827;
 }
 
+@media (min-width: 1181px) and (max-height: 1050px) {
+  .dashboard-date-trigger {
+    height: 40px;
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 940px) {
+  .dashboard-date-trigger {
+    height: 38px;
+  }
+}
+
 @media (max-width: 560px) {
   .dashboard-date-trigger {
     width: min(242px, calc(100vw - 32px));

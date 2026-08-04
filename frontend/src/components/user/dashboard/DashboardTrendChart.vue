@@ -266,6 +266,20 @@ onUnmounted(() => {
   background: rgb(17 24 39 / 64%);
 }
 
+@media (min-width: 1181px) and (max-height: 1050px) {
+  .dashboard-trend-stage {
+    height: 290px;
+    min-height: 290px;
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 940px) {
+  .dashboard-trend-stage {
+    height: 270px;
+    min-height: 270px;
+  }
+}
+
 @media (max-width: 720px) {
   .dashboard-trend-stage {
     height: 300px;
