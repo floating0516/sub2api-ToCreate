@@ -272,6 +272,16 @@ export interface BalanceAddonPurchaseResult {
   balance_after: number
 }
 
+export interface UserPaymentSummary {
+  currency: 'CNY'
+  gross_paid: number
+  refunded: number
+  net_paid: number
+  subscription_paid: number
+  addon_paid: number
+  balance_paid: number
+}
+
 export type CurrencyAmounts = Record<string, number>
 
 export interface DailyPaymentStats {

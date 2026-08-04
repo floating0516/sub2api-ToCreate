@@ -33,6 +33,7 @@ func RegisterPaymentRoutes(
 		authenticated.GET("/checkout-info", paymentHandler.GetCheckoutInfo)
 		authenticated.GET("/plans", paymentHandler.GetPlans)
 		authenticated.GET("/limits", paymentHandler.GetLimits)
+		authenticated.GET("/summary", paymentHandler.GetPaymentSummary)
 		authenticated.POST("/subscriptions/balance-purchase", paymentHandler.PurchaseSubscriptionWithBalance)
 		authenticated.POST("/addons/balance-purchase", paymentHandler.PurchaseAddonWithBalance)
 

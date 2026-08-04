@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -236,6 +237,50 @@ func (h *PaymentHandler) GetLimits(c *gin.Context) {
 		return
 	}
 	response.Success(c, resp)
+}
+
+// GetPaymentSummary returns the current user's real external CNY cash flow.
+// GET /api/v1/payment/summary
+func (h *PaymentHandler) GetPaymentSummary(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
+	if startDate == "" || endDate == "" {
+		response.BadRequest(c, "start_date and end_date are required")
+		return
+	}
+
+	userTZ := c.Query("timezone")
+	startTime, err := timezone.ParseInUserLocation("2006-01-02", startDate, userTZ)
+	if err != nil {
+		response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+		return
+	}
+	endTime, err := timezone.ParseInUserLocation("2006-01-02", endDate, userTZ)
+	if err != nil {
+		response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+		return
+	}
+	if endTime.Before(startTime) {
+		response.BadRequest(c, "end_date must not be before start_date")
+		return
+	}
+
+	summary, err := h.paymentService.GetUserPaymentSummary(
+		c.Request.Context(),
+		subject.UserID,
+		startTime,
+		endTime.AddDate(0, 0, 1),
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, summary)
 }
 
 // CreateOrderRequest is the request body for creating a payment order.

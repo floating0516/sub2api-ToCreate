@@ -15,7 +15,8 @@ import type {
   BalanceSubscriptionPurchaseResult,
   BalanceAddonPurchaseRequest,
   BalanceAddonPurchaseResult,
-  PaymentOrder
+  PaymentOrder,
+  UserPaymentSummary
 } from '@/types/payment'
 import type { BasePaginationResponse } from '@/types'
 
@@ -46,6 +47,12 @@ export const paymentAPI = {
   /** Get payment method limits and fee rates */
   getLimits() {
     return apiClient.get<MethodLimitsResponse>('/payment/limits')
+  },
+
+  /** Get the current user's external CNY payment summary for a date range */
+  async getSummary(params: { start_date: string; end_date: string; timezone?: string }) {
+    const { data } = await apiClient.get<UserPaymentSummary>('/payment/summary', { params })
+    return data
   },
 
   /** Create a new payment order */

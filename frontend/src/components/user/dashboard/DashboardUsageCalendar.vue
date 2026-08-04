@@ -4,7 +4,6 @@
       <header class="dashboard-activity-header">
         <div>
           <h2>{{ t('dashboard.overview.usageSummary') }}</h2>
-          <span>{{ t('dashboard.overview.summaryCaption') }}</span>
         </div>
       </header>
 
@@ -44,7 +43,6 @@
         <header class="dashboard-calendar-panel-header">
           <div class="dashboard-calendar-heading">
             <span>{{ t('dashboard.overview.tokenActivity') }}</span>
-            <small>{{ modeDescription }}</small>
           </div>
 
           <div
@@ -296,12 +294,6 @@ const modeOptions = computed<{ value: ActivityMode; label: string }[]>(() => [
   { value: 'weekly', label: t('dashboard.overview.weeklyHeatmap') },
   { value: 'cumulative', label: t('dashboard.overview.cumulativeHeatmap') }
 ])
-
-const modeDescription = computed(() => {
-  if (activityMode.value === 'weekly') return t('dashboard.overview.weeklyHeatmapDescription')
-  if (activityMode.value === 'cumulative') return t('dashboard.overview.cumulativeHeatmapDescription')
-  return t('dashboard.overview.dailyHeatmapDescription')
-})
 
 const updateCalendarCellSize = () => {
   const stage = calendarStageRef.value
@@ -622,25 +614,25 @@ onUnmounted(() => {
 .dashboard-calendar-modes {
   display: inline-grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(3, minmax(56px, 1fr));
-  gap: 2px;
+  grid-template-columns: repeat(3, minmax(46px, 1fr));
+  gap: 1px;
   border: 1px solid var(--dashboard-divider, #eff1f3);
   border-radius: 8px;
-  padding: 2px;
+  padding: 1px;
   background: var(--dashboard-surface-subtle, #f7f8f9);
 }
 
 .dashboard-calendar-modes button {
-  height: 26px;
+  height: 23px;
   border: 0;
   border-radius: 5px;
-  padding: 0 10px;
+  padding: 0 7px;
   background: transparent;
   color: var(--dashboard-muted, #6b7280);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 550;
-  line-height: 26px;
+  line-height: 23px;
   transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
   white-space: nowrap;
 }
@@ -752,8 +744,8 @@ onUnmounted(() => {
   }
 
   .dashboard-calendar-modes button {
-    height: 24px;
-    line-height: 24px;
+    height: 22px;
+    line-height: 22px;
   }
 }
 

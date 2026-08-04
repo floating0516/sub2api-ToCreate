@@ -12,9 +12,97 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
 // --- Dashboard & Analytics ---
+
+type UserPaymentSummary struct {
+	Currency         string  `json:"currency"`
+	GrossPaid        float64 `json:"gross_paid"`
+	Refunded         float64 `json:"refunded"`
+	NetPaid          float64 `json:"net_paid"`
+	SubscriptionPaid float64 `json:"subscription_paid"`
+	AddonPaid        float64 `json:"addon_paid"`
+	BalancePaid      float64 `json:"balance_paid"`
+}
+
+// GetUserPaymentSummary returns the user's real external CNY cash flow for a
+// half-open time range. Payments are attributed by paid_at and successful
+// refunds by refund_at; balance-wallet purchases are internal transfers and
+// therefore excluded.
+func (s *PaymentService) GetUserPaymentSummary(ctx context.Context, userID int64, startTime, endTime time.Time) (*UserPaymentSummary, error) {
+	result := &UserPaymentSummary{Currency: "CNY"}
+
+	paidOrders, err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.UserIDEQ(userID),
+			paymentorder.PaymentTypeNEQ(PaymentTypeBalanceWallet),
+			paymentorder.PaidAtNotNil(),
+			paymentorder.PaidAtGTE(startTime),
+			paymentorder.PaidAtLT(endTime),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, order := range paidOrders {
+		if PaymentOrderCurrency(order) != result.Currency {
+			continue
+		}
+		result.GrossPaid += order.PayAmount
+		addUserPaymentAmount(result, order.OrderType, order.PayAmount)
+	}
+
+	refundedOrders, err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.UserIDEQ(userID),
+			paymentorder.PaymentTypeNEQ(PaymentTypeBalanceWallet),
+			paymentorder.StatusIn(OrderStatusPartiallyRefunded, OrderStatusRefunded),
+			paymentorder.RefundAtNotNil(),
+			paymentorder.RefundAtGTE(startTime),
+			paymentorder.RefundAtLT(endTime),
+			paymentorder.RefundAmountGT(0),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, order := range refundedOrders {
+		if PaymentOrderCurrency(order) != result.Currency {
+			continue
+		}
+		refundAmount := calculateGatewayRefundAmount(
+			order.Amount,
+			order.PayAmount,
+			order.RefundAmount,
+			result.Currency,
+		)
+		result.Refunded += refundAmount
+		addUserPaymentAmount(result, order.OrderType, -refundAmount)
+	}
+
+	result.GrossPaid = roundAmount(result.GrossPaid)
+	result.Refunded = roundAmount(result.Refunded)
+	result.NetPaid = roundAmount(result.GrossPaid - result.Refunded)
+	result.SubscriptionPaid = roundAmount(result.SubscriptionPaid)
+	result.AddonPaid = roundAmount(result.AddonPaid)
+	result.BalancePaid = roundAmount(result.BalancePaid)
+	return result, nil
+}
+
+func addUserPaymentAmount(summary *UserPaymentSummary, orderType string, amount float64) {
+	switch orderType {
+	case payment.OrderTypeSubscription:
+		summary.SubscriptionPaid += amount
+	case payment.OrderTypeAddon:
+		summary.AddonPaid += amount
+	case payment.OrderTypeBalance:
+		summary.BalancePaid += amount
+	}
+}
 
 func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*DashboardStats, error) {
 	if days <= 0 {

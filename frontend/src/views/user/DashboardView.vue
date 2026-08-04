@@ -125,6 +125,7 @@ import DashboardTrendChart, {
   type DashboardTrendSeries
 } from '@/components/user/dashboard/DashboardTrendChart.vue'
 import { usageAPI, type UserDashboardStats } from '@/api/usage'
+import { paymentAPI } from '@/api/payment'
 import { keysAPI } from '@/api/keys'
 import { maskQuickStartKey } from '@/utils/quickstart'
 import type {
@@ -133,6 +134,7 @@ import type {
   TrendDataPoint,
   UsageStatsResponse
 } from '@/types'
+import type { UserPaymentSummary } from '@/types/payment'
 import { formatDateLocalInput } from '@/utils/format'
 
 type Granularity = 'day' | 'hour'
@@ -186,6 +188,8 @@ const selectedApiKeyID = ref<number | null>(null)
 const dashboardStats = ref<UserDashboardStats | null>(null)
 const rangeStats = ref<UsageStatsResponse | null>(null)
 const previousStats = ref<UsageStatsResponse | null>(null)
+const paymentSummary = ref<UserPaymentSummary | null>(null)
+const previousPaymentSummary = ref<UserPaymentSummary | null>(null)
 const modelStats = ref<ModelStat[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const chartLabels = ref<string[]>([])
@@ -232,6 +236,14 @@ const formatCurrency = (value: number): string =>
   new Intl.NumberFormat(numberLocale.value, {
     style: 'currency',
     currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value || 0)
+
+const formatCNY = (value: number): string =>
+  new Intl.NumberFormat(numberLocale.value, {
+    style: 'currency',
+    currency: 'CNY',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value || 0)
@@ -292,17 +304,27 @@ const metrics = computed<MetricItem[]>(() => {
   return [
     {
       key: 'cost',
-      label: t('dashboard.overview.totalSpend'),
-      value: formatCurrency(current?.total_actual_cost || 0),
-      comparison: compare(current?.total_actual_cost || 0, previous?.total_actual_cost || 0),
+      label: t('dashboard.overview.actualPayment'),
+      value: formatCNY(paymentSummary.value?.net_paid || 0),
+      comparison: compare(
+        paymentSummary.value?.net_paid || 0,
+        previousPaymentSummary.value?.net_paid || 0
+      ),
       details: [
         {
-          label: t('dashboard.overview.standardSpend'),
-          value: formatCurrency(current?.total_cost || 0)
+          label: t('dashboard.overview.apiBilledUsage'),
+          value: formatCurrency(current?.total_actual_cost || 0)
         },
         {
-          label: t('dashboard.overview.dailyAverageSpend'),
-          value: formatCurrency((current?.total_actual_cost || 0) / days)
+          label: t('dashboard.overview.benefitPurchases'),
+          value: formatCNY(
+            (paymentSummary.value?.subscription_paid || 0) +
+            (paymentSummary.value?.addon_paid || 0)
+          )
+        },
+        {
+          label: t('dashboard.overview.balanceRecharges'),
+          value: formatCNY(paymentSummary.value?.balance_paid || 0)
         }
       ]
     },
@@ -518,20 +540,33 @@ const refreshDashboard = async () => {
   loadingOverview.value = true
   errorMessage.value = ''
   try {
-    const [dashboard, current, previous, models, keys] = await Promise.all([
-      usageAPI.getDashboardStats(),
-      usageAPI.getStatsByDateRange(startDate.value, endDate.value),
-      usageAPI.getStatsByDateRange(previousRange.value.start, previousRange.value.end),
-      usageAPI.getDashboardModels({
-        start_date: startDate.value,
-        end_date: endDate.value,
-        timezone: browserTimezone
-      }),
-      keysAPI.list(1, 100)
-    ])
+    const [dashboard, current, previous, currentPayment, previousPayment, models, keys] =
+      await Promise.all([
+        usageAPI.getDashboardStats(),
+        usageAPI.getStatsByDateRange(startDate.value, endDate.value),
+        usageAPI.getStatsByDateRange(previousRange.value.start, previousRange.value.end),
+        paymentAPI.getSummary({
+          start_date: startDate.value,
+          end_date: endDate.value,
+          timezone: browserTimezone
+        }),
+        paymentAPI.getSummary({
+          start_date: previousRange.value.start,
+          end_date: previousRange.value.end,
+          timezone: browserTimezone
+        }),
+        usageAPI.getDashboardModels({
+          start_date: startDate.value,
+          end_date: endDate.value,
+          timezone: browserTimezone
+        }),
+        keysAPI.list(1, 100)
+      ])
     dashboardStats.value = dashboard
     rangeStats.value = current
     previousStats.value = previous
+    paymentSummary.value = currentPayment
+    previousPaymentSummary.value = previousPayment
     modelStats.value = models.models || []
     apiKeys.value = keys.items || []
   } catch (error) {

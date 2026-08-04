@@ -52,6 +52,85 @@ func TestPaymentDashboardStatsExcludeBalanceWalletOrders(t *testing.T) {
 	require.Equal(t, CurrencyAmounts{currency: 20}, got.DailySeries[len(got.DailySeries)-1].Amount)
 }
 
+func TestUserPaymentSummaryUsesExternalCNYNetCashFlow(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentStatsTestClient(t)
+	start := time.Date(2026, time.July, 25, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 0, 7)
+	paidAt := start.Add(12 * time.Hour)
+	refundAt := start.AddDate(0, 0, 2)
+
+	user, err := client.User.Create().
+		SetEmail("user-payment-summary@example.com").
+		SetPasswordHash("hash").
+		SetUsername("user-payment-summary").
+		Save(ctx)
+	require.NoError(t, err)
+
+	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeAlipay, payment.OrderTypeSubscription, "CNY", 100, 120, paidAt, func(order *dbent.PaymentOrderUpdateOne) {
+		order.
+			SetStatus(OrderStatusPartiallyRefunded).
+			SetRefundAmount(50).
+			SetRefundAt(refundAt)
+	})
+	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeWxpay, payment.OrderTypeBalance, "CNY", 50, 50, paidAt, nil)
+	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeAlipay, payment.OrderTypeAddon, "CNY", 20, 20, paidAt, nil)
+	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeStripe, payment.OrderTypeSubscription, "USD", 99, 99, paidAt, nil)
+	createUserPaymentSummaryOrder(t, ctx, client, user, PaymentTypeBalanceWallet, payment.OrderTypeSubscription, "CNY", 88, 88, paidAt, nil)
+
+	svc := &PaymentService{entClient: client}
+	got, err := svc.GetUserPaymentSummary(ctx, user.ID, start, end)
+	require.NoError(t, err)
+	require.Equal(t, &UserPaymentSummary{
+		Currency:         "CNY",
+		GrossPaid:        190,
+		Refunded:         60,
+		NetPaid:          130,
+		SubscriptionPaid: 60,
+		AddonPaid:        20,
+		BalancePaid:      50,
+	}, got)
+}
+
+func createUserPaymentSummaryOrder(
+	t *testing.T,
+	ctx context.Context,
+	client *dbent.Client,
+	user *dbent.User,
+	paymentType, orderType, currency string,
+	amount, payAmount float64,
+	paidAt time.Time,
+	update func(*dbent.PaymentOrderUpdateOne),
+) {
+	t.Helper()
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(amount).
+		SetPayAmount(payAmount).
+		SetFeeRate(0).
+		SetRechargeCode("SUMMARY").
+		SetOutTradeNo("").
+		SetPaymentType(paymentType).
+		SetPaymentTradeNo(paymentType + "-summary-trade").
+		SetProviderSnapshot(map[string]any{"currency": currency}).
+		SetOrderType(orderType).
+		SetStatus(OrderStatusCompleted).
+		SetExpiresAt(paidAt.Add(time.Hour)).
+		SetPaidAt(paidAt).
+		SetCompletedAt(paidAt).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("example.com").
+		Save(ctx)
+	require.NoError(t, err)
+	if update != nil {
+		builder := order.Update()
+		update(builder)
+		require.NoError(t, builder.Exec(ctx))
+	}
+}
+
 func createPaymentStatsOrder(t *testing.T, ctx context.Context, client *dbent.Client, userID int64, email, username, paymentType string, amount float64, paidAt time.Time) {
 	t.Helper()
 
