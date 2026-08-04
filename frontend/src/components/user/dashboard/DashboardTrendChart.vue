@@ -267,11 +267,11 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-:global(html.dark) .dashboard-trend-stage {
+:global(html.dark .dashboard-trend-stage) {
   background: #111827;
 }
 
-:global(html.dark) .dashboard-chart-loading {
+:global(html.dark .dashboard-chart-loading) {
   background: rgb(17 24 39 / 64%);
 }
 

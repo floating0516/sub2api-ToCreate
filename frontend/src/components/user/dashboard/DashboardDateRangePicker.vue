@@ -350,31 +350,31 @@ onUnmounted(() => {
   transform: translateY(-4px);
 }
 
-:global(html.dark) .dashboard-date-trigger,
-:global(html.dark) .dashboard-date-popover,
-:global(html.dark) .dashboard-date-field input {
+:global(html.dark .dashboard-date-trigger),
+:global(html.dark .dashboard-date-popover),
+:global(html.dark .dashboard-date-field input) {
   border-color: #374151;
   color: #d1d5db;
   color-scheme: dark;
 }
 
-:global(html.dark) .dashboard-date-trigger:hover,
-:global(html.dark) .dashboard-date-trigger-open,
-:global(html.dark) .dashboard-date-field input:focus {
+:global(html.dark .dashboard-date-trigger:hover),
+:global(html.dark .dashboard-date-trigger-open),
+:global(html.dark .dashboard-date-field input:focus) {
   border-color: #4b5563;
 }
 
-:global(html.dark) .dashboard-date-preset:hover,
-:global(html.dark) .dashboard-date-cancel:hover {
+:global(html.dark .dashboard-date-preset:hover),
+:global(html.dark .dashboard-date-cancel:hover) {
   color: #f9fafb;
 }
 
-:global(html.dark) .dashboard-date-preset-active {
+:global(html.dark .dashboard-date-preset-active) {
   background: #15352b;
   color: #6ee7b7;
 }
 
-:global(html.dark) .dashboard-date-apply {
+:global(html.dark .dashboard-date-apply) {
   background: #f3f4f6;
   color: #111827;
 }

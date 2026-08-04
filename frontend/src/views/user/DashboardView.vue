@@ -1190,7 +1190,7 @@ onMounted(refreshDashboard)
   50% { opacity: 0.55; }
 }
 
-:global(html.dark) .dashboard-page {
+:global(html.dark .dashboard-page) {
   --dashboard-border: #2d3745;
   --dashboard-text: #f3f4f6;
   --dashboard-muted: #a6adb7;
@@ -1206,60 +1206,60 @@ onMounted(refreshDashboard)
   color-scheme: dark;
 }
 
-:global(html.dark) .dashboard-card {
+:global(html.dark .dashboard-card) {
   border-color: var(--dashboard-border);
   background: var(--dashboard-surface);
   box-shadow: none;
 }
 
-:global(html.dark) .dashboard-segmented {
+:global(html.dark .dashboard-segmented) {
   border-color: #374151;
 }
 
-:global(html.dark) .dashboard-segmented button.active {
+:global(html.dark .dashboard-segmented button.active) {
   color: #f9fafb;
 }
 
-:global(html.dark) .dashboard-select-shell select {
+:global(html.dark .dashboard-select-shell select) {
   border-color: #374151;
   background: var(--dashboard-surface);
   color: #d1d5db;
 }
 
-:global(html.dark) .dashboard-select-shell select:hover,
-:global(html.dark) .dashboard-select-shell select:focus {
+:global(html.dark .dashboard-select-shell select:hover),
+:global(html.dark .dashboard-select-shell select:focus) {
   border-color: #4b5563;
 }
 
-:global(html.dark) .dashboard-chart-scope {
+:global(html.dark .dashboard-chart-scope) {
   border-color: var(--dashboard-divider);
 }
 
-:global(html.dark) .dashboard-table-action:hover {
+:global(html.dark .dashboard-table-action:hover) {
   color: #f9fafb;
 }
 
-:global(html.dark) .dashboard-error {
+:global(html.dark .dashboard-error) {
   border-color: #7f1d1d;
   background: #2b171b;
   color: #fca5a5;
 }
 
-:global(html.dark) .dashboard-platform-icon {
+:global(html.dark .dashboard-platform-icon) {
   color: #d1d5db;
 }
 
-:global(html.dark) .dashboard-platform-anthropic {
+:global(html.dark .dashboard-platform-anthropic) {
   background: #34251e;
   color: #f29d65;
 }
 
-:global(html.dark) .dashboard-platform-gemini {
+:global(html.dark .dashboard-platform-gemini) {
   background: #1d2d43;
   color: #76a9fa;
 }
 
-:global(html.dark) .dashboard-platform-antigravity {
+:global(html.dark .dashboard-platform-antigravity) {
   background: #18332e;
   color: #5eead4;
 }
