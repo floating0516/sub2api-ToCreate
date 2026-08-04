@@ -80,6 +80,7 @@ export default {
       trendInfo: 'Shows real Token usage at the selected time granularity',
       dailyTokenUsage: 'Daily Token Usage',
       recentYear: 'Past year',
+      dailyDistribution: 'Daily usage distribution',
       usageSummary: 'Token usage summary',
       yearlyTotal: 'Past year total',
       activeDaysValue: '{active} / {total} active days',

@@ -39,10 +39,6 @@
       </section>
 
       <section class="dashboard-card dashboard-calendar-card">
-        <header class="dashboard-calendar-header">
-          <h2>{{ t('dashboard.overview.dailyTokenUsage') }}</h2>
-          <span>{{ t('dashboard.overview.recentYear') }}</span>
-        </header>
         <DashboardUsageCalendar
           :data="calendarData"
           :start-date="calendarStartDate"
@@ -747,14 +743,6 @@ onMounted(refreshDashboard)
   padding-bottom: 12px;
 }
 
-.dashboard-calendar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 2px;
-}
-
 .dashboard-chart-header {
   display: flex;
   min-width: 0;
@@ -776,8 +764,7 @@ onMounted(refreshDashboard)
   gap: 7px;
 }
 
-.dashboard-title-row h2,
-.dashboard-calendar-header h2 {
+.dashboard-title-row h2 {
   color: var(--dashboard-text);
   font-size: 15px;
   font-weight: 650;
@@ -789,8 +776,7 @@ onMounted(refreshDashboard)
   color: #a1a7b0;
 }
 
-.dashboard-chart-scope,
-.dashboard-calendar-header span {
+.dashboard-chart-scope {
   color: var(--dashboard-subtle);
   font-size: 12px;
 }
@@ -1111,12 +1097,6 @@ onMounted(refreshDashboard)
 
   .dashboard-key-select {
     grid-column: 1 / -1;
-  }
-
-  .dashboard-calendar-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
   }
 }
 </style>

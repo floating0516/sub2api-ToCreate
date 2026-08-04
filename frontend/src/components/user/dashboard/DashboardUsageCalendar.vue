@@ -1,6 +1,11 @@
 <template>
   <div class="dashboard-activity-layout">
     <aside class="dashboard-activity-summary" :aria-label="t('dashboard.overview.usageSummary')">
+      <header class="dashboard-activity-header">
+        <h2>{{ t('dashboard.overview.dailyTokenUsage') }}</h2>
+        <span>{{ t('dashboard.overview.recentYear') }}</span>
+      </header>
+
       <div class="dashboard-activity-primary">
         <span>{{ t('dashboard.overview.yearlyTotal') }}</span>
         <strong v-if="!loading">{{ formatValue(summary.total) }}</strong>
@@ -36,23 +41,29 @@
     </aside>
 
     <div class="dashboard-calendar-panel">
-      <div class="dashboard-calendar-stage">
-        <div v-if="loading" class="dashboard-calendar-loading">
-          <LoadingSpinner size="md" />
-        </div>
-        <VChart
-          class="dashboard-calendar-chart"
-          :option="chartOption"
-          :update-options="updateOptions"
-          :autoresize="{ throttle: 80 }"
-        />
-        <div v-if="!loading && !hasData" class="dashboard-calendar-empty">
-          {{ t('dashboard.noDataAvailable') }}
-        </div>
-        <div class="dashboard-calendar-legend" aria-hidden="true">
-          <span>{{ t('dashboard.overview.lessUsage') }}</span>
-          <i v-for="color in legendColors" :key="color" :style="{ backgroundColor: color }" />
-          <span>{{ t('dashboard.overview.moreUsage') }}</span>
+      <div class="dashboard-calendar-panel-inner">
+        <header class="dashboard-calendar-panel-header">
+          <span>{{ t('dashboard.overview.dailyDistribution') }}</span>
+          <div class="dashboard-calendar-legend" aria-hidden="true">
+            <span>{{ t('dashboard.overview.lessUsage') }}</span>
+            <i v-for="color in legendColors" :key="color" :style="{ backgroundColor: color }" />
+            <span>{{ t('dashboard.overview.moreUsage') }}</span>
+          </div>
+        </header>
+
+        <div ref="calendarStageRef" class="dashboard-calendar-stage">
+          <div v-if="loading" class="dashboard-calendar-loading">
+            <LoadingSpinner size="md" />
+          </div>
+          <VChart
+            class="dashboard-calendar-chart"
+            :option="chartOption"
+            :update-options="updateOptions"
+            :autoresize="{ throttle: 80 }"
+          />
+          <div v-if="!loading && !hasData" class="dashboard-calendar-empty">
+            {{ t('dashboard.noDataAvailable') }}
+          </div>
         </div>
       </div>
     </div>
@@ -98,11 +109,14 @@ const props = defineProps<{
 
 const { t, locale } = useI18n()
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const calendarStageRef = ref<HTMLElement | null>(null)
+const calendarCellSize = ref(14)
 const updateOptions = { notMerge: false, lazyUpdate: false }
 const lightColors = ['#e8f5ee', '#bfe7cf', '#80cfa4', '#43b67d', '#168a58']
 const darkColors = ['#173329', '#1d4b38', '#236747', '#2d875a', '#42b875']
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 let themeObserver: MutationObserver | null = null
+let calendarResizeObserver: ResizeObserver | null = null
 
 const parseDay = (day: string): number => {
   const [year, month, date] = day.split('-').map(Number)
@@ -217,6 +231,15 @@ const summaryStats = computed(() => [
   }
 ])
 
+const updateCalendarCellSize = () => {
+  const stage = calendarStageRef.value
+  if (!stage) return
+  const widthSize = Math.floor((stage.clientWidth - 48) / 53)
+  const heightSize = Math.floor((stage.clientHeight - 22) / 7)
+  const nextSize = Math.max(14, Math.min(18, widthSize, heightSize))
+  if (nextSize !== calendarCellSize.value) calendarCellSize.value = nextSize
+}
+
 const chartOption = computed<EChartsOption>(() => {
   const dark = isDark.value
   const colors = dark ? darkColors : lightColors
@@ -265,15 +288,15 @@ const chartOption = computed<EChartsOption>(() => {
     },
     calendar: {
       top: 20,
-      bottom: 24,
       left: 'center',
       range: [props.startDate, props.endDate],
-      cellSize: [13, 13],
+      cellSize: [calendarCellSize.value, calendarCellSize.value],
       splitLine: { show: false },
       itemStyle: {
         color: empty,
         borderColor: surface,
-        borderWidth: 3
+        borderWidth: 1.5,
+        borderRadius: 3
       },
       dayLabel: {
         firstDay: 1,
@@ -297,12 +320,14 @@ const chartOption = computed<EChartsOption>(() => {
       data: values.map(([day, value]) => [day, value]),
       itemStyle: {
         borderColor: surface,
-        borderWidth: 2
+        borderWidth: 1.5,
+        borderRadius: 3
       },
       emphasis: {
         itemStyle: {
           borderColor: dark ? '#d1d5db' : '#374151',
           borderWidth: 1,
+          borderRadius: 3,
           shadowBlur: 7,
           shadowColor: 'rgba(17, 24, 39, 0.18)'
         }
@@ -316,20 +341,25 @@ onMounted(() => {
     isDark.value = document.documentElement.classList.contains('dark')
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+  calendarResizeObserver = new ResizeObserver(updateCalendarCellSize)
+  if (calendarStageRef.value) calendarResizeObserver.observe(calendarStageRef.value)
+  requestAnimationFrame(updateCalendarCellSize)
 })
 
 onUnmounted(() => {
   themeObserver?.disconnect()
+  calendarResizeObserver?.disconnect()
 })
 </script>
 
 <style scoped>
 .dashboard-activity-layout {
   display: grid;
-  height: 184px;
-  min-height: 184px;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
+  height: 208px;
+  min-height: 208px;
+  grid-template-columns: 252px minmax(0, 1fr);
+  gap: 22px;
 }
 
 .dashboard-activity-summary {
@@ -338,7 +368,38 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--dashboard-divider, #eff1f3);
-  padding-right: 20px;
+  padding-right: 22px;
+}
+
+.dashboard-activity-header,
+.dashboard-calendar-panel-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-activity-header {
+  margin-bottom: 10px;
+}
+
+.dashboard-activity-header h2 {
+  overflow: hidden;
+  color: var(--dashboard-text, #111318);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-activity-header span,
+.dashboard-calendar-panel-header > span {
+  flex: 0 0 auto;
+  color: var(--dashboard-subtle, #9ca3af);
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .dashboard-activity-primary {
@@ -469,11 +530,23 @@ onUnmounted(() => {
   scrollbar-width: thin;
 }
 
+.dashboard-calendar-panel-inner {
+  display: grid;
+  width: 100%;
+  min-width: 800px;
+  height: 208px;
+  grid-template-rows: 22px minmax(0, 1fr);
+  gap: 0;
+}
+
+.dashboard-calendar-panel-header {
+  padding: 0 8px 0 14px;
+}
+
 .dashboard-calendar-stage {
   position: relative;
-  height: 184px;
-  min-height: 184px;
-  min-width: 760px;
+  min-width: 0;
+  min-height: 0;
   background: var(--dashboard-surface, #fff);
 }
 
@@ -503,10 +576,8 @@ onUnmounted(() => {
 }
 
 .dashboard-calendar-legend {
-  position: absolute;
-  right: 12px;
-  bottom: 7px;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 5px;
   color: var(--dashboard-subtle, #9ca3af);
@@ -514,9 +585,9 @@ onUnmounted(() => {
 }
 
 .dashboard-calendar-legend i {
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }
 
 :global(html.dark .dashboard-calendar-stage) {
@@ -534,8 +605,12 @@ onUnmounted(() => {
 
 @media (min-width: 1181px) and (max-height: 1050px) {
   .dashboard-activity-layout {
-    height: 154px;
-    min-height: 154px;
+    height: 178px;
+    min-height: 178px;
+  }
+
+  .dashboard-activity-header {
+    margin-bottom: 6px;
   }
 
   .dashboard-activity-primary strong {
@@ -558,16 +633,19 @@ onUnmounted(() => {
     padding-top: 4px;
   }
 
-  .dashboard-calendar-stage {
-    height: 154px;
-    min-height: 154px;
+  .dashboard-calendar-panel-inner {
+    height: 178px;
   }
 }
 
 @media (min-width: 1181px) and (max-height: 940px) {
   .dashboard-activity-layout {
-    height: 140px;
-    min-height: 140px;
+    height: 164px;
+    min-height: 164px;
+  }
+
+  .dashboard-activity-header {
+    margin-bottom: 4px;
   }
 
   .dashboard-activity-primary strong {
@@ -588,9 +666,8 @@ onUnmounted(() => {
     padding-top: 3px;
   }
 
-  .dashboard-calendar-stage {
-    height: 140px;
-    min-height: 140px;
+  .dashboard-calendar-panel-inner {
+    height: 164px;
   }
 }
 
@@ -609,6 +686,11 @@ onUnmounted(() => {
     border-right: 0;
     border-bottom: 1px solid var(--dashboard-divider, #eff1f3);
     padding: 0 0 12px;
+  }
+
+  .dashboard-activity-header {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
   }
 
   .dashboard-activity-stats {
@@ -631,9 +713,8 @@ onUnmounted(() => {
     grid-column: auto;
   }
 
-  .dashboard-calendar-stage {
-    height: 170px;
-    min-height: 170px;
+  .dashboard-calendar-panel-inner {
+    height: 192px;
   }
 }
 </style>

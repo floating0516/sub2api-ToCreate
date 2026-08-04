@@ -80,6 +80,7 @@ export default {
       trendInfo: '按所选时间粒度展示真实 Token 使用量',
       dailyTokenUsage: '每日 Token 用量',
       recentYear: '最近一年',
+      dailyDistribution: '每日使用分布',
       usageSummary: 'Token 用量摘要',
       yearlyTotal: '近一年累计',
       activeDaysValue: '活跃 {active} / {total} 天',
