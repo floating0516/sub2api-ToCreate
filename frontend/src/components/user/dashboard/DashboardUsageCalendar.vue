@@ -2,52 +2,66 @@
   <div class="dashboard-activity-layout">
     <aside class="dashboard-activity-summary" :aria-label="t('dashboard.overview.usageSummary')">
       <header class="dashboard-activity-header">
-        <h2>{{ t('dashboard.overview.dailyTokenUsage') }}</h2>
-        <span>{{ t('dashboard.overview.recentYear') }}</span>
+        <div>
+          <h2>{{ t('dashboard.overview.usageSummary') }}</h2>
+          <span>{{ t('dashboard.overview.summaryCaption') }}</span>
+        </div>
       </header>
 
-      <div class="dashboard-activity-primary">
-        <span>{{ t('dashboard.overview.yearlyTotal') }}</span>
-        <strong v-if="!loading">{{ formatValue(summary.total) }}</strong>
-        <i v-else class="dashboard-activity-skeleton dashboard-activity-skeleton-primary" />
-        <small v-if="!loading">
-          {{
-            t('dashboard.overview.activeDaysValue', {
-              active: summary.activeDays,
-              total: summary.windowDays
-            })
-          }}
-        </small>
-        <i v-else class="dashboard-activity-skeleton dashboard-activity-skeleton-meta" />
-      </div>
-
-      <dl class="dashboard-activity-stats">
-        <div v-for="item in summaryStats" :key="item.key">
+      <dl class="dashboard-token-summary">
+        <div v-for="item in summaryMetrics" :key="item.key">
           <dt>{{ item.label }}</dt>
-          <dd v-if="!loading">{{ item.value }}</dd>
-          <dd v-else><i class="dashboard-activity-skeleton dashboard-activity-skeleton-value" /></dd>
+          <dd v-if="!loading">
+            <strong>{{ item.value }}</strong>
+            <small>{{ item.caption }}</small>
+          </dd>
+          <dd v-else>
+            <i class="dashboard-activity-skeleton dashboard-activity-skeleton-value" />
+            <i class="dashboard-activity-skeleton dashboard-activity-skeleton-meta" />
+          </dd>
         </div>
       </dl>
 
-      <div class="dashboard-activity-peak">
-        <span>{{ t('dashboard.overview.peakDay') }}</span>
-        <template v-if="!loading && summary.peakDay">
-          <b>{{ formatDay(summary.peakDay) }}</b>
-          <strong>{{ formatValue(summary.peakValue) }}</strong>
-        </template>
-        <span v-else-if="!loading" class="dashboard-activity-peak-empty">--</span>
-        <i v-else class="dashboard-activity-skeleton dashboard-activity-skeleton-peak" />
+      <div class="dashboard-activity-insights">
+        <span>
+          {{ t('dashboard.overview.activeDays') }}
+          <b v-if="!loading">{{ summary.activeDays }}</b>
+          <i v-else class="dashboard-activity-skeleton dashboard-activity-skeleton-inline" />
+        </span>
+        <span>
+          {{ t('dashboard.overview.peakDay') }}
+          <b v-if="!loading && summary.peakDay">
+            {{ formatDay(summary.peakDay) }} · {{ formatValue(summary.peakValue) }}
+          </b>
+          <b v-else-if="!loading">--</b>
+          <i v-else class="dashboard-activity-skeleton dashboard-activity-skeleton-inline" />
+        </span>
       </div>
     </aside>
 
     <div class="dashboard-calendar-panel">
       <div class="dashboard-calendar-panel-inner">
         <header class="dashboard-calendar-panel-header">
-          <span>{{ t('dashboard.overview.dailyDistribution') }}</span>
-          <div class="dashboard-calendar-legend" aria-hidden="true">
-            <span>{{ t('dashboard.overview.lessUsage') }}</span>
-            <i v-for="color in legendColors" :key="color" :style="{ backgroundColor: color }" />
-            <span>{{ t('dashboard.overview.moreUsage') }}</span>
+          <div class="dashboard-calendar-heading">
+            <span>{{ t('dashboard.overview.tokenActivity') }}</span>
+            <small>{{ modeDescription }}</small>
+          </div>
+
+          <div
+            class="dashboard-calendar-modes"
+            role="group"
+            :aria-label="t('dashboard.overview.heatmapGranularity')"
+          >
+            <button
+              v-for="item in modeOptions"
+              :key="item.value"
+              type="button"
+              :class="activityMode === item.value && 'active'"
+              :aria-pressed="activityMode === item.value"
+              @click="activityMode = item.value"
+            >
+              {{ item.label }}
+            </button>
           </div>
         </header>
 
@@ -63,6 +77,11 @@
           />
           <div v-if="!loading && !hasData" class="dashboard-calendar-empty">
             {{ t('dashboard.noDataAvailable') }}
+          </div>
+          <div class="dashboard-calendar-legend" aria-hidden="true">
+            <span>{{ t('dashboard.overview.lessUsage') }}</span>
+            <i v-for="color in legendColors" :key="color" :style="{ backgroundColor: color }" />
+            <span>{{ t('dashboard.overview.moreUsage') }}</span>
           </div>
         </div>
       </div>
@@ -100,15 +119,19 @@ export interface DashboardCalendarPoint {
   value: number
 }
 
+type ActivityMode = 'daily' | 'weekly' | 'cumulative'
+
 const props = defineProps<{
   data: DashboardCalendarPoint[]
   startDate: string
   endDate: string
+  totalTokens?: number
   loading?: boolean
 }>()
 
 const { t, locale } = useI18n()
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const activityMode = ref<ActivityMode>('daily')
 const calendarStageRef = ref<HTMLElement | null>(null)
 const calendarCellSize = ref(14)
 const updateOptions = { notMerge: false, lazyUpdate: false }
@@ -133,6 +156,11 @@ const formatDayKey = (timestamp: number): string => {
   ].join('-')
 }
 
+const startOfWeek = (timestamp: number): number => {
+  const day = new Date(timestamp).getUTCDay()
+  return timestamp - ((day + 6) % 7) * DAY_IN_MS
+}
+
 const usageByDay = computed(() => {
   const values = new Map<string, number>()
   props.data.forEach((item) => {
@@ -143,8 +171,20 @@ const usageByDay = computed(() => {
   return values
 })
 
-const usageEntries = computed(() => Array.from(usageByDay.value.entries()))
-const hasData = computed(() => usageEntries.value.some(([, value]) => value > 0))
+const dailyWindowEntries = computed<[string, number][]>(() => {
+  const start = parseDay(props.startDate)
+  const end = parseDay(props.endDate)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return []
+
+  const entries: [string, number][] = []
+  for (let cursor = start; cursor <= end; cursor += DAY_IN_MS) {
+    const day = formatDayKey(cursor)
+    entries.push([day, usageByDay.value.get(day) || 0])
+  }
+  return entries
+})
+
+const hasData = computed(() => dailyWindowEntries.value.some(([, value]) => value > 0))
 const legendColors = computed(() => (isDark.value ? darkColors : lightColors))
 
 const formatValue = (value: number): string => {
@@ -165,28 +205,48 @@ const formatDay = (day: string): string => {
   }).format(new Date(timestamp))
 }
 
-const sumRecentDays = (days: number): number => {
-  const end = parseDay(props.endDate)
-  if (!Number.isFinite(end)) return 0
-  let total = 0
-  for (let offset = 0; offset < days; offset += 1) {
-    total += usageByDay.value.get(formatDayKey(end - offset * DAY_IN_MS)) || 0
-  }
-  return total
+const formatWeekRange = (day: string): string => {
+  const timestamp = parseDay(day)
+  if (!Number.isFinite(timestamp)) return day
+  const start = startOfWeek(timestamp)
+  return `${formatDay(formatDayKey(start))} - ${formatDay(formatDayKey(start + 6 * DAY_IN_MS))}`
 }
 
+const weeklyTotals = computed(() => {
+  const values = new Map<string, number>()
+  dailyWindowEntries.value.forEach(([day, value]) => {
+    const week = formatDayKey(startOfWeek(parseDay(day)))
+    values.set(week, (values.get(week) || 0) + value)
+  })
+  return values
+})
+
+const heatmapEntries = computed<[string, number][]>(() => {
+  if (activityMode.value === 'weekly') {
+    return dailyWindowEntries.value.map(([day]) => {
+      const week = formatDayKey(startOfWeek(parseDay(day)))
+      return [day, weeklyTotals.value.get(week) || 0] as [string, number]
+    })
+  }
+
+  if (activityMode.value === 'cumulative') {
+    let runningTotal = 0
+    return dailyWindowEntries.value.map(([day, value]) => {
+      runningTotal += value
+      return [day, runningTotal] as [string, number]
+    })
+  }
+
+  return dailyWindowEntries.value
+})
+
 const summary = computed(() => {
-  const start = parseDay(props.startDate)
-  const end = parseDay(props.endDate)
-  const windowDays = Number.isFinite(start) && Number.isFinite(end)
-    ? Math.max(1, Math.round((end - start) / DAY_IN_MS) + 1)
-    : 365
   let total = 0
   let activeDays = 0
   let peakDay = ''
   let peakValue = 0
 
-  usageEntries.value.forEach(([day, value]) => {
+  dailyWindowEntries.value.forEach(([day, value]) => {
     total += value
     if (value > 0) activeDays += 1
     if (value > peakValue) {
@@ -195,47 +255,59 @@ const summary = computed(() => {
     }
   })
 
+  const endTimestamp = parseDay(props.endDate)
+  const weekStart = Number.isFinite(endTimestamp) ? startOfWeek(endTimestamp) : Number.NaN
+  const weekKey = Number.isFinite(weekStart) ? formatDayKey(weekStart) : ''
+
   return {
     total,
     activeDays,
-    windowDays,
     endDay: usageByDay.value.get(props.endDate) || 0,
-    last7Days: sumRecentDays(7),
-    last30Days: sumRecentDays(30),
-    dailyAverage: total / windowDays,
+    currentWeek: weeklyTotals.value.get(weekKey) || 0,
+    weekRange: Number.isFinite(weekStart) ? formatWeekRange(props.endDate) : '',
     peakDay,
     peakValue
   }
 })
 
-const summaryStats = computed(() => [
+const summaryMetrics = computed(() => [
   {
-    key: 'end-day',
-    label: t('dashboard.overview.endDayUsage'),
-    value: formatValue(summary.value.endDay)
+    key: 'daily',
+    label: t('dashboard.overview.dailyToken'),
+    value: formatValue(summary.value.endDay),
+    caption: formatDay(props.endDate)
   },
   {
-    key: 'last-7-days',
-    label: t('dashboard.overview.last7Days'),
-    value: formatValue(summary.value.last7Days)
+    key: 'weekly',
+    label: t('dashboard.overview.weeklyToken'),
+    value: formatValue(summary.value.currentWeek),
+    caption: summary.value.weekRange
   },
   {
-    key: 'last-30-days',
-    label: t('dashboard.overview.last30Days'),
-    value: formatValue(summary.value.last30Days)
-  },
-  {
-    key: 'daily-average',
-    label: t('dashboard.overview.dailyAverage'),
-    value: formatValue(summary.value.dailyAverage)
+    key: 'cumulative',
+    label: t('dashboard.overview.cumulativeToken'),
+    value: formatValue(props.totalTokens || 0),
+    caption: t('dashboard.overview.accountLifetime')
   }
 ])
+
+const modeOptions = computed<{ value: ActivityMode; label: string }[]>(() => [
+  { value: 'daily', label: t('dashboard.overview.dailyHeatmap') },
+  { value: 'weekly', label: t('dashboard.overview.weeklyHeatmap') },
+  { value: 'cumulative', label: t('dashboard.overview.cumulativeHeatmap') }
+])
+
+const modeDescription = computed(() => {
+  if (activityMode.value === 'weekly') return t('dashboard.overview.weeklyHeatmapDescription')
+  if (activityMode.value === 'cumulative') return t('dashboard.overview.cumulativeHeatmapDescription')
+  return t('dashboard.overview.dailyHeatmapDescription')
+})
 
 const updateCalendarCellSize = () => {
   const stage = calendarStageRef.value
   if (!stage) return
-  const widthSize = Math.floor((stage.clientWidth - 48) / 53)
-  const heightSize = Math.floor((stage.clientHeight - 22) / 7)
+  const widthSize = Math.floor((stage.clientWidth - 54) / 53)
+  const heightSize = Math.floor((stage.clientHeight - 28) / 7)
   const nextSize = Math.max(14, Math.min(18, widthSize, heightSize))
   if (nextSize !== calendarCellSize.value) calendarCellSize.value = nextSize
 }
@@ -243,7 +315,7 @@ const updateCalendarCellSize = () => {
 const chartOption = computed<EChartsOption>(() => {
   const dark = isDark.value
   const colors = dark ? darkColors : lightColors
-  const values = usageEntries.value.filter(([, value]) => value > 0)
+  const values = heatmapEntries.value.filter(([, value]) => value > 0)
   const sortedValues = values.map(([, value]) => value).sort((left, right) => left - right)
   const scaleCeiling = sortedValues[Math.floor((sortedValues.length - 1) * 0.95)] || 0
   const maxValue = Math.max(1, scaleCeiling)
@@ -255,7 +327,7 @@ const chartOption = computed<EChartsOption>(() => {
     backgroundColor: surface,
     animation: true,
     animationDuration: 420,
-    animationDurationUpdate: 300,
+    animationDurationUpdate: 360,
     animationEasing: 'cubicOut',
     aria: {
       enabled: true,
@@ -275,7 +347,11 @@ const chartOption = computed<EChartsOption>(() => {
       formatter: (params: unknown) => {
         const point = params as { value?: [string, number] }
         const [day = '', value = 0] = point.value || []
-        return `${day}<br><strong>${formatValue(Number(value))}</strong>`
+        const heading = activityMode.value === 'weekly' ? formatWeekRange(day) : day
+        const label = activityMode.value === 'cumulative'
+          ? t('dashboard.overview.windowCumulative')
+          : t('dashboard.overview.tokenUsage')
+        return `${heading}<br>${label} <strong>${formatValue(Number(value))}</strong>`
       },
       extraCssText: `border-radius: 8px; box-shadow: 0 10px 28px rgba(17, 24, 39, ${dark ? '0.24' : '0.10'});`
     },
@@ -287,7 +363,7 @@ const chartOption = computed<EChartsOption>(() => {
       inRange: { color: colors }
     },
     calendar: {
-      top: 20,
+      top: 18,
       left: 'center',
       range: [props.startDate, props.endDate],
       cellSize: [calendarCellSize.value, calendarCellSize.value],
@@ -314,7 +390,7 @@ const chartOption = computed<EChartsOption>(() => {
       yearLabel: { show: false }
     },
     series: [{
-      id: 'dashboard-daily-token-calendar',
+      id: 'dashboard-token-activity-calendar',
       type: 'heatmap',
       coordinateSystem: 'calendar',
       data: values.map(([day, value]) => [day, value]),
@@ -358,8 +434,8 @@ onUnmounted(() => {
   display: grid;
   height: 208px;
   min-height: 208px;
-  grid-template-columns: 252px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: minmax(280px, 0.32fr) minmax(0, 1fr);
+  gap: 24px;
 }
 
 .dashboard-activity-summary {
@@ -368,7 +444,7 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--dashboard-divider, #eff1f3);
-  padding-right: 22px;
+  padding-right: 24px;
 }
 
 .dashboard-activity-header,
@@ -377,117 +453,127 @@ onUnmounted(() => {
   min-width: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
 }
 
 .dashboard-activity-header {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.dashboard-activity-header h2 {
-  overflow: hidden;
-  color: var(--dashboard-text, #111318);
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 22px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-activity-header span,
-.dashboard-calendar-panel-header > span {
-  flex: 0 0 auto;
-  color: var(--dashboard-subtle, #9ca3af);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.dashboard-activity-primary {
+.dashboard-activity-header > div,
+.dashboard-calendar-heading {
   display: grid;
   min-width: 0;
   gap: 1px;
 }
 
-.dashboard-activity-primary > span,
-.dashboard-activity-stats dt,
-.dashboard-activity-peak > span:first-child {
+.dashboard-activity-header h2,
+.dashboard-calendar-heading > span {
+  overflow: hidden;
+  color: var(--dashboard-text, #111318);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-activity-header span,
+.dashboard-activity-header > small,
+.dashboard-calendar-heading small {
   color: var(--dashboard-subtle, #9ca3af);
   font-size: 10px;
   font-weight: 500;
   line-height: 14px;
 }
 
-.dashboard-activity-primary strong {
+.dashboard-activity-header > small {
+  flex: 0 0 auto;
+}
+
+.dashboard-token-summary {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.dashboard-token-summary > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(94px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.dashboard-token-summary > div + div {
+  border-top: 1px solid var(--dashboard-divider, #eff1f3);
+}
+
+.dashboard-token-summary dt {
+  color: var(--dashboard-muted, #6b7280);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 16px;
+}
+
+.dashboard-token-summary dd {
+  display: grid;
+  min-width: 0;
+  justify-items: end;
+  margin: 0;
+}
+
+.dashboard-token-summary strong {
+  max-width: 100%;
   overflow: hidden;
   color: var(--dashboard-text, #111318);
-  font-size: 24px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
-  line-height: 29px;
+  line-height: 23px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dashboard-activity-primary small {
-  color: var(--dashboard-muted, #6b7280);
-  font-size: 10px;
-  line-height: 14px;
-}
-
-.dashboard-activity-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin: 8px 0 0;
-}
-
-.dashboard-activity-stats > div {
-  min-width: 0;
-}
-
-.dashboard-activity-stats dd {
-  min-height: 17px;
-  margin: 0;
+.dashboard-token-summary dd small {
+  max-width: 100%;
   overflow: hidden;
-  color: var(--dashboard-text, #111318);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  line-height: 17px;
+  color: var(--dashboard-subtle, #9ca3af);
+  font-size: 9px;
+  line-height: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dashboard-activity-peak {
-  display: grid;
+.dashboard-activity-insights {
+  display: flex;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  margin-top: auto;
+  justify-content: space-between;
+  gap: 14px;
   border-top: 1px solid var(--dashboard-divider, #eff1f3);
   padding-top: 6px;
-  color: var(--dashboard-muted, #6b7280);
-  font-size: 10px;
-  line-height: 14px;
+  color: var(--dashboard-subtle, #9ca3af);
+  font-size: 9px;
+  line-height: 13px;
 }
 
-.dashboard-activity-peak b {
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
+.dashboard-activity-insights span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
 }
 
-.dashboard-activity-peak strong {
-  color: var(--dashboard-text, #111318);
+.dashboard-activity-insights b {
+  overflow: hidden;
+  color: var(--dashboard-muted, #6b7280);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-}
-
-.dashboard-activity-peak-empty {
-  grid-column: 2 / -1;
-  justify-self: end;
+  text-overflow: ellipsis;
 }
 
 .dashboard-activity-skeleton {
@@ -497,29 +583,20 @@ onUnmounted(() => {
   animation: dashboard-activity-pulse 1.4s ease-in-out infinite;
 }
 
-.dashboard-activity-skeleton-primary {
+.dashboard-activity-skeleton-value {
   width: 74%;
-  height: 25px;
-  margin: 2px 0;
+  height: 17px;
 }
 
 .dashboard-activity-skeleton-meta {
   width: 52%;
+  height: 8px;
+  margin-top: 3px;
+}
+
+.dashboard-activity-skeleton-inline {
+  width: 38px;
   height: 9px;
-  margin-top: 2px;
-}
-
-.dashboard-activity-skeleton-value {
-  width: 66%;
-  height: 12px;
-  margin-top: 2px;
-}
-
-.dashboard-activity-skeleton-peak {
-  width: 58%;
-  height: 10px;
-  grid-column: 2 / -1;
-  justify-self: end;
 }
 
 .dashboard-calendar-panel {
@@ -533,14 +610,49 @@ onUnmounted(() => {
 .dashboard-calendar-panel-inner {
   display: grid;
   width: 100%;
-  min-width: 800px;
+  min-width: 760px;
   height: 208px;
-  grid-template-rows: 22px minmax(0, 1fr);
-  gap: 0;
+  grid-template-rows: 36px minmax(0, 1fr);
 }
 
 .dashboard-calendar-panel-header {
   padding: 0 8px 0 14px;
+}
+
+.dashboard-calendar-modes {
+  display: inline-grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(56px, 1fr));
+  gap: 2px;
+  border: 1px solid var(--dashboard-divider, #eff1f3);
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--dashboard-surface-subtle, #f7f8f9);
+}
+
+.dashboard-calendar-modes button {
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--dashboard-muted, #6b7280);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 26px;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  white-space: nowrap;
+}
+
+.dashboard-calendar-modes button:hover {
+  color: var(--dashboard-text, #111318);
+}
+
+.dashboard-calendar-modes button.active {
+  background: var(--dashboard-surface-active, #fff);
+  color: var(--dashboard-text, #111318);
+  box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
 }
 
 .dashboard-calendar-stage {
@@ -567,7 +679,7 @@ onUnmounted(() => {
 
 .dashboard-calendar-empty {
   position: absolute;
-  inset: 28px 0 38px;
+  inset: 20px 0 30px;
   display: grid;
   place-items: center;
   color: var(--dashboard-subtle, #9ca3af);
@@ -576,17 +688,20 @@ onUnmounted(() => {
 }
 
 .dashboard-calendar-legend {
+  position: absolute;
+  right: 8px;
+  bottom: 1px;
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
   gap: 5px;
   color: var(--dashboard-subtle, #9ca3af);
-  font-size: 10px;
+  font-size: 9px;
+  pointer-events: none;
 }
 
 .dashboard-calendar-legend i {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 3px;
 }
 
@@ -598,80 +713,85 @@ onUnmounted(() => {
   background: rgb(17 24 39 / 64%);
 }
 
+:global(html.dark .dashboard-calendar-modes) {
+  border-color: #374151;
+}
+
+:global(html.dark .dashboard-calendar-modes button.active) {
+  color: #f9fafb;
+  box-shadow: none;
+}
+
 @keyframes dashboard-activity-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
 
 @media (min-width: 1181px) and (max-height: 1050px) {
-  .dashboard-activity-layout {
-    height: 178px;
-    min-height: 178px;
-  }
-
-  .dashboard-activity-header {
-    margin-bottom: 6px;
-  }
-
-  .dashboard-activity-primary strong {
-    font-size: 21px;
-    line-height: 25px;
-  }
-
-  .dashboard-activity-stats {
-    gap: 4px 10px;
-    margin-top: 5px;
-  }
-
-  .dashboard-activity-stats dd {
-    min-height: 15px;
-    font-size: 12px;
-    line-height: 15px;
-  }
-
-  .dashboard-activity-peak {
-    padding-top: 4px;
-  }
-
+  .dashboard-activity-layout,
   .dashboard-calendar-panel-inner {
     height: 178px;
-  }
-}
-
-@media (min-width: 1181px) and (max-height: 940px) {
-  .dashboard-activity-layout {
-    height: 164px;
-    min-height: 164px;
+    min-height: 178px;
   }
 
   .dashboard-activity-header {
     margin-bottom: 4px;
   }
 
-  .dashboard-activity-primary strong {
-    font-size: 20px;
-    line-height: 23px;
+  .dashboard-token-summary strong {
+    font-size: 17px;
+    line-height: 20px;
   }
 
-  .dashboard-activity-primary small {
-    line-height: 12px;
-  }
-
-  .dashboard-activity-stats {
-    gap: 3px 10px;
-    margin-top: 4px;
-  }
-
-  .dashboard-activity-peak {
-    padding-top: 3px;
+  .dashboard-activity-insights {
+    padding-top: 4px;
   }
 
   .dashboard-calendar-panel-inner {
-    height: 164px;
+    grid-template-rows: 32px minmax(0, 1fr);
+  }
+
+  .dashboard-calendar-modes button {
+    height: 24px;
+    line-height: 24px;
   }
 }
 
-@media (max-width: 880px) {
+@media (min-width: 1181px) and (max-height: 940px) {
+  .dashboard-activity-layout,
+  .dashboard-calendar-panel-inner {
+    height: 164px;
+    min-height: 164px;
+  }
+
+  .dashboard-activity-layout {
+    grid-template-columns: minmax(270px, 0.3fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .dashboard-activity-summary {
+    padding-right: 20px;
+  }
+
+  .dashboard-activity-header span {
+    display: none;
+  }
+
+  .dashboard-token-summary > div {
+    gap: 12px;
+  }
+
+  .dashboard-token-summary strong {
+    font-size: 16px;
+    line-height: 19px;
+  }
+
+  .dashboard-calendar-panel-inner {
+    grid-template-rows: 30px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
   .dashboard-activity-layout {
     height: auto;
     min-height: 0;
@@ -680,41 +800,84 @@ onUnmounted(() => {
   }
 
   .dashboard-activity-summary {
-    display: grid;
-    grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.4fr);
-    gap: 12px 20px;
     border-right: 0;
     border-bottom: 1px solid var(--dashboard-divider, #eff1f3);
     padding: 0 0 12px;
   }
 
-  .dashboard-activity-header {
-    grid-column: 1 / -1;
-    margin-bottom: 0;
+  .dashboard-token-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto;
+    gap: 0;
   }
 
-  .dashboard-activity-stats {
-    margin-top: 0;
-  }
-
-  .dashboard-activity-peak {
-    grid-column: 1 / -1;
-    margin-top: 0;
-  }
-}
-
-@media (max-width: 720px) {
-  .dashboard-activity-summary {
+  .dashboard-token-summary > div {
+    display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
+    align-items: start;
+    gap: 3px;
+    padding: 8px 16px 8px 0;
   }
 
-  .dashboard-activity-peak {
-    grid-column: auto;
+  .dashboard-token-summary > div + div {
+    border-top: 0;
+    border-left: 1px solid var(--dashboard-divider, #eff1f3);
+    padding-left: 16px;
+  }
+
+  .dashboard-token-summary dd {
+    justify-items: start;
+  }
+
+  .dashboard-activity-insights {
+    margin-top: 4px;
   }
 
   .dashboard-calendar-panel-inner {
     height: 192px;
+    min-height: 192px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-token-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-token-summary > div,
+  .dashboard-token-summary > div + div {
+    grid-template-columns: 110px minmax(0, 1fr);
+    align-items: center;
+    border-top: 1px solid var(--dashboard-divider, #eff1f3);
+    border-left: 0;
+    padding: 9px 0;
+  }
+
+  .dashboard-token-summary dd {
+    justify-items: end;
+  }
+
+  .dashboard-activity-insights {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dashboard-calendar-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .dashboard-calendar-panel-inner {
+    height: 224px;
+    min-height: 224px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .dashboard-calendar-modes {
+    width: 100%;
   }
 }
 </style>

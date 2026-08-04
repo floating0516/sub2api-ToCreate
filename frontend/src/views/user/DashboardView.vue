@@ -43,6 +43,7 @@
           :data="calendarData"
           :start-date="calendarStartDate"
           :end-date="calendarEndDate"
+          :total-tokens="dashboardStats?.total_tokens || 0"
           :loading="loadingCalendar"
         />
       </section>
