@@ -17,9 +17,6 @@
 
       <section class="dashboard-metric-grid" :aria-label="t('dashboard.overview.coreMetrics')">
         <article v-for="metric in metrics" :key="metric.key" class="dashboard-card dashboard-metric-card">
-          <div class="dashboard-metric-icon" :class="`dashboard-metric-icon-${metric.tone}`">
-            <Icon :name="metric.icon" size="md" :stroke-width="1.7" />
-          </div>
           <p class="dashboard-metric-label">{{ metric.label }}</p>
           <div v-if="loadingOverview" class="dashboard-value-skeleton" />
           <p v-else class="dashboard-metric-value" :title="metric.value">{{ metric.value }}</p>
@@ -28,6 +25,16 @@
             {{ metric.comparison.suffix }}
           </p>
           <div v-else class="dashboard-trend-skeleton" />
+          <dl
+            v-if="!loadingOverview"
+            class="dashboard-metric-details"
+            :class="`dashboard-metric-details-${metric.details.length}`"
+          >
+            <div v-for="detail in metric.details" :key="detail.label">
+              <dt>{{ detail.label }}</dt>
+              <dd :title="detail.value">{{ detail.value }}</dd>
+            </div>
+          </dl>
         </article>
       </section>
 
@@ -81,7 +88,7 @@
               <select v-model="selectedApiKeyID" :aria-label="t('dashboard.overview.selectApiKey')" @change="loadTrendSeries">
                 <option :value="null">{{ t('dashboard.overview.allApiKeys') }}</option>
                 <option v-for="key in apiKeys" :key="key.id" :value="key.id">
-                  {{ key.name }} · #{{ key.id }}
+                  {{ apiKeyLabel(key) }}
                 </option>
               </select>
               <Icon name="chevronDown" size="sm" />
@@ -193,6 +200,7 @@ import DashboardTrendChart, {
 } from '@/components/user/dashboard/DashboardTrendChart.vue'
 import { usageAPI, type UserDashboardStats } from '@/api/usage'
 import { keysAPI } from '@/api/keys'
+import { maskQuickStartKey } from '@/utils/quickstart'
 import type {
   ApiKey,
   GroupPlatform,
@@ -204,8 +212,6 @@ import { formatDateLocalInput } from '@/utils/format'
 
 type Granularity = 'day' | 'hour'
 type GroupMode = 'model' | 'api_key'
-type MetricTone = 'green' | 'purple' | 'blue' | 'pink'
-type IconName = 'creditCard' | 'database' | 'trendingUp' | 'clock'
 
 interface Comparison {
   value: string
@@ -217,9 +223,13 @@ interface MetricItem {
   key: string
   label: string
   value: string
-  icon: IconName
-  tone: MetricTone
   comparison: Comparison
+  details: MetricDetail[]
+}
+
+interface MetricDetail {
+  label: string
+  value: string
 }
 
 interface ModelRow {
@@ -238,7 +248,17 @@ interface PlatformRow {
   isOther?: boolean
 }
 
-const SERIES_COLORS = ['#22a06b', '#3b82f6', '#8b5cf6']
+const MODEL_COLOR_PALETTE = [
+  '#22a06b',
+  '#3b82f6',
+  '#8b5cf6',
+  '#d97738',
+  '#0891b2',
+  '#d14f7a',
+  '#b8870b',
+  '#4f6f8f'
+]
+const API_KEY_COLOR = '#22a06b'
 const OTHER_COLOR = '#9ca3af'
 const DAY_MS = 86_400_000
 
@@ -321,6 +341,17 @@ const formatDuration = (value: number): string => {
 
 const formatPercent = (value: number): string => `${(value || 0).toFixed(1)}%`
 
+const apiKeyLabel = (key: ApiKey): string => `${key.name} · ${maskQuickStartKey(key.key)}`
+
+const hashModelName = (name: string): number => {
+  let hash = 2166136261
+  for (let index = 0; index < name.length; index += 1) {
+    hash ^= name.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
 const compare = (current: number, previous: number, lowerIsBetter = false): Comparison => {
   if (!previous) {
     return {
@@ -341,42 +372,80 @@ const compare = (current: number, previous: number, lowerIsBetter = false): Comp
 const metrics = computed<MetricItem[]>(() => {
   const current = rangeStats.value
   const previous = previousStats.value
+  const days = inclusiveDayCount(startDate.value, endDate.value)
+  const requests = current?.total_requests || 0
   return [
     {
       key: 'cost',
       label: t('dashboard.overview.totalSpend'),
       value: formatCurrency(current?.total_actual_cost || 0),
-      icon: 'creditCard',
-      tone: 'green',
-      comparison: compare(current?.total_actual_cost || 0, previous?.total_actual_cost || 0)
+      comparison: compare(current?.total_actual_cost || 0, previous?.total_actual_cost || 0),
+      details: [
+        {
+          label: t('dashboard.overview.standardSpend'),
+          value: formatCurrency(current?.total_cost || 0)
+        },
+        {
+          label: t('dashboard.overview.dailyAverageSpend'),
+          value: formatCurrency((current?.total_actual_cost || 0) / days)
+        }
+      ]
     },
     {
       key: 'tokens',
       label: t('dashboard.totalTokens'),
       value: formatTokens(current?.total_tokens || 0),
-      icon: 'database',
-      tone: 'purple',
-      comparison: compare(current?.total_tokens || 0, previous?.total_tokens || 0)
+      comparison: compare(current?.total_tokens || 0, previous?.total_tokens || 0),
+      details: [
+        {
+          label: t('dashboard.overview.inputTokens'),
+          value: formatTokens(current?.total_input_tokens || 0)
+        },
+        {
+          label: t('dashboard.overview.outputTokens'),
+          value: formatTokens(current?.total_output_tokens || 0)
+        },
+        {
+          label: t('dashboard.overview.cacheTokens'),
+          value: formatTokens(current?.total_cache_tokens || 0)
+        }
+      ]
     },
     {
       key: 'requests',
       label: t('dashboard.overview.totalRequests'),
-      value: formatRequests(current?.total_requests || 0),
-      icon: 'trendingUp',
-      tone: 'blue',
-      comparison: compare(current?.total_requests || 0, previous?.total_requests || 0)
+      value: formatRequests(requests),
+      comparison: compare(requests, previous?.total_requests || 0),
+      details: [
+        {
+          label: t('dashboard.overview.dailyAverageRequests'),
+          value: formatRequests(requests / days)
+        },
+        {
+          label: t('dashboard.overview.tokensPerRequest'),
+          value: formatTokens(requests ? (current?.total_tokens || 0) / requests : 0)
+        }
+      ]
     },
     {
       key: 'duration',
       label: t('dashboard.overview.averageResponseTime'),
       value: formatDuration(current?.average_duration_ms || 0),
-      icon: 'clock',
-      tone: 'pink',
       comparison: compare(
         current?.average_duration_ms || 0,
         previous?.average_duration_ms || 0,
         true
-      )
+      ),
+      details: [
+        {
+          label: t('dashboard.overview.currentRPM'),
+          value: formatRequests(dashboardStats.value?.rpm || 0)
+        },
+        {
+          label: t('dashboard.overview.currentTPM'),
+          value: formatTokens(dashboardStats.value?.tpm || 0)
+        }
+      ]
     }
   ]
 })
@@ -385,14 +454,37 @@ const sortedModels = computed(() =>
   [...modelStats.value].sort((left, right) => right.total_tokens - left.total_tokens)
 )
 
+const visibleModelColors = computed<Record<string, string>>(() => {
+  const names = [...new Set(sortedModels.value.slice(0, 3).map((item) => item.model))]
+    .sort((left, right) => left.localeCompare(right))
+  const colors: Record<string, string> = {}
+  const usedIndexes = new Set<number>()
+
+  names.forEach((name) => {
+    const startIndex = hashModelName(name) % MODEL_COLOR_PALETTE.length
+    let colorIndex = startIndex
+    for (let offset = 0; offset < MODEL_COLOR_PALETTE.length; offset += 1) {
+      const candidate = (startIndex + offset) % MODEL_COLOR_PALETTE.length
+      if (!usedIndexes.has(candidate)) {
+        colorIndex = candidate
+        break
+      }
+    }
+    usedIndexes.add(colorIndex)
+    colors[name] = MODEL_COLOR_PALETTE[colorIndex]
+  })
+
+  return colors
+})
+
 const modelRows = computed<ModelRow[]>(() => {
   const totalTokens = sortedModels.value.reduce((sum, item) => sum + item.total_tokens, 0)
   const topModels = sortedModels.value.slice(0, 3)
-  const rows = topModels.map((item, index) => ({
+  const rows = topModels.map((item) => ({
     name: item.model,
     tokens: item.total_tokens,
     share: totalTokens ? (item.total_tokens / totalTokens) * 100 : 0,
-    color: SERIES_COLORS[index],
+    color: visibleModelColors.value[item.model] || MODEL_COLOR_PALETTE[0],
     trend: modelTrendCache.value[item.model] || []
   }))
   const others = sortedModels.value.slice(3)
@@ -492,7 +584,7 @@ const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
     const values = normalizeTrend(total.trend || [], buckets)
     chartSeries.value = [{
       label: t('dashboard.overview.allModels'),
-      color: SERIES_COLORS[0],
+      color: MODEL_COLOR_PALETTE[0],
       values
     }]
     modelTrendCache.value = {}
@@ -511,7 +603,7 @@ const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
   const totalValues = normalizeTrend(responses[responses.length - 1].trend || [], buckets)
   chartSeries.value = models.map((model, index) => ({
     label: model.model,
-    color: SERIES_COLORS[index],
+    color: visibleModelColors.value[model.model] || MODEL_COLOR_PALETTE[index],
     values: modelValues[index]
   }))
 
@@ -532,8 +624,8 @@ const loadApiKeyTrendSeries = async (requestID: number, buckets: string[]) => {
   )
   if (requestID !== chartRequestID) return
   chartSeries.value = [{
-    label: selectedKey?.name || t('dashboard.overview.allApiKeys'),
-    color: SERIES_COLORS[0],
+    label: selectedKey ? apiKeyLabel(selectedKey) : t('dashboard.overview.allApiKeys'),
+    color: API_KEY_COLOR,
     values: normalizeTrend(response.trend || [], buckets)
   }]
 }
@@ -655,37 +747,38 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-metric-card {
-  position: relative;
-  height: 145px;
+  display: flex;
+  height: 160px;
   min-width: 0;
+  flex-direction: column;
   overflow: hidden;
-  padding: 22px;
+  padding: 17px 20px 14px;
 }
 
 .dashboard-metric-label {
   color: var(--dashboard-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 18px;
 }
 
 .dashboard-metric-value {
-  margin-top: 10px;
+  margin-top: 5px;
   overflow: hidden;
   color: var(--dashboard-text);
-  font-size: 30px;
+  font-size: 28px;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
-  line-height: 38px;
+  line-height: 34px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dashboard-metric-trend {
-  margin-top: 8px;
+  margin-top: 2px;
   color: var(--dashboard-subtle);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .dashboard-metric-trend span {
@@ -705,35 +798,53 @@ onMounted(refreshDashboard)
   color: var(--dashboard-subtle);
 }
 
-.dashboard-metric-icon {
-  position: absolute;
-  top: 18px;
-  right: 18px;
+.dashboard-metric-details {
   display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 9px;
+  min-width: 0;
+  gap: 0;
+  margin: auto 0 0;
+  border-top: 1px solid #eff1f3;
+  padding-top: 9px;
 }
 
-.dashboard-metric-icon-green {
-  background: #eaf8f1;
-  color: #168052;
+.dashboard-metric-details-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-metric-icon-purple {
-  background: #f2edff;
-  color: #7456d8;
+.dashboard-metric-details-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.dashboard-metric-icon-blue {
-  background: #eaf3ff;
-  color: #3478ce;
+.dashboard-metric-details > div {
+  min-width: 0;
+  padding-right: 10px;
 }
 
-.dashboard-metric-icon-pink {
-  background: #fff0f4;
-  color: #cb5276;
+.dashboard-metric-details > div + div {
+  border-left: 1px solid #eff1f3;
+  padding-left: 10px;
+}
+
+.dashboard-metric-details dt {
+  overflow: hidden;
+  color: var(--dashboard-subtle);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-metric-details dd {
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: #4f5660;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-value-skeleton,
@@ -746,13 +857,13 @@ onMounted(refreshDashboard)
 .dashboard-value-skeleton {
   width: 68%;
   height: 30px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .dashboard-trend-skeleton {
   width: 48%;
   height: 12px;
-  margin-top: 14px;
+  margin-top: 8px;
 }
 
 .dashboard-trend-card {
@@ -914,7 +1025,7 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-key-select {
-  width: 190px;
+  width: 230px;
 }
 
 .dashboard-table-grid {
@@ -1097,6 +1208,15 @@ onMounted(refreshDashboard)
   color: #e5e7eb;
 }
 
+:global(.dark) .dashboard-metric-details,
+:global(.dark) .dashboard-metric-details > div + div {
+  border-color: #283342;
+}
+
+:global(.dark) .dashboard-metric-details dd {
+  color: #c8ced7;
+}
+
 :global(.dark) .dashboard-platform-icon {
   background: #263142;
 }
@@ -1133,7 +1253,7 @@ onMounted(refreshDashboard)
   }
 
   .dashboard-metric-card {
-    height: 136px;
+    height: 154px;
   }
 
   .dashboard-trend-card {

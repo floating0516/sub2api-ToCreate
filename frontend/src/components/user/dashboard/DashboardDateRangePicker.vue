@@ -179,7 +179,6 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-date-picker {
   position: relative;
-  z-index: 30;
 }
 
 .dashboard-date-trigger {
@@ -229,6 +228,7 @@ onUnmounted(() => {
 
 .dashboard-date-popover {
   position: absolute;
+  z-index: 10;
   top: calc(100% + 8px);
   right: 0;
   width: min(430px, calc(100vw - 32px));
