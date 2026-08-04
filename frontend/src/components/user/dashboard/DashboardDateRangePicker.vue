@@ -187,11 +187,11 @@ onUnmounted(() => {
   height: 44px;
   align-items: center;
   gap: 9px;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--dashboard-border, #e2e5e9);
   border-radius: 9px;
-  background: #fff;
+  background: var(--dashboard-surface, #fff);
   padding: 0 12px;
-  color: #4b5563;
+  color: var(--dashboard-muted, #4b5563);
   font-size: 13px;
   font-weight: 500;
   transition: border-color 160ms ease, box-shadow 160ms ease;
@@ -210,7 +210,7 @@ onUnmounted(() => {
 .dashboard-date-chevron,
 .dashboard-date-arrow {
   flex: 0 0 auto;
-  color: #8b929d;
+  color: var(--dashboard-subtle, #8b929d);
 }
 
 .dashboard-date-chevron {
@@ -233,9 +233,9 @@ onUnmounted(() => {
   right: 0;
   width: min(430px, calc(100vw - 32px));
   overflow: hidden;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--dashboard-border, #e2e5e9);
   border-radius: 10px;
-  background: #fff;
+  background: var(--dashboard-surface, #fff);
   box-shadow: 0 12px 32px rgb(17 24 39 / 10%);
 }
 
@@ -244,7 +244,7 @@ onUnmounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 12px;
-  border-bottom: 1px solid #eef0f2;
+  border-bottom: 1px solid var(--dashboard-divider, #eef0f2);
 }
 
 .dashboard-date-preset {
@@ -255,8 +255,8 @@ onUnmounted(() => {
 }
 
 .dashboard-date-preset:hover {
-  background: #f6f7f8;
-  color: #111318;
+  background: var(--dashboard-surface-subtle, #f6f7f8);
+  color: var(--dashboard-text, #111318);
 }
 
 .dashboard-date-preset-active {
@@ -277,7 +277,7 @@ onUnmounted(() => {
   display: grid;
   gap: 6px;
   min-width: 0;
-  color: #6b7280;
+  color: var(--dashboard-muted, #6b7280);
   font-size: 12px;
   font-weight: 500;
 }
@@ -286,11 +286,11 @@ onUnmounted(() => {
   width: 100%;
   height: 38px;
   min-width: 0;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--dashboard-border, #e2e5e9);
   border-radius: 7px;
-  background: #fff;
+  background: var(--dashboard-surface, #fff);
   padding: 0 9px;
-  color: #30343b;
+  color: var(--dashboard-text, #30343b);
   font-size: 13px;
   outline: none;
 }
@@ -308,7 +308,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  border-top: 1px solid #eef0f2;
+  border-top: 1px solid var(--dashboard-divider, #eef0f2);
   padding: 10px 12px;
 }
 
@@ -322,11 +322,11 @@ onUnmounted(() => {
 }
 
 .dashboard-date-cancel {
-  color: #606873;
+  color: var(--dashboard-muted, #606873);
 }
 
 .dashboard-date-cancel:hover {
-  background: #f5f6f7;
+  background: var(--dashboard-surface-subtle, #f5f6f7);
 }
 
 .dashboard-date-apply {
@@ -350,23 +350,33 @@ onUnmounted(() => {
   transform: translateY(-4px);
 }
 
-:global(.dark) .dashboard-date-trigger,
-:global(.dark) .dashboard-date-popover,
-:global(.dark) .dashboard-date-field input {
+:global(html.dark) .dashboard-date-trigger,
+:global(html.dark) .dashboard-date-popover,
+:global(html.dark) .dashboard-date-field input {
   border-color: #374151;
-  background: #111827;
   color: #d1d5db;
+  color-scheme: dark;
 }
 
-:global(.dark) .dashboard-date-presets,
-:global(.dark) .dashboard-date-actions {
-  border-color: #283342;
+:global(html.dark) .dashboard-date-trigger:hover,
+:global(html.dark) .dashboard-date-trigger-open,
+:global(html.dark) .dashboard-date-field input:focus {
+  border-color: #4b5563;
 }
 
-:global(.dark) .dashboard-date-preset:hover,
-:global(.dark) .dashboard-date-cancel:hover {
-  background: #1f2937;
+:global(html.dark) .dashboard-date-preset:hover,
+:global(html.dark) .dashboard-date-cancel:hover {
   color: #f9fafb;
+}
+
+:global(html.dark) .dashboard-date-preset-active {
+  background: #15352b;
+  color: #6ee7b7;
+}
+
+:global(html.dark) .dashboard-date-apply {
+  background: #f3f4f6;
+  color: #111827;
 }
 
 @media (max-width: 560px) {

@@ -88,6 +88,7 @@ const chartOption = computed<EChartsOption>(() => {
   const showSymbols = props.labels.length <= 31
 
   return {
+    backgroundColor: dark ? '#111827' : '#ffffff',
     animation: true,
     animationThreshold: 2000,
     animationDuration: 480,
@@ -175,7 +176,7 @@ const chartOption = computed<EChartsOption>(() => {
       }
     },
     series: props.series.map((item, index) => ({
-      id: `dashboard-series-${index}`,
+      id: `dashboard-series-${item.label}`,
       name: item.label,
       type: 'line',
       data: item.values,
@@ -239,6 +240,8 @@ onUnmounted(() => {
   position: relative;
   height: 350px;
   min-height: 350px;
+  background: var(--dashboard-surface, #fff);
+  transition: background-color 160ms ease;
 }
 
 .dashboard-echart {
@@ -264,7 +267,11 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-:global(.dark) .dashboard-chart-loading {
+:global(html.dark) .dashboard-trend-stage {
+  background: #111827;
+}
+
+:global(html.dark) .dashboard-chart-loading {
   background: rgb(17 24 39 / 64%);
 }
 

@@ -256,8 +256,14 @@ const MODEL_COLOR_PALETTE = [
   '#0891b2',
   '#d14f7a',
   '#b8870b',
-  '#4f6f8f'
+  '#4f6f8f',
+  '#dc5555',
+  '#0f9f8f',
+  '#6366f1',
+  '#729b24'
 ]
+const MAX_CHART_MODEL_SERIES = 8
+const MODEL_TABLE_ROW_COUNT = 3
 const API_KEY_COLOR = '#22a06b'
 const OTHER_COLOR = '#9ca3af'
 const DAY_MS = 86_400_000
@@ -455,8 +461,11 @@ const sortedModels = computed(() =>
 )
 
 const visibleModelColors = computed<Record<string, string>>(() => {
-  const names = [...new Set(sortedModels.value.slice(0, 3).map((item) => item.model))]
-    .sort((left, right) => left.localeCompare(right))
+  const names = [
+    ...new Set(
+      sortedModels.value.slice(0, MAX_CHART_MODEL_SERIES).map((item) => item.model)
+    )
+  ].sort((left, right) => left.localeCompare(right))
   const colors: Record<string, string> = {}
   const usedIndexes = new Set<number>()
 
@@ -479,7 +488,7 @@ const visibleModelColors = computed<Record<string, string>>(() => {
 
 const modelRows = computed<ModelRow[]>(() => {
   const totalTokens = sortedModels.value.reduce((sum, item) => sum + item.total_tokens, 0)
-  const topModels = sortedModels.value.slice(0, 3)
+  const topModels = sortedModels.value.slice(0, MODEL_TABLE_ROW_COUNT)
   const rows = topModels.map((item) => ({
     name: item.model,
     tokens: item.total_tokens,
@@ -487,7 +496,7 @@ const modelRows = computed<ModelRow[]>(() => {
     color: visibleModelColors.value[item.model] || MODEL_COLOR_PALETTE[0],
     trend: modelTrendCache.value[item.model] || []
   }))
-  const others = sortedModels.value.slice(3)
+  const others = sortedModels.value.slice(MODEL_TABLE_ROW_COUNT)
   if (others.length) {
     const otherTokens = others.reduce((sum, item) => sum + item.total_tokens, 0)
     rows.push({
@@ -577,7 +586,7 @@ const trendParams = (extra: { model?: string; api_key_id?: number } = {}) => ({
 })
 
 const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
-  const models = sortedModels.value.slice(0, 3)
+  const models = sortedModels.value.slice(0, MAX_CHART_MODEL_SERIES)
   if (!models.length) {
     const total = await usageAPI.getDashboardTrend(trendParams())
     if (requestID !== chartRequestID) return
@@ -611,8 +620,9 @@ const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
   models.forEach((model, index) => {
     cache[model.model] = modelValues[index]
   })
+  const tableModelValues = modelValues.slice(0, MODEL_TABLE_ROW_COUNT)
   cache.__other__ = totalValues.map((value, index) =>
-    Math.max(0, value - modelValues.reduce((sum, points) => sum + (points[index] || 0), 0))
+    Math.max(0, value - tableModelValues.reduce((sum, points) => sum + (points[index] || 0), 0))
   )
   modelTrendCache.value = cache
 }
@@ -701,6 +711,14 @@ onMounted(refreshDashboard)
   --dashboard-text: #111318;
   --dashboard-muted: #6b7280;
   --dashboard-subtle: #9ca3af;
+  --dashboard-surface: #fff;
+  --dashboard-surface-subtle: #f7f8f9;
+  --dashboard-surface-active: #fff;
+  --dashboard-divider: #eff1f3;
+  --dashboard-body-text: #4f5660;
+  --dashboard-strong-text: #30343a;
+  --dashboard-icon-surface: #f3f4f6;
+  --dashboard-skeleton: #f0f1f3;
   display: grid;
   gap: 20px;
   width: 100%;
@@ -736,7 +754,7 @@ onMounted(refreshDashboard)
 .dashboard-card {
   border: 1px solid var(--dashboard-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--dashboard-surface);
   box-shadow: 0 1px 2px rgb(17 24 39 / 2%);
 }
 
@@ -803,7 +821,7 @@ onMounted(refreshDashboard)
   min-width: 0;
   gap: 0;
   margin: auto 0 0;
-  border-top: 1px solid #eff1f3;
+  border-top: 1px solid var(--dashboard-divider);
   padding-top: 9px;
 }
 
@@ -821,7 +839,7 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-metric-details > div + div {
-  border-left: 1px solid #eff1f3;
+  border-left: 1px solid var(--dashboard-divider);
   padding-left: 10px;
 }
 
@@ -838,7 +856,7 @@ onMounted(refreshDashboard)
 .dashboard-metric-details dd {
   margin: 1px 0 0;
   overflow: hidden;
-  color: #4f5660;
+  color: var(--dashboard-body-text);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -850,7 +868,7 @@ onMounted(refreshDashboard)
 .dashboard-value-skeleton,
 .dashboard-trend-skeleton {
   border-radius: 5px;
-  background: #f0f1f3;
+  background: var(--dashboard-skeleton);
   animation: dashboard-pulse 1.4s ease-in-out infinite;
 }
 
@@ -964,7 +982,7 @@ onMounted(refreshDashboard)
   gap: 2px;
   border: 1px solid #e2e5e9;
   border-radius: 8px;
-  background: #f7f8f9;
+  background: var(--dashboard-surface-subtle);
   padding: 3px;
 }
 
@@ -979,8 +997,8 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-segmented button.active {
-  background: #fff;
-  color: #20242a;
+  background: var(--dashboard-surface-active);
+  color: var(--dashboard-text);
   box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
 }
 
@@ -997,7 +1015,7 @@ onMounted(refreshDashboard)
   appearance: none;
   border: 1px solid #e2e5e9;
   border-radius: 8px;
-  background: #fff;
+  background: var(--dashboard-surface);
   padding: 0 32px 0 11px;
   color: #4b525c;
   font-size: 12px;
@@ -1083,8 +1101,8 @@ onMounted(refreshDashboard)
 
 .dashboard-table-wrap td {
   height: 51px;
-  border-top: 1px solid #eff1f3;
-  color: #4f5660;
+  border-top: 1px solid var(--dashboard-divider);
+  color: var(--dashboard-body-text);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -1101,7 +1119,7 @@ onMounted(refreshDashboard)
 
 .dashboard-entity strong {
   overflow: hidden;
-  color: #30343a;
+  color: var(--dashboard-strong-text);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1114,7 +1132,7 @@ onMounted(refreshDashboard)
   height: 26px;
   place-items: center;
   border-radius: 7px;
-  background: #f3f4f6;
+  background: var(--dashboard-icon-surface);
   color: #32363c;
 }
 
@@ -1172,53 +1190,78 @@ onMounted(refreshDashboard)
   50% { opacity: 0.55; }
 }
 
-:global(.dark) .dashboard-page {
+:global(html.dark) .dashboard-page {
   --dashboard-border: #2d3745;
   --dashboard-text: #f3f4f6;
   --dashboard-muted: #a6adb7;
   --dashboard-subtle: #7f8792;
+  --dashboard-surface: #111827;
+  --dashboard-surface-subtle: #172130;
+  --dashboard-surface-active: #263142;
+  --dashboard-divider: #283342;
+  --dashboard-body-text: #b5bdc8;
+  --dashboard-strong-text: #e5e7eb;
+  --dashboard-icon-surface: #263142;
+  --dashboard-skeleton: #263142;
+  color-scheme: dark;
 }
 
-:global(.dark) .dashboard-card,
-:global(.dark) .dashboard-select-shell select {
-  background: #111827;
+:global(html.dark) .dashboard-card {
+  border-color: var(--dashboard-border);
+  background: var(--dashboard-surface);
+  box-shadow: none;
 }
 
-:global(.dark) .dashboard-segmented {
+:global(html.dark) .dashboard-segmented {
   border-color: #374151;
-  background: #172130;
 }
 
-:global(.dark) .dashboard-segmented button.active {
-  background: #263142;
+:global(html.dark) .dashboard-segmented button.active {
   color: #f9fafb;
 }
 
-:global(.dark) .dashboard-select-shell select {
+:global(html.dark) .dashboard-select-shell select {
   border-color: #374151;
+  background: var(--dashboard-surface);
   color: #d1d5db;
 }
 
-:global(.dark) .dashboard-table-wrap td {
-  border-color: #283342;
-  color: #b5bdc8;
+:global(html.dark) .dashboard-select-shell select:hover,
+:global(html.dark) .dashboard-select-shell select:focus {
+  border-color: #4b5563;
 }
 
-:global(.dark) .dashboard-entity strong {
-  color: #e5e7eb;
+:global(html.dark) .dashboard-chart-scope {
+  border-color: var(--dashboard-divider);
 }
 
-:global(.dark) .dashboard-metric-details,
-:global(.dark) .dashboard-metric-details > div + div {
-  border-color: #283342;
+:global(html.dark) .dashboard-table-action:hover {
+  color: #f9fafb;
 }
 
-:global(.dark) .dashboard-metric-details dd {
-  color: #c8ced7;
+:global(html.dark) .dashboard-error {
+  border-color: #7f1d1d;
+  background: #2b171b;
+  color: #fca5a5;
 }
 
-:global(.dark) .dashboard-platform-icon {
-  background: #263142;
+:global(html.dark) .dashboard-platform-icon {
+  color: #d1d5db;
+}
+
+:global(html.dark) .dashboard-platform-anthropic {
+  background: #34251e;
+  color: #f29d65;
+}
+
+:global(html.dark) .dashboard-platform-gemini {
+  background: #1d2d43;
+  color: #76a9fa;
+}
+
+:global(html.dark) .dashboard-platform-antigravity {
+  background: #18332e;
+  color: #5eead4;
 }
 
 @media (max-width: 1180px) {
