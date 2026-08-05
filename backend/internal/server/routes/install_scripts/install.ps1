@@ -138,10 +138,47 @@ function Ensure-Node {
 }
 
 function Get-Architecture {
-  $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+  $architecture = ""
+  $runtimeInformationTypes = @(
+    "System.Runtime.InteropServices.RuntimeInformation, mscorlib",
+    "System.Runtime.InteropServices.RuntimeInformation, System.Private.CoreLib",
+    "System.Runtime.InteropServices.RuntimeInformation, System.Runtime.InteropServices.RuntimeInformation"
+  )
+
+  foreach ($typeName in $runtimeInformationTypes) {
+    try {
+      $runtimeInformation = [Type]::GetType($typeName, $false)
+      if (-not $runtimeInformation) {
+        continue
+      }
+      $osArchitecture = $runtimeInformation.GetProperty("OSArchitecture")
+      if (-not $osArchitecture) {
+        continue
+      }
+      $value = $osArchitecture.GetValue($null)
+      if ($value) {
+        $architecture = $value.ToString().ToLowerInvariant()
+        break
+      }
+    } catch {
+      $architecture = ""
+    }
+  }
+
+  if ([string]::IsNullOrWhiteSpace($architecture)) {
+    $architecture = [string]$env:PROCESSOR_ARCHITEW6432
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+      $architecture = [string]$env:PROCESSOR_ARCHITECTURE
+    }
+    $architecture = $architecture.Trim().ToLowerInvariant()
+  }
+
   switch ($architecture) {
     "x64" { return "amd64" }
+    "amd64" { return "amd64" }
     "arm64" { return "arm64" }
+    "aarch64" { return "arm64" }
+    "" { Stop-Install "Could not detect the Windows CPU architecture." }
     default { Stop-Install "Unsupported CPU architecture: $architecture" }
   }
 }

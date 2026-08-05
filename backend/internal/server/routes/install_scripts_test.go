@@ -75,6 +75,10 @@ func TestInstallScriptsUseRequestOriginWithoutEmbeddingSecrets(t *testing.T) {
 				require.Contains(t, body, "OpenJS.NodeJS.LTS")
 				require.Contains(t, body, "\"upgrade\"")
 				require.Contains(t, body, "\"--force\"")
+				require.Contains(t, body, `RuntimeInformation, mscorlib`)
+				require.Contains(t, body, `PROCESSOR_ARCHITEW6432`)
+				require.Contains(t, body, `PROCESSOR_ARCHITECTURE`)
+				require.NotContains(t, body, `[System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture`)
 
 				preflightIndex := strings.LastIndex(body, "Write-Section \"1. Preflight\"")
 				require.NotEqual(t, -1, preflightIndex)
