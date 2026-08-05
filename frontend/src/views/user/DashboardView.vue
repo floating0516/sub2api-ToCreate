@@ -1,14 +1,6 @@
 <template>
   <AppLayout>
     <div class="dashboard-page">
-      <div class="dashboard-toolbar">
-        <DashboardDateRangePicker
-          v-model:start-date="startDate"
-          v-model:end-date="endDate"
-          @change="refreshDashboard"
-        />
-      </div>
-
       <div v-if="errorMessage" class="dashboard-error" role="alert">
         <Icon name="exclamationCircle" size="sm" />
         <span>{{ errorMessage }}</span>
@@ -20,10 +12,7 @@
           <p class="dashboard-metric-label">{{ metric.label }}</p>
           <div v-if="loadingOverview" class="dashboard-value-skeleton" />
           <p v-else class="dashboard-metric-value" :title="metric.value">{{ metric.value }}</p>
-          <p v-if="!loadingOverview" class="dashboard-metric-trend">
-            <span :class="metric.comparison.tone">{{ metric.comparison.value }}</span>
-            {{ metric.comparison.suffix }}
-          </p>
+          <p v-if="!loadingOverview" class="dashboard-metric-scope">{{ metric.scope }}</p>
           <div v-else class="dashboard-trend-skeleton" />
           <dl
             v-if="!loadingOverview"
@@ -67,6 +56,24 @@
           </div>
 
           <div class="dashboard-chart-controls">
+            <DashboardDateRangePicker
+              v-if="granularity === 'day'"
+              v-model:start-date="startDate"
+              v-model:end-date="endDate"
+              class="dashboard-trend-date"
+              compact
+              @change="loadTrendSeries"
+            />
+            <DashboardDateRangePicker
+              v-else
+              :start-date="hourDate"
+              :end-date="hourDate"
+              class="dashboard-trend-date"
+              mode="single"
+              compact
+              @change="onHourDateChange"
+            />
+
             <div class="dashboard-segmented" role="group" :aria-label="t('dashboard.granularity')">
               <button
                 type="button"
@@ -127,12 +134,12 @@ import DashboardTrendChart, {
 import { usageAPI, type UserDashboardStats } from '@/api/usage'
 import { paymentAPI } from '@/api/payment'
 import { keysAPI } from '@/api/keys'
+import { useAuthStore } from '@/stores/auth'
 import { maskQuickStartKey } from '@/utils/quickstart'
 import type {
   ApiKey,
   ModelTrendPoint,
-  TrendDataPoint,
-  UsageStatsResponse
+  TrendDataPoint
 } from '@/types'
 import type { UserPaymentSummary } from '@/types/payment'
 import { formatDateLocalInput } from '@/utils/format'
@@ -140,17 +147,11 @@ import { formatDateLocalInput } from '@/utils/format'
 type Granularity = 'day' | 'hour'
 type GroupMode = 'model' | 'api_key'
 
-interface Comparison {
-  value: string
-  suffix: string
-  tone: string
-}
-
 interface MetricItem {
   key: string
   label: string
   value: string
-  comparison: Comparison
+  scope: string
   details: MetricDetail[]
 }
 
@@ -179,17 +180,16 @@ const DAY_MS = 86_400_000
 const CALENDAR_DAY_COUNT = 365
 
 const { t, locale } = useI18n()
+const authStore = useAuthStore()
 const endDate = ref(formatDateLocalInput(new Date()))
 const startDate = ref(formatDateLocalInput(new Date(Date.now() - 6 * DAY_MS)))
+const hourDate = ref(endDate.value)
 const granularity = ref<Granularity>('day')
 const groupMode = ref<GroupMode>('model')
 const selectedApiKeyID = ref<number | null>(null)
 
 const dashboardStats = ref<UserDashboardStats | null>(null)
-const rangeStats = ref<UsageStatsResponse | null>(null)
-const previousStats = ref<UsageStatsResponse | null>(null)
 const paymentSummary = ref<UserPaymentSummary | null>(null)
-const previousPaymentSummary = ref<UserPaymentSummary | null>(null)
 const apiKeys = ref<ApiKey[]>([])
 const chartLabels = ref<string[]>([])
 const chartSeries = ref<DashboardTrendSeries[]>([])
@@ -217,28 +217,21 @@ const inclusiveDayCount = (start: string, end: string): number => {
   return Math.max(1, Math.round((endTime - startTime) / DAY_MS) + 1)
 }
 
-const previousRange = computed(() => {
-  const days = inclusiveDayCount(startDate.value, endDate.value)
-  const end = addDays(startDate.value, -1)
-  return { start: addDays(end, -(days - 1)), end }
-})
-
-const calendarStartDate = computed(() => addDays(endDate.value, -(CALENDAR_DAY_COUNT - 1)))
-const calendarEndDate = computed(() => endDate.value)
+const calendarEndDate = ref(formatDateLocalInput(new Date()))
+const calendarStartDate = computed(() => addDays(calendarEndDate.value, -(CALENDAR_DAY_COUNT - 1)))
 const chartScopeLabel = computed(() => {
   if (granularity.value === 'hour') {
-    return t('dashboard.overview.hourlyScope', { date: endDate.value })
+    return t('dashboard.overview.hourlyScope', { date: hourDate.value })
   }
   return t('dashboard.overview.dailyScope')
 })
 
-const formatCurrency = (value: number): string =>
-  new Intl.NumberFormat(numberLocale.value, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0)
+const accountStartDate = computed(() => {
+  const createdAt = authStore.user?.created_at
+  return createdAt ? formatDateLocalInput(new Date(createdAt)) : '1970-01-01'
+})
+
+const accountAgeDays = computed(() => inclusiveDayCount(accountStartDate.value, calendarEndDate.value))
 
 const formatCNY = (value: number): string =>
   new Intl.NumberFormat(numberLocale.value, {
@@ -279,52 +272,27 @@ const hashModelName = (name: string): number => {
   return hash >>> 0
 }
 
-const compare = (current: number, previous: number, lowerIsBetter = false): Comparison => {
-  if (!previous) {
-    return {
-      value: t('dashboard.overview.noComparison'),
-      suffix: '',
-      tone: 'dashboard-trend-neutral'
-    }
-  }
-  const delta = ((current - previous) / Math.abs(previous)) * 100
-  const favorable = lowerIsBetter ? delta <= 0 : delta >= 0
-  return {
-    value: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
-    suffix: t('dashboard.overview.vsPrevious'),
-    tone: favorable ? 'dashboard-trend-positive' : 'dashboard-trend-negative'
-  }
-}
-
 const metrics = computed<MetricItem[]>(() => {
-  const current = rangeStats.value
-  const previous = previousStats.value
-  const days = inclusiveDayCount(startDate.value, endDate.value)
+  const current = dashboardStats.value
   const requests = current?.total_requests || 0
   return [
     {
       key: 'cost',
-      label: t('dashboard.overview.actualPayment'),
-      value: formatCNY(paymentSummary.value?.net_paid || 0),
-      comparison: compare(
-        paymentSummary.value?.net_paid || 0,
-        previousPaymentSummary.value?.net_paid || 0
-      ),
+      label: t('dashboard.overview.accountCredit'),
+      value: formatCNY(authStore.user?.balance || 0),
+      scope: t('dashboard.overview.currentAvailable'),
       details: [
         {
-          label: t('dashboard.overview.apiBilledUsage'),
-          value: formatCurrency(current?.total_actual_cost || 0)
-        },
-        {
-          label: t('dashboard.overview.benefitPurchases'),
-          value: formatCNY(
-            (paymentSummary.value?.subscription_paid || 0) +
-            (paymentSummary.value?.addon_paid || 0)
-          )
+          label: t('dashboard.overview.lifetimeActualPayment'),
+          value: formatCNY(paymentSummary.value?.net_paid || 0)
         },
         {
           label: t('dashboard.overview.balanceRecharges'),
           value: formatCNY(paymentSummary.value?.balance_paid || 0)
+        },
+        {
+          label: t('dashboard.overview.platformGranted'),
+          value: formatCNY(paymentSummary.value?.platform_granted || 0)
         }
       ]
     },
@@ -332,7 +300,7 @@ const metrics = computed<MetricItem[]>(() => {
       key: 'tokens',
       label: t('dashboard.totalTokens'),
       value: formatTokens(current?.total_tokens || 0),
-      comparison: compare(current?.total_tokens || 0, previous?.total_tokens || 0),
+      scope: t('dashboard.overview.accountLifetimeScope'),
       details: [
         {
           label: t('dashboard.overview.inputTokens'),
@@ -344,7 +312,10 @@ const metrics = computed<MetricItem[]>(() => {
         },
         {
           label: t('dashboard.overview.cacheTokens'),
-          value: formatTokens(current?.total_cache_tokens || 0)
+          value: formatTokens(
+            (current?.total_cache_creation_tokens || 0) +
+            (current?.total_cache_read_tokens || 0)
+          )
         }
       ]
     },
@@ -352,11 +323,11 @@ const metrics = computed<MetricItem[]>(() => {
       key: 'requests',
       label: t('dashboard.overview.totalRequests'),
       value: formatRequests(requests),
-      comparison: compare(requests, previous?.total_requests || 0),
+      scope: t('dashboard.overview.accountLifetimeScope'),
       details: [
         {
           label: t('dashboard.overview.dailyAverageRequests'),
-          value: formatRequests(requests / days)
+          value: formatRequests(requests / accountAgeDays.value)
         },
         {
           label: t('dashboard.overview.tokensPerRequest'),
@@ -368,11 +339,7 @@ const metrics = computed<MetricItem[]>(() => {
       key: 'duration',
       label: t('dashboard.overview.averageResponseTime'),
       value: formatDuration(current?.average_duration_ms || 0),
-      comparison: compare(
-        current?.average_duration_ms || 0,
-        previous?.average_duration_ms || 0,
-        true
-      ),
+      scope: t('dashboard.overview.accountLifetimeScope'),
       details: [
         {
           label: t('dashboard.overview.currentRPM'),
@@ -411,7 +378,7 @@ const buildModelColors = (modelNames: string[]): Record<string, string> => {
 
 const buildBucketKeys = (): string[] => {
   if (granularity.value === 'hour') {
-    return Array.from({ length: 24 }, (_, hour) => `${endDate.value} ${String(hour).padStart(2, '0')}:00`)
+    return Array.from({ length: 24 }, (_, hour) => `${hourDate.value} ${String(hour).padStart(2, '0')}:00`)
   }
   const keys: string[] = []
   let cursor = startDate.value
@@ -434,8 +401,8 @@ const normalizeTrend = (trend: TrendDataPoint[], buckets: string[]): number[] =>
 }
 
 const trendParams = (extra: { model?: string; api_key_id?: number } = {}) => ({
-  start_date: granularity.value === 'hour' ? endDate.value : startDate.value,
-  end_date: endDate.value,
+  start_date: granularity.value === 'hour' ? hourDate.value : startDate.value,
+  end_date: granularity.value === 'hour' ? hourDate.value : endDate.value,
   granularity: granularity.value,
   timezone: browserTimezone,
   ...extra
@@ -549,27 +516,18 @@ const loadTrendSeries = async () => {
 const loadOverview = async () => {
   loadingOverview.value = true
   try {
-    const [dashboard, current, previous, currentPayment, previousPayment] =
+    const [dashboard, currentPayment] =
       await Promise.all([
         usageAPI.getDashboardStats({ summary_only: true }),
-        usageAPI.getStatsSummaryByDateRange(startDate.value, endDate.value),
-        usageAPI.getStatsSummaryByDateRange(previousRange.value.start, previousRange.value.end),
         paymentAPI.getSummary({
-          start_date: startDate.value,
-          end_date: endDate.value,
+          start_date: accountStartDate.value,
+          end_date: calendarEndDate.value,
           timezone: browserTimezone
         }),
-        paymentAPI.getSummary({
-          start_date: previousRange.value.start,
-          end_date: previousRange.value.end,
-          timezone: browserTimezone
-        })
+        authStore.refreshUser()
       ])
     dashboardStats.value = dashboard
-    rangeStats.value = current
-    previousStats.value = previous
     paymentSummary.value = currentPayment
-    previousPaymentSummary.value = previousPayment
   } catch (error) {
     console.error('Failed to load dashboard:', error)
     errorMessage.value = t('dashboard.overview.loadFailed')
@@ -590,6 +548,11 @@ const refreshDashboard = async () => {
 const setGranularity = async (value: Granularity) => {
   if (granularity.value === value) return
   granularity.value = value
+  await loadTrendSeries()
+}
+
+const onHourDateChange = async (value: { startDate: string; endDate: string }) => {
+  hourDate.value = value.endDate
   await loadTrendSeries()
 }
 
@@ -618,12 +581,6 @@ onMounted(refreshDashboard)
   color: var(--dashboard-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: 0;
-}
-
-.dashboard-toolbar {
-  display: flex;
-  min-height: 44px;
-  justify-content: flex-end;
 }
 
 .dashboard-error {
@@ -685,28 +642,11 @@ onMounted(refreshDashboard)
   white-space: nowrap;
 }
 
-.dashboard-metric-trend {
+.dashboard-metric-scope {
   margin-top: 2px;
   color: var(--dashboard-subtle);
   font-size: 12px;
   line-height: 17px;
-}
-
-.dashboard-metric-trend span {
-  margin-right: 3px;
-  font-weight: 600;
-}
-
-.dashboard-trend-positive {
-  color: #1b8a5a;
-}
-
-.dashboard-trend-negative {
-  color: #dc5555;
-}
-
-.dashboard-trend-neutral {
-  color: var(--dashboard-subtle);
 }
 
 .dashboard-metric-details {
@@ -881,6 +821,10 @@ onMounted(refreshDashboard)
   white-space: nowrap;
 }
 
+.dashboard-trend-date {
+  flex: 0 0 auto;
+}
+
 .dashboard-segmented {
   display: flex;
   height: 38px;
@@ -1011,10 +955,6 @@ onMounted(refreshDashboard)
     margin-block: -8px;
   }
 
-  .dashboard-toolbar {
-    min-height: 40px;
-  }
-
   .dashboard-metric-grid {
     gap: 14px;
   }
@@ -1062,10 +1002,6 @@ onMounted(refreshDashboard)
   .dashboard-page {
     gap: 12px;
     margin-block: -12px;
-  }
-
-  .dashboard-toolbar {
-    min-height: 38px;
   }
 
   .dashboard-metric-grid {
@@ -1142,6 +1078,15 @@ onMounted(refreshDashboard)
 
   .dashboard-key-select {
     grid-column: 1 / -1;
+  }
+
+  .dashboard-trend-date {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  :deep(.dashboard-trend-date .dashboard-date-trigger) {
+    width: 100%;
   }
 }
 </style>

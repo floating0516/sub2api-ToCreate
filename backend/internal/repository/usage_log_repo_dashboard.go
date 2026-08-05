@@ -526,14 +526,21 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	return stats, nil
 }
 
-// GetUserDashboardSummaryStats returns only the lifetime token total and current RPM/TPM.
-// It avoids the API-key, daily, platform, cost, and latency queries used by the full dashboard response.
+// GetUserDashboardSummaryStats returns the lifetime overview and current RPM/TPM in one query.
+// It avoids the API-key, daily, and platform breakdown queries used by the full dashboard response.
 func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*UserDashboardStats, error) {
 	stats := &UserDashboardStats{}
 	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 	query := `
 		SELECT
-			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS total_tokens,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+			COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+			COALESCE(SUM(cache_creation_tokens), 0) AS total_cache_creation_tokens,
+			COALESCE(SUM(cache_read_tokens), 0) AS total_cache_read_tokens,
+			COALESCE(SUM(total_cost), 0) AS total_cost,
+			COALESCE(SUM(actual_cost), 0) AS total_actual_cost,
+			COALESCE(AVG(duration_ms), 0) AS average_duration_ms,
 			COUNT(*) FILTER (WHERE created_at >= $2) AS recent_requests,
 			COALESCE(SUM(input_tokens + output_tokens) FILTER (WHERE created_at >= $2), 0) AS recent_tokens
 		FROM usage_logs
@@ -547,12 +554,20 @@ func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, u
 		r.sql,
 		query,
 		[]any{userID, fiveMinutesAgo},
-		&stats.TotalTokens,
+		&stats.TotalRequests,
+		&stats.TotalInputTokens,
+		&stats.TotalOutputTokens,
+		&stats.TotalCacheCreationTokens,
+		&stats.TotalCacheReadTokens,
+		&stats.TotalCost,
+		&stats.TotalActualCost,
+		&stats.AverageDurationMs,
 		&recentRequests,
 		&recentTokens,
 	); err != nil {
 		return nil, err
 	}
+	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheCreationTokens + stats.TotalCacheReadTokens
 	stats.Rpm = recentRequests / 5
 	stats.Tpm = recentTokens / 5
 	return stats, nil

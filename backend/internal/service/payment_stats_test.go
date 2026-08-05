@@ -77,6 +77,15 @@ func TestUserPaymentSummaryUsesExternalCNYNetCashFlow(t *testing.T) {
 	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeAlipay, payment.OrderTypeAddon, "CNY", 20, 20, paidAt, nil)
 	createUserPaymentSummaryOrder(t, ctx, client, user, payment.TypeStripe, payment.OrderTypeSubscription, "USD", 99, 99, paidAt, nil)
 	createUserPaymentSummaryOrder(t, ctx, client, user, PaymentTypeBalanceWallet, payment.OrderTypeSubscription, "CNY", 88, 88, paidAt, nil)
+	_, err = client.RedeemCode.Create().
+		SetCode("PLATFORM-GRANT").
+		SetType(AdjustmentTypeAdminBalance).
+		SetValue(1).
+		SetStatus(StatusUsed).
+		SetUsedBy(user.ID).
+		SetUsedAt(paidAt).
+		Save(ctx)
+	require.NoError(t, err)
 
 	svc := &PaymentService{entClient: client}
 	got, err := svc.GetUserPaymentSummary(ctx, user.ID, start, end)
@@ -89,6 +98,7 @@ func TestUserPaymentSummaryUsesExternalCNYNetCashFlow(t *testing.T) {
 		SubscriptionPaid: 60,
 		AddonPaid:        20,
 		BalancePaid:      50,
+		PlatformGranted:  1,
 	}, got)
 }
 

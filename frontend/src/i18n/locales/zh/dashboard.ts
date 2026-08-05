@@ -61,11 +61,16 @@ export default {
       coreMetrics: '核心指标',
       totalSpend: '总消费',
       actualPayment: '实际支付',
+      accountCredit: '账户额度',
+      currentAvailable: '当前可用余额',
+      lifetimeActualPayment: '累计实付',
+      platformGranted: '平台赠送',
+      accountLifetimeScope: '账户创建至今',
       apiBilledUsage: 'API 计费用量',
       benefitPurchases: '权益购买',
       balanceRecharges: '余额充值',
       totalRequests: '累计请求',
-      averageResponseTime: '平均响应时间',
+      averageResponseTime: '历史平均响应时间',
       standardSpend: '标准费用',
       dailyAverageSpend: '日均消费',
       inputTokens: '输入 Token',
@@ -1005,6 +1010,7 @@ export default {
 
   // Dates
   dates: {
+    date: '日期',
     today: '今天',
     yesterday: '昨天',
     thisWeek: '本周',

@@ -61,11 +61,16 @@ export default {
       coreMetrics: 'Core metrics',
       totalSpend: 'Total Spend',
       actualPayment: 'Actual Payment',
+      accountCredit: 'Account Credit',
+      currentAvailable: 'Available balance',
+      lifetimeActualPayment: 'Lifetime paid',
+      platformGranted: 'Platform grants',
+      accountLifetimeScope: 'Since account creation',
       apiBilledUsage: 'API Billed Usage',
       benefitPurchases: 'Benefit Purchases',
       balanceRecharges: 'Balance Recharges',
       totalRequests: 'Total Requests',
-      averageResponseTime: 'Average Response Time',
+      averageResponseTime: 'Historical Average Response Time',
       standardSpend: 'Standard Spend',
       dailyAverageSpend: 'Daily Average',
       inputTokens: 'Input Tokens',
@@ -1000,6 +1005,7 @@ export default {
 
   // Dates
   dates: {
+    date: 'Date',
     today: 'Today',
     yesterday: 'Yesterday',
     thisWeek: 'This Week',

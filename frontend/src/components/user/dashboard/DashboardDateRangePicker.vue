@@ -1,5 +1,12 @@
 <template>
-  <div ref="rootRef" class="dashboard-date-picker">
+  <div
+    ref="rootRef"
+    class="dashboard-date-picker"
+    :class="[
+      compact && 'dashboard-date-picker-compact',
+      mode === 'single' && 'dashboard-date-picker-single'
+    ]"
+  >
     <button
       type="button"
       class="dashboard-date-trigger"
@@ -20,9 +27,12 @@
 
     <Transition name="dashboard-popover">
       <div v-if="isOpen" class="dashboard-date-popover" role="dialog">
-        <div class="dashboard-date-presets">
+        <div
+          class="dashboard-date-presets"
+          :style="{ gridTemplateColumns: `repeat(${visiblePresets.length}, minmax(0, 1fr))` }"
+        >
           <button
-            v-for="preset in presets"
+            v-for="preset in visiblePresets"
             :key="preset.value"
             type="button"
             class="dashboard-date-preset"
@@ -33,7 +43,7 @@
           </button>
         </div>
 
-        <div class="dashboard-date-fields">
+        <div v-if="mode === 'range'" class="dashboard-date-fields">
           <label class="dashboard-date-field">
             <span>{{ t('dates.startDate') }}</span>
             <input v-model="draftStart" type="date" :max="draftEnd || today" />
@@ -42,6 +52,13 @@
           <label class="dashboard-date-field">
             <span>{{ t('dates.endDate') }}</span>
             <input v-model="draftEnd" type="date" :min="draftStart" :max="today" />
+          </label>
+        </div>
+
+        <div v-else class="dashboard-date-fields dashboard-date-fields-single">
+          <label class="dashboard-date-field">
+            <span>{{ t('dates.date') }}</span>
+            <input v-model="draftEnd" type="date" :max="today" />
           </label>
         </div>
 
@@ -69,10 +86,15 @@ interface DatePreset {
   days: number
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   startDate: string
   endDate: string
-}>()
+  mode?: 'range' | 'single'
+  compact?: boolean
+}>(), {
+  mode: 'range',
+  compact: false
+})
 
 const emit = defineEmits<{
   (event: 'update:startDate', value: string): void
@@ -94,10 +116,13 @@ const formatDateInput = (date: Date): string => {
 }
 
 const today = computed(() => formatDateInput(new Date()))
-const displayValue = computed(() => `${props.startDate} ～ ${props.endDate}`)
-const canApply = computed(
-  () => Boolean(draftStart.value && draftEnd.value && draftStart.value <= draftEnd.value)
-)
+const displayValue = computed(() => (
+  props.mode === 'single' ? props.endDate : `${props.startDate} ～ ${props.endDate}`
+))
+const canApply = computed(() => {
+  if (props.mode === 'single') return Boolean(draftEnd.value)
+  return Boolean(draftStart.value && draftEnd.value && draftStart.value <= draftEnd.value)
+})
 
 const presets: DatePreset[] = [
   { labelKey: 'dates.today', value: 'today', days: 1 },
@@ -105,6 +130,9 @@ const presets: DatePreset[] = [
   { labelKey: 'dates.last7Days', value: '7days', days: 7 },
   { labelKey: 'dates.last30Days', value: '30days', days: 30 }
 ]
+const visiblePresets = computed(() => (
+  props.mode === 'single' ? presets.slice(0, 2) : presets
+))
 
 const rangeForPreset = (preset: DatePreset) => {
   const end = new Date()
@@ -116,12 +144,13 @@ const rangeForPreset = (preset: DatePreset) => {
 
 const isPresetActive = (preset: DatePreset): boolean => {
   const range = rangeForPreset(preset)
+  if (props.mode === 'single') return draftEnd.value === range.end
   return draftStart.value === range.start && draftEnd.value === range.end
 }
 
 const selectPreset = (preset: DatePreset) => {
   const range = rangeForPreset(preset)
-  draftStart.value = range.start
+  draftStart.value = props.mode === 'single' ? range.end : range.start
   draftEnd.value = range.end
 }
 
@@ -141,9 +170,10 @@ const cancel = () => {
 
 const apply = () => {
   if (!canApply.value) return
-  emit('update:startDate', draftStart.value)
+  const nextStart = props.mode === 'single' ? draftEnd.value : draftStart.value
+  emit('update:startDate', nextStart)
   emit('update:endDate', draftEnd.value)
-  emit('change', { startDate: draftStart.value, endDate: draftEnd.value })
+  emit('change', { startDate: nextStart, endDate: draftEnd.value })
   isOpen.value = false
 }
 
@@ -195,6 +225,18 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 500;
   transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-date-picker-compact .dashboard-date-trigger {
+  width: 218px;
+  height: 38px;
+  border-radius: 8px;
+  padding-inline: 11px;
+  font-size: 12px;
+}
+
+.dashboard-date-picker-single.dashboard-date-picker-compact .dashboard-date-trigger {
+  width: 148px;
 }
 
 .dashboard-date-trigger:hover,
@@ -271,6 +313,17 @@ onUnmounted(() => {
   align-items: end;
   gap: 10px;
   padding: 15px 16px;
+}
+
+.dashboard-date-fields-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 640px) {
+  .dashboard-date-picker-compact,
+  .dashboard-date-picker-compact .dashboard-date-trigger {
+    width: 100%;
+  }
 }
 
 .dashboard-date-field {

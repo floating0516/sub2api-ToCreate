@@ -12,6 +12,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
+	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
@@ -25,6 +26,7 @@ type UserPaymentSummary struct {
 	SubscriptionPaid float64 `json:"subscription_paid"`
 	AddonPaid        float64 `json:"addon_paid"`
 	BalancePaid      float64 `json:"balance_paid"`
+	PlatformGranted  float64 `json:"platform_granted"`
 }
 
 // GetUserPaymentSummary returns the user's real external CNY cash flow for a
@@ -84,12 +86,30 @@ func (s *PaymentService) GetUserPaymentSummary(ctx context.Context, userID int64
 		addUserPaymentAmount(result, order.OrderType, -refundAmount)
 	}
 
+	grants, err := s.entClient.RedeemCode.Query().
+		Where(
+			redeemcode.UsedByEQ(userID),
+			redeemcode.TypeEQ(AdjustmentTypeAdminBalance),
+			redeemcode.ValueGT(0),
+			redeemcode.UsedAtNotNil(),
+			redeemcode.UsedAtGTE(startTime),
+			redeemcode.UsedAtLT(endTime),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, grant := range grants {
+		result.PlatformGranted += grant.Value
+	}
+
 	result.GrossPaid = roundAmount(result.GrossPaid)
 	result.Refunded = roundAmount(result.Refunded)
 	result.NetPaid = roundAmount(result.GrossPaid - result.Refunded)
 	result.SubscriptionPaid = roundAmount(result.SubscriptionPaid)
 	result.AddonPaid = roundAmount(result.AddonPaid)
 	result.BalancePaid = roundAmount(result.BalancePaid)
+	result.PlatformGranted = roundAmount(result.PlatformGranted)
 	return result, nil
 }
 

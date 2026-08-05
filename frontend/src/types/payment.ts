@@ -280,6 +280,7 @@ export interface UserPaymentSummary {
   subscription_paid: number
   addon_paid: number
   balance_paid: number
+  platform_granted: number
 }
 
 export type CurrencyAmounts = Record<string, number>
