@@ -55,7 +55,11 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const isDark = ref(document.documentElement.classList.contains('dark'))
-const updateOptions = { notMerge: false, lazyUpdate: false }
+const updateOptions = {
+  notMerge: false,
+  lazyUpdate: false,
+  replaceMerge: ['series', 'xAxis']
+}
 let themeObserver: MutationObserver | null = null
 
 const hasData = computed(() => props.series.some((item) => item.values.some((value) => value > 0)))
