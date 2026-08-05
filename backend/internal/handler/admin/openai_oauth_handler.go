@@ -18,11 +18,11 @@ import (
 
 // OpenAIOAuthHandler handles OpenAI OAuth-related operations
 type OpenAIOAuthHandler struct {
-	openaiOAuthService *service.OpenAIOAuthService
-	adminService       service.AdminService
-	quotaService       openAIQuotaService
+	openaiOAuthService  *service.OpenAIOAuthService
+	adminService        service.AdminService
+	quotaService        openAIQuotaService
 	quotaHistoryService openAIQuotaHistoryService
-	rateLimitService   openAIAccountStateRecoverer
+	rateLimitService    openAIAccountStateRecoverer
 }
 
 type openAIQuotaService interface {
