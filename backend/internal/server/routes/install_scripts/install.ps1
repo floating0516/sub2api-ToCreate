@@ -229,28 +229,39 @@ function Load-InstallMetadata([string]$Arch) {
     os = "windows"
     arch = $Arch
   }
-  $script:Client = [string]$response.data.client
-  switch ($script:Client) {
+  $client = [string]$response.data.client
+  $metadata = $null
+  switch ($client) {
     "claude-code" {
-      $script:ClientLabel = "Claude Code"
-      $script:CliCommand = "claude"
-      $script:CliPackage = "@anthropic-ai/claude-code@latest"
+      $metadata = [pscustomobject]@{
+        Client = $client
+        ClientLabel = "Claude Code"
+        CliCommand = "claude"
+        CliPackage = "@anthropic-ai/claude-code@latest"
+      }
     }
     "codex" {
-      $script:ClientLabel = "Codex"
-      $script:CliCommand = "codex"
-      $script:CliPackage = "@openai/codex@latest"
+      $metadata = [pscustomobject]@{
+        Client = $client
+        ClientLabel = "Codex"
+        CliCommand = "codex"
+        CliPackage = "@openai/codex@latest"
+      }
     }
     "gemini-cli" {
-      $script:ClientLabel = "Gemini CLI"
-      $script:CliCommand = "gemini"
-      $script:CliPackage = "@google/gemini-cli@latest"
+      $metadata = [pscustomobject]@{
+        Client = $client
+        ClientLabel = "Gemini CLI"
+        CliCommand = "gemini"
+        CliPackage = "@google/gemini-cli@latest"
+      }
     }
     default {
       Stop-Install "The install token returned an unsupported client."
     }
   }
-  Write-Success "Install token is valid for $ClientLabel"
+  Write-Success "Install token is valid for $($metadata.ClientLabel)"
+  return $metadata
 }
 
 function Install-Cli {
@@ -292,16 +303,16 @@ function Test-CcSwitchInstalled {
 
 function Ensure-CcSwitch([string]$Arch) {
   if (Test-CcSwitchInstalled) {
-    $script:CcSwitchReady = $true
     Write-Success "CC Switch is already installed"
-    return
+    return $true
   }
 
   Write-Progress "Downloading CC Switch"
   $platform = if ($Arch -eq "arm64") { "windows-arm64" } else { "windows" }
   $msi = Join-Path ([System.IO.Path]::GetTempPath()) "tocreate-cc-switch-$([Guid]::NewGuid().ToString('N')).msi"
+  $ccSwitchReady = $false
   try {
-    Invoke-WebRequest -Uri "$BaseUrl/download/cc-switch/$platform" -OutFile $msi -UseBasicParsing
+    $null = Invoke-WebRequest -Uri "$BaseUrl/download/cc-switch/$platform" -OutFile $msi -UseBasicParsing
     $process = Start-Process msiexec.exe -ArgumentList @(
       "/i",
       "`"$msi`"",
@@ -312,18 +323,19 @@ function Ensure-CcSwitch([string]$Arch) {
       throw "msiexec exit code $($process.ExitCode)"
     }
     Start-Sleep -Seconds 2
-    $script:CcSwitchReady = Test-CcSwitchInstalled
+    $ccSwitchReady = Test-CcSwitchInstalled
   } catch {
-    $script:CcSwitchReady = $false
+    $ccSwitchReady = $false
   } finally {
     Remove-Item $msi -Force -ErrorAction SilentlyContinue
   }
 
-  if ($CcSwitchReady) {
+  if ($ccSwitchReady) {
     Write-Success "CC Switch installed"
   } else {
     Write-WarningText "CC Switch could not be installed automatically; browser confirmation will be used"
   }
+  return $ccSwitchReady
 }
 
 function Show-NextSteps {
@@ -336,7 +348,7 @@ function Show-NextSteps {
   Write-Host "Docs: $BaseUrl/custom/codex-claude-import"
 }
 
-function Redeem-AndImport([string]$Arch) {
+function Redeem-AndImport([string]$Arch, [bool]$CcSwitchAvailable) {
   $response = Invoke-InstallApi "/api/v1/install-token/redeem" @{
     token = $Token
     os = "windows"
@@ -348,7 +360,7 @@ function Redeem-AndImport([string]$Arch) {
     Stop-Install "ToCreate returned an incomplete CC Switch import payload."
   }
 
-  if ($CcSwitchReady -and (Test-CcSwitchProtocol)) {
+  if ($CcSwitchAvailable -and (Test-CcSwitchProtocol)) {
     try {
       Start-Process $deeplink
       Write-Success "CC Switch import opened"
@@ -357,7 +369,7 @@ function Redeem-AndImport([string]$Arch) {
       Show-NextSteps
       return
     } catch {
-      $script:CcSwitchReady = $false
+      $CcSwitchAvailable = $false
     }
   }
 
@@ -384,13 +396,17 @@ $arch = Get-Architecture
 Write-Section "1. Preflight"
 Write-Success "Detected windows/$arch"
 Write-Success "Install token is present"
-Load-InstallMetadata $arch
+$installMetadata = Load-InstallMetadata $arch
+$Client = $installMetadata.Client
+$ClientLabel = $installMetadata.ClientLabel
+$CliCommand = $installMetadata.CliCommand
+$CliPackage = $installMetadata.CliPackage
 Ensure-Node
 
 Write-Section "2. Install tools"
 Install-Cli
-Ensure-CcSwitch $arch
+$CcSwitchReady = Ensure-CcSwitch $arch
 
 Write-Section "3. Import config"
 Write-Progress "Redeeming the one-time install token"
-Redeem-AndImport $arch
+Redeem-AndImport $arch $CcSwitchReady

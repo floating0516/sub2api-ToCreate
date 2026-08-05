@@ -79,6 +79,11 @@ func TestInstallScriptsUseRequestOriginWithoutEmbeddingSecrets(t *testing.T) {
 				require.Contains(t, body, `PROCESSOR_ARCHITEW6432`)
 				require.Contains(t, body, `PROCESSOR_ARCHITECTURE`)
 				require.NotContains(t, body, `[System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture`)
+				require.NotContains(t, body, `$script:`)
+				require.Contains(t, body, `$installMetadata = Load-InstallMetadata $arch`)
+				require.Contains(t, body, `$ClientLabel = $installMetadata.ClientLabel`)
+				require.Contains(t, body, `$CcSwitchReady = Ensure-CcSwitch $arch`)
+				require.Contains(t, body, `Redeem-AndImport $arch $CcSwitchReady`)
 
 				preflightIndex := strings.LastIndex(body, "Write-Section \"1. Preflight\"")
 				require.NotEqual(t, -1, preflightIndex)
