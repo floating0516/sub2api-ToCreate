@@ -10,6 +10,11 @@ const pollOrderStatus = vi.hoisted(() => vi.fn())
 const verifyOrder = vi.hoisted(() => vi.fn())
 const verifyOrderPublic = vi.hoisted(() => vi.fn())
 const resolveOrderPublicByResumeToken = vi.hoisted(() => vi.fn())
+const appStoreState = vi.hoisted(() => ({
+  cachedPublicSettings: {
+    user_orders_enabled: true,
+  } as Record<string, unknown>,
+}))
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -34,6 +39,10 @@ vi.mock('@/stores/payment', () => ({
   usePaymentStore: () => ({
     pollOrderStatus,
   }),
+}))
+
+vi.mock('@/stores/app', () => ({
+  useAppStore: () => appStoreState,
 }))
 
 vi.mock('@/api/payment', () => ({
@@ -91,11 +100,29 @@ describe('PaymentResultView', () => {
     verifyOrder.mockReset()
     verifyOrderPublic.mockReset()
     resolveOrderPublicByResumeToken.mockReset()
+    appStoreState.cachedPublicSettings = { user_orders_enabled: true }
     window.localStorage.clear()
   })
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('hides the order-history action when the user orders page is disabled', async () => {
+    appStoreState.cachedPublicSettings = { user_orders_enabled: false }
+
+    const wrapper = mount(PaymentResultView, {
+      global: {
+        stubs: {
+          OrderStatusBadge: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.result.backToRecharge')
+    expect(wrapper.text()).not.toContain('payment.result.viewOrders')
   })
 
   it('renders a pending state instead of a failure state when the restored order is still pending', async () => {

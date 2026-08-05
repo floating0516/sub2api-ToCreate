@@ -30,6 +30,14 @@ export default {
           enabled: 'Enable Available Channels',
           enabledHint: 'When off, the sidebar entry is hidden and the endpoint returns an empty list.',
         },
+        userPages: {
+          title: 'User Pages',
+          description: 'Control which self-service pages users can see and open without affecting admin tools or existing data.',
+          redeemEnabled: 'Show user redemption page',
+          redeemEnabledHint: 'When off, redemption links are hidden from the sidebar and dashboard, and direct access is blocked.',
+          ordersEnabled: 'Show user orders page',
+          ordersEnabledHint: 'When off, order links and the payment-result action are hidden, and direct access is blocked.',
+        },
         modelPlaza: {
           title: 'Model Plaza',
           description: 'A public page showcasing available models and pricing by group. Disabled by default.',

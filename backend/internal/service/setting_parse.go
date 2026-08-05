@@ -191,6 +191,10 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		// Available channels feature (default disabled; opt-in)
 		SettingKeyAvailableChannelsEnabled: "false",
 
+		// User-facing redemption and order pages (default enabled; opt-out)
+		SettingKeyUserRedeemEnabled: "true",
+		SettingKeyUserOrdersEnabled: "true",
+
 		// Model plaza feature (default disabled; opt-in, public unless require_auth)
 		SettingKeyModelPlazaEnabled:     "false",
 		SettingKeyModelPlazaRequireAuth: "false",
@@ -788,6 +792,8 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Available channels feature (default: disabled; strict true)
 	result.AvailableChannelsEnabled = settings[SettingKeyAvailableChannelsEnabled] == "true"
+	result.UserRedeemEnabled = !isFalseSettingValue(settings[SettingKeyUserRedeemEnabled])
+	result.UserOrdersEnabled = !isFalseSettingValue(settings[SettingKeyUserOrdersEnabled])
 
 	// Model plaza feature (default: disabled; strict true)
 	result.ModelPlazaEnabled = settings[SettingKeyModelPlazaEnabled] == "true"

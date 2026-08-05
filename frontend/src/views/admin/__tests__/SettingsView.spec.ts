@@ -466,6 +466,8 @@ const baseSettingsResponse = {
   antigravity_user_agent_version: "",
   openai_codex_user_agent: "",
   payment_enabled: true,
+  user_redeem_enabled: true,
+  user_orders_enabled: true,
   payment_min_amount: 1,
   payment_max_amount: 10000,
   payment_daily_limit: 50000,
@@ -593,6 +595,16 @@ async function openUsersTab(wrapper: ReturnType<typeof mountView>) {
   await flushPromises();
 }
 
+async function openFeaturesTab(wrapper: ReturnType<typeof mountView>) {
+  const featuresTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.features"));
+
+  expect(featuresTabButton).toBeDefined();
+  await featuresTabButton?.trigger("click");
+  await flushPromises();
+}
+
 describe("admin SettingsView payment visible method controls", () => {
   beforeEach(() => {
     getSettings.mockReset();
@@ -685,6 +697,24 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
+  });
+
+  it("saves the redemption and order page visibility independently", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openFeaturesTab(wrapper);
+
+    await wrapper.get('[data-testid="user-redeem-enabled-toggle"]').setValue(false);
+    await wrapper.get('[data-testid="user-orders-enabled-toggle"]').setValue(false);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_redeem_enabled: false,
+        user_orders_enabled: false,
+      }),
+    );
   });
 
   it("submits the compact home page toggle", async () => {

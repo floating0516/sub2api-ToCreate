@@ -55,6 +55,12 @@ declare module 'vue-router' {
      */
     requiresRiskControl?: boolean
 
+    /** Whether the user-facing redemption page is enabled. */
+    requiresUserRedeem?: boolean
+
+    /** Whether the user-facing order-history page is enabled. */
+    requiresUserOrders?: boolean
+
     /**
      * i18n key for the page title
      */

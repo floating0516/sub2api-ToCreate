@@ -573,6 +573,12 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.AvailableChannelsEnabled != after.AvailableChannelsEnabled {
 		changed = append(changed, "available_channels_enabled")
 	}
+	if before.UserRedeemEnabled != after.UserRedeemEnabled {
+		changed = append(changed, "user_redeem_enabled")
+	}
+	if before.UserOrdersEnabled != after.UserOrdersEnabled {
+		changed = append(changed, "user_orders_enabled")
+	}
 	if before.ModelPlazaEnabled != after.ModelPlazaEnabled {
 		changed = append(changed, "model_plaza_enabled")
 	}

@@ -11,6 +11,7 @@ import { useAdminComplianceStore } from '@/stores/adminCompliance'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
 
@@ -282,7 +283,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Redeem Code',
       titleKey: 'redeem.title',
-      descriptionKey: 'redeem.description'
+      descriptionKey: 'redeem.description',
+      requiresUserRedeem: true
     }
   },
   {
@@ -365,7 +367,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Orders',
       titleKey: 'nav.myOrders',
-      requiresPayment: true
+      requiresPayment: true,
+      requiresUserOrders: true
     }
   },
   {
@@ -981,9 +984,15 @@ router.beforeEach(async (to, _from, next) => {
 
 
   // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
-  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 payment/risk_control
-  // 误判为“未启用”而错误拦截，故这里先确保设置加载完成。
-  if ((to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
+  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把功能开关误判为
+  // “未启用”而错误拦截，故这里先确保设置加载完成。
+  if (
+    (to.meta.requiresPayment ||
+      to.meta.requiresRiskControl ||
+      to.meta.requiresUserRedeem ||
+      to.meta.requiresUserOrders) &&
+    !appStore.publicSettingsLoaded
+  ) {
     try {
       await appStore.fetchPublicSettings()
     } catch (error) {
@@ -1008,6 +1017,24 @@ router.beforeEach(async (to, _from, next) => {
     appStore.cachedPublicSettings?.risk_control_enabled === false
   ) {
     next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+    return
+  }
+
+  if (
+    to.meta.requiresUserRedeem &&
+    appStore.publicSettingsLoaded &&
+    !isFeatureFlagEnabled(FeatureFlags.userRedeem)
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
+  }
+
+  if (
+    to.meta.requiresUserOrders &&
+    appStore.publicSettingsLoaded &&
+    !isFeatureFlagEnabled(FeatureFlags.userOrders)
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
     return
   }
 

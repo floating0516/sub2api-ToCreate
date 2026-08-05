@@ -402,6 +402,14 @@ const (
 	// sidebar entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
 
+	// SettingKeyUserRedeemEnabled controls whether the user-facing redemption page
+	// is visible and directly accessible. Admin redemption-code management is unaffected.
+	SettingKeyUserRedeemEnabled = "user_redeem_enabled"
+
+	// SettingKeyUserOrdersEnabled controls whether the user-facing order-history page
+	// is visible and directly accessible. Payment processing and admin order management are unaffected.
+	SettingKeyUserOrdersEnabled = "user_orders_enabled"
+
 	// SettingKeyModelPlazaEnabled is a DB-backed soft switch for the Model Plaza page
 	// (public group/model pricing showcase). When false: the plaza endpoint returns 404
 	// and the header entry is hidden. Defaults to false (opt-in feature).

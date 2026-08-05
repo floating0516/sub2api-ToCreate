@@ -68,3 +68,14 @@ describe('AppSidebar Quick Start access', () => {
     expect(componentSource).toContain('FeatureFlags.quickStartInstaller')
   })
 })
+
+describe('AppSidebar user-page switches', () => {
+  it('gates the redemption and order entries independently', () => {
+    expect(componentSource).toContain('FeatureFlags.userRedeem')
+    expect(componentSource).toContain('FeatureFlags.userOrders')
+    expect(componentSource).toContain("path: '/redeem'")
+    expect(componentSource).toContain('featureFlag: flagUserRedeem')
+    expect(componentSource).toContain("path: '/orders'")
+    expect(componentSource).toContain('featureFlag: flagUserOrders')
+  })
+})

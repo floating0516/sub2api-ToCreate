@@ -332,6 +332,8 @@ type UpdateSettingsRequest struct {
 
 	// Available Channels feature switch (user-facing)
 	AvailableChannelsEnabled *bool `json:"available_channels_enabled"`
+	UserRedeemEnabled        *bool `json:"user_redeem_enabled"`
+	UserOrdersEnabled        *bool `json:"user_orders_enabled"`
 
 	// Model Plaza feature switches + description
 	ModelPlazaEnabled     *bool   `json:"model_plaza_enabled"`
@@ -1859,6 +1861,18 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.AvailableChannelsEnabled
 		}(),
+		UserRedeemEnabled: func() bool {
+			if req.UserRedeemEnabled != nil {
+				return *req.UserRedeemEnabled
+			}
+			return previousSettings.UserRedeemEnabled
+		}(),
+		UserOrdersEnabled: func() bool {
+			if req.UserOrdersEnabled != nil {
+				return *req.UserOrdersEnabled
+			}
+			return previousSettings.UserOrdersEnabled
+		}(),
 		ModelPlazaEnabled: func() bool {
 			if req.ModelPlazaEnabled != nil {
 				return *req.ModelPlazaEnabled
@@ -2287,6 +2301,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ChannelMonitorDefaultIntervalSeconds: updatedSettings.ChannelMonitorDefaultIntervalSeconds,
 
 		AvailableChannelsEnabled: updatedSettings.AvailableChannelsEnabled,
+		UserRedeemEnabled:        updatedSettings.UserRedeemEnabled,
+		UserOrdersEnabled:        updatedSettings.UserOrdersEnabled,
 
 		ModelPlazaEnabled:     updatedSettings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth: updatedSettings.ModelPlazaRequireAuth,

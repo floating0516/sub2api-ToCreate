@@ -243,6 +243,7 @@ const formatCNY = (value: number): string =>
 
 const formatTokens = (value: number): string => {
   const absolute = Math.abs(value || 0)
+  if (absolute >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`
   if (absolute >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (absolute >= 1_000) return `${(value / 1_000).toFixed(1)}K`
   return Math.round(value || 0).toLocaleString(numberLocale.value)

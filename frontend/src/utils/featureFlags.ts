@@ -104,6 +104,16 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Available Channels',
   }),
+  userRedeem: defineFlag({
+    key: 'user_redeem_enabled',
+    mode: 'opt-out',
+    label: 'User Redeem Page',
+  }),
+  userOrders: defineFlag({
+    key: 'user_orders_enabled',
+    mode: 'opt-out',
+    label: 'User Orders Page',
+  }),
   quickStartInstaller: defineFlag({
     key: 'quick_start_installer_enabled',
     mode: 'opt-in',

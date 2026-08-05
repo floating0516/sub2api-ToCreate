@@ -30,6 +30,14 @@ export default {
           enabled: '启用可用渠道',
           enabledHint: '关闭后用户端侧边栏入口隐藏，接口返回空数组。',
         },
+        userPages: {
+          title: '用户端页面',
+          description: '控制普通用户可以看到和直接访问的自助功能页面，不影响管理员后台及已有数据。',
+          redeemEnabled: '显示用户兑换界面',
+          redeemEnabledHint: '关闭后隐藏侧边栏和仪表盘中的兑换入口，并阻止直接访问用户兑换页。',
+          ordersEnabled: '显示用户订单界面',
+          ordersEnabledHint: '关闭后隐藏订单入口和支付结果页的查看订单按钮，并阻止直接访问用户订单页。',
+        },
         modelPlaza: {
           title: '模型广场',
           description: '以分组为单位向访客展示可用模型与价格的公开页面。默认关闭。',
