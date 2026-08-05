@@ -91,8 +91,8 @@ const chartOption = computed<EChartsOption>(() => {
     backgroundColor: dark ? '#111827' : '#ffffff',
     animation: true,
     animationThreshold: 2000,
-    animationDuration: 480,
-    animationDurationUpdate: 360,
+    animationDuration: 300,
+    animationDurationUpdate: 240,
     animationEasing: 'cubicOut',
     animationEasingUpdate: 'cubicOut',
     aria: {

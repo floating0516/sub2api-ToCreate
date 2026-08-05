@@ -318,8 +318,8 @@ const chartOption = computed<EChartsOption>(() => {
   return {
     backgroundColor: surface,
     animation: true,
-    animationDuration: 420,
-    animationDurationUpdate: 360,
+    animationDuration: 260,
+    animationDurationUpdate: 240,
     animationEasing: 'cubicOut',
     aria: {
       enabled: true,

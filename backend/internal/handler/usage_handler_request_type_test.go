@@ -20,7 +20,9 @@ type userUsageRepoCapture struct {
 	listParams   pagination.PaginationParams
 	listFilters  usagestats.UsageLogFilters
 	statsFilters usagestats.UsageLogFilters
+	statsSummary bool
 	trendFilters usagestats.UsageLogFilters
+	modelTrend   []usagestats.ModelTrendPoint
 	groupFilters usagestats.UsageLogFilters
 	listRows     []service.UsageLog
 	stats        *usagestats.UsageStats
@@ -45,6 +47,15 @@ func (s *userUsageRepoCapture) GetStatsWithFilters(ctx context.Context, filters 
 		return s.stats, nil
 	}
 	return &usagestats.UsageStats{}, nil
+}
+
+func (s *userUsageRepoCapture) GetStatsSummaryWithFilters(ctx context.Context, filters usagestats.UsageLogFilters) (*usagestats.UsageStats, error) {
+	s.statsSummary = true
+	return s.GetStatsWithFilters(ctx, filters)
+}
+
+func (s *userUsageRepoCapture) GetUserModelUsageTrend(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.ModelTrendPoint, error) {
+	return s.modelTrend, nil
 }
 
 func (s *userUsageRepoCapture) GetUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, requestType *int16, stream *bool, billingType *int8) ([]usagestats.TrendDataPoint, error) {
@@ -89,9 +100,44 @@ func newUserUsageRequestTypeTestRouter(repo *userUsageRepoCapture) *gin.Engine {
 	})
 	router.GET("/usage", handler.List)
 	router.GET("/usage/stats", handler.Stats)
+	router.GET("/usage/dashboard/model-trends", handler.DashboardModelTrends)
 	router.GET("/usage/dashboard/models", handler.DashboardModels)
 	router.GET("/usage/dashboard/snapshot-v2", handler.DashboardSnapshotV2)
 	return router
+}
+
+func TestUserUsageStatsSummaryOnlyUsesLightweightRepositoryPath(t *testing.T) {
+	repo := &userUsageRepoCapture{}
+	router := newUserUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/usage/stats?summary_only=true&start_date=2026-03-01&end_date=2026-03-02", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.True(t, repo.statsSummary)
+	require.Equal(t, int64(42), repo.statsFilters.UserID)
+}
+
+func TestUserDashboardModelTrendsReturnsBatchSeries(t *testing.T) {
+	repo := &userUsageRepoCapture{
+		modelTrend: []usagestats.ModelTrendPoint{{
+			Date:        "2026-03-01",
+			Model:       "gpt-5.6-sol",
+			Rank:        1,
+			Requests:    3,
+			TotalTokens: 900,
+		}},
+	}
+	router := newUserUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/usage/dashboard/model-trends?start_date=2026-03-01&end_date=2026-03-02&limit=8", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "gpt-5.6-sol")
+	require.Contains(t, rec.Body.String(), `"rank":1`)
 }
 
 func TestUserUsageListRequestTypePriority(t *testing.T) {

@@ -400,7 +400,17 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.usageService.GetStatsWithFilters(c.Request.Context(), parsed.Filters)
+	summaryOnly, ok := parseBoolQueryWithDefault(c, "summary_only", false)
+	if !ok {
+		return
+	}
+	var stats *usagestats.UsageStats
+	var err error
+	if summaryOnly {
+		stats, err = h.usageService.GetStatsSummaryWithFilters(c.Request.Context(), parsed.Filters)
+	} else {
+		stats, err = h.usageService.GetStatsWithFilters(c.Request.Context(), parsed.Filters)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -444,7 +454,17 @@ func (h *UsageHandler) DashboardStats(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.usageService.GetUserDashboardStats(c.Request.Context(), subject.UserID)
+	summaryOnly, ok := parseBoolQueryWithDefault(c, "summary_only", false)
+	if !ok {
+		return
+	}
+	var stats *usagestats.UserDashboardStats
+	var err error
+	if summaryOnly {
+		stats, err = h.usageService.GetUserDashboardSummaryStats(c.Request.Context(), subject.UserID)
+	} else {
+		stats, err = h.usageService.GetUserDashboardStats(c.Request.Context(), subject.UserID)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -468,6 +488,49 @@ func (h *UsageHandler) DashboardTrend(c *gin.Context) {
 		return
 	}
 
+	response.Success(c, gin.H{
+		"trend":       trend,
+		"start_date":  parsed.StartTime.Format("2006-01-02"),
+		"end_date":    parsed.EndTime.Add(-24 * time.Hour).Format("2006-01-02"),
+		"granularity": granularity,
+	})
+}
+
+// DashboardModelTrends returns the top model series in a single response.
+// GET /api/v1/usage/dashboard/model-trends
+func (h *UsageHandler) DashboardModelTrends(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	parsed, ok := h.parseUserUsageFilters(c, true)
+	if !ok {
+		return
+	}
+	granularity := c.DefaultQuery("granularity", "day")
+	limit := 8
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		parsedLimit, err := strconv.Atoi(raw)
+		if err != nil || parsedLimit <= 0 || parsedLimit > 12 {
+			response.BadRequest(c, "Invalid limit, use a value from 1 to 12")
+			return
+		}
+		limit = parsedLimit
+	}
+
+	trend, err := h.usageService.GetUserModelUsageTrend(
+		c.Request.Context(),
+		subject.UserID,
+		parsed.StartTime,
+		parsed.EndTime,
+		granularity,
+		limit,
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	response.Success(c, gin.H{
 		"trend":       trend,
 		"start_date":  parsed.StartTime.Format("2006-01-02"),

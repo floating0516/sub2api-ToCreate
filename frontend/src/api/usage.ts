@@ -10,6 +10,7 @@ import type {
   UsageStatsResponse,
   PaginatedResponse,
   TrendDataPoint,
+  ModelTrendPoint,
   ModelStat,
   GroupStat,
   UsageRequestType,
@@ -71,6 +72,13 @@ export interface TrendParams {
 
 export interface TrendResponse {
   trend: TrendDataPoint[]
+  start_date: string
+  end_date: string
+  granularity: string
+}
+
+export interface ModelTrendResponse {
+  trend: ModelTrendPoint[]
   start_date: string
   end_date: string
   granularity: string
@@ -211,6 +219,20 @@ export async function getStatsByDateRange(
   return data
 }
 
+export async function getStatsSummaryByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<UsageStatsResponse> {
+  const { data } = await apiClient.get<UsageStatsResponse>('/usage/stats', {
+    params: {
+      start_date: startDate,
+      end_date: endDate,
+      summary_only: true
+    }
+  })
+  return data
+}
+
 /**
  * Get usage by date range
  * @param startDate - Start date (YYYY-MM-DD format)
@@ -256,8 +278,8 @@ export async function getById(id: number): Promise<UsageLog> {
  * Get user dashboard statistics
  * @returns Dashboard statistics for current user
  */
-export async function getDashboardStats(): Promise<UserDashboardStats> {
-  const { data } = await apiClient.get<UserDashboardStats>('/usage/dashboard/stats')
+export async function getDashboardStats(params?: { summary_only?: boolean }): Promise<UserDashboardStats> {
+  const { data } = await apiClient.get<UserDashboardStats>('/usage/dashboard/stats', { params })
   return data
 }
 
@@ -268,6 +290,15 @@ export async function getDashboardStats(): Promise<UserDashboardStats> {
  */
 export async function getDashboardTrend(params?: TrendParams): Promise<TrendResponse> {
   const { data } = await apiClient.get<TrendResponse>('/usage/dashboard/trend', { params })
+  return data
+}
+
+export async function getDashboardModelTrends(
+  params?: TrendParams & { limit?: number }
+): Promise<ModelTrendResponse> {
+  const { data } = await apiClient.get<ModelTrendResponse>('/usage/dashboard/model-trends', {
+    params
+  })
   return data
 }
 
@@ -373,11 +404,13 @@ export const usageAPI = {
   query,
   getStats,
   getStatsByDateRange,
+  getStatsSummaryByDateRange,
   getByDateRange,
   getById,
   // Dashboard
   getDashboardStats,
   getDashboardTrend,
+  getDashboardModelTrends,
   getDashboardModels,
   getMyApiKeyDailyUsage,
   getDashboardSnapshotV2,

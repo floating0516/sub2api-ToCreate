@@ -657,6 +657,15 @@ func (r *usageLogRepository) GetGlobalStats(ctx context.Context, startTime, endT
 
 // GetStatsWithFilters gets usage statistics with optional filters
 func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters UsageLogFilters) (*UsageStats, error) {
+	return r.getStatsWithFilters(ctx, filters, true)
+}
+
+// GetStatsSummaryWithFilters skips endpoint breakdowns for summary-only surfaces.
+func (r *usageLogRepository) GetStatsSummaryWithFilters(ctx context.Context, filters UsageLogFilters) (*UsageStats, error) {
+	return r.getStatsWithFilters(ctx, filters, false)
+}
+
+func (r *usageLogRepository) getStatsWithFilters(ctx context.Context, filters UsageLogFilters, includeBreakdowns bool) (*UsageStats, error) {
 	conditions := make([]string, 0, 9)
 	args := make([]any, 0, 9)
 
@@ -737,6 +746,14 @@ func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters Us
 			&totalAccountCost,
 			&stats.AverageDurationMs,
 		)
+	}
+	if !includeBreakdowns {
+		if err := runSummary(ctx); err != nil {
+			return nil, err
+		}
+		stats.TotalAccountCost = &totalAccountCost
+		stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheTokens
+		return stats, nil
 	}
 	// endpoint 明细:best-effort(失败 log + 返空),不致命。
 	runEndpoints := func(c context.Context) {

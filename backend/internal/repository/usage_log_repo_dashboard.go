@@ -526,6 +526,38 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	return stats, nil
 }
 
+// GetUserDashboardSummaryStats returns only the lifetime token total and current RPM/TPM.
+// It avoids the API-key, daily, platform, cost, and latency queries used by the full dashboard response.
+func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*UserDashboardStats, error) {
+	stats := &UserDashboardStats{}
+	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+	query := `
+		SELECT
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS total_tokens,
+			COUNT(*) FILTER (WHERE created_at >= $2) AS recent_requests,
+			COALESCE(SUM(input_tokens + output_tokens) FILTER (WHERE created_at >= $2), 0) AS recent_tokens
+		FROM usage_logs
+		WHERE user_id = $1
+	`
+
+	var recentRequests int64
+	var recentTokens int64
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		[]any{userID, fiveMinutesAgo},
+		&stats.TotalTokens,
+		&recentRequests,
+		&recentTokens,
+	); err != nil {
+		return nil, err
+	}
+	stats.Rpm = recentRequests / 5
+	stats.Tpm = recentTokens / 5
+	return stats, nil
+}
+
 // getPerformanceStatsByAPIKey 获取指定 API Key 的 RPM 和 TPM（近5分钟平均值）
 func (r *usageLogRepository) getPerformanceStatsByAPIKey(ctx context.Context, apiKeyID int64) (rpm, tpm int64, err error) {
 	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)

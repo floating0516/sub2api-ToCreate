@@ -391,6 +391,22 @@ func (s *UsageService) GetUserDashboardStats(ctx context.Context, userID int64) 
 	return stats, nil
 }
 
+// GetUserDashboardSummaryStats returns the lightweight subset used by the user dashboard.
+func (s *UsageService) GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*usagestats.UserDashboardStats, error) {
+	type dashboardSummaryRepo interface {
+		GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*usagestats.UserDashboardStats, error)
+	}
+	repo, ok := s.usageRepo.(dashboardSummaryRepo)
+	if !ok {
+		return s.GetUserDashboardStats(ctx, userID)
+	}
+	stats, err := repo.GetUserDashboardSummaryStats(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user dashboard summary stats: %w", err)
+	}
+	return stats, nil
+}
+
 // GetAPIKeyDashboardStats returns dashboard summary stats filtered by API Key.
 func (s *UsageService) GetAPIKeyDashboardStats(ctx context.Context, apiKeyID int64) (*usagestats.UserDashboardStats, error) {
 	stats, err := s.usageRepo.GetAPIKeyDashboardStats(ctx, apiKeyID)
@@ -424,6 +440,22 @@ func (s *UsageService) GetUsageTrendWithFilters(ctx context.Context, startTime, 
 	trend, err := s.usageRepo.GetUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, filters.BillingType)
 	if err != nil {
 		return nil, fmt.Errorf("get usage trend with filters: %w", err)
+	}
+	return trend, nil
+}
+
+// GetUserModelUsageTrend returns top-model time series in one repository query.
+func (s *UsageService) GetUserModelUsageTrend(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.ModelTrendPoint, error) {
+	type modelTrendRepo interface {
+		GetUserModelUsageTrend(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.ModelTrendPoint, error)
+	}
+	repo, ok := s.usageRepo.(modelTrendRepo)
+	if !ok {
+		return nil, errors.New("user model usage trend is not supported")
+	}
+	trend, err := repo.GetUserModelUsageTrend(ctx, userID, startTime, endTime, granularity, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get user model usage trend: %w", err)
 	}
 	return trend, nil
 }
@@ -551,6 +583,22 @@ func (s *UsageService) GetStatsWithFilters(ctx context.Context, filters usagesta
 	stats, err := s.usageRepo.GetStatsWithFilters(ctx, filters)
 	if err != nil {
 		return nil, fmt.Errorf("get usage stats with filters: %w", err)
+	}
+	return stats, nil
+}
+
+// GetStatsSummaryWithFilters skips endpoint breakdowns when callers only need totals.
+func (s *UsageService) GetStatsSummaryWithFilters(ctx context.Context, filters usagestats.UsageLogFilters) (*usagestats.UsageStats, error) {
+	type usageStatsSummaryRepo interface {
+		GetStatsSummaryWithFilters(ctx context.Context, filters usagestats.UsageLogFilters) (*usagestats.UsageStats, error)
+	}
+	repo, ok := s.usageRepo.(usageStatsSummaryRepo)
+	if !ok {
+		return s.GetStatsWithFilters(ctx, filters)
+	}
+	stats, err := repo.GetStatsSummaryWithFilters(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("get usage stats summary with filters: %w", err)
 	}
 	return stats, nil
 }

@@ -130,7 +130,7 @@ import { keysAPI } from '@/api/keys'
 import { maskQuickStartKey } from '@/utils/quickstart'
 import type {
   ApiKey,
-  ModelStat,
+  ModelTrendPoint,
   TrendDataPoint,
   UsageStatsResponse
 } from '@/types'
@@ -190,7 +190,6 @@ const rangeStats = ref<UsageStatsResponse | null>(null)
 const previousStats = ref<UsageStatsResponse | null>(null)
 const paymentSummary = ref<UserPaymentSummary | null>(null)
 const previousPaymentSummary = ref<UserPaymentSummary | null>(null)
-const modelStats = ref<ModelStat[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const chartLabels = ref<string[]>([])
 const chartSeries = ref<DashboardTrendSeries[]>([])
@@ -201,6 +200,7 @@ const loadingCalendar = ref(true)
 const errorMessage = ref('')
 let chartRequestID = 0
 let calendarRequestID = 0
+let apiKeysPromise: Promise<void> | null = null
 
 const numberLocale = computed(() => (locale.value.startsWith('zh') ? 'zh-CN' : 'en-US'))
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -387,16 +387,8 @@ const metrics = computed<MetricItem[]>(() => {
   ]
 })
 
-const sortedModels = computed(() =>
-  [...modelStats.value].sort((left, right) => right.total_tokens - left.total_tokens)
-)
-
-const visibleModelColors = computed<Record<string, string>>(() => {
-  const names = [
-    ...new Set(
-      sortedModels.value.slice(0, MAX_CHART_MODEL_SERIES).map((item) => item.model)
-    )
-  ].sort((left, right) => left.localeCompare(right))
+const buildModelColors = (modelNames: string[]): Record<string, string> => {
+  const names = [...new Set(modelNames)].sort((left, right) => left.localeCompare(right))
   const colors: Record<string, string> = {}
   const usedIndexes = new Set<number>()
 
@@ -415,7 +407,7 @@ const visibleModelColors = computed<Record<string, string>>(() => {
   })
 
   return colors
-})
+}
 
 const buildBucketKeys = (): string[] => {
   if (granularity.value === 'hour') {
@@ -449,32 +441,35 @@ const trendParams = (extra: { model?: string; api_key_id?: number } = {}) => ({
   ...extra
 })
 
-const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
-  const models = sortedModels.value.slice(0, MAX_CHART_MODEL_SERIES)
-  if (!models.length) {
-    const total = await usageAPI.getDashboardTrend(trendParams())
-    if (requestID !== chartRequestID) return
-    const values = normalizeTrend(total.trend || [], buckets)
-    chartSeries.value = [{
-      label: t('dashboard.overview.allModels'),
-      color: MODEL_COLOR_PALETTE[0],
-      values
-    }]
-    return
-  }
-
-  const responses = await Promise.all(
-    models.map((model) => usageAPI.getDashboardTrend(trendParams({ model: model.model })))
+const normalizeModelTrend = (
+  trend: ModelTrendPoint[],
+  model: string,
+  buckets: string[]
+): number[] => {
+  const values = new Map(
+    trend.filter((point) => point.model === model).map((point) => [point.date, point.total_tokens])
   )
+  return buckets.map((bucket) => values.get(bucket) || 0)
+}
+
+const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
+  const response = await usageAPI.getDashboardModelTrends({
+    ...trendParams(),
+    limit: MAX_CHART_MODEL_SERIES
+  })
   if (requestID !== chartRequestID) return
 
-  const modelValues = responses.slice(0, models.length).map((response) =>
-    normalizeTrend(response.trend || [], buckets)
-  )
-  chartSeries.value = models.map((model, index) => ({
-    label: model.model,
-    color: visibleModelColors.value[model.model] || MODEL_COLOR_PALETTE[index],
-    values: modelValues[index]
+  const trend = response.trend || []
+  const rankedModels = [
+    ...new Map(trend.map((point) => [point.model, point.rank] as const)).entries()
+  ]
+    .sort((left, right) => left[1] - right[1])
+    .map(([model]) => model)
+  const colors = buildModelColors(rankedModels)
+  chartSeries.value = rankedModels.map((model, index) => ({
+    label: model,
+    color: colors[model] || MODEL_COLOR_PALETTE[index],
+    values: normalizeModelTrend(trend, model, buckets)
   }))
 }
 
@@ -502,7 +497,22 @@ const loadCalendarUsage = async () => {
   }
 }
 
+const ensureApiKeys = async (): Promise<void> => {
+  if (apiKeys.value.length > 0) return
+  if (apiKeysPromise) return apiKeysPromise
+  apiKeysPromise = keysAPI.list(1, 100)
+    .then((response) => {
+      apiKeys.value = response.items || []
+    })
+    .finally(() => {
+      apiKeysPromise = null
+    })
+  return apiKeysPromise
+}
+
 const loadApiKeyTrendSeries = async (requestID: number, buckets: string[]) => {
+  await ensureApiKeys()
+  if (requestID !== chartRequestID) return
   const selectedKey = apiKeys.value.find((key) => key.id === selectedApiKeyID.value)
   const response = await usageAPI.getDashboardTrend(
     trendParams(selectedKey ? { api_key_id: selectedKey.id } : {})
@@ -536,15 +546,14 @@ const loadTrendSeries = async () => {
   }
 }
 
-const refreshDashboard = async () => {
+const loadOverview = async () => {
   loadingOverview.value = true
-  errorMessage.value = ''
   try {
-    const [dashboard, current, previous, currentPayment, previousPayment, models, keys] =
+    const [dashboard, current, previous, currentPayment, previousPayment] =
       await Promise.all([
-        usageAPI.getDashboardStats(),
-        usageAPI.getStatsByDateRange(startDate.value, endDate.value),
-        usageAPI.getStatsByDateRange(previousRange.value.start, previousRange.value.end),
+        usageAPI.getDashboardStats({ summary_only: true }),
+        usageAPI.getStatsSummaryByDateRange(startDate.value, endDate.value),
+        usageAPI.getStatsSummaryByDateRange(previousRange.value.start, previousRange.value.end),
         paymentAPI.getSummary({
           start_date: startDate.value,
           end_date: endDate.value,
@@ -554,28 +563,28 @@ const refreshDashboard = async () => {
           start_date: previousRange.value.start,
           end_date: previousRange.value.end,
           timezone: browserTimezone
-        }),
-        usageAPI.getDashboardModels({
-          start_date: startDate.value,
-          end_date: endDate.value,
-          timezone: browserTimezone
-        }),
-        keysAPI.list(1, 100)
+        })
       ])
     dashboardStats.value = dashboard
     rangeStats.value = current
     previousStats.value = previous
     paymentSummary.value = currentPayment
     previousPaymentSummary.value = previousPayment
-    modelStats.value = models.models || []
-    apiKeys.value = keys.items || []
   } catch (error) {
     console.error('Failed to load dashboard:', error)
     errorMessage.value = t('dashboard.overview.loadFailed')
   } finally {
     loadingOverview.value = false
   }
-  await Promise.all([loadTrendSeries(), loadCalendarUsage()])
+}
+
+const refreshDashboard = async () => {
+  errorMessage.value = ''
+  await Promise.allSettled([
+    loadOverview(),
+    loadTrendSeries(),
+    loadCalendarUsage()
+  ])
 }
 
 const setGranularity = async (value: Granularity) => {

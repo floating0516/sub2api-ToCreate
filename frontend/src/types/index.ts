@@ -1848,6 +1848,14 @@ export interface TrendDataPoint {
   actual_cost: number // 实际扣除
 }
 
+export interface ModelTrendPoint {
+  date: string
+  model: string
+  rank: number
+  requests: number
+  total_tokens: number
+}
+
 export interface ModelStat {
   model: string
   requests: number

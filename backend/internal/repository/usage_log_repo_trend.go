@@ -263,6 +263,76 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 	return results, nil
 }
 
+// GetUserModelUsageTrend returns the top models and all of their time buckets in one query.
+func (r *usageLogRepository) GetUserModelUsageTrend(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string, limit int) (results []usagestats.ModelTrendPoint, err error) {
+	if limit <= 0 {
+		limit = 8
+	}
+	if limit > 12 {
+		limit = 12
+	}
+
+	dateFormat := safeDateFormat(granularity)
+	modelExpr := resolveModelDimensionExpression(usagestats.ModelSourceRequested)
+	query := fmt.Sprintf(`
+		WITH filtered AS (
+			SELECT
+				created_at,
+				%s AS model,
+				(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) AS tokens
+			FROM usage_logs
+			WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+		), model_totals AS (
+			SELECT model, SUM(tokens) AS total_tokens
+			FROM filtered
+			WHERE model IS NOT NULL AND model <> ''
+			GROUP BY model
+		), top_models AS (
+			SELECT
+				model,
+				total_tokens,
+				ROW_NUMBER() OVER (ORDER BY total_tokens DESC, model ASC) AS rank
+			FROM model_totals
+			ORDER BY total_tokens DESC, model ASC
+			LIMIT $4
+		)
+		SELECT
+			TO_CHAR(f.created_at, '%s') AS date,
+			f.model,
+			tm.rank,
+			COUNT(*) AS requests,
+			COALESCE(SUM(f.tokens), 0) AS total_tokens
+		FROM filtered f
+		JOIN top_models tm ON tm.model = f.model
+		GROUP BY date, f.model, tm.rank, tm.total_tokens
+		ORDER BY date ASC, tm.rank ASC
+	`, modelExpr, dateFormat)
+
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
+
+	results = make([]usagestats.ModelTrendPoint, 0)
+	for rows.Next() {
+		var row usagestats.ModelTrendPoint
+		if err = rows.Scan(&row.Date, &row.Model, &row.Rank, &row.Requests, &row.TotalTokens); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // GetUserModelStats 获取指定用户的模型统计
 func (r *usageLogRepository) GetUserModelStats(ctx context.Context, userID int64, startTime, endTime time.Time) (results []ModelStat, err error) {
 	return r.getModelStatsWithFiltersBySource(ctx, startTime, endTime, userID, 0, 0, 0, "", nil, nil, nil, usagestats.ModelSourceRequested, "")
