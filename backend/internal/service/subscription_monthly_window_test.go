@@ -13,7 +13,8 @@ import (
 
 type activateWindowUserSubRepo struct {
 	userSubRepoNoop
-	windowStart time.Time
+	dailyStart    time.Time
+	periodicStart time.Time
 }
 
 type monthlyResetUserSubRepo struct {
@@ -28,8 +29,9 @@ func (r *monthlyResetUserSubRepo) ResetMonthlyUsage(_ context.Context, _ int64, 
 	return nil
 }
 
-func (r *activateWindowUserSubRepo) ActivateWindows(_ context.Context, _ int64, start time.Time) error {
-	r.windowStart = start
+func (r *activateWindowUserSubRepo) ActivateWindows(_ context.Context, _ int64, dailyStart, periodicStart time.Time) error {
+	r.dailyStart = dailyStart
+	r.periodicStart = periodicStart
 	return nil
 }
 
@@ -47,8 +49,9 @@ func TestDelayedFirstUseAnchorsMonthlyWindowAtSubscriptionStart(t *testing.T) {
 
 	require.NoError(t, svc.CheckAndActivateWindow(context.Background(), sub))
 
-	require.Equal(t, startsAt, repo.windowStart)
-	monthlyWindowStart := repo.windowStart
+	require.Equal(t, startsAt, repo.dailyStart)
+	require.Equal(t, startsAt, repo.periodicStart)
+	monthlyWindowStart := repo.periodicStart
 	resetAt, ok := sub.automaticWindowStartAt(&monthlyWindowStart, 30*24*time.Hour, startsAt.Add(30*24*time.Hour))
 	require.True(t, ok)
 	require.Equal(t, startsAt.Add(30*24*time.Hour), resetAt)

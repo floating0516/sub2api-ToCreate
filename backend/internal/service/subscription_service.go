@@ -1133,7 +1133,7 @@ func (s *SubscriptionService) checkAndActivateWindowAt(ctx context.Context, sub 
 	if windowStart.IsZero() {
 		windowStart = now
 	}
-	return s.userSubRepo.ActivateWindows(ctx, sub.ID, windowStart)
+	return s.userSubRepo.ActivateWindows(ctx, sub.ID, windowStart, windowStart)
 }
 
 // AdminResetQuota manually resets the daily, weekly, and/or monthly usage windows.
@@ -1149,7 +1149,7 @@ func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionI
 	}
 	now := s.currentTime()
 	if sub.StartsAt.IsZero() {
-		if err := s.userSubRepo.ResetUsageWindows(ctx, sub.ID, resetDaily, resetWeekly, resetMonthly, now); err != nil {
+		if err := s.userSubRepo.ResetUsageWindows(ctx, sub.ID, resetDaily, resetWeekly, resetMonthly, now, now); err != nil {
 			return nil, err
 		}
 	} else {
