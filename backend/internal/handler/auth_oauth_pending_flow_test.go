@@ -2683,6 +2683,10 @@ func (r *oauthPendingFlowPromoRepoStub) ListUsagesByPromoCode(context.Context, i
 	panic("unexpected ListUsagesByPromoCode call")
 }
 
+func (r *oauthPendingFlowPromoRepoStub) ListUsagesByUser(context.Context, int64, int) ([]service.PromoCodeUsage, error) {
+	panic("unexpected ListUsagesByUser call")
+}
+
 func (r *oauthPendingFlowPromoRepoStub) IncrementUsedCount(context.Context, int64) error {
 	if r.promo != nil {
 		r.promo.UsedCount++

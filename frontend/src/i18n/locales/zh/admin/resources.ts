@@ -456,7 +456,7 @@ export default {
     // Promo Codes
     promo: {
       title: '优惠码管理',
-      description: '创建和管理注册优惠码',
+      description: '创建和管理可供注册或登录用户使用的共享优惠码',
       createCode: '创建优惠码',
       editCode: '编辑优惠码',
       deleteCode: '删除优惠码',

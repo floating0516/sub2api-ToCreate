@@ -244,6 +244,24 @@ func (r *promoCodeRepository) ListUsagesByPromoCode(ctx context.Context, promoCo
 	return outUsages, paginationResultFromTotal(int64(total), params), nil
 }
 
+func (r *promoCodeRepository) ListUsagesByUser(ctx context.Context, userID int64, limit int) ([]service.PromoCodeUsage, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+
+	usages, err := r.client.PromoCodeUsage.Query().
+		Where(promocodeusage.UserIDEQ(userID)).
+		WithPromoCode().
+		Limit(limit).
+		Order(dbent.Desc(promocodeusage.FieldUsedAt), dbent.Desc(promocodeusage.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return promoCodeUsageEntitiesToService(usages), nil
+}
+
 func (r *promoCodeRepository) IncrementUsedCount(ctx context.Context, id int64) error {
 	client := clientFromContext(ctx, r.client)
 	_, err := client.PromoCode.UpdateOneID(id).
@@ -295,6 +313,9 @@ func promoCodeUsageEntityToService(m *dbent.PromoCodeUsage) *service.PromoCodeUs
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
+	}
+	if m.Edges.PromoCode != nil {
+		out.PromoCode = promoCodeEntityToService(m.Edges.PromoCode)
 	}
 	return out
 }

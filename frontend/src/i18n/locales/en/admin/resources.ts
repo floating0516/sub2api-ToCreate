@@ -459,7 +459,7 @@ export default {
     // Promo Codes
     promo: {
       title: 'Promo Code Management',
-      description: 'Create and manage registration promo codes',
+      description: 'Create and manage shared promo codes for registration or signed-in users',
       createCode: 'Create Promo Code',
       editCode: 'Edit Promo Code',
       deleteCode: 'Delete Promo Code',

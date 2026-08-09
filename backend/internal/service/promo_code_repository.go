@@ -24,6 +24,7 @@ type PromoCodeRepository interface {
 	CreateUsage(ctx context.Context, usage *PromoCodeUsage) error
 	GetUsageByPromoCodeAndUser(ctx context.Context, promoCodeID, userID int64) (*PromoCodeUsage, error)
 	ListUsagesByPromoCode(ctx context.Context, promoCodeID int64, params pagination.PaginationParams) ([]PromoCodeUsage, *pagination.PaginationResult, error)
+	ListUsagesByUser(ctx context.Context, userID int64, limit int) ([]PromoCodeUsage, error)
 
 	// 计数操作
 	IncrementUsedCount(ctx context.Context, id int64) error
