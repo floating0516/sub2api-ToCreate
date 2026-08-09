@@ -371,7 +371,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ModelPlazaEnabled:     settings[SettingKeyModelPlazaEnabled] == "true",
 		ModelPlazaRequireAuth: settings[SettingKeyModelPlazaRequireAuth] == "true",
 
-		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
+		AffiliateEnabled:           settings[SettingKeyAffiliateEnabled] == "true",
 		AccountContributionEnabled: settings[SettingKeyAccountContributionEnabled] == "true",
 		AccountContributionSubmissionEnabled: settings[SettingKeyAccountContributionEnabled] == "true" &&
 			settings[SettingKeyAccountContributionSubmissionEnabled] == "true",
@@ -634,8 +634,8 @@ type PublicSettingsInjectionPayload struct {
 	AccountContributionSubmissionEnabled bool `json:"account_contribution_submission_enabled"`
 	AccountContributionPayoutEnabled     bool `json:"account_contribution_payout_enabled"`
 
-	RiskControlEnabled           bool `json:"risk_control_enabled"`
-	AllowUserViewErrorRequests   bool `json:"allow_user_view_error_requests"`
+	RiskControlEnabled         bool `json:"risk_control_enabled"`
+	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.

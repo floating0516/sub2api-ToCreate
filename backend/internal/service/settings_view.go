@@ -166,12 +166,12 @@ type SystemSettings struct {
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 
-	DefaultConcurrency           int
-	DefaultBalance               float64
-	RiskControlEnabled           bool
-	CyberSessionBlockEnabled     bool
-	CyberSessionBlockTTLSeconds  int
-	AffiliateEnabled             bool
+	DefaultConcurrency          int
+	DefaultBalance              float64
+	RiskControlEnabled          bool
+	CyberSessionBlockEnabled    bool
+	CyberSessionBlockTTLSeconds int
+	AffiliateEnabled            bool
 
 	AccountContributionEnabled           bool
 	AccountContributionSubmissionEnabled bool
