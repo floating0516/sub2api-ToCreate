@@ -352,6 +352,10 @@ type UpdateSettingsRequest struct {
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled *bool `json:"affiliate_enabled"`
 
+	AccountContributionEnabled           *bool `json:"account_contribution_enabled"`
+	AccountContributionSubmissionEnabled *bool `json:"account_contribution_submission_enabled"`
+	AccountContributionPayoutEnabled     *bool `json:"account_contribution_payout_enabled"`
+
 	// 风控中心功能开关
 	RiskControlEnabled *bool `json:"risk_control_enabled"`
 
@@ -1953,6 +1957,25 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.AffiliateEnabled
 		}(),
+
+		AccountContributionEnabled: func() bool {
+			if req.AccountContributionEnabled != nil {
+				return *req.AccountContributionEnabled
+			}
+			return previousSettings.AccountContributionEnabled
+		}(),
+		AccountContributionSubmissionEnabled: func() bool {
+			if req.AccountContributionSubmissionEnabled != nil {
+				return *req.AccountContributionSubmissionEnabled
+			}
+			return previousSettings.AccountContributionSubmissionEnabled
+		}(),
+		AccountContributionPayoutEnabled: func() bool {
+			if req.AccountContributionPayoutEnabled != nil {
+				return *req.AccountContributionPayoutEnabled
+			}
+			return previousSettings.AccountContributionPayoutEnabled
+		}(),
 		RiskControlEnabled: func() bool {
 			if req.RiskControlEnabled != nil {
 				return *req.RiskControlEnabled
@@ -1971,6 +1994,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.CyberSessionBlockTTLSeconds
 		}(),
+	}
+	if !settings.AccountContributionEnabled {
+		settings.AccountContributionSubmissionEnabled = false
+		settings.AccountContributionPayoutEnabled = false
 	}
 
 	// req.AuthSourceXxxPlatformQuotas 为 nil 表示本次请求未包含该 source 的 quota 配置（保留 previousAuthSourceDefaults 中的值）；
@@ -2373,6 +2400,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ModelPlazaDescription: updatedSettings.ModelPlazaDescription,
 
 		AffiliateEnabled: updatedSettings.AffiliateEnabled,
+
+		AccountContributionEnabled:           updatedSettings.AccountContributionEnabled,
+		AccountContributionSubmissionEnabled: updatedSettings.AccountContributionSubmissionEnabled,
+		AccountContributionPayoutEnabled:     updatedSettings.AccountContributionPayoutEnabled,
 
 		RiskControlEnabled:          updatedSettings.RiskControlEnabled,
 		CyberSessionBlockEnabled:    updatedSettings.CyberSessionBlockEnabled,

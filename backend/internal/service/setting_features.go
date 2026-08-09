@@ -101,6 +101,33 @@ func (s *SettingService) IsAffiliateEnabled(ctx context.Context) bool {
 	return value == "true"
 }
 
+// IsAccountContributionEnabled reports whether the contributor module is visible.
+// Missing settings fail closed.
+func (s *SettingService) IsAccountContributionEnabled(ctx context.Context) bool {
+	return s.isStrictlyEnabled(ctx, SettingKeyAccountContributionEnabled)
+}
+
+// IsAccountContributionSubmissionEnabled gates every future credential or
+// account submission write path independently from module visibility.
+func (s *SettingService) IsAccountContributionSubmissionEnabled(ctx context.Context) bool {
+	return s.IsAccountContributionEnabled(ctx) &&
+		s.isStrictlyEnabled(ctx, SettingKeyAccountContributionSubmissionEnabled)
+}
+
+// IsAccountContributionPayoutEnabled gates every future payout request path.
+func (s *SettingService) IsAccountContributionPayoutEnabled(ctx context.Context) bool {
+	return s.IsAccountContributionEnabled(ctx) &&
+		s.isStrictlyEnabled(ctx, SettingKeyAccountContributionPayoutEnabled)
+}
+
+func (s *SettingService) isStrictlyEnabled(ctx context.Context, key string) bool {
+	if s == nil || s.settingRepo == nil {
+		return false
+	}
+	value, err := s.settingRepo.GetValue(ctx, key)
+	return err == nil && value == "true"
+}
+
 // IsAffiliateAdminRechargeEnabled reports whether admin balance
 // deposits should participate in the affiliate rebate program.
 func (s *SettingService) IsAffiliateAdminRechargeEnabled(ctx context.Context) bool {

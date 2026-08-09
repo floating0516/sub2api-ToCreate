@@ -303,6 +303,9 @@ export interface PublicSettings {
   model_plaza_require_auth: boolean
   service_quota_enabled: boolean
   affiliate_enabled: boolean
+  account_contribution_enabled?: boolean
+  account_contribution_submission_enabled?: boolean
+  account_contribution_payout_enabled?: boolean
   allow_user_view_error_requests?: boolean
 }
 

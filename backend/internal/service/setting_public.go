@@ -238,6 +238,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyModelPlazaEnabled,
 		SettingKeyModelPlazaRequireAuth,
 		SettingKeyAffiliateEnabled,
+		SettingKeyAccountContributionEnabled,
+		SettingKeyAccountContributionSubmissionEnabled,
+		SettingKeyAccountContributionPayoutEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
 	}
@@ -369,6 +372,11 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ModelPlazaRequireAuth: settings[SettingKeyModelPlazaRequireAuth] == "true",
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
+		AccountContributionEnabled: settings[SettingKeyAccountContributionEnabled] == "true",
+		AccountContributionSubmissionEnabled: settings[SettingKeyAccountContributionEnabled] == "true" &&
+			settings[SettingKeyAccountContributionSubmissionEnabled] == "true",
+		AccountContributionPayoutEnabled: settings[SettingKeyAccountContributionEnabled] == "true" &&
+			settings[SettingKeyAccountContributionPayoutEnabled] == "true",
 
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
@@ -621,6 +629,11 @@ type PublicSettingsInjectionPayload struct {
 	ModelPlazaEnabled            bool `json:"model_plaza_enabled"`
 	ModelPlazaRequireAuth        bool `json:"model_plaza_require_auth"`
 	AffiliateEnabled             bool `json:"affiliate_enabled"`
+
+	AccountContributionEnabled           bool `json:"account_contribution_enabled"`
+	AccountContributionSubmissionEnabled bool `json:"account_contribution_submission_enabled"`
+	AccountContributionPayoutEnabled     bool `json:"account_contribution_payout_enabled"`
+
 	RiskControlEnabled           bool `json:"risk_control_enabled"`
 	AllowUserViewErrorRequests   bool `json:"allow_user_view_error_requests"`
 }
@@ -704,6 +717,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ModelPlazaEnabled:                    settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth:                settings.ModelPlazaRequireAuth,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
+		AccountContributionEnabled:           settings.AccountContributionEnabled,
+		AccountContributionSubmissionEnabled: settings.AccountContributionSubmissionEnabled,
+		AccountContributionPayoutEnabled:     settings.AccountContributionPayoutEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
 	}, nil

@@ -727,6 +727,11 @@ export interface SystemSettings {
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: boolean;
 
+  // Account contribution marketplace gates. The first foundation release has no UI.
+  account_contribution_enabled?: boolean;
+  account_contribution_submission_enabled?: boolean;
+  account_contribution_payout_enabled?: boolean;
+
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
 

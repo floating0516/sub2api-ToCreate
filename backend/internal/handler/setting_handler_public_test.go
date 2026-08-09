@@ -111,6 +111,68 @@ func TestSettingHandler_GetPublicSettings_ExposesQuickStartInstallerFlag(t *test
 	require.True(t, resp.Data.QuickStartInstallerEnabled)
 }
 
+func TestSettingHandler_GetPublicSettings_ExposesAccountContributionSafetyGates(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &settingHandlerPublicRepoStub{
+		values: map[string]string{
+			service.SettingKeyAccountContributionEnabled:           "true",
+			service.SettingKeyAccountContributionSubmissionEnabled: "true",
+			service.SettingKeyAccountContributionPayoutEnabled:     "true",
+		},
+	}
+	h := NewSettingHandler(service.NewSettingService(repo, &config.Config{}), "test-version")
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/settings/public", nil)
+
+	h.GetPublicSettings(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Enabled           bool `json:"account_contribution_enabled"`
+			SubmissionEnabled bool `json:"account_contribution_submission_enabled"`
+			PayoutEnabled     bool `json:"account_contribution_payout_enabled"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
+	require.Equal(t, 0, resp.Code)
+	require.True(t, resp.Data.Enabled)
+	require.True(t, resp.Data.SubmissionEnabled)
+	require.True(t, resp.Data.PayoutEnabled)
+}
+
+func TestSettingHandler_GetPublicSettings_AccountContributionWriteGatesRequireModule(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &settingHandlerPublicRepoStub{
+		values: map[string]string{
+			service.SettingKeyAccountContributionSubmissionEnabled: "true",
+			service.SettingKeyAccountContributionPayoutEnabled:     "true",
+		},
+	}
+	h := NewSettingHandler(service.NewSettingService(repo, &config.Config{}), "test-version")
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/settings/public", nil)
+	h.GetPublicSettings(c)
+
+	var resp struct {
+		Data struct {
+			SubmissionEnabled bool `json:"account_contribution_submission_enabled"`
+			PayoutEnabled     bool `json:"account_contribution_payout_enabled"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
+	require.False(t, resp.Data.SubmissionEnabled)
+	require.False(t, resp.Data.PayoutEnabled)
+}
+
 func TestSettingHandler_GetPublicSettings_ExposesTencentCaptchaConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
