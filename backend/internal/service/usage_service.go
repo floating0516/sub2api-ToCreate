@@ -392,15 +392,15 @@ func (s *UsageService) GetUserDashboardStats(ctx context.Context, userID int64) 
 }
 
 // GetUserDashboardSummaryStats returns the lightweight subset used by the user dashboard.
-func (s *UsageService) GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*usagestats.UserDashboardStats, error) {
+func (s *UsageService) GetUserDashboardSummaryStats(ctx context.Context, userID int64, todayStart time.Time) (*usagestats.UserDashboardStats, error) {
 	type dashboardSummaryRepo interface {
-		GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*usagestats.UserDashboardStats, error)
+		GetUserDashboardSummaryStats(ctx context.Context, userID int64, todayStart time.Time) (*usagestats.UserDashboardStats, error)
 	}
 	repo, ok := s.usageRepo.(dashboardSummaryRepo)
 	if !ok {
 		return s.GetUserDashboardStats(ctx, userID)
 	}
-	stats, err := repo.GetUserDashboardSummaryStats(ctx, userID)
+	stats, err := repo.GetUserDashboardSummaryStats(ctx, userID, todayStart)
 	if err != nil {
 		return nil, fmt.Errorf("get user dashboard summary stats: %w", err)
 	}

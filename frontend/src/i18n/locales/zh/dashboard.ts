@@ -63,6 +63,7 @@ export default {
       actualPayment: '实际支付',
       accountCredit: '账户额度',
       currentAvailable: '当前可用余额',
+      todayUsageAmount: '今日使用额',
       lifetimeActualPayment: '累计实付',
       platformGranted: '平台赠送',
       accountLifetimeScope: '账户创建至今',

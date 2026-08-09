@@ -31,10 +31,10 @@ describe('dashboard usage api performance options', () => {
   })
 
   it('requests the lightweight lifetime dashboard summary', async () => {
-    await usageAPI.getDashboardStats({ summary_only: true })
+    await usageAPI.getDashboardStats({ summary_only: true, timezone: 'Asia/Shanghai' })
 
     expect(get).toHaveBeenCalledWith('/usage/dashboard/stats', {
-      params: { summary_only: true },
+      params: { summary_only: true, timezone: 'Asia/Shanghai' },
     })
   })
 

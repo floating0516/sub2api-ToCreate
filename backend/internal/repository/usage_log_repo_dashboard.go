@@ -526,9 +526,9 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	return stats, nil
 }
 
-// GetUserDashboardSummaryStats returns the lifetime overview and current RPM/TPM in one query.
+// GetUserDashboardSummaryStats returns the lifetime overview, today's usage, and current RPM/TPM in one query.
 // It avoids the API-key, daily, and platform breakdown queries used by the full dashboard response.
-func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, userID int64) (*UserDashboardStats, error) {
+func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, userID int64, todayStart time.Time) (*UserDashboardStats, error) {
 	stats := &UserDashboardStats{}
 	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 	query := `
@@ -540,6 +540,7 @@ func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, u
 			COALESCE(SUM(cache_read_tokens), 0) AS total_cache_read_tokens,
 			COALESCE(SUM(total_cost), 0) AS total_cost,
 			COALESCE(SUM(actual_cost), 0) AS total_actual_cost,
+			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $3), 0) AS today_actual_cost,
 			COALESCE(AVG(duration_ms), 0) AS average_duration_ms,
 			COUNT(*) FILTER (WHERE created_at >= $2) AS recent_requests,
 			COALESCE(SUM(input_tokens + output_tokens) FILTER (WHERE created_at >= $2), 0) AS recent_tokens
@@ -553,7 +554,7 @@ func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, u
 		ctx,
 		r.sql,
 		query,
-		[]any{userID, fiveMinutesAgo},
+		[]any{userID, fiveMinutesAgo, todayStart},
 		&stats.TotalRequests,
 		&stats.TotalInputTokens,
 		&stats.TotalOutputTokens,
@@ -561,6 +562,7 @@ func (r *usageLogRepository) GetUserDashboardSummaryStats(ctx context.Context, u
 		&stats.TotalCacheReadTokens,
 		&stats.TotalCost,
 		&stats.TotalActualCost,
+		&stats.TodayActualCost,
 		&stats.AverageDurationMs,
 		&recentRequests,
 		&recentTokens,

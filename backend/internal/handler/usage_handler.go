@@ -461,7 +461,10 @@ func (h *UsageHandler) DashboardStats(c *gin.Context) {
 	var stats *usagestats.UserDashboardStats
 	var err error
 	if summaryOnly {
-		stats, err = h.usageService.GetUserDashboardSummaryStats(c.Request.Context(), subject.UserID)
+		userTZ := c.Query("timezone")
+		now := timezone.NowInUserLocation(userTZ)
+		todayStart := timezone.StartOfDayInUserLocation(now, userTZ)
+		stats, err = h.usageService.GetUserDashboardSummaryStats(c.Request.Context(), subject.UserID, todayStart)
 	} else {
 		stats, err = h.usageService.GetUserDashboardStats(c.Request.Context(), subject.UserID)
 	}

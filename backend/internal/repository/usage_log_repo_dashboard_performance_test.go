@@ -47,9 +47,10 @@ func TestGetStatsSummaryWithFiltersRunsOnlySummaryQuery(t *testing.T) {
 func TestGetUserDashboardSummaryStatsReturnsLifetimeOverview(t *testing.T) {
 	db, mock := newSQLMock(t)
 	repo := &usageLogRepository{sql: db}
+	todayStart := time.Date(2026, 8, 9, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*60*60))
 
-	mock.ExpectQuery("SELECT[[:space:]]+COUNT\\(\\*\\) AS total_requests").
-		WithArgs(int64(42), sqlmock.AnyArg()).
+	mock.ExpectQuery("(?s)SELECT[[:space:]]+COUNT\\(\\*\\) AS total_requests.*FILTER \\(WHERE created_at >= \\$3\\).*AS today_actual_cost").
+		WithArgs(int64(42), sqlmock.AnyArg(), todayStart).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"total_requests",
 			"total_input_tokens",
@@ -58,12 +59,13 @@ func TestGetUserDashboardSummaryStatsReturnsLifetimeOverview(t *testing.T) {
 			"total_cache_read_tokens",
 			"total_cost",
 			"total_actual_cost",
+			"today_actual_cost",
 			"average_duration_ms",
 			"recent_requests",
 			"recent_tokens",
-		}).AddRow(240, 600000, 300000, 50000, 37654, 15.5, 12.25, 820.5, 25, 5000))
+		}).AddRow(240, 600000, 300000, 50000, 37654, 15.5, 12.25, 1.75, 820.5, 25, 5000))
 
-	stats, err := repo.GetUserDashboardSummaryStats(context.Background(), 42)
+	stats, err := repo.GetUserDashboardSummaryStats(context.Background(), 42, todayStart)
 	require.NoError(t, err)
 	require.Equal(t, int64(987654), stats.TotalTokens)
 	require.Equal(t, int64(240), stats.TotalRequests)
@@ -71,6 +73,7 @@ func TestGetUserDashboardSummaryStatsReturnsLifetimeOverview(t *testing.T) {
 	require.Equal(t, int64(300000), stats.TotalOutputTokens)
 	require.Equal(t, int64(87654), stats.TotalCacheCreationTokens+stats.TotalCacheReadTokens)
 	require.InDelta(t, 12.25, stats.TotalActualCost, 0.000001)
+	require.InDelta(t, 1.75, stats.TodayActualCost, 0.000001)
 	require.InDelta(t, 820.5, stats.AverageDurationMs, 0.000001)
 	require.Equal(t, int64(5), stats.Rpm)
 	require.Equal(t, int64(1000), stats.Tpm)

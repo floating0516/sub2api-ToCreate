@@ -12,7 +12,13 @@
           <p class="dashboard-metric-label">{{ metric.label }}</p>
           <div v-if="loadingOverview" class="dashboard-value-skeleton" />
           <p v-else class="dashboard-metric-value" :title="metric.value">{{ metric.value }}</p>
-          <p v-if="!loadingOverview" class="dashboard-metric-scope">{{ metric.scope }}</p>
+          <div v-if="!loadingOverview" class="dashboard-metric-scope-row">
+            <p class="dashboard-metric-scope">{{ metric.scope }}</p>
+            <p v-if="metric.scopeDetail" class="dashboard-metric-scope-detail">
+              <span>{{ metric.scopeDetail.label }}</span>
+              <strong :title="metric.scopeDetail.value">{{ metric.scopeDetail.value }}</strong>
+            </p>
+          </div>
           <div v-else class="dashboard-trend-skeleton" />
           <dl
             v-if="!loadingOverview"
@@ -152,6 +158,7 @@ interface MetricItem {
   label: string
   value: string
   scope: string
+  scopeDetail?: MetricDetail
   details: MetricDetail[]
 }
 
@@ -282,6 +289,10 @@ const metrics = computed<MetricItem[]>(() => {
       label: t('dashboard.overview.accountCredit'),
       value: formatCNY(authStore.user?.balance || 0),
       scope: t('dashboard.overview.currentAvailable'),
+      scopeDetail: {
+        label: t('dashboard.overview.todayUsageAmount'),
+        value: formatCNY(current?.today_actual_cost || 0)
+      },
       details: [
         {
           label: t('dashboard.overview.lifetimeActualPayment'),
@@ -519,7 +530,7 @@ const loadOverview = async () => {
   try {
     const [dashboard, currentPayment] =
       await Promise.all([
-        usageAPI.getDashboardStats({ summary_only: true }),
+        usageAPI.getDashboardStats({ summary_only: true, timezone: browserTimezone }),
         paymentAPI.getSummary({
           start_date: accountStartDate.value,
           end_date: calendarEndDate.value,
@@ -644,10 +655,49 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-metric-scope {
-  margin-top: 2px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--dashboard-subtle);
   font-size: 12px;
   line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-metric-scope-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.dashboard-metric-scope-detail {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--dashboard-subtle);
+  font-size: 11px;
+  line-height: 17px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.dashboard-metric-scope-detail span {
+  flex-shrink: 0;
+}
+
+.dashboard-metric-scope-detail strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dashboard-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  text-overflow: ellipsis;
 }
 
 .dashboard-metric-details {

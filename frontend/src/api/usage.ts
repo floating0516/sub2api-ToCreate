@@ -278,7 +278,7 @@ export async function getById(id: number): Promise<UsageLog> {
  * Get user dashboard statistics
  * @returns Dashboard statistics for current user
  */
-export async function getDashboardStats(params?: { summary_only?: boolean }): Promise<UserDashboardStats> {
+export async function getDashboardStats(params?: { summary_only?: boolean; timezone?: string }): Promise<UserDashboardStats> {
   const { data } = await apiClient.get<UserDashboardStats>('/usage/dashboard/stats', { params })
   return data
 }

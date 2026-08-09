@@ -63,6 +63,7 @@ export default {
       actualPayment: 'Actual Payment',
       accountCredit: 'Account Credit',
       currentAvailable: 'Available balance',
+      todayUsageAmount: 'Used today',
       lifetimeActualPayment: 'Lifetime paid',
       platformGranted: 'Platform grants',
       accountLifetimeScope: 'Since account creation',
