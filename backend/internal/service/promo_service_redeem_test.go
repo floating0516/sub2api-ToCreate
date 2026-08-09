@@ -88,6 +88,9 @@ func newPromoRedeemTestClient(t *testing.T) *dbent.Client {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	require.NoError(t, err)
+
 	driver := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(driver)))
 	t.Cleanup(func() { _ = client.Close() })
