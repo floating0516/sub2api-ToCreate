@@ -82,6 +82,10 @@ type stubAdminService struct {
 	mu sync.Mutex
 }
 
+func (s *stubAdminService) GetAccountContributionOverview(context.Context) (*service.AccountContributionAdminOverview, error) {
+	return &service.AccountContributionAdminOverview{}, nil
+}
+
 func newStubAdminService() *stubAdminService {
 	now := time.Now().UTC()
 	user := service.User{

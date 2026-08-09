@@ -430,6 +430,11 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.POST("/cookie-auth", h.Admin.OAuth.CookieAuth)
 		accounts.POST("/setup-token-cookie-auth", h.Admin.OAuth.SetupTokenCookieAuth)
 	}
+
+	accountContributions := admin.Group("/account-contributions")
+	{
+		accountContributions.GET("/overview", h.Admin.Account.GetContributionOverview)
+	}
 }
 
 func registerAnnouncementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

@@ -11,6 +11,9 @@ import (
 
 // AdminService interface defines admin management operations
 type AdminService interface {
+	// Account contribution marketplace (admin read-only foundation)
+	GetAccountContributionOverview(ctx context.Context) (*AccountContributionAdminOverview, error)
+
 	// User management
 	ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error)
 	GetUser(ctx context.Context, id int64) (*User, error)

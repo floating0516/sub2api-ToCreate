@@ -179,6 +179,7 @@ export default {
     subscriptions: '订阅管理',
     benefitGrants: '权益发放中心',
     accounts: '账号管理',
+    accountContributions: '账号贡献',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
     ops: '运维监控',
