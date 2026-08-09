@@ -42,7 +42,15 @@
       <div class="dashboard-calendar-panel-inner">
         <header class="dashboard-calendar-panel-header">
           <div class="dashboard-calendar-heading">
-            <span>{{ t('dashboard.overview.tokenActivity') }}</span>
+            <button
+              type="button"
+              class="dashboard-calendar-heading-button"
+              :title="t('dashboard.dailyReport.todayReport')"
+              @click="emit('select-day', endDate)"
+            >
+              <span>{{ t('dashboard.overview.tokenActivity') }}</span>
+              <Icon name="sparkles" size="xs" />
+            </button>
           </div>
 
           <div
@@ -72,6 +80,7 @@
             :option="chartOption"
             :update-options="updateOptions"
             :autoresize="{ throttle: 80 }"
+            @click="handleChartClick"
           />
           <div v-if="!loading && !hasData" class="dashboard-calendar-empty">
             {{ t('dashboard.noDataAvailable') }}
@@ -102,6 +111,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsOption } from 'echarts'
 import VChart from 'vue-echarts'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import Icon from '@/components/icons/Icon.vue'
 
 use([
   CanvasRenderer,
@@ -125,6 +135,10 @@ const props = defineProps<{
   endDate: string
   totalTokens?: number
   loading?: boolean
+}>()
+
+const emit = defineEmits<{
+  (event: 'select-day', day: string): void
 }>()
 
 const { t, locale } = useI18n()
@@ -343,7 +357,7 @@ const chartOption = computed<EChartsOption>(() => {
         const label = activityMode.value === 'cumulative'
           ? t('dashboard.overview.windowCumulative')
           : t('dashboard.overview.tokenUsage')
-        return `${heading}<br>${label} <strong>${formatValue(Number(value))}</strong>`
+        return `${heading}<br>${label} <strong>${formatValue(Number(value))}</strong><br><span style="color:${text}">${t('dashboard.dailyReport.open')}</span>`
       },
       extraCssText: `border-radius: 8px; box-shadow: 0 10px 28px rgba(17, 24, 39, ${dark ? '0.24' : '0.10'});`
     },
@@ -386,6 +400,7 @@ const chartOption = computed<EChartsOption>(() => {
       type: 'heatmap',
       coordinateSystem: 'calendar',
       data: values.map(([day, value]) => [day, value]),
+      cursor: 'pointer',
       itemStyle: {
         borderColor: surface,
         borderWidth: 1.5,
@@ -403,6 +418,12 @@ const chartOption = computed<EChartsOption>(() => {
     }]
   }
 })
+
+const handleChartClick = (params: unknown) => {
+  const point = params as { value?: [string, number] }
+  const day = point.value?.[0]
+  if (day) emit('select-day', day)
+}
 
 onMounted(() => {
   themeObserver = new MutationObserver(() => {
@@ -460,7 +481,7 @@ onUnmounted(() => {
 }
 
 .dashboard-activity-header h2,
-.dashboard-calendar-heading > span {
+.dashboard-calendar-heading-button > span {
   overflow: hidden;
   color: var(--dashboard-text, #111318);
   font-size: 15px;
@@ -468,6 +489,32 @@ onUnmounted(() => {
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-calendar-heading-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--dashboard-text, #111318);
+  cursor: pointer;
+}
+
+.dashboard-calendar-heading-button svg {
+  flex: 0 0 auto;
+  color: #168a58;
+}
+
+.dashboard-calendar-heading-button:hover > span {
+  color: #168a58;
+}
+
+.dashboard-calendar-heading-button:focus-visible {
+  outline: 2px solid #168a58;
+  outline-offset: 4px;
 }
 
 .dashboard-activity-header span,

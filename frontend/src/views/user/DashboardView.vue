@@ -40,8 +40,16 @@
           :end-date="calendarEndDate"
           :total-tokens="dashboardStats?.total_tokens || 0"
           :loading="loadingCalendar"
+          @select-day="openDailyReport"
         />
       </section>
+
+      <DashboardDailyReportDialog
+        :show="dailyReportOpen"
+        :date="selectedReportDate"
+        :timezone="browserTimezone"
+        @close="dailyReportOpen = false"
+      />
 
       <section class="dashboard-card dashboard-trend-card">
         <header class="dashboard-chart-header">
@@ -137,6 +145,7 @@ import DashboardUsageCalendar, {
 import DashboardTrendChart, {
   type DashboardTrendSeries
 } from '@/components/user/dashboard/DashboardTrendChart.vue'
+import DashboardDailyReportDialog from '@/components/user/dashboard/DashboardDailyReportDialog.vue'
 import { usageAPI, type UserDashboardStats } from '@/api/usage'
 import { paymentAPI } from '@/api/payment'
 import { keysAPI } from '@/api/keys'
@@ -204,6 +213,8 @@ const calendarData = ref<DashboardCalendarPoint[]>([])
 const loadingOverview = ref(true)
 const loadingChart = ref(true)
 const loadingCalendar = ref(true)
+const dailyReportOpen = ref(false)
+const selectedReportDate = ref(endDate.value)
 const errorMessage = ref('')
 let chartRequestID = 0
 let calendarRequestID = 0
@@ -555,6 +566,11 @@ const refreshDashboard = async () => {
     loadTrendSeries(),
     loadCalendarUsage()
   ])
+}
+
+const openDailyReport = (date: string) => {
+  selectedReportDate.value = date
+  dailyReportOpen.value = true
 }
 
 const setGranularity = async (value: Granularity) => {

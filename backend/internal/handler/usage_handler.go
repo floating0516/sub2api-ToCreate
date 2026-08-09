@@ -46,10 +46,11 @@ type userGroupStat struct {
 
 // UsageHandler handles usage-related requests
 type UsageHandler struct {
-	usageService   *service.UsageService
-	apiKeyService  *service.APIKeyService
-	opsService     *service.OpsService
-	settingService *service.SettingService
+	usageService       *service.UsageService
+	apiKeyService      *service.APIKeyService
+	opsService         *service.OpsService
+	settingService     *service.SettingService
+	dailyReportService *service.UserDailyReportService
 }
 
 // NewUsageHandler creates a new UsageHandler
@@ -60,11 +61,66 @@ func NewUsageHandler(
 	settingService *service.SettingService,
 ) *UsageHandler {
 	return &UsageHandler{
-		usageService:   usageService,
-		apiKeyService:  apiKeyService,
-		opsService:     opsService,
-		settingService: settingService,
+		usageService:       usageService,
+		apiKeyService:      apiKeyService,
+		opsService:         opsService,
+		settingService:     settingService,
+		dailyReportService: service.NewUserDailyReportService(usageService),
 	}
+}
+
+// DailyReport returns one user's playful, model-aware usage report for a calendar day.
+// GET /api/v1/usage/daily-report
+func (h *UsageHandler) DailyReport(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if h.dailyReportService == nil {
+		response.InternalError(c, "Daily report service not available")
+		return
+	}
+
+	userTZ := strings.TrimSpace(c.Query("timezone"))
+	if userTZ != "" {
+		if _, err := time.LoadLocation(userTZ); err != nil {
+			response.BadRequest(c, "Invalid timezone")
+			return
+		}
+	}
+	now := timezone.NowInUserLocation(userTZ)
+	date := strings.TrimSpace(c.Query("date"))
+	if date == "" {
+		date = now.Format("2006-01-02")
+	}
+	dayStart, err := timezone.ParseInUserLocation("2006-01-02", date, userTZ)
+	if err != nil {
+		response.BadRequest(c, "Invalid date format, use YYYY-MM-DD")
+		return
+	}
+	todayStart := timezone.StartOfDayInUserLocation(now, userTZ)
+	if dayStart.After(todayStart) {
+		response.BadRequest(c, "Daily report date cannot be in the future")
+		return
+	}
+	if dayStart.Before(todayStart.AddDate(0, 0, -365)) {
+		response.BadRequest(c, "Daily report date is outside the supported range")
+		return
+	}
+
+	report, err := h.dailyReportService.Get(
+		c.Request.Context(),
+		subject.UserID,
+		date,
+		userTZ,
+		c.DefaultQuery("locale", "zh"),
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, report)
 }
 
 func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) (*userUsageFilters, bool) {

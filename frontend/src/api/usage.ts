@@ -56,6 +56,49 @@ export interface UserDashboardStats {
   by_platform?: PlatformDashboardStats[]
 }
 
+export interface UserDailyReportSummary {
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  model_count: number
+  average_tokens_per_request: number
+  average_duration_ms: number
+  cache_hit_rate: number
+}
+
+export interface UserDailyReportComparison {
+  previous_requests: number
+  previous_total_tokens: number
+  request_change_pct: number | null
+  token_change_pct: number | null
+}
+
+export interface UserDailyReportModel {
+  model: string
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  share: number
+}
+
+export interface UserDailyReport {
+  date: string
+  timezone: string
+  generated_at: string
+  summary: UserDailyReportSummary
+  comparison: UserDailyReportComparison
+  models: UserDailyReportModel[]
+  narrative: string
+  ai_generated: boolean
+  generator_model?: string
+}
+
 export interface TrendParams {
   start_date?: string
   end_date?: string
@@ -283,6 +326,15 @@ export async function getDashboardStats(params?: { summary_only?: boolean; timez
   return data
 }
 
+export async function getDailyReport(params: {
+  date: string
+  timezone?: string
+  locale?: string
+}): Promise<UserDailyReport> {
+  const { data } = await apiClient.get<UserDailyReport>('/usage/daily-report', { params })
+  return data
+}
+
 /**
  * Get user usage trend data
  * @param params - Query parameters for filtering
@@ -409,6 +461,7 @@ export const usageAPI = {
   getById,
   // Dashboard
   getDashboardStats,
+  getDailyReport,
   getDashboardTrend,
   getDashboardModelTrends,
   getDashboardModels,
