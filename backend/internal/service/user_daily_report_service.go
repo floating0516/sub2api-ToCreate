@@ -207,7 +207,11 @@ func (s *UserDailyReportService) Get(ctx context.Context, userID int64, date, ti
 	if err != nil {
 		return nil, err
 	}
-	return value.(*UserDailyReport), nil
+	report, ok := value.(*UserDailyReport)
+	if !ok || report == nil {
+		return nil, errors.New("daily report generation returned an unexpected result")
+	}
+	return report, nil
 }
 
 func (s *UserDailyReportService) build(ctx context.Context, userID int64, date, timezoneName, locale string) (*UserDailyReport, time.Duration, error) {
@@ -520,7 +524,9 @@ func (s *UserDailyReportService) generateNarrative(ctx context.Context, report *
 	if err != nil {
 		return "", fmt.Errorf("call daily report model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
 		return "", fmt.Errorf("read daily report model response: %w", err)
