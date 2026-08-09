@@ -31,9 +31,9 @@ const (
 	defaultUserDailyReportTimeout         = 45 * time.Second
 	defaultUserDailyReportMaxOutputTokens = 350
 	maxUserDailyReportCacheEntries        = 4096
-	currentDayReportCacheTTL               = 30 * time.Minute
-	historicalReportCacheTTL               = 30 * 24 * time.Hour
-	failedAIReportCacheTTL                 = 10 * time.Minute
+	currentDayReportCacheTTL              = 30 * time.Minute
+	historicalReportCacheTTL              = 30 * 24 * time.Hour
+	failedAIReportCacheTTL                = 10 * time.Minute
 )
 
 type UserDailyReportOptions struct {
@@ -498,8 +498,8 @@ func (s *UserDailyReportService) generateNarrative(ctx context.Context, report *
 		"reasoning": map[string]string{
 			"effort": s.options.ReasoningEffort,
 		},
-		"store":             false,
-		"stream":            false,
+		"store":  false,
+		"stream": false,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal daily report request: %w", err)

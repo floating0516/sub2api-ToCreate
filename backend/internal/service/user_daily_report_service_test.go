@@ -70,7 +70,7 @@ func TestBuildUserDailyReportFallback(t *testing.T) {
 			CacheHitRate: 61.5,
 		},
 		Comparison: UserDailyReportComparison{TokenChangePct: float64Pointer(-18)},
-		Models: []UserDailyReportModel{{Model: "gpt-5.6-luna", Share: 72}},
+		Models:     []UserDailyReportModel{{Model: "gpt-5.6-luna", Share: 72}},
 	}
 
 	narrative := buildUserDailyReportFallback(report, "zh")
