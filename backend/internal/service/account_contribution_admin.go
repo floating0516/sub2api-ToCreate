@@ -138,7 +138,7 @@ ORDER BY key`)
 	if err != nil {
 		return fmt.Errorf("account contribution overview settings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var key, raw string
@@ -197,7 +197,7 @@ SELECT
 	if err != nil {
 		return fmt.Errorf("account contribution overview stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("account contribution overview stats rows: %w", err)
@@ -243,7 +243,7 @@ LIMIT 20`)
 	if err != nil {
 		return fmt.Errorf("account contribution overview contributors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var item AccountContributionAdminContributor
@@ -282,7 +282,7 @@ LIMIT 20`)
 	if err != nil {
 		return fmt.Errorf("account contribution overview accounts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var item AccountContributionAdminAccount
@@ -332,7 +332,7 @@ LIMIT 20`)
 	if err != nil {
 		return fmt.Errorf("account contribution overview earnings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var item AccountContributionAdminEarning
@@ -377,7 +377,7 @@ LIMIT 20`)
 	if err != nil {
 		return fmt.Errorf("account contribution overview payouts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var item AccountContributionAdminPayout
