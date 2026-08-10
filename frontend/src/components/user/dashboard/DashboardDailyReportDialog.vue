@@ -76,25 +76,33 @@
           <span>{{ t('dashboard.dailyReport.modelCount', { count: report.models.length }) }}</span>
         </header>
 
-        <div v-if="report.models.length" class="daily-report-model-list">
-          <div v-for="(model, index) in report.models" :key="model.model" class="daily-report-model-row">
-            <div class="daily-report-model-rank">{{ index + 1 }}</div>
-            <div class="daily-report-model-main">
-              <div class="daily-report-model-heading">
-                <strong :title="model.model">{{ model.model }}</strong>
-                <span>{{ formatPercent(model.share) }}</span>
-              </div>
-              <div class="daily-report-model-track" aria-hidden="true">
-                <i :style="{ width: `${Math.max(2, Math.min(100, model.share))}%` }" />
-              </div>
-              <p>
-                {{ t('dashboard.dailyReport.modelStats', {
-                  requests: formatNumber(model.requests),
-                  tokens: formatTokens(model.total_tokens)
-                }) }}
-              </p>
+        <div v-if="report.models.length" class="daily-report-model-list" role="list">
+          <article
+            v-for="(model, index) in report.models"
+            :key="model.model"
+            class="daily-report-model-row"
+            data-test="daily-report-model"
+            role="listitem"
+          >
+            <div class="daily-report-model-heading">
+              <span class="daily-report-model-rank">{{ index + 1 }}</span>
+              <strong :title="model.model">{{ model.model }}</strong>
+              <span class="daily-report-model-share">{{ formatPercent(model.share) }}</span>
             </div>
-          </div>
+            <div class="daily-report-model-track" aria-hidden="true">
+              <i :style="{ width: `${Math.max(2, Math.min(100, model.share))}%` }" />
+            </div>
+            <dl class="daily-report-model-stats">
+              <div data-test="model-requests">
+                <dt>{{ t('dashboard.dailyReport.modelRequests') }}</dt>
+                <dd>{{ formatNumber(model.requests) }}</dd>
+              </div>
+              <div data-test="model-tokens">
+                <dt>{{ t('dashboard.dailyReport.modelTokens') }}</dt>
+                <dd>{{ formatTokens(model.total_tokens) }}</dd>
+              </div>
+            </dl>
+          </article>
         </div>
 
         <div v-else class="daily-report-empty">
@@ -363,60 +371,61 @@ watch(
 }
 
 .daily-report-model-list {
-  border-top: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 8px;
 }
 
 .daily-report-model-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid #edf0f2;
+  min-width: 0;
+  grid-template-rows: auto 4px auto;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .daily-report-model-rank {
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 5px;
   background: #eef2f6;
   color: #536273;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
-.daily-report-model-main {
-  min-width: 0;
-}
-
 .daily-report-model-heading {
-  display: flex;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  gap: 7px;
 }
 
 .daily-report-model-heading strong {
   min-width: 0;
   overflow: hidden;
   color: #26313d;
-  font-size: 13px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.daily-report-model-heading span {
+.daily-report-model-share {
   color: #168a58;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .daily-report-model-track {
-  height: 5px;
-  margin-top: 8px;
+  height: 4px;
   overflow: hidden;
-  border-radius: 3px;
+  border-radius: 2px;
   background: #edf1f4;
 }
 
@@ -427,10 +436,34 @@ watch(
   background: #28a96b;
 }
 
-.daily-report-model-main p {
-  margin-top: 6px;
+.daily-report-model-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.daily-report-model-stats > div {
+  min-width: 0;
+}
+
+.daily-report-model-stats > div + div {
+  border-left: 1px solid #edf0f2;
+  padding-left: 10px;
+}
+
+.daily-report-model-stats dt {
   color: #7c838d;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.daily-report-model-stats dd {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #26313d;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
 }
 
 .daily-report-empty {
@@ -464,15 +497,20 @@ watch(
 
 :global(.dark) .daily-report-metrics,
 :global(.dark) .daily-report-metrics > div + div,
-:global(.dark) .daily-report-model-list,
 :global(.dark) .daily-report-model-row,
+:global(.dark) .daily-report-model-stats > div + div,
 :global(.dark) .daily-report-empty {
   border-color: #303b49;
 }
 
+:global(.dark) .daily-report-model-row {
+  background: #19222d;
+}
+
 :global(.dark) .daily-report-metrics dd,
 :global(.dark) .daily-report-models h4,
-:global(.dark) .daily-report-model-heading strong {
+:global(.dark) .daily-report-model-heading strong,
+:global(.dark) .daily-report-model-stats dd {
   color: #e5e7eb;
 }
 
