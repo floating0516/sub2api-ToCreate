@@ -13,47 +13,47 @@ type accountContributionQueryer interface {
 }
 
 type AccountContributionFeatureState struct {
-	Enabled                  bool `json:"enabled"`
-	SubmissionConfigured     bool `json:"submission_configured"`
-	PayoutConfigured         bool `json:"payout_configured"`
-	SubmissionEnabled        bool `json:"submission_enabled"`
-	PayoutEnabled            bool `json:"payout_enabled"`
+	Enabled              bool `json:"enabled"`
+	SubmissionConfigured bool `json:"submission_configured"`
+	PayoutConfigured     bool `json:"payout_configured"`
+	SubmissionEnabled    bool `json:"submission_enabled"`
+	PayoutEnabled        bool `json:"payout_enabled"`
 }
 
 type AccountContributionAdminStats struct {
-	ContributorsTotal        int64 `json:"contributors_total"`
-	ContributorsPending      int64 `json:"contributors_pending"`
-	ContributionsTotal       int64 `json:"contributions_total"`
-	ContributionsActive      int64 `json:"contributions_active"`
-	EarningEntriesTotal      int64 `json:"earning_entries_total"`
-	TotalEarningsCNYFen      int64 `json:"total_earnings_cny_fen"`
-	AvailableEarningsCNYFen  int64 `json:"available_earnings_cny_fen"`
-	PayoutRequestsTotal      int64 `json:"payout_requests_total"`
-	PayoutRequestsPending    int64 `json:"payout_requests_pending"`
-	PendingPayoutCNYFen      int64 `json:"pending_payout_cny_fen"`
+	ContributorsTotal       int64 `json:"contributors_total"`
+	ContributorsPending     int64 `json:"contributors_pending"`
+	ContributionsTotal      int64 `json:"contributions_total"`
+	ContributionsActive     int64 `json:"contributions_active"`
+	EarningEntriesTotal     int64 `json:"earning_entries_total"`
+	TotalEarningsCNYFen     int64 `json:"total_earnings_cny_fen"`
+	AvailableEarningsCNYFen int64 `json:"available_earnings_cny_fen"`
+	PayoutRequestsTotal     int64 `json:"payout_requests_total"`
+	PayoutRequestsPending   int64 `json:"payout_requests_pending"`
+	PendingPayoutCNYFen     int64 `json:"pending_payout_cny_fen"`
 }
 
 type AccountContributionAdminContributor struct {
-	ID            int64      `json:"id"`
-	UserID        *int64     `json:"user_id"`
-	Email         string     `json:"email"`
-	Username      string     `json:"username"`
-	Status        string     `json:"status"`
-	Contributions int64      `json:"contributions"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID            int64     `json:"id"`
+	UserID        *int64    `json:"user_id"`
+	Email         string    `json:"email"`
+	Username      string    `json:"username"`
+	Status        string    `json:"status"`
+	Contributions int64     `json:"contributions"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type AccountContributionAdminAccount struct {
-	ID             int64      `json:"id"`
-	ContributorID  int64      `json:"contributor_id"`
-	Contributor    string     `json:"contributor"`
-	AccountID      *int64     `json:"account_id"`
-	AccountName    string     `json:"account_name"`
-	Platform       string     `json:"platform"`
-	Status         string     `json:"status"`
-	SettlementMode string     `json:"settlement_mode"`
-	ShareRateBPS   int        `json:"share_rate_bps"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID             int64     `json:"id"`
+	ContributorID  int64     `json:"contributor_id"`
+	Contributor    string    `json:"contributor"`
+	AccountID      *int64    `json:"account_id"`
+	AccountName    string    `json:"account_name"`
+	Platform       string    `json:"platform"`
+	Status         string    `json:"status"`
+	SettlementMode string    `json:"settlement_mode"`
+	ShareRateBPS   int       `json:"share_rate_bps"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type AccountContributionAdminEarning struct {
@@ -80,12 +80,12 @@ type AccountContributionAdminPayout struct {
 }
 
 type AccountContributionAdminOverview struct {
-	Features      AccountContributionFeatureState        `json:"features"`
-	Stats         AccountContributionAdminStats          `json:"stats"`
-	Contributors  []AccountContributionAdminContributor  `json:"contributors"`
-	Contributions []AccountContributionAdminAccount      `json:"contributions"`
-	Earnings      []AccountContributionAdminEarning      `json:"earnings"`
-	Payouts       []AccountContributionAdminPayout       `json:"payouts"`
+	Features      AccountContributionFeatureState       `json:"features"`
+	Stats         AccountContributionAdminStats         `json:"stats"`
+	Contributors  []AccountContributionAdminContributor `json:"contributors"`
+	Contributions []AccountContributionAdminAccount     `json:"contributions"`
+	Earnings      []AccountContributionAdminEarning     `json:"earnings"`
+	Payouts       []AccountContributionAdminPayout      `json:"payouts"`
 }
 
 func (s *adminServiceImpl) GetAccountContributionOverview(ctx context.Context) (*AccountContributionAdminOverview, error) {
