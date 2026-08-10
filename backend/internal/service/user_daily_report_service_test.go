@@ -46,6 +46,10 @@ func TestGenerateDailyReportNarrative(t *testing.T) {
 		reasoning, ok := payload["reasoning"].(map[string]any)
 		require.True(t, ok)
 		require.Equal(t, "low", reasoning["effort"])
+		instructions, ok := payload["instructions"].(string)
+		require.True(t, ok)
+		require.Contains(t, instructions, "自然、清晰、克制")
+		require.NotContains(t, instructions, "语言要俏皮")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"output":[{"content":[{"type":"output_text","text":"今天的模型小队状态很亮眼。"}]}]}`))
 	}))
@@ -101,6 +105,26 @@ func TestDailyReportFallbackVariesCachePhrasingByDate(t *testing.T) {
 		variants[sentence] = struct{}{}
 	}
 	require.GreaterOrEqual(t, len(variants), 5)
+}
+
+func TestDailyReportFallbackUsesNeutralTone(t *testing.T) {
+	report := &UserDailyReport{
+		Summary: UserDailyReportSummary{
+			Requests:     86,
+			TotalTokens:  1_280_000,
+			ModelCount:   2,
+			CacheHitRate: 61.5,
+		},
+		Comparison: UserDailyReportComparison{TokenChangePct: float64Pointer(-18)},
+		Models:     []UserDailyReportModel{{Model: "gpt-5.6-luna", Share: 72}},
+	}
+	for day := 1; day <= 20; day++ {
+		report.Date = fmt.Sprintf("2026-08-%02d", day)
+		narrative := buildUserDailyReportFallback(report, "zh")
+		for _, playful := range []string{"小队", "打卡", "队长徽章", "C 位", "快车道", "灵感"} {
+			require.NotContains(t, narrative, playful)
+		}
+	}
 }
 
 func TestSanitizeDailyReportModelName(t *testing.T) {
