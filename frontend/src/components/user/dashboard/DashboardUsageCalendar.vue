@@ -53,21 +53,49 @@
             </button>
           </div>
 
-          <div
-            class="dashboard-calendar-modes"
-            role="group"
-            :aria-label="t('dashboard.overview.heatmapGranularity')"
-          >
-            <button
-              v-for="item in modeOptions"
-              :key="item.value"
-              type="button"
-              :class="activityMode === item.value && 'active'"
-              :aria-pressed="activityMode === item.value"
-              @click="activityMode = item.value"
+          <div class="dashboard-calendar-controls">
+            <div
+              v-if="calendarWeekCount < FULL_CALENDAR_WEEK_COUNT"
+              class="dashboard-calendar-navigation"
+              role="group"
+              :aria-label="t('dashboard.overview.heatmapPeriod')"
             >
-              {{ item.label }}
-            </button>
+              <button
+                type="button"
+                :title="t('dashboard.overview.previousPeriod')"
+                :aria-label="t('dashboard.overview.previousPeriod')"
+                :disabled="!canMoveCalendarBackward"
+                @click="moveCalendarPage(1)"
+              >
+                <Icon name="chevronLeft" size="xs" />
+              </button>
+              <button
+                type="button"
+                :title="t('dashboard.overview.nextPeriod')"
+                :aria-label="t('dashboard.overview.nextPeriod')"
+                :disabled="!canMoveCalendarForward"
+                @click="moveCalendarPage(-1)"
+              >
+                <Icon name="chevronRight" size="xs" />
+              </button>
+            </div>
+
+            <div
+              class="dashboard-calendar-modes"
+              role="group"
+              :aria-label="t('dashboard.overview.heatmapGranularity')"
+            >
+              <button
+                v-for="item in modeOptions"
+                :key="item.value"
+                type="button"
+                :class="activityMode === item.value && 'active'"
+                :aria-pressed="activityMode === item.value"
+                @click="activityMode = item.value"
+              >
+                {{ item.label }}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -97,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { use } from 'echarts/core'
 import { HeatmapChart } from 'echarts/charts'
@@ -112,6 +140,13 @@ import type { EChartsOption } from 'echarts'
 import VChart from 'vue-echarts'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
+import {
+  FULL_CALENDAR_WEEK_COUNT,
+  getCalendarCellSize,
+  getCalendarPageEndDate,
+  getCalendarWeekCount,
+  getVisibleCalendarStartDate
+} from './dashboardCalendarLayout'
 
 use([
   CanvasRenderer,
@@ -146,6 +181,8 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 const activityMode = ref<ActivityMode>('daily')
 const calendarStageRef = ref<HTMLElement | null>(null)
 const calendarCellSize = ref(14)
+const calendarWeekCount = ref(FULL_CALENDAR_WEEK_COUNT)
+const calendarPage = ref(0)
 const updateOptions = { notMerge: false, lazyUpdate: false }
 const lightColors = ['#e8f5ee', '#bfe7cf', '#80cfa4', '#43b67d', '#168a58']
 const darkColors = ['#173329', '#1d4b38', '#236747', '#2d875a', '#42b875']
@@ -196,7 +233,6 @@ const dailyWindowEntries = computed<[string, number][]>(() => {
   return entries
 })
 
-const hasData = computed(() => dailyWindowEntries.value.some(([, value]) => value > 0))
 const legendColors = computed(() => (isDark.value ? darkColors : lightColors))
 
 const formatValue = (value: number): string => {
@@ -251,6 +287,27 @@ const heatmapEntries = computed<[string, number][]>(() => {
 
   return dailyWindowEntries.value
 })
+
+const visibleCalendarEndDate = computed(() => getCalendarPageEndDate(
+  props.startDate,
+  props.endDate,
+  calendarWeekCount.value,
+  calendarPage.value
+))
+
+const visibleCalendarStartDate = computed(() => getVisibleCalendarStartDate(
+  props.startDate,
+  visibleCalendarEndDate.value,
+  calendarWeekCount.value
+))
+
+const visibleHeatmapEntries = computed(() => heatmapEntries.value.filter(([day]) => (
+  day >= visibleCalendarStartDate.value && day <= visibleCalendarEndDate.value
+)))
+
+const hasData = computed(() => visibleHeatmapEntries.value.some(([, value]) => value > 0))
+const canMoveCalendarBackward = computed(() => visibleCalendarStartDate.value > props.startDate)
+const canMoveCalendarForward = computed(() => visibleCalendarEndDate.value < props.endDate)
 
 const summary = computed(() => {
   let total = 0
@@ -309,19 +366,35 @@ const modeOptions = computed<{ value: ActivityMode; label: string }[]>(() => [
   { value: 'cumulative', label: t('dashboard.overview.cumulativeHeatmap') }
 ])
 
+const moveCalendarPage = (change: number) => {
+  const nextPage = Math.max(0, calendarPage.value + change)
+  if (nextPage > calendarPage.value && !canMoveCalendarBackward.value) return
+  if (nextPage < calendarPage.value && !canMoveCalendarForward.value) return
+  calendarPage.value = nextPage
+}
+
+watch(
+  [() => props.startDate, () => props.endDate, calendarWeekCount],
+  () => {
+    calendarPage.value = 0
+  }
+)
+
 const updateCalendarCellSize = () => {
   const stage = calendarStageRef.value
   if (!stage) return
-  const widthSize = Math.floor((stage.clientWidth - 54) / 53)
-  const heightSize = Math.floor((stage.clientHeight - 28) / 7)
-  const nextSize = Math.max(14, Math.min(18, widthSize, heightSize))
+
+  const nextWeekCount = getCalendarWeekCount(stage.clientWidth)
+  if (nextWeekCount !== calendarWeekCount.value) calendarWeekCount.value = nextWeekCount
+
+  const nextSize = getCalendarCellSize(stage.clientWidth, stage.clientHeight, nextWeekCount)
   if (nextSize !== calendarCellSize.value) calendarCellSize.value = nextSize
 }
 
 const chartOption = computed<EChartsOption>(() => {
   const dark = isDark.value
   const colors = dark ? darkColors : lightColors
-  const values = heatmapEntries.value.filter(([, value]) => value > 0)
+  const values = visibleHeatmapEntries.value.filter(([, value]) => value > 0)
   const sortedValues = values.map(([, value]) => value).sort((left, right) => left - right)
   const scaleCeiling = sortedValues[Math.floor((sortedValues.length - 1) * 0.95)] || 0
   const maxValue = Math.max(1, scaleCeiling)
@@ -371,7 +444,7 @@ const chartOption = computed<EChartsOption>(() => {
     calendar: {
       top: 18,
       left: 'center',
-      range: [props.startDate, props.endDate],
+      range: [visibleCalendarStartDate.value, visibleCalendarEndDate.value],
       cellSize: [calendarCellSize.value, calendarCellSize.value],
       splitLine: { show: false },
       itemStyle: {
@@ -640,22 +713,58 @@ onUnmounted(() => {
 
 .dashboard-calendar-panel {
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-color: var(--dashboard-border, #e4e7eb) transparent;
-  scrollbar-width: thin;
+  overflow: hidden;
 }
 
 .dashboard-calendar-panel-inner {
   display: grid;
   width: 100%;
-  min-width: 760px;
+  min-width: 0;
   height: 208px;
   grid-template-rows: 36px minmax(0, 1fr);
 }
 
 .dashboard-calendar-panel-header {
   padding: 0 8px 0 14px;
+}
+
+.dashboard-calendar-controls {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.dashboard-calendar-navigation {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.dashboard-calendar-navigation button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid var(--dashboard-divider, #eff1f3);
+  border-radius: 6px;
+  background: var(--dashboard-surface, #fff);
+  color: var(--dashboard-muted, #6b7280);
+}
+
+.dashboard-calendar-navigation button:not(:disabled) {
+  cursor: pointer;
+}
+
+.dashboard-calendar-navigation button:not(:disabled):hover {
+  color: var(--dashboard-text, #111318);
+}
+
+.dashboard-calendar-navigation button:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .dashboard-calendar-modes {
@@ -909,10 +1018,32 @@ onUnmounted(() => {
     padding-bottom: 8px;
   }
 
+  .dashboard-calendar-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .dashboard-calendar-panel-inner {
     height: 224px;
     min-height: 224px;
     grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .dashboard-calendar-modes {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .dashboard-calendar-modes button {
+    padding-inline: 3px;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-calendar-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .dashboard-calendar-modes {

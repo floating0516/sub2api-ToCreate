@@ -11,6 +11,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/admin.benefitGrants.spec.ts \
 	src/api/__tests__/admin.paymentAddonProducts.spec.ts \
 	src/api/__tests__/usage.dashboardPerformance.spec.ts \
+	src/components/user/dashboard/__tests__/dashboardCalendarLayout.spec.ts \
 	src/components/user/dashboard/__tests__/DashboardTrendChart.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/utils/__tests__/subscriptionColors.spec.ts \
