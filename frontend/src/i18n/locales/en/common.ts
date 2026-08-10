@@ -179,7 +179,6 @@ export default {
     subscriptions: 'Subscriptions',
     benefitGrants: 'Benefit Grants',
     accounts: 'Accounts',
-    accountContributions: 'Account Contributions',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
     ops: 'Ops',

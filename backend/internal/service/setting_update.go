@@ -440,9 +440,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 
 	// Affiliate (邀请返利) feature switch
 	updates[SettingKeyAffiliateEnabled] = strconv.FormatBool(settings.AffiliateEnabled)
-	updates[SettingKeyAccountContributionEnabled] = strconv.FormatBool(settings.AccountContributionEnabled)
-	updates[SettingKeyAccountContributionSubmissionEnabled] = strconv.FormatBool(settings.AccountContributionSubmissionEnabled)
-	updates[SettingKeyAccountContributionPayoutEnabled] = strconv.FormatBool(settings.AccountContributionPayoutEnabled)
 
 	// 风控中心功能开关
 	updates[SettingKeyRiskControlEnabled] = strconv.FormatBool(settings.RiskControlEnabled)

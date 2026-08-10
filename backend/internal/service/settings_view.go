@@ -166,17 +166,12 @@ type SystemSettings struct {
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 
-	DefaultConcurrency          int
-	DefaultBalance              float64
-	RiskControlEnabled          bool
-	CyberSessionBlockEnabled    bool
-	CyberSessionBlockTTLSeconds int
-	AffiliateEnabled            bool
-
-	AccountContributionEnabled           bool
-	AccountContributionSubmissionEnabled bool
-	AccountContributionPayoutEnabled     bool
-
+	DefaultConcurrency           int
+	DefaultBalance               float64
+	RiskControlEnabled           bool
+	CyberSessionBlockEnabled     bool
+	CyberSessionBlockTTLSeconds  int
+	AffiliateEnabled             bool
 	AffiliateRebateRate          float64
 	AffiliateRebateFreezeHours   int
 	AffiliateRebateDurationDays  int
@@ -405,11 +400,6 @@ type PublicSettings struct {
 
 	// Affiliate (邀请返利) feature toggle
 	AffiliateEnabled bool `json:"affiliate_enabled"`
-
-	// Account contribution marketplace gates. All default to disabled.
-	AccountContributionEnabled           bool `json:"account_contribution_enabled"`
-	AccountContributionSubmissionEnabled bool `json:"account_contribution_submission_enabled"`
-	AccountContributionPayoutEnabled     bool `json:"account_contribution_payout_enabled"`
 
 	// 风控中心功能开关
 	RiskControlEnabled bool `json:"risk_control_enabled"`

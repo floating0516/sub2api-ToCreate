@@ -119,10 +119,6 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 
 		AffiliateEnabled: settings.AffiliateEnabled,
 
-		AccountContributionEnabled:           settings.AccountContributionEnabled,
-		AccountContributionSubmissionEnabled: settings.AccountContributionSubmissionEnabled,
-		AccountContributionPayoutEnabled:     settings.AccountContributionPayoutEnabled,
-
 		RiskControlEnabled: settings.RiskControlEnabled,
 
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,

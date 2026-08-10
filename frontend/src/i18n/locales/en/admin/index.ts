@@ -7,7 +7,6 @@ import settings from './settings'
 import dailyReport from './dailyReport'
 import audit from './audit'
 import promptAudit from './promptAudit'
-import accountContributions from './accountContributions'
 
 export default {
   ...overview,
@@ -19,5 +18,4 @@ export default {
   ...dailyReport,
   ...audit,
   ...promptAudit,
-  ...accountContributions,
 }
