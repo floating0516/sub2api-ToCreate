@@ -81,9 +81,7 @@ export default {
       modelTokens: 'Token',
       noModels: '今天的模型小队还没有出场记录',
       moreThanYesterday: '比昨天多 {value}%',
-      lessThanYesterday: '比昨天少 {value}%',
-      generatedBy: '由 {model} 整理',
-      templateGenerated: '由轻量日报模板整理'
+      lessThanYesterday: '比昨天少 {value}%'
     },
     overview: {
       coreMetrics: '核心指标',

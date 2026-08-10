@@ -55,7 +55,8 @@ const report = {
     { model: 'gemini-light', requests: 20, input_tokens: 50_000, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 50_000, total_tokens: 50_000, share: 3.3 }
   ],
   narrative: '今天的模型阵容很热闹。',
-  ai_generated: false
+  ai_generated: true,
+  generator_model: 'internal-report-writer'
 }
 
 describe('DashboardDailyReportDialog', () => {
@@ -92,5 +93,7 @@ describe('DashboardDailyReportDialog', () => {
     expect(models[0].get('[data-test="model-requests"]').text()).toContain('120')
     expect(models[0].get('[data-test="model-tokens"]').text()).toContain('1.2M')
     expect(models[0].text()).toContain('80.0%')
+    expect(wrapper.text()).not.toContain('internal-report-writer')
+    expect(wrapper.text()).not.toContain('dashboard.dailyReport.templateGenerated')
   })
 })

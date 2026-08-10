@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -67,6 +68,7 @@ func TestGenerateDailyReportNarrative(t *testing.T) {
 
 func TestBuildUserDailyReportFallback(t *testing.T) {
 	report := &UserDailyReport{
+		Date: "2026-08-10",
 		Summary: UserDailyReportSummary{
 			Requests:     86,
 			TotalTokens:  1_280_000,
@@ -78,10 +80,27 @@ func TestBuildUserDailyReportFallback(t *testing.T) {
 	}
 
 	narrative := buildUserDailyReportFallback(report, "zh")
-	require.Contains(t, narrative, "2 位模型伙伴")
+	require.Contains(t, narrative, "2")
+	require.Contains(t, narrative, "86")
+	require.Contains(t, narrative, "1.3M")
 	require.Contains(t, narrative, "gpt-5.6-luna")
-	require.Contains(t, narrative, "少用了 18.0%")
-	require.Contains(t, narrative, "缓存命中率约 61.5%")
+	require.Contains(t, narrative, "18.0%")
+	require.Contains(t, narrative, "61.5%")
+	require.Equal(t, narrative, buildUserDailyReportFallback(report, "zh"))
+}
+
+func TestDailyReportFallbackVariesCachePhrasingByDate(t *testing.T) {
+	report := &UserDailyReport{
+		Summary: UserDailyReportSummary{CacheHitRate: 61.5},
+	}
+	variants := make(map[string]struct{})
+	for day := 1; day <= 20; day++ {
+		report.Date = fmt.Sprintf("2026-08-%02d", day)
+		sentence := buildDailyReportCacheSentence(report, "zh")
+		require.Contains(t, sentence, "61.5%")
+		variants[sentence] = struct{}{}
+	}
+	require.GreaterOrEqual(t, len(variants), 5)
 }
 
 func TestSanitizeDailyReportModelName(t *testing.T) {

@@ -30,9 +30,7 @@
             <span v-if="comparisonText" class="daily-report-comparison">
               {{ comparisonText }}
             </span>
-            <span>
-              {{ generatorText }} · {{ formatGeneratedAt(report.generated_at) }}
-            </span>
+            <span>{{ formatGeneratedAt(report.generated_at) }}</span>
           </div>
         </div>
       </section>
@@ -151,13 +149,6 @@ const comparisonText = computed(() => {
     return t('dashboard.dailyReport.moreThanYesterday', { value: Math.abs(change).toFixed(1) })
   }
   return t('dashboard.dailyReport.lessThanYesterday', { value: Math.abs(change).toFixed(1) })
-})
-
-const generatorText = computed(() => {
-  if (report.value?.ai_generated && report.value.generator_model) {
-    return t('dashboard.dailyReport.generatedBy', { model: report.value.generator_model })
-  }
-  return t('dashboard.dailyReport.templateGenerated')
 })
 
 const topModelCaption = computed(() => {
@@ -334,9 +325,9 @@ watch(
 .daily-report-metrics dd {
   margin-top: 5px;
   overflow: hidden;
-  color: #111827;
+  color: #145c3d;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
 }
@@ -417,7 +408,7 @@ watch(
 }
 
 .daily-report-model-share {
-  color: #168a58;
+  color: #145c3d;
   font-size: 11px;
   font-weight: 700;
 }
@@ -459,9 +450,9 @@ watch(
 .daily-report-model-stats dd {
   margin-top: 2px;
   overflow: hidden;
-  color: #26313d;
+  color: #145c3d;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
 }
@@ -509,9 +500,14 @@ watch(
 
 :global(.dark) .daily-report-metrics dd,
 :global(.dark) .daily-report-models h4,
-:global(.dark) .daily-report-model-heading strong,
-:global(.dark) .daily-report-model-stats dd {
+:global(.dark) .daily-report-model-heading strong {
   color: #e5e7eb;
+}
+
+:global(.dark) .daily-report-metrics dd,
+:global(.dark) .daily-report-model-share,
+:global(.dark) .daily-report-model-stats dd {
+  color: #8bd7ad;
 }
 
 :global(.dark) .daily-report-model-rank,

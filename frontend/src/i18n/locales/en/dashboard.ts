@@ -81,9 +81,7 @@ export default {
       modelTokens: 'Tokens',
       noModels: 'The model crew has no appearances recorded today',
       moreThanYesterday: '{value}% more than yesterday',
-      lessThanYesterday: '{value}% less than yesterday',
-      generatedBy: 'Edited by {model}',
-      templateGenerated: 'Edited with the lightweight report template'
+      lessThanYesterday: '{value}% less than yesterday'
     },
     overview: {
       coreMetrics: 'Core metrics',
