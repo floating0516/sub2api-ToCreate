@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	appTimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
@@ -25,6 +26,17 @@ type UserSpendingRankingResponse = usagestats.UserSpendingRankingResponse
 
 // APIKeyUsageTrendPoint represents API key usage trend data point
 type APIKeyUsageTrendPoint = usagestats.APIKeyUsageTrendPoint
+
+func usageTrendTimezoneName(startTime time.Time) string {
+	name := startTime.Location().String()
+	if name == "" || name == "Local" {
+		return appTimezone.Name()
+	}
+	if _, err := time.LoadLocation(name); err != nil {
+		return appTimezone.Name()
+	}
+	return name
+}
 
 // GetAPIKeyUsageTrend returns usage trend data grouped by API key and date
 func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) (results []APIKeyUsageTrendPoint, err error) {
@@ -225,10 +237,11 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 // GetUserUsageTrendByUserID 获取指定用户的使用趋势
 func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string) (results []TrendDataPoint, err error) {
 	dateFormat := safeDateFormat(granularity)
+	timezoneName := usageTrendTimezoneName(startTime)
 
 	query := fmt.Sprintf(`
 		SELECT
-			TO_CHAR(created_at, '%s') as date,
+			TO_CHAR(created_at AT TIME ZONE $4, '%s') as date,
 			COUNT(*) as requests,
 			COALESCE(SUM(input_tokens), 0) as input_tokens,
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -243,7 +256,7 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 		ORDER BY date ASC
 	`, dateFormat)
 
-	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime)
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime, timezoneName)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +286,7 @@ func (r *usageLogRepository) GetUserModelUsageTrend(ctx context.Context, userID 
 	}
 
 	dateFormat := safeDateFormat(granularity)
+	timezoneName := usageTrendTimezoneName(startTime)
 	modelExpr := resolveModelDimensionExpression(usagestats.ModelSourceRequested)
 	query := fmt.Sprintf(`
 		WITH filtered AS (
@@ -297,7 +311,7 @@ func (r *usageLogRepository) GetUserModelUsageTrend(ctx context.Context, userID 
 			LIMIT $4
 		)
 		SELECT
-			TO_CHAR(f.created_at, '%s') AS date,
+			TO_CHAR(f.created_at AT TIME ZONE $5, '%s') AS date,
 			f.model,
 			tm.rank,
 			COUNT(*) AS requests,
@@ -308,7 +322,7 @@ func (r *usageLogRepository) GetUserModelUsageTrend(ctx context.Context, userID 
 		ORDER BY date ASC, tm.rank ASC
 	`, modelExpr, dateFormat)
 
-	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime, limit)
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime, limit, timezoneName)
 	if err != nil {
 		return nil, err
 	}
@@ -356,10 +370,11 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 	}
 
 	dateFormat := safeDateFormat(granularity)
+	timezoneName := usageTrendTimezoneName(startTime)
 
 	query := fmt.Sprintf(`
 		SELECT
-			TO_CHAR(created_at, '%s') as date,
+			TO_CHAR(created_at AT TIME ZONE $3, '%s') as date,
 			COUNT(*) as requests,
 			COALESCE(SUM(input_tokens), 0) as input_tokens,
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -372,7 +387,7 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 		WHERE created_at >= $1 AND created_at < $2
 	`, dateFormat)
 
-	args := []any{startTime, endTime}
+	args := []any{startTime, endTime, timezoneName}
 	if userID > 0 {
 		query += fmt.Sprintf(" AND user_id = $%d", len(args)+1)
 		args = append(args, userID)

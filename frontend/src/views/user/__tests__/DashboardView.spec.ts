@@ -103,4 +103,29 @@ describe('user DashboardView', () => {
     expect(accountCard.get('.dashboard-metric-scope-detail').text()).toContain('dashboard.overview.todayUsageAmount')
     expect(accountCard.get('.dashboard-metric-scope-detail').text()).toContain('4.82')
   })
+
+  it('labels hourly usage as forward-looking hour intervals', async () => {
+    const wrapper = shallowMount(DashboardView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: true,
+          DashboardDateRangePicker: true,
+          DashboardUsageCalendar: true,
+          DashboardTrendChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+    const hourlyButton = wrapper.findAll('.dashboard-segmented button')
+      .find((button) => button.text() === 'dashboard.overview.hourly')
+    expect(hourlyButton).toBeDefined()
+    await hourlyButton!.trigger('click')
+    await flushPromises()
+
+    const labels = wrapper.getComponent({ name: 'DashboardTrendChart' }).props('labels') as string[]
+    expect(labels[0]).toBe('00:00-01:00')
+    expect(labels[23]).toBe('23:00-24:00')
+  })
 })

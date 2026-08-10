@@ -131,7 +131,7 @@ const chartOption = computed<EChartsOption>(() => {
           type: 'dashed'
         }
       },
-      extraCssText: `border-radius: 8px; box-shadow: 0 10px 28px rgba(17, 24, 39, ${dark ? '0.24' : '0.10'}); color: ${tooltipTitle};`
+      extraCssText: `max-width: calc(100% - 24px); white-space: normal; overflow-wrap: anywhere; border-radius: 8px; box-shadow: 0 10px 28px rgba(17, 24, 39, ${dark ? '0.24' : '0.10'}); color: ${tooltipTitle};`
     },
     xAxis: {
       type: 'category',

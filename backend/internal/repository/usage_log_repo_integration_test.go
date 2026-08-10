@@ -1344,6 +1344,34 @@ func (s *UsageLogRepoSuite) TestGetUserUsageTrendByUserID_HourlyGranularity() {
 	s.Require().Len(trend, 3) // 3 different hours
 }
 
+func (s *UsageLogRepoSuite) TestUserDashboardHourlyTrendsKeepMidnightInUserTimezone() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "usertrend-midnight@test.com"})
+	apiKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-usertrend-midnight", Name: "k"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-usertrend-midnight"})
+	userLocation, err := time.LoadLocation("America/New_York")
+	s.Require().NoError(err)
+
+	previousHour := time.Date(2026, 8, 9, 23, 30, 0, 0, userLocation)
+	midnightHour := time.Date(2026, 8, 10, 0, 15, 0, 0, userLocation)
+	s.createUsageLog(user, apiKey, account, 10, 20, 0.5, previousHour)
+	s.createUsageLog(user, apiKey, account, 15, 25, 0.6, midnightHour)
+
+	startTime := time.Date(2026, 8, 9, 23, 0, 0, 0, userLocation)
+	endTime := time.Date(2026, 8, 10, 1, 0, 0, 0, userLocation)
+
+	trend, err := s.repo.GetUsageTrendWithFilters(s.ctx, startTime, endTime, "hour", user.ID, 0, 0, 0, "", nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().Len(trend, 2)
+	s.Require().Equal("2026-08-09 23:00", trend[0].Date)
+	s.Require().Equal("2026-08-10 00:00", trend[1].Date)
+
+	modelTrend, err := s.repo.GetUserModelUsageTrend(s.ctx, user.ID, startTime, endTime, "hour", 8)
+	s.Require().NoError(err)
+	s.Require().Len(modelTrend, 2)
+	s.Require().Equal("2026-08-09 23:00", modelTrend[0].Date)
+	s.Require().Equal("2026-08-10 00:00", modelTrend[1].Date)
+}
+
 // --- GetUserModelStats ---
 
 func (s *UsageLogRepoSuite) TestGetUserModelStats() {

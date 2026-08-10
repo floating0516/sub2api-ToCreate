@@ -413,7 +413,11 @@ const buildBucketKeys = (): string[] => {
 }
 
 const formatBucketLabel = (bucket: string): string => {
-  if (granularity.value === 'hour') return bucket.slice(11)
+  if (granularity.value === 'hour') {
+    const hour = Number.parseInt(bucket.slice(11, 13), 10)
+    if (!Number.isFinite(hour)) return bucket.slice(11)
+    return `${String(hour).padStart(2, '0')}:00-${String(hour + 1).padStart(2, '0')}:00`
+  }
   const [, month, day] = bucket.split('-')
   return locale.value.startsWith('zh') ? `${month}月${day}日` : `${month}/${day}`
 }
@@ -873,6 +877,7 @@ onMounted(refreshDashboard)
 }
 
 .dashboard-legend b {
+  min-width: 0;
   overflow: hidden;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -1129,6 +1134,24 @@ onMounted(refreshDashboard)
   .dashboard-calendar-card,
   .dashboard-trend-card {
     padding: 18px 14px 18px;
+  }
+
+  .dashboard-chart-heading {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .dashboard-legend {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    overflow: hidden;
+  }
+
+  .dashboard-legend span {
+    width: 100%;
+    max-width: none;
   }
 
   .dashboard-chart-controls {

@@ -88,7 +88,7 @@ func TestGetUserModelUsageTrendReturnsRankedSeriesFromOneQuery(t *testing.T) {
 	end := start.Add(7 * 24 * time.Hour)
 
 	mock.ExpectQuery("WITH filtered AS").
-		WithArgs(int64(42), start, end, 8).
+		WithArgs(int64(42), start, end, 8, "UTC").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"date",
 			"model",
