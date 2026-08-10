@@ -413,11 +413,7 @@ const buildBucketKeys = (): string[] => {
 }
 
 const formatBucketLabel = (bucket: string): string => {
-  if (granularity.value === 'hour') {
-    const hour = Number.parseInt(bucket.slice(11, 13), 10)
-    if (!Number.isFinite(hour)) return bucket.slice(11)
-    return `${String(hour).padStart(2, '0')}:00-${String(hour + 1).padStart(2, '0')}:00`
-  }
+  if (granularity.value === 'hour') return bucket.slice(11)
   const [, month, day] = bucket.split('-')
   return locale.value.startsWith('zh') ? `${month}月${day}日` : `${month}/${day}`
 }

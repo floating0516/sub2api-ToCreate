@@ -104,7 +104,7 @@ describe('user DashboardView', () => {
     expect(accountCard.get('.dashboard-metric-scope-detail').text()).toContain('4.82')
   })
 
-  it('labels hourly usage as forward-looking hour intervals', async () => {
+  it('labels hourly usage with the bucket start time', async () => {
     const wrapper = shallowMount(DashboardView, {
       global: {
         stubs: {
@@ -125,7 +125,7 @@ describe('user DashboardView', () => {
     await flushPromises()
 
     const labels = wrapper.getComponent({ name: 'DashboardTrendChart' }).props('labels') as string[]
-    expect(labels[0]).toBe('00:00-01:00')
-    expect(labels[23]).toBe('23:00-24:00')
+    expect(labels[0]).toBe('00:00')
+    expect(labels[23]).toBe('23:00')
   })
 })
