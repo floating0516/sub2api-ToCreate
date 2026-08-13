@@ -390,10 +390,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 
 		AffiliateEnabled: settings.AffiliateEnabled,
 
-		AccountContributionEnabled:           settings.AccountContributionEnabled,
-		AccountContributionSubmissionEnabled: settings.AccountContributionSubmissionEnabled,
-		AccountContributionPayoutEnabled:     settings.AccountContributionPayoutEnabled,
-
 		AccountSchedulingThresholds: settings.AccountSchedulingThresholds,
 		AllowUserViewErrorRequests:  settings.AllowUserViewErrorRequests,
 	}

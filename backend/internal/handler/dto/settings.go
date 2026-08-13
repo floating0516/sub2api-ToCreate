@@ -332,10 +332,6 @@ type SystemSettings struct {
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled bool `json:"affiliate_enabled"`
 
-	AccountContributionEnabled           bool `json:"account_contribution_enabled"`
-	AccountContributionSubmissionEnabled bool `json:"account_contribution_submission_enabled"`
-	AccountContributionPayoutEnabled     bool `json:"account_contribution_payout_enabled"`
-
 	// OpenAI fast/flex policy
 	OpenAIFastPolicySettings *OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 
@@ -432,10 +428,6 @@ type PublicSettings struct {
 	ModelPlazaRequireAuth bool `json:"model_plaza_require_auth"`
 
 	AffiliateEnabled bool `json:"affiliate_enabled"`
-
-	AccountContributionEnabled           bool `json:"account_contribution_enabled"`
-	AccountContributionSubmissionEnabled bool `json:"account_contribution_submission_enabled"`
-	AccountContributionPayoutEnabled     bool `json:"account_contribution_payout_enabled"`
 
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 

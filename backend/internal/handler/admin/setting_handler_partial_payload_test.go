@@ -39,33 +39,6 @@ func TestUpdateSettingsPartialPayloadKeepsUnsentKeys(t *testing.T) {
 	require.Equal(t, "true", repo.values[service.SettingKeyTurnstileEnabled])
 }
 
-func TestUpdateSettingsPartialPayloadKeepsAccountContributionGates(t *testing.T) {
-	h, repo := newStepUpSwitchTestHandler(t, map[string]string{
-		service.SettingKeyAccountContributionEnabled:           "true",
-		service.SettingKeyAccountContributionSubmissionEnabled: "true",
-		service.SettingKeyAccountContributionPayoutEnabled:     "true",
-	})
-
-	rec := doUpdateSettings(t, h, map[string]any{"risk_control_enabled": true}, nil)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	require.Equal(t, "true", repo.values[service.SettingKeyAccountContributionEnabled])
-	require.Equal(t, "true", repo.values[service.SettingKeyAccountContributionSubmissionEnabled])
-	require.Equal(t, "true", repo.values[service.SettingKeyAccountContributionPayoutEnabled])
-}
-
-func TestUpdateSettingsAccountContributionWriteGatesRequireModule(t *testing.T) {
-	h, repo := newStepUpSwitchTestHandler(t, map[string]string{})
-
-	rec := doUpdateSettings(t, h, map[string]any{
-		"account_contribution_submission_enabled": true,
-		"account_contribution_payout_enabled":     true,
-	}, nil)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	require.Equal(t, "false", repo.values[service.SettingKeyAccountContributionEnabled])
-	require.Equal(t, "false", repo.values[service.SettingKeyAccountContributionSubmissionEnabled])
-	require.Equal(t, "false", repo.values[service.SettingKeyAccountContributionPayoutEnabled])
-}
-
 // A full payload keeps whole-document semantics: fields explicitly set to their
 // zero value are still cleared.
 func TestUpdateSettingsFullPayloadStillClearsSentEmptyFields(t *testing.T) {

@@ -364,6 +364,7 @@ func TestAPIContracts(t *testing.T) {
 						"daily_limit_usd": null,
 						"weekly_limit_usd": null,
 						"monthly_limit_usd": null,
+						"long_context_pricing_enabled": false,
 						"image_price_1k": null,
 						"image_price_2k": null,
 						"image_price_4k": null,
@@ -999,9 +1000,6 @@ func TestAPIContracts(t *testing.T) {
 					"cyber_session_block_enabled": false,
 					"cyber_session_block_ttl_seconds": 3600,
 					"affiliate_enabled": false,
-					"account_contribution_enabled": false,
-					"account_contribution_submission_enabled": false,
-					"account_contribution_payout_enabled": false,
 					"wechat_connect_enabled": false,
 					"wechat_connect_app_id": "",
 					"wechat_connect_app_secret_configured": false,
@@ -1315,9 +1313,6 @@ func TestAPIContracts(t *testing.T) {
 					"cyber_session_block_enabled": false,
 					"cyber_session_block_ttl_seconds": 3600,
 					"affiliate_enabled": false,
-					"account_contribution_enabled": false,
-					"account_contribution_submission_enabled": false,
-					"account_contribution_payout_enabled": false,
 					"wechat_connect_enabled": true,
 					"wechat_connect_app_id": "wx-open-config",
 					"wechat_connect_app_secret_configured": true,
@@ -1479,7 +1474,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 	settingRepo := newStubSettingRepo()
 	settingService := service.NewSettingService(settingRepo, cfg)
 
-	adminService := service.NewAdminService(userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	adminService := service.NewAdminService(userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	authHandler := handler.NewAuthHandler(cfg, nil, userService, settingService, nil, redeemService, nil, nil)
 	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)
 	usageHandler := handler.NewUsageHandler(usageService, apiKeyService, nil, nil)
