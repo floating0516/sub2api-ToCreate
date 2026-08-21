@@ -144,3 +144,43 @@ func TestUsageLog_GetStatsWithFilters_AggregatesAndEndpoints(t *testing.T) {
 	require.NotEmpty(t, stats.UpstreamEndpoints)
 	require.NotEmpty(t, stats.EndpointPaths)
 }
+
+func TestUsageLog_GetStatsSummaryWithFilters_AggregatesWithoutEndpoints(t *testing.T) {
+	ctx := context.Background()
+	tx := testEntTx(t)
+	client := tx.Client()
+	repo := newUsageLogRepositoryWithSQL(client, tx)
+
+	user := mustCreateUser(t, client, &service.User{Email: "summary-stats@test.com"})
+	apiKey := mustCreateApiKey(t, client, &service.APIKey{UserID: user.ID, Key: "sk-summary-stats", Name: "k"})
+	account := mustCreateAccount(t, client, &service.Account{Name: "summary-stats-account"})
+
+	now := time.Now().UTC()
+	inboundEndpoint := "/v1/messages"
+	upstreamEndpoint := "/v1/responses"
+	for i := 0; i < 2; i++ {
+		_, err := repo.Create(ctx, &service.UsageLog{
+			UserID: user.ID, APIKeyID: apiKey.ID, AccountID: account.ID,
+			Model: "claude-3", InputTokens: 2, OutputTokens: 3,
+			CacheCreationTokens: 4, CacheReadTokens: 5,
+			TotalCost: 0.5, ActualCost: 0.4, CreatedAt: now,
+			InboundEndpoint: &inboundEndpoint, UpstreamEndpoint: &upstreamEndpoint,
+		})
+		require.NoError(t, err)
+	}
+
+	start := now.Add(-time.Hour)
+	end := now.Add(time.Hour)
+	stats, err := repo.GetStatsSummaryWithFilters(ctx, usagestats.UsageLogFilters{
+		UserID: user.ID, StartTime: &start, EndTime: &end,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), stats.TotalRequests)
+	require.Equal(t, int64(4), stats.TotalInputTokens)
+	require.Equal(t, int64(6), stats.TotalOutputTokens)
+	require.Equal(t, int64(18), stats.TotalCacheTokens)
+	require.InDelta(t, 0.8, stats.TotalActualCost, 1e-9)
+	require.Nil(t, stats.Endpoints)
+	require.Nil(t, stats.UpstreamEndpoints)
+	require.Nil(t, stats.EndpointPaths)
+}

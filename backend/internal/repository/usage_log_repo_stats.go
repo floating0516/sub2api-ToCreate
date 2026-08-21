@@ -709,8 +709,20 @@ func (r *usageLogRepository) getStatsWithFilters(ctx context.Context, filters Us
 		(upstream_endpoint),
 		(inbound_endpoint, upstream_endpoint)
 	`
+	groupingProjection := `
+			GROUPING(inbound_endpoint) AS inbound_grouped,
+			GROUPING(upstream_endpoint) AS upstream_grouped,
+			inbound_endpoint,
+			upstream_endpoint,
+	`
 	if !includeBreakdowns {
 		groupingSets = "()"
+		groupingProjection = `
+			1 AS inbound_grouped,
+			1 AS upstream_grouped,
+			NULL::text AS inbound_endpoint,
+			NULL::text AS upstream_endpoint,
+		`
 	}
 
 	query := fmt.Sprintf(`
@@ -730,10 +742,7 @@ func (r *usageLogRepository) getStatsWithFilters(ctx context.Context, filters Us
 			%s
 		)
 		SELECT
-			GROUPING(inbound_endpoint) AS inbound_grouped,
-			GROUPING(upstream_endpoint) AS upstream_grouped,
-			inbound_endpoint,
-			upstream_endpoint,
+			%s
 			COUNT(*) AS requests,
 			COALESCE(SUM(input_tokens), 0) AS input_tokens,
 			COALESCE(SUM(output_tokens), 0) AS output_tokens,
@@ -747,7 +756,7 @@ func (r *usageLogRepository) getStatsWithFilters(ctx context.Context, filters Us
 		GROUP BY GROUPING SETS (
 			%s
 		)
-	`, buildWhere(conditions), groupingSets)
+	`, buildWhere(conditions), groupingProjection, groupingSets)
 
 	stats := &UsageStats{}
 	var totalAccountCost float64

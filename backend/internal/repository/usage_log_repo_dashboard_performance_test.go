@@ -16,7 +16,7 @@ func TestGetStatsSummaryWithFiltersRunsOnlySummaryQuery(t *testing.T) {
 	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery("(?s)WITH scoped AS.*GROUP BY GROUPING SETS \\(\\s*\\(\\)\\s*\\)").
+	mock.ExpectQuery("(?s)WITH scoped AS.*1 AS inbound_grouped.*1 AS upstream_grouped.*NULL::text AS inbound_endpoint.*NULL::text AS upstream_endpoint.*GROUP BY GROUPING SETS \\(\\s*\\(\\)\\s*\\)").
 		WithArgs(int64(42), start, end).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"inbound_grouped",
