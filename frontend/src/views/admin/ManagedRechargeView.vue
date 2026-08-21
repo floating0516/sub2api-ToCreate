@@ -616,7 +616,7 @@ function orderStatusClass(status: string): string {
 }
 
 function orderNeedsSync(status: string): boolean {
-  return ['paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
+  return ['validating', 'paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
 }
 
 function canRefund(order: ManagedRechargeOrder): boolean {

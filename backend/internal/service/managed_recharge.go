@@ -604,7 +604,9 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
 	if strings.TrimSpace(created.TaskID) == "" {
-		_ = s.refundOrder(fulfillCtx, orderID, userID, "UPSTREAM_CREATE_REJECTED", "充值任务未被受理，余额已退回")
+		if refundErr := s.refundOrder(fulfillCtx, orderID, userID, "UPSTREAM_CREATE_REJECTED", "充值任务未被受理，余额已退回"); refundErr != nil {
+			_ = s.markManualReview(fulfillCtx, orderID, "REFUND_FAILED", "充值任务未被受理，退款处理需要人工核对")
+		}
 		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
 	if err := s.markTaskCreated(fulfillCtx, orderID, created.TaskID); err != nil {
@@ -736,6 +738,19 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 		_ = s.markManualReview(fulfillCtx, orderID, "REPLACEMENT_SESSION_UNCERTAIN", "新 Session 提交结果不确定，已转人工核对")
 		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
+	if strings.TrimSpace(result.Error) != "" {
+		if _, updateErr := s.db.ExecContext(fulfillCtx, `
+			UPDATE managed_recharge_orders
+			SET status = 'action_required', session_ciphertext = '',
+			    error_code = 'REPLACEMENT_SESSION_REJECTED',
+			    error_message = '新 Session 无效或不匹配，请重新获取后提交',
+			    last_synced_at = NOW(), updated_at = NOW()
+			WHERE id = $1
+		`, orderID); updateErr != nil {
+			return nil, fmt.Errorf("mark replacement Session rejected: %w", updateErr)
+		}
+		return s.GetOrder(fulfillCtx, userID, orderID, false)
+	}
 	status := ManagedRechargeStatusVerifying
 	switch result.PostProcessStatus {
 	case "action_required":
@@ -854,7 +869,9 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 		if managedRechargeFailureNeedsManualReview(result.FailureReason) {
 			_ = s.markManualReview(syncCtx, order.ID, "PAYMENT_RESULT_UNCERTAIN", "支付结果需要人工核对")
 		} else {
-			_ = s.refundOrder(syncCtx, order.ID, order.UserID, "UPSTREAM_FAILED", normalizeManagedRechargeFailure(result.FailureReason))
+			if refundErr := s.refundOrder(syncCtx, order.ID, order.UserID, "UPSTREAM_FAILED", normalizeManagedRechargeFailure(result.FailureReason)); refundErr != nil {
+				_ = s.markManualReview(syncCtx, order.ID, "REFUND_FAILED", "充值失败，但退款处理需要人工核对")
+			}
 		}
 		return s.getOrder(syncCtx, order.ID, &order.UserID)
 	}

@@ -126,9 +126,6 @@ func (c *managedRechargeUpstreamClient) submitReplacementSession(ctx context.Con
 		"cdk_code":     code,
 		"session_json": session,
 	}, &result)
-	if err == nil && strings.TrimSpace(result.Error) != "" {
-		err = fmt.Errorf("managed recharge upstream replacement Session rejected")
-	}
 	return &result, err
 }
 
