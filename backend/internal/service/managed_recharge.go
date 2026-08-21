@@ -993,6 +993,13 @@ func (s *ManagedRechargeService) failUnpaidOrder(ctx context.Context, orderID in
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var paidAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT paid_at FROM managed_recharge_orders WHERE id = $1 FOR UPDATE`, orderID).Scan(&paidAt); err != nil {
+		return err
+	}
+	if paidAt.Valid {
+		return nil
+	}
 	cdkStatus := managedRechargeCDKAvailable
 	if quarantineCDK {
 		cdkStatus = managedRechargeCDKInvalid

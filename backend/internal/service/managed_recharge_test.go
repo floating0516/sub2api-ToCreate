@@ -113,3 +113,25 @@ func TestManagedRechargeMarkTaskCreatedRequiresPaidOrder(t *testing.T) {
 		t.Fatalf("markTaskCreated SQL expectations: %v", err)
 	}
 }
+
+func TestManagedRechargeFailUnpaidOrderDoesNotReleasePaidInventory(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{db: db}
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT paid_at FROM managed_recharge_orders").
+		WithArgs(int64(12)).
+		WillReturnRows(sqlmock.NewRows([]string{"paid_at"}).AddRow(time.Now()))
+	mock.ExpectRollback()
+
+	if err := service.failUnpaidOrder(context.Background(), 12, "INTERRUPTED", "interrupted", false); err != nil {
+		t.Fatalf("paid order cleanup returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("paid order cleanup SQL expectations: %v", err)
+	}
+}
