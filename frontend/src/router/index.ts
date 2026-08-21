@@ -359,6 +359,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/member-recharge',
+    name: 'ManagedRecharge',
+    component: () => import('@/views/user/ManagedRechargeView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Member Recharge',
+      titleKey: 'nav.memberRecharge'
+    }
+  },
+  {
     path: '/orders',
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),
@@ -625,6 +636,17 @@ const routes: RouteRecordRaw[] = [
       title: 'Redeem Code Management',
       titleKey: 'admin.redeem.title',
       descriptionKey: 'admin.redeem.description'
+    }
+  },
+  {
+    path: '/admin/managed-recharge',
+    name: 'AdminManagedRecharge',
+    component: () => import('@/views/admin/ManagedRechargeView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Managed Recharge',
+      titleKey: 'nav.managedRecharge'
     }
   },
   {

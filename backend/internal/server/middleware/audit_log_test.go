@@ -188,3 +188,14 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestManagedRechargeCredentialRoutesOmitAuditBodies(t *testing.T) {
+	routes := []string{
+		"POST /api/v1/managed-recharge/orders",
+		"POST /api/v1/managed-recharge/orders/:id/session",
+		"POST /api/v1/admin/managed-recharge/cdks/import",
+	}
+	for _, route := range routes {
+		require.Contains(t, auditBodyOmittedRoutes, route)
+	}
+}

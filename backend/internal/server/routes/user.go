@@ -12,6 +12,7 @@ import (
 func RegisterUserRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
+	managedRecharge *handler.ManagedRechargeHandler,
 	jwtAuth middleware.JWTAuthMiddleware,
 	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
@@ -129,6 +130,17 @@ func RegisterUserRoutes(
 		{
 			redeem.POST("", h.Redeem.Redeem)
 			redeem.GET("/history", h.Redeem.GetHistory)
+		}
+
+		if managedRecharge != nil {
+			managed := authenticated.Group("/managed-recharge")
+			{
+				managed.GET("/catalog", managedRecharge.Catalog)
+				managed.POST("/orders", managedRecharge.CreateOrder)
+				managed.GET("/orders", managedRecharge.ListOrders)
+				managed.GET("/orders/:id", managedRecharge.GetOrder)
+				managed.POST("/orders/:id/session", managedRecharge.SubmitReplacementSession)
+			}
 		}
 
 		// 用户订阅

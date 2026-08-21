@@ -138,15 +138,29 @@ func registerRoutes(
 		cfg,
 	)
 	installTokenHandler := handler.NewInstallTokenHandler(installTokenService)
+	var rechargeEncryptor service.SecretEncryptor
+	if cfg != nil {
+		if encryptor, err := repository.NewAESEncryptor(cfg); err != nil {
+			log.Printf("Warning: managed recharge encryption is unavailable: %v", err)
+		} else {
+			rechargeEncryptor = encryptor
+		}
+	}
+	var rechargeBalanceCache service.BillingCache
+	if redisClient != nil {
+		rechargeBalanceCache = repository.NewBillingCache(redisClient)
+	}
+	managedRechargeService := service.NewManagedRechargeService(db, rechargeEncryptor, rechargeBalanceCache, apiKeyService)
+	managedRechargeHandler := handler.NewManagedRechargeHandler(managedRechargeService)
 
 	// 注册各模块路由
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
-	routes.RegisterUserRoutes(v1, h, jwtAuth, auditLog, settingService, panelRateLimiter)
+	routes.RegisterUserRoutes(v1, h, managedRechargeHandler, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterInstallTokenRoutes(v1, installTokenHandler, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterLiheOAuthRoutes(r, v1, h, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterLiheOIDCRoutes(r, v1, h, jwtAuth, auditLog, settingService, redisClient, panelRateLimiter)
 	routes.RegisterModelPlazaRoutes(v1, h, optionalJWTAuth, settingService, panelRateLimiter)
-	routes.RegisterAdminRoutes(v1, h, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
+	routes.RegisterAdminRoutes(v1, h, managedRechargeHandler, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg)
 	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter)
 

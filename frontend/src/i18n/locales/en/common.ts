@@ -194,6 +194,8 @@ export default {
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
     buySubscription: 'Recharge / Subscription',
+    memberRecharge: 'Member Recharge',
+    managedRecharge: 'Recharge Management',
     docs: 'Docs',
     myOrders: 'My Orders',
     orderManagement: 'Orders',

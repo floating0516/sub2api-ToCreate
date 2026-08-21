@@ -14,6 +14,7 @@ import (
 func RegisterAdminRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
+	managedRecharge *handler.ManagedRechargeHandler,
 	adminAuth middleware.AdminAuthMiddleware,
 	auditLog middleware.AuditLogMiddleware,
 	stepUpAuth middleware.StepUpAuthMiddleware,
@@ -73,6 +74,8 @@ func RegisterAdminRoutes(
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, h)
 
+		registerManagedRechargeRoutes(admin, managedRecharge)
+
 		// 系统设置
 		registerSettingsRoutes(admin, h)
 
@@ -127,6 +130,25 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+	}
+}
+
+func registerManagedRechargeRoutes(admin *gin.RouterGroup, h *handler.ManagedRechargeHandler) {
+	if h == nil {
+		return
+	}
+	managed := admin.Group("/managed-recharge")
+	{
+		managed.GET("/products", h.AdminListProducts)
+		managed.POST("/products", h.AdminCreateProduct)
+		managed.PUT("/products/:id", h.AdminUpdateProduct)
+		managed.GET("/cdks", h.AdminListCDKs)
+		managed.POST("/cdks/import", h.AdminImportCDKs)
+		managed.PUT("/cdks/:id/status", h.AdminSetCDKStatus)
+		managed.PUT("/cdks/:id/product", h.AdminMoveCDK)
+		managed.GET("/orders", h.AdminListOrders)
+		managed.POST("/orders/:id/sync", h.AdminSyncOrder)
+		managed.POST("/orders/:id/refund", h.AdminRefundOrder)
 	}
 }
 
