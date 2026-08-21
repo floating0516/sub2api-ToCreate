@@ -22,6 +22,14 @@ type managedRechargeUpstreamClient struct {
 	client  *http.Client
 }
 
+type managedRechargeUpstreamHTTPError struct {
+	StatusCode int
+}
+
+func (e *managedRechargeUpstreamHTTPError) Error() string {
+	return fmt.Sprintf("managed recharge upstream returned status %d", e.StatusCode)
+}
+
 type managedRechargeVerifyResponse struct {
 	Valid          bool   `json:"valid"`
 	PlanType       string `json:"plan_type"`
@@ -106,6 +114,9 @@ func (c *managedRechargeUpstreamClient) lookupTask(ctx context.Context, code str
 	var result managedRechargeLookupResponse
 	path := "/api/v1/lookup/task?cdk_code=" + url.QueryEscape(code)
 	err := c.doJSON(ctx, http.MethodGet, path, nil, &result)
+	if err == nil && strings.TrimSpace(result.Error) != "" {
+		err = fmt.Errorf("managed recharge upstream lookup rejected")
+	}
 	return &result, err
 }
 
@@ -115,6 +126,9 @@ func (c *managedRechargeUpstreamClient) submitReplacementSession(ctx context.Con
 		"cdk_code":     code,
 		"session_json": session,
 	}, &result)
+	if err == nil && strings.TrimSpace(result.Error) != "" {
+		err = fmt.Errorf("managed recharge upstream replacement Session rejected")
+	}
 	return &result, err
 }
 
@@ -153,7 +167,7 @@ func (c *managedRechargeUpstreamClient) doJSON(ctx context.Context, method, path
 		return fmt.Errorf("managed recharge upstream response exceeds limit")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("managed recharge upstream returned status %d", resp.StatusCode)
+		return &managedRechargeUpstreamHTTPError{StatusCode: resp.StatusCode}
 	}
 	if len(strings.TrimSpace(string(payload))) == 0 {
 		return fmt.Errorf("managed recharge upstream returned an empty response")

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -10,6 +11,12 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+)
+
+const (
+	managedRechargeControlBodyMaxBytes = 16 * 1024
+	managedRechargeSessionBodyMaxBytes = 320 * 1024
+	managedRechargeImportBodyMaxBytes  = 640 * 1024
 )
 
 type ManagedRechargeHandler struct {
@@ -61,8 +68,7 @@ func (h *ManagedRechargeHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 	var req managedRechargeCreateOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid recharge request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeSessionBodyMaxBytes, "Invalid recharge request") {
 		return
 	}
 	result, err := h.service.CreateOrder(c.Request.Context(), userID, service.ManagedRechargeCreateOrderInput{
@@ -114,8 +120,7 @@ func (h *ManagedRechargeHandler) SubmitReplacementSession(c *gin.Context) {
 		return
 	}
 	var req managedRechargeReplacementSessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid Session request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeSessionBodyMaxBytes, "Invalid Session request") {
 		return
 	}
 	order, err := h.service.SubmitReplacementSession(c.Request.Context(), userID, orderID, req.SessionJSON)
@@ -135,8 +140,7 @@ func (h *ManagedRechargeHandler) AdminListProducts(c *gin.Context) {
 
 func (h *ManagedRechargeHandler) AdminCreateProduct(c *gin.Context) {
 	var req service.ManagedRechargeProductInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid product request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeControlBodyMaxBytes, "Invalid product request") {
 		return
 	}
 	product, err := h.service.CreateProduct(c.Request.Context(), req)
@@ -152,8 +156,7 @@ func (h *ManagedRechargeHandler) AdminUpdateProduct(c *gin.Context) {
 		return
 	}
 	var req service.ManagedRechargeProductInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid product request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeControlBodyMaxBytes, "Invalid product request") {
 		return
 	}
 	product, err := h.service.UpdateProduct(c.Request.Context(), productID, req)
@@ -169,8 +172,7 @@ func (h *ManagedRechargeHandler) AdminImportCDKs(c *gin.Context) {
 		return
 	}
 	var req managedRechargeImportRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid CDK import")
+	if !managedRechargeBindJSON(c, &req, managedRechargeImportBodyMaxBytes, "Invalid CDK import") {
 		return
 	}
 	var expiresAt *time.Time
@@ -204,8 +206,7 @@ func (h *ManagedRechargeHandler) AdminSetCDKStatus(c *gin.Context) {
 		return
 	}
 	var req managedRechargeCDKStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid CDK status request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeControlBodyMaxBytes, "Invalid CDK status request") {
 		return
 	}
 	if err := h.service.SetCDKStatus(c.Request.Context(), cdkID, req.Status); response.ErrorFrom(c, err) {
@@ -220,8 +221,7 @@ func (h *ManagedRechargeHandler) AdminMoveCDK(c *gin.Context) {
 		return
 	}
 	var req managedRechargeCDKProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid CDK product request")
+	if !managedRechargeBindJSON(c, &req, managedRechargeControlBodyMaxBytes, "Invalid CDK product request") {
 		return
 	}
 	if err := h.service.MoveCDK(c.Request.Context(), cdkID, req.ProductID); response.ErrorFrom(c, err) {
@@ -292,6 +292,19 @@ func managedRechargeLimit(c *gin.Context, fallback int) int {
 	return limit
 }
 
+func managedRechargeBindJSON(c *gin.Context, dst any, maxBytes int64, invalidMessage string) bool {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+	if err := c.ShouldBindJSON(dst); err != nil {
+		if _, ok := extractMaxBytesError(err); ok {
+			response.Error(c, http.StatusRequestEntityTooLarge, "Recharge request is too large")
+		} else {
+			response.BadRequest(c, invalidMessage)
+		}
+		return false
+	}
+	return true
+}
+
 func managedRechargeUserOrders(orders []service.ManagedRechargeOrder) []service.ManagedRechargeOrder {
 	result := make([]service.ManagedRechargeOrder, len(orders))
 	for i := range orders {
@@ -307,6 +320,8 @@ func managedRechargeUserOrder(order *service.ManagedRechargeOrder) *service.Mana
 	result := *order
 	result.CDKMasked = ""
 	result.UpstreamStatus = ""
+	result.Progress = ""
+	result.ErrorCode = ""
 	result.UserEmail = ""
 	result.Username = ""
 	return &result

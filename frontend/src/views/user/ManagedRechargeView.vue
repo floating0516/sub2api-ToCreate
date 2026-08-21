@@ -100,7 +100,7 @@
 
             <label class="flex items-start gap-3 text-sm text-gray-600 dark:text-dark-300">
               <input v-model="agreed" type="checkbox" class="mt-0.5 h-4 w-4" />
-              <span>我确认该账号归本人所有，并授权使用第三方履约服务完成本次充值。</span>
+              <span>我确认该账号归本人所有，并同意 Session 在本次订单中加密保存、临时传输给第三方履约服务；完成或退款后清除。</span>
             </label>
 
             <div v-if="submitError" class="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/15 dark:text-red-300">
@@ -308,7 +308,7 @@ async function submitOrder(): Promise<void> {
 }
 
 function isActiveStatus(status: string): boolean {
-  return ['paid', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
+  return ['validating', 'paid', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
 }
 
 async function refreshOrder(id: number): Promise<void> {

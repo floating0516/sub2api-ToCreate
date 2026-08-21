@@ -216,7 +216,7 @@
                       <Icon name="refresh" size="sm" :class="workingOrders.has(order.id) ? 'animate-spin' : ''" />
                     </button>
                     <button
-                      v-if="canRefund(order.status)"
+                      v-if="canRefund(order)"
                       class="btn btn-danger btn-sm"
                       :disabled="workingOrders.has(order.id)"
                       @click="openRefundDialog(order)"
@@ -619,8 +619,9 @@ function orderNeedsSync(status: string): boolean {
   return ['paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
 }
 
-function canRefund(status: string): boolean {
-  return ['paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
+function canRefund(order: ManagedRechargeOrder): boolean {
+  if (order.status !== 'manual_review' || order.error_code !== 'UPSTREAM_TASK_NOT_FOUND' || !order.paid_at) return false
+  return Date.now() - new Date(order.paid_at).getTime() >= 10 * 60 * 1000
 }
 
 onMounted(loadAll)

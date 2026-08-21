@@ -40,8 +40,11 @@ const (
 	managedRechargeImportMaxCodes  = 500
 	managedRechargeSyncInterval    = 8 * time.Second
 	managedRechargeReserveAttempts = 3
+	managedRechargeOrderTimeout    = 3 * time.Minute
 	managedRechargeFulfillTimeout  = 90 * time.Second
 	managedRechargeRecoveryTimeout = 10 * time.Second
+	managedRechargeValidatingTTL   = 2 * time.Minute
+	managedRechargePaidReviewTTL   = 10 * time.Minute
 )
 
 var (
@@ -475,8 +478,10 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
+	orderCtx, cancelOrder := context.WithTimeout(context.Background(), managedRechargeOrderTimeout)
+	defer cancelOrder()
 
-	product, err := s.getActiveProduct(ctx, input.ProductID)
+	product, err := s.getActiveProduct(orderCtx, input.ProductID)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +495,7 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		return nil, fmt.Errorf("generate managed recharge order number: %w", err)
 	}
 	var orderID int64
-	err = s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowContext(orderCtx, `
 		INSERT INTO managed_recharge_orders
 		    (order_no, user_id, product_id, idempotency_key, price, account_email, session_ciphertext)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -498,16 +503,24 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		RETURNING id
 	`, orderNo, userID, product.ID, input.IdempotencyKey, product.Price, accountEmail, sessionCiphertext).Scan(&orderID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s.getOrderByIdempotency(ctx, userID, input.IdempotencyKey)
+		return s.getOrderByIdempotency(orderCtx, userID, input.IdempotencyKey)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("create managed recharge order: %w", err)
 	}
+	cleanupUnpaid := true
+	defer func() {
+		if cleanupUnpaid {
+			_ = s.runRecovery(func(recoveryCtx context.Context) error {
+				return s.failUnpaidOrder(recoveryCtx, orderID, "ORDER_INTERRUPTED", "订单处理被中断，请重新提交", false)
+			})
+		}
+	}()
 
 	var reserved *ManagedRechargeCDK
 	var plaintextCode string
 	for attempt := 0; attempt < managedRechargeReserveAttempts; attempt++ {
-		reserved, err = s.reserveNextCDK(ctx, orderID, product.ID)
+		reserved, err = s.reserveNextCDK(orderCtx, orderID, product.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				if recoveryErr := s.runRecovery(func(recoveryCtx context.Context) error {
@@ -528,7 +541,7 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 			}
 			continue
 		}
-		verified, verifyErr := s.upstream.verifyCDK(ctx, plaintextCode)
+		verified, verifyErr := s.upstream.verifyCDK(orderCtx, plaintextCode)
 		if verifyErr != nil {
 			if recoveryErr := s.runRecovery(func(recoveryCtx context.Context) error {
 				return s.failUnpaidOrder(recoveryCtx, orderID, "UPSTREAM_UNAVAILABLE", "上游验证暂时不可用", false)
@@ -568,7 +581,7 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		return nil, ErrManagedRechargeNoInventory
 	}
 
-	balanceBefore, balanceAfter, err := s.chargeOrder(ctx, orderID, userID, product.Price)
+	balanceBefore, balanceAfter, err := s.chargeOrder(orderCtx, orderID, userID, product.Price)
 	if err != nil {
 		if recoveryErr := s.runRecovery(func(recoveryCtx context.Context) error {
 			return s.failUnpaidOrder(recoveryCtx, orderID, "PAYMENT_FAILED", "余额支付失败", false)
@@ -580,6 +593,7 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		}
 		return nil, err
 	}
+	cleanupUnpaid = false
 	s.invalidateBalanceCaches(userID)
 
 	fulfillCtx, cancelFulfill := context.WithTimeout(context.Background(), managedRechargeFulfillTimeout)
@@ -607,13 +621,17 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		_ = s.markManualReview(fulfillCtx, orderID, "UPSTREAM_CONFIRM_UNCERTAIN", "上游确认结果不确定，已转人工核对")
 		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
-	if _, err := s.db.ExecContext(fulfillCtx, `
+	updateResult, err := s.db.ExecContext(fulfillCtx, `
 		UPDATE managed_recharge_orders
 		SET status = $2, upstream_status = $3, submitted_at = NOW(), last_synced_at = NOW(),
 		    error_code = '', error_message = '', updated_at = NOW()
-		WHERE id = $1
-	`, orderID, status, confirmed.Status); err != nil {
+		WHERE id = $1 AND status NOT IN ('refunded', 'completed')
+	`, orderID, status, confirmed.Status)
+	if err != nil {
 		return nil, fmt.Errorf("mark managed recharge order submitted: %w", err)
+	}
+	if affected, _ := updateResult.RowsAffected(); affected == 0 {
+		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
 	_ = balanceAfter
 	return s.GetOrder(fulfillCtx, userID, orderID, false)
@@ -685,7 +703,7 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	if err != nil {
 		return nil, err
 	}
-	if order.Status != ManagedRechargeStatusActionRequired && order.Status != ManagedRechargeStatusVerifying && order.Status != ManagedRechargeStatusManualReview {
+	if order.Status != ManagedRechargeStatusActionRequired {
 		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_SESSION_NOT_REQUIRED", "this order does not require a new Session")
 	}
 	if order.AccountEmail != "" && !strings.EqualFold(order.AccountEmail, email) {
@@ -699,13 +717,17 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	if err != nil {
 		return nil, fmt.Errorf("encrypt replacement Session: %w", err)
 	}
-	if _, err := s.db.ExecContext(ctx, `
+	updateResult, err := s.db.ExecContext(ctx, `
 		UPDATE managed_recharge_orders
 		SET session_ciphertext = $2, account_email = $3, status = 'verifying',
 		    error_code = '', error_message = '', updated_at = NOW()
-		WHERE id = $1
-	`, orderID, ciphertext, email); err != nil {
+		WHERE id = $1 AND status = 'action_required'
+	`, orderID, ciphertext, email)
+	if err != nil {
 		return nil, fmt.Errorf("store replacement Session: %w", err)
+	}
+	if affected, _ := updateResult.RowsAffected(); affected == 0 {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_SESSION_NOT_REQUIRED", "this order does not require a new Session")
 	}
 	fulfillCtx, cancelFulfill := context.WithTimeout(context.Background(), managedRechargeFulfillTimeout)
 	defer cancelFulfill()
@@ -723,24 +745,33 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	}
 	if _, err := s.db.ExecContext(fulfillCtx, `
 		UPDATE managed_recharge_orders
-		SET status = $2, upstream_status = $3, last_synced_at = NOW(), updated_at = NOW()
+		SET status = $2, session_ciphertext = '', last_synced_at = NOW(), updated_at = NOW()
 		WHERE id = $1
-	`, orderID, status, result.PostProcessStatus); err != nil {
+	`, orderID, status); err != nil {
 		return nil, fmt.Errorf("update replacement Session status: %w", err)
 	}
 	return s.GetOrder(fulfillCtx, userID, orderID, false)
 }
 
 func (s *ManagedRechargeService) AdminRefundOrder(ctx context.Context, adminID, orderID int64) (*ManagedRechargeOrder, error) {
-	order, err := s.getOrder(ctx, orderID, nil)
+	order, err := s.AdminGetOrder(ctx, orderID, true)
 	if err != nil {
 		return nil, err
 	}
-	if order.Status == ManagedRechargeStatusCompleted {
-		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_COMPLETED", "completed orders cannot be refunded automatically")
+	if order.Status == ManagedRechargeStatusRefunded {
+		return order, nil
+	}
+	if order.Status == ManagedRechargeStatusCompleted || strings.EqualFold(order.UpstreamStatus, "completed") {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_COMPLETED", "completed recharges cannot be refunded")
 	}
 	if order.PaidAt == nil {
 		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_NOT_PAID", "only paid orders can be refunded")
+	}
+	if order.Status != ManagedRechargeStatusManualReview {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_REFUND_REVIEW_REQUIRED", "only manual-review orders can be refunded")
+	}
+	if order.ErrorCode != "UPSTREAM_TASK_NOT_FOUND" || time.Since(*order.PaidAt) < managedRechargePaidReviewTTL {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_REFUND_SYNC_REQUIRED", "provider must confirm that no task exists before refunding")
 	}
 	if err := s.refundOrder(ctx, orderID, order.UserID, "ADMIN_REFUND", "管理员已退款"); err != nil {
 		return nil, err
@@ -750,7 +781,21 @@ func (s *ManagedRechargeService) AdminRefundOrder(ctx context.Context, adminID, 
 }
 
 func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *ManagedRechargeOrder, force bool) (*ManagedRechargeOrder, error) {
-	if order == nil || !managedRechargeStatusNeedsSync(order.Status) || order.cdkCiphertext == "" {
+	if order == nil {
+		return order, nil
+	}
+	if order.Status == ManagedRechargeStatusValidating {
+		if time.Since(order.UpdatedAt) < managedRechargeValidatingTTL {
+			return order, nil
+		}
+		if err := s.runRecovery(func(recoveryCtx context.Context) error {
+			return s.failUnpaidOrder(recoveryCtx, order.ID, "ORDER_INTERRUPTED", "订单未完成扣款，请重新提交", false)
+		}); err != nil {
+			return nil, err
+		}
+		return s.getOrder(ctx, order.ID, &order.UserID)
+	}
+	if !managedRechargeStatusNeedsSync(order.Status) || order.cdkCiphertext == "" {
 		return order, nil
 	}
 	if !force && order.LastSyncedAt != nil && time.Since(*order.LastSyncedAt) < managedRechargeSyncInterval {
@@ -764,13 +809,44 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 	}
 	result, err := s.upstream.lookupTask(syncCtx, code)
 	if err != nil {
+		errorCode := "SYNC_UNAVAILABLE"
+		errorMessage := "状态同步暂时不可用"
+		var upstreamHTTPError *managedRechargeUpstreamHTTPError
+		if errors.As(err, &upstreamHTTPError) && upstreamHTTPError.StatusCode == http.StatusNotFound {
+			errorCode = "UPSTREAM_TASK_NOT_FOUND"
+			errorMessage = "暂未查询到履约任务，正在人工核对"
+		}
 		_, _ = s.db.ExecContext(syncCtx, `
 			UPDATE managed_recharge_orders
-			SET last_synced_at = NOW(), error_code = 'SYNC_UNAVAILABLE',
-			    error_message = '状态同步暂时不可用', updated_at = NOW()
+			SET last_synced_at = NOW(), error_code = $2,
+			    error_message = $3, updated_at = NOW()
 			WHERE id = $1
-		`, order.ID)
+		`, order.ID, errorCode, errorMessage)
+		if order.Status == ManagedRechargeStatusPaid && time.Since(order.UpdatedAt) >= managedRechargePaidReviewTTL {
+			_ = s.markManualReview(syncCtx, order.ID, "UPSTREAM_CREATE_UNCERTAIN", "上游提交结果不确定，已转人工核对")
+		}
 		return s.getOrder(syncCtx, order.ID, &order.UserID)
+	}
+	if strings.EqualFold(strings.TrimSpace(result.TaskStatus), "pending") {
+		taskID := strings.TrimSpace(result.TaskID)
+		if taskID == "" {
+			taskID = strings.TrimSpace(order.upstreamTaskID)
+		}
+		confirmedAccepted := false
+		if taskID != "" {
+			confirmed, confirmErr := s.upstream.confirmTask(syncCtx, taskID)
+			if confirmErr == nil {
+				if accepted := normalizeManagedRechargeAcceptedStatus(confirmed.Status); accepted != "" {
+					result.TaskID = taskID
+					result.TaskStatus = confirmed.Status
+					confirmedAccepted = true
+				}
+			}
+		}
+		if !confirmedAccepted {
+			_ = s.markManualReview(syncCtx, order.ID, "UPSTREAM_CONFIRM_UNCERTAIN", "上游确认结果不确定，已转人工核对")
+			return s.getOrder(syncCtx, order.ID, &order.UserID)
+		}
 	}
 
 	nextStatus := normalizeManagedRechargeLookupStatus(result)
@@ -783,27 +859,40 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 		return s.getOrder(syncCtx, order.ID, &order.UserID)
 	}
 
-	clearSession := nextStatus == ManagedRechargeStatusCompleted
+	fulfillmentCompleted := strings.EqualFold(strings.TrimSpace(result.TaskStatus), "completed")
 	query := `
 		UPDATE managed_recharge_orders
 		SET status = $2, upstream_status = $3, upstream_failure_reason = $4,
 		    queue_position = $5, queue_total = $6, progress = $7,
 		    account_email = CASE WHEN $8 = '' THEN account_email ELSE $8 END,
 		    error_code = '', error_message = '', last_synced_at = NOW(), updated_at = NOW(),
-		    completed_at = CASE WHEN $2 = 'completed' THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
-		    session_ciphertext = CASE WHEN $9 THEN '' ELSE session_ciphertext END
+		    completed_at = CASE WHEN $9 THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
+		    session_ciphertext = CASE WHEN $9 THEN '' ELSE session_ciphertext END,
+		    upstream_task_id = CASE WHEN $10 = '' THEN upstream_task_id ELSE $10 END
 		WHERE id = $1 AND status NOT IN ('refunded', 'completed')
 	`
-	if _, err := s.db.ExecContext(syncCtx, query, order.ID, nextStatus, result.TaskStatus, result.FailureReason,
-		result.QueuePosition, result.QueueTotal, result.Progress, result.AccountEmail, clearSession); err != nil {
+	tx, err := s.db.BeginTx(syncCtx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin managed recharge sync: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	updateResult, err := tx.ExecContext(syncCtx, query, order.ID, nextStatus, result.TaskStatus, result.FailureReason,
+		result.QueuePosition, result.QueueTotal, result.Progress, result.AccountEmail, fulfillmentCompleted, result.TaskID)
+	if err != nil {
 		return nil, fmt.Errorf("sync managed recharge order: %w", err)
 	}
-	if nextStatus == ManagedRechargeStatusCompleted {
-		_, _ = s.db.ExecContext(syncCtx, `
+	affected, _ := updateResult.RowsAffected()
+	if affected == 1 && fulfillmentCompleted {
+		if _, err := tx.ExecContext(syncCtx, `
 			UPDATE managed_recharge_cdks
 			SET status = 'used', reserved_at = NULL, updated_at = NOW()
-			WHERE id = (SELECT cdk_id FROM managed_recharge_orders WHERE id = $1)
-		`, order.ID)
+			WHERE id = (SELECT cdk_id FROM managed_recharge_orders WHERE id = $1) AND status = 'reserved'
+		`, order.ID); err != nil {
+			return nil, fmt.Errorf("mark managed recharge CDK used: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit managed recharge sync: %w", err)
 	}
 	return s.getOrder(syncCtx, order.ID, &order.UserID)
 }
@@ -1020,7 +1109,10 @@ func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userI
 	var price float64
 	var status string
 	var paidAt sql.NullTime
-	err = tx.QueryRowContext(ctx, `SELECT price, status, paid_at FROM managed_recharge_orders WHERE id = $1 FOR UPDATE`, orderID).Scan(&price, &status, &paidAt)
+	var orderUserID int64
+	var upstreamStatus string
+	err = tx.QueryRowContext(ctx, `SELECT price, status, paid_at, user_id, upstream_status FROM managed_recharge_orders WHERE id = $1 FOR UPDATE`, orderID).
+		Scan(&price, &status, &paidAt, &orderUserID, &upstreamStatus)
 	if err != nil {
 		return err
 	}
@@ -1029,6 +1121,12 @@ func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userI
 	}
 	if status == ManagedRechargeStatusCompleted {
 		return infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_COMPLETED", "completed orders cannot be refunded automatically")
+	}
+	if strings.EqualFold(upstreamStatus, "completed") {
+		return infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_COMPLETED", "completed recharges cannot be refunded")
+	}
+	if orderUserID != userID {
+		return fmt.Errorf("managed recharge refund user mismatch")
 	}
 	if paidAt.Valid {
 		if _, err := tx.ExecContext(ctx, `UPDATE users SET balance = balance + $2, updated_at = NOW() WHERE id = $1`, userID, price); err != nil {
@@ -1061,12 +1159,18 @@ func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userI
 }
 
 func (s *ManagedRechargeService) markTaskCreated(ctx context.Context, orderID int64, taskID string) error {
-	_, err := s.db.ExecContext(ctx, `
+	result, err := s.db.ExecContext(ctx, `
 		UPDATE managed_recharge_orders
 		SET status = 'submitting', upstream_task_id = $2, upstream_status = 'created', updated_at = NOW()
-		WHERE id = $1
+		WHERE id = $1 AND status = 'paid'
 	`, orderID, taskID)
-	return err
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return fmt.Errorf("managed recharge order is no longer awaiting submission")
+	}
+	return nil
 }
 
 func (s *ManagedRechargeService) markManualReview(ctx context.Context, orderID int64, code, message string) error {

@@ -136,10 +136,10 @@ func RegisterUserRoutes(
 			managed := authenticated.Group("/managed-recharge")
 			{
 				managed.GET("/catalog", managedRecharge.Catalog)
-				managed.POST("/orders", managedRecharge.CreateOrder)
+				managed.POST("/orders", panelRateLimiter.Heavy(), managedRecharge.CreateOrder)
 				managed.GET("/orders", managedRecharge.ListOrders)
 				managed.GET("/orders/:id", managedRecharge.GetOrder)
-				managed.POST("/orders/:id/session", managedRecharge.SubmitReplacementSession)
+				managed.POST("/orders/:id/session", panelRateLimiter.Heavy(), managedRecharge.SubmitReplacementSession)
 			}
 		}
 
