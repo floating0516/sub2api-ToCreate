@@ -44,18 +44,18 @@ type managedRechargeConfirmResponse struct {
 }
 
 type managedRechargeLookupResponse struct {
-	TaskID              string `json:"task_id"`
-	TaskStatus          string `json:"task_status"`
-	AccountEmail        string `json:"account_email"`
-	FailureReason       string `json:"failure_reason"`
-	PostProcessStatus   string `json:"post_process_status"`
-	PostProcessCode     string `json:"post_process_code"`
-	PostProcessUpdated  string `json:"post_process_updated_at"`
-	QueuePosition       int    `json:"queue_position"`
-	QueueTotal          int    `json:"queue_total"`
-	Progress            string `json:"progress"`
-	Error               string `json:"error"`
-	Message             string `json:"message"`
+	TaskID             string `json:"task_id"`
+	TaskStatus         string `json:"task_status"`
+	AccountEmail       string `json:"account_email"`
+	FailureReason      string `json:"failure_reason"`
+	PostProcessStatus  string `json:"post_process_status"`
+	PostProcessCode    string `json:"post_process_code"`
+	PostProcessUpdated string `json:"post_process_updated_at"`
+	QueuePosition      int    `json:"queue_position"`
+	QueueTotal         int    `json:"queue_total"`
+	Progress           string `json:"progress"`
+	Error              string `json:"error"`
+	Message            string `json:"message"`
 }
 
 type managedRechargeReplacementSessionResponse struct {
@@ -88,7 +88,7 @@ func (c *managedRechargeUpstreamClient) verifyCDK(ctx context.Context, code stri
 func (c *managedRechargeUpstreamClient) createTask(ctx context.Context, code, session string) (*managedRechargeCreateResponse, error) {
 	var result managedRechargeCreateResponse
 	err := c.doJSON(ctx, http.MethodPost, "/api/v1/recharge/create-task", map[string]string{
-		"cdk_code":    code,
+		"cdk_code":     code,
 		"session_json": session,
 	}, &result)
 	return &result, err
@@ -112,7 +112,7 @@ func (c *managedRechargeUpstreamClient) lookupTask(ctx context.Context, code str
 func (c *managedRechargeUpstreamClient) submitReplacementSession(ctx context.Context, code, session string) (*managedRechargeReplacementSessionResponse, error) {
 	var result managedRechargeReplacementSessionResponse
 	err := c.doJSON(ctx, http.MethodPost, "/api/v1/lookup/task/session", map[string]string{
-		"cdk_code":    code,
+		"cdk_code":     code,
 		"session_json": session,
 	}, &result)
 	return &result, err
@@ -142,7 +142,7 @@ func (c *managedRechargeUpstreamClient) doJSON(ctx context.Context, method, path
 	if err != nil {
 		return fmt.Errorf("managed recharge upstream request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	limited := io.LimitReader(resp.Body, managedRechargeMaxResponseSize+1)
 	payload, err := io.ReadAll(limited)

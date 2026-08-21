@@ -47,8 +47,8 @@ const (
 var (
 	managedRechargeSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{1,63}$`)
 
-	ErrManagedRechargeUnavailable = infraerrors.New(http.StatusServiceUnavailable, "MANAGED_RECHARGE_UNAVAILABLE", "member recharge is not configured")
-	ErrManagedRechargeNoInventory = infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_OUT_OF_STOCK", "the selected product is out of stock")
+	ErrManagedRechargeUnavailable  = infraerrors.New(http.StatusServiceUnavailable, "MANAGED_RECHARGE_UNAVAILABLE", "member recharge is not configured")
+	ErrManagedRechargeNoInventory  = infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_OUT_OF_STOCK", "the selected product is out of stock")
 	ErrManagedRechargeOrderMissing = infraerrors.New(http.StatusNotFound, "MANAGED_RECHARGE_ORDER_NOT_FOUND", "recharge order not found")
 	ErrManagedRechargeProduct      = infraerrors.New(http.StatusBadRequest, "MANAGED_RECHARGE_PRODUCT_INVALID", "invalid recharge product")
 )
@@ -217,7 +217,7 @@ func (s *ManagedRechargeService) listProducts(ctx context.Context, activeOnly bo
 	if err != nil {
 		return nil, fmt.Errorf("list managed recharge products: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	products := make([]ManagedRechargeProduct, 0)
 	for rows.Next() {
@@ -384,7 +384,7 @@ func (s *ManagedRechargeService) ListCDKs(ctx context.Context, productID int64, 
 	if err != nil {
 		return nil, fmt.Errorf("list managed recharge CDKs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]ManagedRechargeCDK, 0)
 	for rows.Next() {
 		var item ManagedRechargeCDK
@@ -657,7 +657,7 @@ func (s *ManagedRechargeService) listOrders(ctx context.Context, where string, a
 	if err != nil {
 		return nil, fmt.Errorf("list managed recharge orders: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	orders := make([]ManagedRechargeOrder, 0)
 	for rows.Next() {
 		order, err := scanManagedRechargeOrder(rows)
@@ -715,9 +715,10 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 		return s.GetOrder(fulfillCtx, userID, orderID, false)
 	}
 	status := ManagedRechargeStatusVerifying
-	if result.PostProcessStatus == "action_required" {
+	switch result.PostProcessStatus {
+	case "action_required":
 		status = ManagedRechargeStatusActionRequired
-	} else if result.PostProcessStatus == "manual_review" {
+	case "manual_review":
 		status = ManagedRechargeStatusManualReview
 	}
 	if _, err := s.db.ExecContext(fulfillCtx, `
