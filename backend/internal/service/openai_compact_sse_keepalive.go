@@ -248,19 +248,31 @@ func openAISSEKeepaliveAdjustedWrittenSize(c *gin.Context, key string) int {
 		return -1
 	}
 	state := openAISSEKeepaliveStateFromContext(c, key)
-	if state == nil {
-		return c.Writer.Size()
+	size := c.Writer.Size()
+	keepaliveBytes := 0
+	if state != nil {
+		state.mu.Lock()
+		if state.writer == nil {
+			state.mu.Unlock()
+			return -1
+		}
+		size = state.writer.Size()
+		keepaliveBytes = state.bytes
+		state.mu.Unlock()
 	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if state.writer == nil {
-		return -1
+	if key == openAICompactSSEKeepaliveKey {
+		if value, ok := c.Get(openAIStreamKeepaliveBytesKey); ok {
+			streamKeepaliveBytes, _ := value.(int)
+			keepaliveBytes += streamKeepaliveBytes
+		}
 	}
-	size := state.writer.Size()
 	if size < 0 {
 		return size
 	}
-	if real := size - state.bytes; real > 0 {
+	if keepaliveBytes <= 0 {
+		return size
+	}
+	if real := size - keepaliveBytes; real > 0 {
 		return real
 	}
 	return -1

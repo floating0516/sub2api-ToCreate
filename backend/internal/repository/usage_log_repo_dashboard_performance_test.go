@@ -16,20 +16,23 @@ func TestGetStatsSummaryWithFiltersRunsOnlySummaryQuery(t *testing.T) {
 	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery("SELECT[[:space:]]+COUNT\\(\\*\\) as total_requests").
+	mock.ExpectQuery("(?s)WITH scoped AS.*GROUP BY GROUPING SETS \\(\\s*\\(\\)\\s*\\)").
 		WithArgs(int64(42), start, end).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"total_requests",
-			"total_input_tokens",
-			"total_output_tokens",
-			"total_cache_tokens",
-			"total_cache_creation_tokens",
-			"total_cache_read_tokens",
-			"total_cost",
-			"total_actual_cost",
-			"total_account_cost",
+			"inbound_grouped",
+			"upstream_grouped",
+			"inbound_endpoint",
+			"upstream_endpoint",
+			"requests",
+			"input_tokens",
+			"output_tokens",
+			"cache_creation_tokens",
+			"cache_read_tokens",
+			"cost",
+			"actual_cost",
+			"account_cost",
 			"avg_duration_ms",
-		}).AddRow(12, 100, 50, 25, 10, 15, 1.5, 1.2, 0.8, 240.0))
+		}).AddRow(1, 1, nil, nil, 12, 100, 50, 10, 15, 1.5, 1.2, 0.8, 240.0))
 
 	stats, err := repo.GetStatsSummaryWithFilters(context.Background(), usagestats.UsageLogFilters{
 		UserID:    42,
