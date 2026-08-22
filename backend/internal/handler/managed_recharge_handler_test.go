@@ -14,14 +14,14 @@ import (
 
 func TestManagedRechargeUserOrderOmitsProviderFields(t *testing.T) {
 	order := managedRechargeUserOrder(&service.ManagedRechargeOrder{
-		CDKMasked:       "abcd...wxyz",
-		RedemptionCode:  "USER-OWNED-CDK",
-		RedemptionURL:   "https://redeem.example.test/recharge?cdk=USER-OWNED-CDK",
-		UpstreamStatus:  "provider-internal-status",
-		Progress:        `{"step":"provider-checkout"}`,
-		ErrorCode:       "UPSTREAM_INTERNAL_CODE",
-		UserEmail:       "user@example.com",
-		Username:        "user-name",
+		CDKMasked:      "abcd...wxyz",
+		RedemptionCode: "USER-OWNED-CDK",
+		RedemptionURL:  "https://redeem.example.test/recharge?cdk=USER-OWNED-CDK",
+		UpstreamStatus: "provider-internal-status",
+		Progress:       `{"step":"provider-checkout"}`,
+		ErrorCode:      "UPSTREAM_INTERNAL_CODE",
+		UserEmail:      "user@example.com",
+		Username:       "user-name",
 	})
 	payload, err := json.Marshal(order)
 	if err != nil {
