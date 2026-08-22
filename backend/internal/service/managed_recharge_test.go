@@ -9,6 +9,16 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
+type managedRechargeTestEncryptor struct{}
+
+func (managedRechargeTestEncryptor) Encrypt(plaintext string) (string, error) {
+	return plaintext, nil
+}
+
+func (managedRechargeTestEncryptor) Decrypt(ciphertext string) (string, error) {
+	return ciphertext, nil
+}
+
 func TestNormalizeManagedRechargePlanType(t *testing.T) {
 	tests := map[string]string{
 		"plus":         "plus",
@@ -145,7 +155,7 @@ func TestManagedRechargeMockModeRejectsNonTestSessionBeforeCreatingOrder(t *test
 
 	service := &ManagedRechargeService{
 		db:           db,
-		encryptor:    &plainEncryptor{},
+		encryptor:    managedRechargeTestEncryptor{},
 		upstream:     newManagedRechargeMockUpstream(10 * time.Second),
 		mockMode:     true,
 		featureReady: true,
