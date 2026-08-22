@@ -1552,6 +1552,9 @@ onMounted(async () => {
         }
       }
     }
+    if (route.query.tab === 'member') {
+      activeTab.value = 'member'
+    }
   } catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
   finally { loading.value = false }
   // Fetch active subscriptions (uses cache, non-blocking)

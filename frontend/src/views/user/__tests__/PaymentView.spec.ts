@@ -373,6 +373,25 @@ describe('PaymentView managed recharge entry', () => {
       query: { plan: 'pro-5x' },
     })
   })
+
+  it('restores the GPT Plus-Pro tab when returning from the dedicated page', async () => {
+    routeState.query = { tab: 'member' }
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture())
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="payment-tab-member"]').classes()).toContain('bg-white')
+    expect(wrapper.findComponent(ManagedRechargeEntryCard).exists()).toBe(true)
+  })
 })
 
 describe('PaymentView subscription confirmation amounts', () => {

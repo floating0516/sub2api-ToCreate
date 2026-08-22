@@ -1,18 +1,47 @@
 <template>
   <AppLayout>
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5 sm:px-6">
-      <header class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5 dark:border-dark-700">
-        <div>
-          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">会员代充</h1>
-          <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">Plus / Pro 库存充值</p>
+      <header class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-5 dark:border-dark-700">
+        <div class="flex min-w-0 items-center gap-3">
+          <button
+            data-testid="managed-recharge-back"
+            type="button"
+            class="btn btn-secondary h-9 w-9 shrink-0 p-0"
+            title="返回充值订阅"
+            aria-label="返回充值订阅"
+            @click="goBack"
+          >
+            <Icon name="arrowLeft" size="sm" />
+          </button>
+          <div class="min-w-0">
+            <h1 class="text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">订阅 GPT Plus / Pro</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">确认套餐与账号后，使用站内余额完成订阅</p>
+          </div>
         </div>
-        <div class="text-right">
+        <div class="border-l border-gray-200 pl-4 text-right dark:border-dark-700">
           <div class="text-xs text-gray-500 dark:text-dark-400">可用余额</div>
           <div class="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
             {{ formatAmount(catalog?.balance || 0) }}
           </div>
         </div>
       </header>
+
+      <ol class="grid grid-cols-3 border-y border-gray-200 py-4 dark:border-dark-700" aria-label="订阅流程">
+        <li
+          v-for="(step, index) in purchaseSteps"
+          :key="step.title"
+          :data-testid="`managed-recharge-step-${index + 1}`"
+          class="flex min-w-0 items-center justify-center gap-2 px-2 sm:gap-3"
+        >
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">
+            {{ index + 1 }}
+          </span>
+          <span class="min-w-0">
+            <span class="block text-xs font-medium text-gray-900 dark:text-white sm:text-sm">{{ step.title }}</span>
+            <span class="mt-0.5 hidden text-xs text-gray-500 dark:text-dark-400 sm:block">{{ step.description }}</span>
+          </span>
+        </li>
+      </ol>
 
       <div
         v-if="catalog?.mock_mode"
@@ -42,107 +71,211 @@
         <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">库存补充后将在这里开放购买。</p>
       </div>
 
-      <div v-else class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
-          <div class="border-b border-gray-200 px-4 py-3 dark:border-dark-700">
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">选择套餐</h2>
-          </div>
-          <div class="divide-y divide-gray-100 dark:divide-dark-700">
-            <button
-              v-for="product in catalog.products"
-              :key="product.id"
-              type="button"
-              class="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors"
-              :class="selectedProductId === product.id ? 'bg-primary-50 dark:bg-primary-900/15' : 'hover:bg-gray-50 dark:hover:bg-dark-700/60'"
-              :disabled="product.available_stock <= 0"
-              @click="selectedProductId = product.id"
-            >
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-semibold text-gray-900 dark:text-white">{{ product.name }}</span>
-                <span class="mt-1 block text-xs text-gray-500 dark:text-dark-400">
-                  {{ product.available_stock > 0 ? `库存 ${product.available_stock}` : '暂时缺货' }}
+      <form
+        v-else
+        id="managed-recharge-form"
+        class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
+        @submit.prevent="submitOrder"
+      >
+        <div class="space-y-5">
+          <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">1</span>
+              <div>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">选择订阅套餐</h2>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">请确认档位、库存和支付金额</p>
+              </div>
+            </div>
+
+            <div v-if="requestedPlanUnavailable" class="flex gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
+              <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0" />
+              <span>{{ requestedPlanLabel }} 暂未配置对应商品，请选择其他可用套餐。</span>
+            </div>
+
+            <div class="grid gap-3 p-5 sm:grid-cols-2">
+              <button
+                v-for="product in catalog.products"
+                :key="product.id"
+                :data-testid="`managed-recharge-product-${product.id}`"
+                type="button"
+                class="flex min-h-24 w-full items-center justify-between gap-4 rounded-lg border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                :class="selectedProductId === product.id
+                  ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:bg-primary-900/15'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700/60'"
+                :aria-pressed="selectedProductId === product.id"
+                :disabled="product.available_stock <= 0"
+                @click="selectedProductId = product.id"
+              >
+                <span class="flex min-w-0 items-center gap-3">
+                  <span
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border"
+                    :class="selectedProductId === product.id
+                      ? 'border-primary-500 bg-primary-500 text-white'
+                      : 'border-gray-300 text-transparent dark:border-dark-500'"
+                  >
+                    <Icon name="check" size="sm" />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block break-words text-sm font-semibold text-gray-900 dark:text-white">{{ product.name }}</span>
+                    <span class="mt-1 block text-xs text-gray-500 dark:text-dark-400">
+                      {{ product.available_stock > 0 ? `库存 ${product.available_stock}` : '暂时缺货' }}
+                    </span>
+                  </span>
                 </span>
-              </span>
-              <span class="shrink-0 text-base font-semibold text-gray-900 dark:text-white">{{ formatAmount(product.price) }}</span>
-            </button>
-          </div>
-        </section>
+                <span class="shrink-0 text-base font-semibold text-gray-900 dark:text-white">{{ formatAmount(product.price) }}</span>
+              </button>
+            </div>
+          </section>
 
-        <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
-          <div class="border-b border-gray-200 px-5 py-3 dark:border-dark-700">
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">提交账号</h2>
-          </div>
-          <div v-if="requestedPlanUnavailable" class="flex gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
-            <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0" />
-            <span>{{ requestedPlanLabel }} 暂未配置对应商品，请选择其他可用套餐。</span>
-          </div>
-          <form class="space-y-5 p-5" @submit.prevent="submitOrder">
-            <div v-if="selectedProduct" class="grid gap-3 border-b border-gray-100 pb-4 text-sm dark:border-dark-700 sm:grid-cols-3">
+          <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">2</span>
               <div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">套餐</div>
-                <div class="mt-1 font-medium text-gray-900 dark:text-white">{{ selectedProduct.name }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">支付金额</div>
-                <div class="mt-1 font-medium text-gray-900 dark:text-white">{{ formatAmount(selectedProduct.price) }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">支付方式</div>
-                <div class="mt-1 font-medium text-gray-900 dark:text-white">站内余额</div>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">提交目标账号 Session</h2>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">粘贴后会自动识别账号，确认无误再支付</p>
               </div>
             </div>
 
-            <div>
-              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <label for="managed-recharge-session" class="input-label mb-0">Session JSON</label>
-                <a
-                  v-if="!catalog?.mock_mode"
-                  href="https://chatgpt.com/api/auth/session"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                >
-                  获取 Session
-                </a>
+            <div class="space-y-4 p-5">
+              <details
+                v-if="!catalog?.mock_mode"
+                data-testid="managed-recharge-session-guide"
+                class="group rounded-lg border border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-700/40"
+              >
+                <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  <Icon name="book" size="sm" class="shrink-0 text-primary-600 dark:text-primary-400" />
+                  <span class="min-w-0 flex-1">第一次使用？查看详细获取教程</span>
+                  <Icon name="chevronDown" size="sm" class="shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div class="border-t border-gray-200 px-4 py-4 dark:border-dark-600">
+                  <ol class="space-y-4 text-sm text-gray-600 dark:text-dark-300">
+                    <li v-for="(item, index) in sessionGuideSteps" :key="item.title" class="flex gap-3">
+                      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-gray-700 shadow-sm dark:bg-dark-800 dark:text-dark-200">
+                        {{ index + 1 }}
+                      </span>
+                      <span>
+                        <span class="block font-medium text-gray-900 dark:text-white">{{ item.title }}</span>
+                        <span class="mt-1 block text-xs leading-5">{{ item.description }}</span>
+                      </span>
+                    </li>
+                  </ol>
+                  <a
+                    href="https://chatgpt.com/api/auth/session"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-secondary btn-sm mt-4"
+                  >
+                    <Icon name="externalLink" size="sm" class="mr-2" />
+                    打开 Session 页面
+                  </a>
+                  <p class="mt-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                    如果页面显示未登录或内容为空，请先登录需要订阅的 ChatGPT 账号，再刷新 Session 页面。
+                  </p>
+                </div>
+              </details>
+
+              <div v-else class="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200">
+                <Icon name="beaker" size="md" class="mt-0.5 shrink-0" />
+                <span>点击页面上方“填入模拟 Session”，即可体验账号识别、余额扣款和订单进度。</span>
               </div>
-              <textarea
-                id="managed-recharge-session"
-                v-model="sessionJson"
-                class="input min-h-36 resize-y font-mono text-xs"
-                autocomplete="off"
-                spellcheck="false"
-                :placeholder="catalog?.mock_mode ? '点击上方按钮填入模拟 Session' : '粘贴包含 user 和 accessToken 的完整 JSON'"
-                @input="validateSession"
-              />
-              <div v-if="sessionEmail" class="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                <Icon name="checkCircle" size="sm" />
-                <span class="break-all">{{ sessionEmail }}</span>
+
+              <div>
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <label for="managed-recharge-session" class="input-label mb-0">Session JSON</label>
+                  <span class="text-xs text-gray-500 dark:text-dark-400">粘贴时不会自动支付</span>
+                </div>
+                <textarea
+                  id="managed-recharge-session"
+                  v-model="sessionJson"
+                  data-testid="managed-recharge-session-input"
+                  class="input min-h-40 resize-y font-mono text-xs leading-5"
+                  autocomplete="off"
+                  spellcheck="false"
+                  :placeholder="catalog?.mock_mode ? '点击上方按钮填入模拟 Session' : '粘贴从 { 开始到 } 结束的完整 Session JSON'"
+                  @input="validateSession"
+                />
+                <div v-if="sessionEmail" class="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900/60 dark:bg-green-950/20 dark:text-green-300">
+                  <Icon name="checkCircle" size="sm" class="mt-0.5 shrink-0" />
+                  <span class="min-w-0">
+                    <span class="block text-xs">已识别目标账号</span>
+                    <span class="mt-0.5 block break-all font-medium">{{ sessionEmail }}</span>
+                  </span>
+                </div>
+                <p v-else-if="sessionError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ sessionError }}</p>
               </div>
-              <p v-else-if="sessionError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ sessionError }}</p>
+            </div>
+          </section>
+        </div>
+
+        <aside class="space-y-4 lg:sticky lg:top-5">
+          <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">3</span>
+              <div>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">确认并支付</h2>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">支付方式：站内余额</p>
+              </div>
             </div>
 
-            <label class="flex items-start gap-3 text-sm text-gray-600 dark:text-dark-300">
-              <input v-model="agreed" type="checkbox" class="mt-0.5 h-4 w-4" />
-              <span v-if="catalog?.mock_mode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
-              <span v-else>我确认该账号归本人所有，并同意 Session 在本次订单中加密保存、临时传输给第三方履约服务；完成或退款后清除。</span>
-            </label>
+            <div class="space-y-4 p-5">
+              <dl class="space-y-3 text-sm">
+                <div class="flex items-start justify-between gap-3">
+                  <dt class="text-gray-500 dark:text-dark-400">订阅套餐</dt>
+                  <dd class="max-w-[11rem] text-right font-medium text-gray-900 dark:text-white">{{ selectedProduct?.name || '尚未选择' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-gray-500 dark:text-dark-400">目标账号</dt>
+                  <dd class="max-w-[11rem] truncate text-right text-gray-900 dark:text-white" :title="sessionEmail">{{ sessionEmail || '等待识别' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-dark-700">
+                  <dt class="text-gray-500 dark:text-dark-400">应付金额</dt>
+                  <dd class="text-xl font-semibold text-gray-900 dark:text-white">{{ formatAmount(selectedProduct?.price || 0) }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 text-xs">
+                  <dt class="text-gray-500 dark:text-dark-400">支付后余额</dt>
+                  <dd :class="!selectedProduct || hasEnoughBalance ? 'text-gray-700 dark:text-dark-200' : 'text-red-600 dark:text-red-400'">
+                    {{ formatAmount(balanceAfterPayment) }}
+                  </dd>
+                </div>
+              </dl>
 
-            <div v-if="submitError" class="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/15 dark:text-red-300">
-              {{ submitError }}
+              <div v-if="selectedProduct && !hasEnoughBalance" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+                余额不足，还差 {{ formatAmount(selectedProduct.price - (catalog?.balance || 0)) }}
+              </div>
+
+              <label class="flex items-start gap-3 text-xs leading-5 text-gray-600 dark:text-dark-300">
+                <input v-model="agreed" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" />
+                <span v-if="catalog?.mock_mode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
+                <span v-else>我确认账号归本人所有，并同意 Session 加密保存、临时传输给第三方履约服务；订单完成或退款后清除。</span>
+              </label>
+
+              <div v-if="submitError" class="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/15 dark:text-red-300">
+                {{ submitError }}
+              </div>
+
+              <button
+                data-testid="managed-recharge-submit"
+                type="submit"
+                class="btn btn-primary w-full"
+                :disabled="!canSubmit || submitting"
+              >
+                <Icon v-if="submitting" name="refresh" size="sm" class="mr-2 animate-spin" />
+                <Icon v-else name="creditCard" size="sm" class="mr-2" />
+                {{ submitting ? '正在提交' : `余额支付 ${formatAmount(selectedProduct?.price || 0)}` }}
+              </button>
+
+              <p class="text-center text-xs leading-5 text-gray-500 dark:text-dark-400">
+                支付后可在下方查看处理进度；未完成的订单会按规则退款。
+              </p>
             </div>
 
-            <button
-              type="submit"
-              class="btn btn-primary w-full sm:w-auto"
-              :disabled="!canSubmit || submitting"
-            >
-              <Icon v-if="submitting" name="refresh" size="sm" class="mr-2 animate-spin" />
-              <Icon v-else name="creditCard" size="sm" class="mr-2" />
-              {{ submitting ? '正在提交' : `余额支付 ${formatAmount(selectedProduct?.price || 0)}` }}
-            </button>
-          </form>
-        </section>
-      </div>
+            <div class="flex gap-3 border-t border-gray-200 bg-gray-50 px-5 py-4 text-xs leading-5 text-gray-600 dark:border-dark-700 dark:bg-dark-900/40 dark:text-dark-300">
+              <Icon name="shield" size="md" class="mt-0.5 shrink-0 text-green-600 dark:text-green-400" />
+              <span>请勿把 Session 发送到聊天群、工单截图或其他网站。提交后请保持目标账号登录，直到订单完成。</span>
+            </div>
+          </section>
+        </aside>
+      </form>
 
       <section class="border-t border-gray-200 pt-5 dark:border-dark-700">
         <div class="mb-3 flex items-center justify-between gap-3">
@@ -227,7 +360,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -246,6 +379,7 @@ import {
 } from '@/api/managedRecharge'
 
 const route = useRoute()
+const router = useRouter()
 const catalog = ref<ManagedRechargeCatalog | null>(null)
 const selectedProductId = ref<number | null>(null)
 const sessionJson = ref('')
@@ -266,6 +400,33 @@ const mockSessionExample = JSON.stringify({
   user: { email: 'mock@example.com' },
   accessToken: 'mock-access-token',
 }, null, 2)
+const purchaseSteps = [
+  { title: '选择套餐', description: '确认档位与库存' },
+  { title: '提交账号', description: '粘贴 Session JSON' },
+  { title: '确认支付', description: '余额支付并跟踪进度' },
+]
+const sessionGuideSteps = [
+  {
+    title: '登录目标 ChatGPT 账号',
+    description: '请在当前浏览器中登录真正需要开通 Plus 或 Pro 的账号，并确认右上角账号信息无误。',
+  },
+  {
+    title: '打开 Session 页面',
+    description: '点击下方按钮，新标签页会显示一段 JSON。如果显示未登录，请先完成 ChatGPT 登录后刷新。',
+  },
+  {
+    title: '复制完整 JSON',
+    description: '全选并复制从 { 开始到 } 结束的全部内容，不要只复制 accessToken，也不要上传截图。',
+  },
+  {
+    title: '粘贴并核对账号',
+    description: '返回本页粘贴 JSON，页面识别出的邮箱必须与需要订阅的账号一致。',
+  },
+  {
+    title: '支付后保持登录',
+    description: '订单处理期间不要退出该 ChatGPT 账号；如状态提示需要新 Session，请按相同步骤重新获取并补交。',
+  },
+]
 
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
 const requestedPlan = computed(() => normalizeManagedRechargePlanKey(route.query.plan))
@@ -279,13 +440,25 @@ const requestedPlanUnavailable = computed(() => Boolean(
   catalog.value &&
   !findManagedRechargeProduct(catalog.value.products, requestedPlan.value),
 ))
+const hasEnoughBalance = computed(() => Boolean(
+  selectedProduct.value &&
+  (catalog.value?.balance || 0) >= selectedProduct.value.price,
+))
+const balanceAfterPayment = computed(() => {
+  if (!selectedProduct.value) return catalog.value?.balance || 0
+  return Math.max(0, (catalog.value?.balance || 0) - selectedProduct.value.price)
+})
 const canSubmit = computed(() => Boolean(
   selectedProduct.value &&
   selectedProduct.value.available_stock > 0 &&
   sessionEmail.value &&
   agreed.value &&
-  (catalog.value?.balance || 0) >= selectedProduct.value.price,
+  hasEnoughBalance.value,
 ))
+
+function goBack(): void {
+  router.push({ path: '/purchase', query: { tab: 'member' } })
+}
 
 function errorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'message' in error) return String(error.message)

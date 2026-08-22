@@ -7,6 +7,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
 	src/views/auth/__tests__/WechatCallbackView.spec.ts \
 	src/views/user/__tests__/PaymentView.spec.ts \
+	src/views/user/__tests__/ManagedRechargeView.spec.ts \
 	src/views/user/__tests__/PaymentResultView.spec.ts \
 	src/api/__tests__/admin.benefitGrants.spec.ts \
 	src/api/__tests__/admin.paymentAddonProducts.spec.ts \
