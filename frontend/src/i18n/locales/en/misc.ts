@@ -469,15 +469,24 @@ export default {
     tabAddon: 'Add-ons',
     tabMemberRecharge: 'Subscribe to GPT Plus-Pro',
     memberRecharge: {
-      imageAlt: 'GPT Plus and Pro subscription cards',
-      title: 'Subscribe to GPT Plus-Pro',
-      description: 'Choose a membership plan, then track fulfillment progress and order status on the dedicated page.',
-      plus: 'GPT Plus',
-      pro: 'GPT Pro',
-      featurePlan: 'Choose Plus or Pro',
-      featureProgress: 'Track order progress',
-      featureRefund: 'Refund or manual review on failure',
       subscribeNow: 'Subscribe Now',
+      plans: {
+        plus: {
+          title: 'Plus',
+          badge: 'PLUS',
+          description: 'For reliable everyday use with a ChatGPT Plus membership.',
+        },
+        pro5x: {
+          title: 'Pro (5x)',
+          badge: 'PRO 5X',
+          description: 'For more frequent use with 5x Pro usage capacity.',
+        },
+        pro20x: {
+          title: 'Pro (20x)',
+          badge: 'PRO 20X',
+          description: 'For intensive use with 20x Pro usage capacity.',
+        },
+      },
     },
     addon: {
       noSubscription: 'No active subscription',

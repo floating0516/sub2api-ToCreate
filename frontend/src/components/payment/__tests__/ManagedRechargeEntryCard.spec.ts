@@ -10,15 +10,12 @@ const i18n = createI18n({
     zh: {
       payment: {
         memberRecharge: {
-          imageAlt: 'GPT Plus 和 Pro 订阅卡片',
-          title: '订阅 GPT Plus-Pro',
-          description: '选择需要的会员套餐',
-          plus: 'GPT Plus',
-          pro: 'GPT Pro',
-          featurePlan: 'Plus / Pro 套餐可选',
-          featureProgress: '订单进度随时查看',
-          featureRefund: '失败后退款或人工核对',
           subscribeNow: '立即订阅',
+          plans: {
+            plus: { title: 'Plus', badge: 'PLUS', description: 'Plus 套餐' },
+            pro5x: { title: 'Pro（5 倍）', badge: 'PRO 5X', description: '5 倍套餐' },
+            pro20x: { title: 'Pro（20 倍）', badge: 'PRO 20X', description: '20 倍套餐' },
+          },
         },
       },
     },
@@ -26,21 +23,21 @@ const i18n = createI18n({
 })
 
 describe('ManagedRechargeEntryCard', () => {
-  it('renders the subscription image and plan information', () => {
+  it('renders the three membership plan cards', () => {
     const wrapper = mount(ManagedRechargeEntryCard, { global: { plugins: [i18n] } })
 
-    expect(wrapper.get('img').attributes('alt')).toBe('GPT Plus 和 Pro 订阅卡片')
-    expect(wrapper.text()).toContain('订阅 GPT Plus-Pro')
-    expect(wrapper.text()).toContain('GPT Plus')
-    expect(wrapper.text()).toContain('GPT Pro')
-    expect(wrapper.text()).toContain('订单进度随时查看')
+    expect(wrapper.findAll('[data-testid^="managed-recharge-plan-"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain('Plus')
+    expect(wrapper.text()).toContain('Pro（5 倍）')
+    expect(wrapper.text()).toContain('Pro（20 倍）')
+    expect(wrapper.findAll('img')).toHaveLength(3)
   })
 
-  it('emits select when the subscribe button is clicked', async () => {
+  it('emits the selected plan when a card is clicked', async () => {
     const wrapper = mount(ManagedRechargeEntryCard, { global: { plugins: [i18n] } })
 
-    await wrapper.get('[data-testid="managed-recharge-subscribe-button"]').trigger('click')
+    await wrapper.get('[data-testid="managed-recharge-plan-pro-20x"]').trigger('click')
 
-    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(wrapper.emitted('select')).toEqual([['pro-20x']])
   })
 })

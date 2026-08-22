@@ -488,6 +488,7 @@ import {
 import { platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import { subscriptionAccentBarClass, subscriptionBadgeClass, subscriptionTextClass } from '@/utils/subscriptionColors'
 import ManagedRechargeEntryCard from '@/components/payment/ManagedRechargeEntryCard.vue'
+import type { ManagedRechargePlanKey } from '@/components/payment/managedRechargePlans'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -760,8 +761,8 @@ const tabGridClass = computed(() => [
       : 'sm:grid-cols-4',
 ])
 
-function openManagedRecharge() {
-  router.push('/member-recharge')
+function openManagedRecharge(plan: ManagedRechargePlanKey) {
+  router.push({ path: '/member-recharge', query: { plan } })
 }
 
 function formatQuota(value: number): string {

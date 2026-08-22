@@ -491,15 +491,24 @@ export default {
     tabAddon: '加油包',
     tabMemberRecharge: '订阅 GPT Plus-Pro',
     memberRecharge: {
-      imageAlt: 'GPT Plus 和 Pro 订阅卡片',
-      title: '订阅 GPT Plus-Pro',
-      description: '选择需要的会员套餐，提交后可在专属页面查看充值进度和订单状态。',
-      plus: 'GPT Plus',
-      pro: 'GPT Pro',
-      featurePlan: 'Plus / Pro 套餐可选',
-      featureProgress: '订单进度随时查看',
-      featureRefund: '失败后退款或人工核对',
       subscribeNow: '立即订阅',
+      plans: {
+        plus: {
+          title: 'Plus',
+          badge: 'PLUS',
+          description: '适合日常稳定使用，订阅 ChatGPT Plus 会员。',
+        },
+        pro5x: {
+          title: 'Pro（5 倍）',
+          badge: 'PRO 5X',
+          description: '面向更高频使用场景，提供 5 倍 Pro 使用额度。',
+        },
+        pro20x: {
+          title: 'Pro（20 倍）',
+          badge: 'PRO 20X',
+          description: '面向高强度使用场景，提供 20 倍 Pro 使用额度。',
+        },
+      },
     },
     addon: {
       noSubscription: '暂无可用订阅',

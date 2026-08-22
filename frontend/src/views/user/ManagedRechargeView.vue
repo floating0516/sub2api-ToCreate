@@ -72,6 +72,10 @@
           <div class="border-b border-gray-200 px-5 py-3 dark:border-dark-700">
             <h2 class="text-sm font-semibold text-gray-900 dark:text-white">提交账号</h2>
           </div>
+          <div v-if="requestedPlanUnavailable" class="flex gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
+            <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0" />
+            <span>{{ requestedPlanLabel }} 暂未配置对应商品，请选择其他可用套餐。</span>
+          </div>
           <form class="space-y-5 p-5" @submit.prevent="submitOrder">
             <div v-if="selectedProduct" class="grid gap-3 border-b border-gray-100 pb-4 text-sm dark:border-dark-700 sm:grid-cols-3">
               <div>
@@ -223,9 +227,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import {
+  findManagedRechargeProduct,
+  normalizeManagedRechargePlanKey,
+} from '@/components/payment/managedRechargePlans'
 import {
   createManagedRechargeOrder,
   getManagedRechargeCatalog,
@@ -236,6 +245,7 @@ import {
   type ManagedRechargeOrder,
 } from '@/api/managedRecharge'
 
+const route = useRoute()
 const catalog = ref<ManagedRechargeCatalog | null>(null)
 const selectedProductId = ref<number | null>(null)
 const sessionJson = ref('')
@@ -258,6 +268,17 @@ const mockSessionExample = JSON.stringify({
 }, null, 2)
 
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
+const requestedPlan = computed(() => normalizeManagedRechargePlanKey(route.query.plan))
+const requestedPlanLabel = computed(() => ({
+  plus: 'Plus',
+  'pro-5x': 'Pro（5 倍）',
+  'pro-20x': 'Pro（20 倍）',
+})[requestedPlan.value || 'plus'])
+const requestedPlanUnavailable = computed(() => Boolean(
+  requestedPlan.value &&
+  catalog.value &&
+  !findManagedRechargeProduct(catalog.value.products, requestedPlan.value),
+))
 const canSubmit = computed(() => Boolean(
   selectedProduct.value &&
   selectedProduct.value.available_stock > 0 &&
@@ -306,9 +327,12 @@ function fillMockSession(): void {
 
 async function loadCatalog(): Promise<void> {
   catalog.value = await getManagedRechargeCatalog()
-  if (!selectedProductId.value || !catalog.value.products.some((item) => item.id === selectedProductId.value)) {
-    selectedProductId.value = catalog.value.products.find((item) => item.available_stock > 0)?.id || null
+  if (selectedProductId.value && catalog.value.products.some((item) => item.id === selectedProductId.value)) return
+  if (requestedPlan.value) {
+    selectedProductId.value = findManagedRechargeProduct(catalog.value.products, requestedPlan.value)?.id ?? null
+    return
   }
+  selectedProductId.value = catalog.value.products.find((item) => item.available_stock > 0)?.id || null
 }
 
 async function loadOrders(): Promise<void> {

@@ -366,9 +366,12 @@ describe('PaymentView managed recharge entry', () => {
 
     await wrapper.get('[data-testid="payment-tab-member"]').trigger('click')
     const entryCard = wrapper.getComponent(ManagedRechargeEntryCard)
-    entryCard.vm.$emit('select')
+    entryCard.vm.$emit('select', 'pro-5x')
 
-    expect(routerPush).toHaveBeenCalledWith('/member-recharge')
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/member-recharge',
+      query: { plan: 'pro-5x' },
+    })
   })
 })
 
