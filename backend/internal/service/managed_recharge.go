@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 const (
 	ManagedRechargeStatusValidating     = "validating"
 	ManagedRechargeStatusPaid           = "paid"
+	ManagedRechargeStatusIssued         = "issued"
 	ManagedRechargeStatusSubmitting     = "submitting"
 	ManagedRechargeStatusQueued         = "queued"
 	ManagedRechargeStatusProcessing     = "processing"
@@ -29,6 +31,9 @@ const (
 	ManagedRechargeStatusCompleted      = "completed"
 	ManagedRechargeStatusFailed         = "failed"
 	ManagedRechargeStatusRefunded       = "refunded"
+
+	ManagedRechargeFulfillmentProxy    = "proxy"
+	ManagedRechargeFulfillmentExternal = "external"
 
 	managedRechargeCDKAvailable = "available"
 	managedRechargeCDKReserved  = "reserved"
@@ -66,15 +71,17 @@ type ManagedRechargeSecretProtector interface {
 }
 
 type ManagedRechargeService struct {
-	db               *sql.DB
-	encryptor        ManagedRechargeSecretProtector
-	balanceCache     managedRechargeBalanceCache
-	authCache        APIKeyAuthCacheInvalidator
-	upstream         managedRechargeUpstream
-	mockMode         bool
-	mockStepSecs     int
-	featureReady     bool
-	fulfillmentReady bool
+	db                *sql.DB
+	encryptor         ManagedRechargeSecretProtector
+	balanceCache      managedRechargeBalanceCache
+	authCache         APIKeyAuthCacheInvalidator
+	upstream          managedRechargeUpstream
+	mockMode          bool
+	mockStepSecs      int
+	featureReady      bool
+	fulfillmentReady  bool
+	fulfillmentMode   string
+	externalRedeemURL string
 }
 
 type ManagedRechargeProduct struct {
@@ -98,6 +105,7 @@ type ManagedRechargeCatalog struct {
 	Products        []ManagedRechargeProduct `json:"products"`
 	MockMode        bool                     `json:"mock_mode"`
 	MockStepSeconds int                      `json:"mock_step_seconds,omitempty"`
+	FulfillmentMode string                   `json:"fulfillment_mode"`
 }
 
 type ManagedRechargeSessionValidation struct {
@@ -128,7 +136,10 @@ type ManagedRechargeOrder struct {
 	ProductID             int64      `json:"product_id"`
 	ProductSlug           string     `json:"product_slug"`
 	ProductName           string     `json:"product_name"`
+	FulfillmentMode       string     `json:"fulfillment_mode"`
 	CDKMasked             string     `json:"cdk_masked,omitempty"`
+	RedemptionCode        string     `json:"redemption_code,omitempty"`
+	RedemptionURL         string     `json:"redemption_url,omitempty"`
 	Price                 float64    `json:"price"`
 	Status                string     `json:"status"`
 	AccountEmail          string     `json:"account_email"`
@@ -151,6 +162,7 @@ type ManagedRechargeOrder struct {
 	upstreamFailureReason string
 	sessionCiphertext     string
 	cdkCiphertext         string
+	cdkStatus             string
 }
 
 type ManagedRechargeProductInput struct {
@@ -192,6 +204,10 @@ func NewManagedRechargeService(
 	authCache APIKeyAuthCacheInvalidator,
 ) *ManagedRechargeService {
 	upstream, mockMode, mockStepSecs, upstreamErr := newManagedRechargeUpstreamFromEnvironment()
+	fulfillmentMode, externalRedeemURL, fulfillmentConfigErr := managedRechargeFulfillmentConfigFromEnvironment()
+	if upstreamErr == nil && fulfillmentConfigErr != nil {
+		upstreamErr = fulfillmentConfigErr
+	}
 	fulfillmentEnabled, fulfillmentErr := managedRechargeFulfillmentEnabledFromEnvironment(mockMode)
 	if upstreamErr == nil && fulfillmentErr != nil {
 		upstreamErr = fulfillmentErr
@@ -201,15 +217,17 @@ func NewManagedRechargeService(
 	}
 	featureReady := db != nil && encryptor != nil && upstreamErr == nil
 	return &ManagedRechargeService{
-		db:               db,
-		encryptor:        encryptor,
-		balanceCache:     balanceCache,
-		authCache:        authCache,
-		upstream:         upstream,
-		mockMode:         mockMode,
-		mockStepSecs:     mockStepSecs,
-		featureReady:     featureReady,
-		fulfillmentReady: featureReady && fulfillmentEnabled,
+		db:                db,
+		encryptor:         encryptor,
+		balanceCache:      balanceCache,
+		authCache:         authCache,
+		upstream:          upstream,
+		mockMode:          mockMode,
+		mockStepSecs:      mockStepSecs,
+		featureReady:      featureReady,
+		fulfillmentReady:  featureReady && fulfillmentEnabled,
+		fulfillmentMode:   fulfillmentMode,
+		externalRedeemURL: externalRedeemURL,
 	}
 }
 
@@ -231,6 +249,7 @@ func (s *ManagedRechargeService) GetCatalog(ctx context.Context, userID int64) (
 		Products:        products,
 		MockMode:        s.mockMode,
 		MockStepSeconds: s.mockStepSecs,
+		FulfillmentMode: s.fulfillmentMode,
 	}, nil
 }
 
@@ -244,6 +263,9 @@ func (s *ManagedRechargeService) ListProducts(ctx context.Context) ([]ManagedRec
 func (s *ManagedRechargeService) ValidateSession(ctx context.Context, raw string) (*ManagedRechargeSessionValidation, error) {
 	if err := s.requireReady(); err != nil {
 		return nil, err
+	}
+	if s.fulfillmentMode == ManagedRechargeFulfillmentExternal {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_SESSION_EXTERNAL", "Session is submitted only on the external redemption page")
 	}
 	session := strings.TrimSpace(raw)
 	if session == "" || len(session) > managedRechargeSessionMaxBytes {
@@ -581,17 +603,29 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_REQUEST_INVALID", "invalid recharge request")
 	}
 	session := strings.TrimSpace(input.Session)
-	if session == "" || len(session) > managedRechargeSessionMaxBytes {
-		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "invalid Session payload")
-	}
-	accountEmail, err := parseManagedRechargeSession(session)
-	if err != nil {
-		return nil, err
-	}
-	if s.mockMode && !isManagedRechargeMockSession(session) {
-		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
+	accountEmail := ""
+	sessionCiphertext := ""
+	if s.fulfillmentMode != ManagedRechargeFulfillmentExternal {
+		if session == "" || len(session) > managedRechargeSessionMaxBytes {
+			return nil, infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "invalid Session payload")
+		}
+		var err error
+		accountEmail, err = parseManagedRechargeSession(session)
+		if err != nil {
+			return nil, err
+		}
+		if s.mockMode && !isManagedRechargeMockSession(session) {
+			return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
+		}
+		sessionCiphertext, err = s.encryptor.Encrypt(session)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt managed recharge Session: %w", err)
+		}
 	}
 	if existing, err := s.getOrderByIdempotency(ctx, userID, input.IdempotencyKey); err == nil {
+		if err := s.attachExternalRedemption(existing); err != nil {
+			return nil, err
+		}
 		return existing, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -603,11 +637,6 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 	if err != nil {
 		return nil, err
 	}
-	sessionCiphertext, err := s.encryptor.Encrypt(session)
-	if err != nil {
-		return nil, fmt.Errorf("encrypt managed recharge Session: %w", err)
-	}
-
 	orderNo, err := newManagedRechargeOrderNo()
 	if err != nil {
 		return nil, fmt.Errorf("generate managed recharge order number: %w", err)
@@ -615,13 +644,20 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 	var orderID int64
 	err = s.db.QueryRowContext(orderCtx, `
 		INSERT INTO managed_recharge_orders
-		    (order_no, user_id, product_id, idempotency_key, price, account_email, session_ciphertext)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		    (order_no, user_id, product_id, idempotency_key, price, account_email, session_ciphertext, fulfillment_mode)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, idempotency_key) DO NOTHING
 		RETURNING id
-	`, orderNo, userID, product.ID, input.IdempotencyKey, product.Price, accountEmail, sessionCiphertext).Scan(&orderID)
+	`, orderNo, userID, product.ID, input.IdempotencyKey, product.Price, accountEmail, sessionCiphertext, s.fulfillmentMode).Scan(&orderID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s.getOrderByIdempotency(orderCtx, userID, input.IdempotencyKey)
+		existing, getErr := s.getOrderByIdempotency(orderCtx, userID, input.IdempotencyKey)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if attachErr := s.attachExternalRedemption(existing); attachErr != nil {
+			return nil, attachErr
+		}
+		return existing, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("create managed recharge order: %w", err)
@@ -713,6 +749,13 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 	}
 	cleanupUnpaid = false
 	s.invalidateBalanceCaches(userID)
+	if s.fulfillmentMode == ManagedRechargeFulfillmentExternal {
+		if err := s.markExternalOrderIssued(orderCtx, orderID); err != nil {
+			_ = s.markManualReview(orderCtx, orderID, "CDK_ISSUE_FAILED", "CDK 发放状态异常，已转人工核对")
+			return s.GetOrder(orderCtx, userID, orderID, false)
+		}
+		return s.GetOrder(orderCtx, userID, orderID, false)
+	}
 
 	fulfillCtx, cancelFulfill := context.WithTimeout(context.Background(), managedRechargeFulfillTimeout)
 	defer cancelFulfill()
@@ -762,7 +805,14 @@ func (s *ManagedRechargeService) GetOrder(ctx context.Context, userID, orderID i
 	if err != nil {
 		return nil, err
 	}
-	return s.syncOrderIfNeeded(ctx, order, forceSync)
+	order, err = s.syncOrderIfNeeded(ctx, order, forceSync)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachExternalRedemption(order); err != nil {
+		return nil, err
+	}
+	return order, nil
 }
 
 func (s *ManagedRechargeService) AdminGetOrder(ctx context.Context, orderID int64, forceSync bool) (*ManagedRechargeOrder, error) {
@@ -811,6 +861,13 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	if err := s.requireFulfillmentReady(); err != nil {
 		return nil, err
 	}
+	order, err := s.getOrder(ctx, orderID, &userID)
+	if err != nil {
+		return nil, err
+	}
+	if order.FulfillmentMode == ManagedRechargeFulfillmentExternal {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_SESSION_EXTERNAL", "Session is submitted only on the external redemption page")
+	}
 	session = strings.TrimSpace(session)
 	if session == "" || len(session) > managedRechargeSessionMaxBytes {
 		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "invalid Session payload")
@@ -821,10 +878,6 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	}
 	if s.mockMode && !isManagedRechargeMockSession(session) {
 		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
-	}
-	order, err := s.getOrder(ctx, orderID, &userID)
-	if err != nil {
-		return nil, err
 	}
 	if order.Status != ManagedRechargeStatusActionRequired {
 		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_SESSION_NOT_REQUIRED", "this order does not require a new Session")
@@ -894,6 +947,9 @@ func (s *ManagedRechargeService) AdminRefundOrder(ctx context.Context, adminID, 
 	if err != nil {
 		return nil, err
 	}
+	if order.FulfillmentMode == ManagedRechargeFulfillmentExternal && order.PaidAt != nil {
+		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_EXTERNAL_CDK_ISSUED", "externally issued CDKs cannot be refunded automatically")
+	}
 	if order.Status == ManagedRechargeStatusRefunded {
 		return order, nil
 	}
@@ -949,6 +1005,14 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 		errorMessage := "状态同步暂时不可用"
 		var upstreamHTTPError *managedRechargeUpstreamHTTPError
 		if errors.As(err, &upstreamHTTPError) && upstreamHTTPError.StatusCode == http.StatusNotFound {
+			if order.FulfillmentMode == ManagedRechargeFulfillmentExternal && order.Status == ManagedRechargeStatusIssued {
+				_, _ = s.db.ExecContext(syncCtx, `
+					UPDATE managed_recharge_orders
+					SET last_synced_at = NOW(), error_code = '', error_message = '', updated_at = NOW()
+					WHERE id = $1
+				`, order.ID)
+				return s.getOrder(syncCtx, order.ID, &order.UserID)
+			}
 			errorCode = "UPSTREAM_TASK_NOT_FOUND"
 			errorMessage = "暂未查询到履约任务，正在人工核对"
 		}
@@ -987,6 +1051,21 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 
 	nextStatus := normalizeManagedRechargeLookupStatus(result)
 	if nextStatus == ManagedRechargeStatusFailed {
+		if order.FulfillmentMode == ManagedRechargeFulfillmentExternal {
+			_, updateErr := s.db.ExecContext(syncCtx, `
+				UPDATE managed_recharge_orders
+				SET status = 'issued', upstream_status = $2, upstream_failure_reason = $3,
+				    queue_position = 0, queue_total = 0, progress = $4,
+				    error_code = 'EXTERNAL_REDEEM_RETRY',
+				    error_message = '上次兑换未完成，CDK 仍归当前订单所有，请前往兑换页重新提交',
+				    last_synced_at = NOW(), updated_at = NOW()
+				WHERE id = $1 AND status NOT IN ('refunded', 'completed')
+			`, order.ID, result.TaskStatus, result.FailureReason, result.Progress)
+			if updateErr != nil {
+				return nil, fmt.Errorf("mark external redemption retryable: %w", updateErr)
+			}
+			return s.getOrder(syncCtx, order.ID, &order.UserID)
+		}
 		if managedRechargeFailureNeedsManualReview(result.FailureReason) {
 			_ = s.markManualReview(syncCtx, order.ID, "PAYMENT_RESULT_UNCERTAIN", "支付结果需要人工核对")
 		} else {
@@ -1383,12 +1462,13 @@ func (s *ManagedRechargeService) getOrder(ctx context.Context, orderID int64, us
 
 const managedRechargeOrderSelect = `
 	SELECT o.id, o.order_no, o.user_id, COALESCE(u.email, ''), COALESCE(u.username, ''),
-	       o.product_id, p.slug, p.name, COALESCE(c.code_masked, ''), o.price, o.status,
+	       o.product_id, p.slug, p.name, o.fulfillment_mode, COALESCE(c.code_masked, ''), o.price, o.status,
 	       o.account_email, o.upstream_task_id, o.upstream_status, o.upstream_failure_reason,
 	       o.queue_position, o.queue_total, o.progress, o.error_code, o.error_message,
 	       COALESCE(o.balance_before, 0), COALESCE(o.balance_after, 0),
 	       o.paid_at, o.submitted_at, o.completed_at, o.refunded_at, o.last_synced_at,
-	       o.created_at, o.updated_at, o.session_ciphertext, COALESCE(c.code_ciphertext, '')
+	       o.created_at, o.updated_at, o.session_ciphertext, COALESCE(c.code_ciphertext, ''),
+	       COALESCE(c.status, '')
 	FROM managed_recharge_orders o
 	JOIN managed_recharge_products p ON p.id = o.product_id
 	JOIN users u ON u.id = o.user_id
@@ -1404,12 +1484,12 @@ func scanManagedRechargeOrder(scanner managedRechargeRowScanner) (*ManagedRechar
 	var paidAt, submittedAt, completedAt, refundedAt, lastSyncedAt sql.NullTime
 	err := scanner.Scan(
 		&order.ID, &order.OrderNo, &order.UserID, &order.UserEmail, &order.Username,
-		&order.ProductID, &order.ProductSlug, &order.ProductName, &order.CDKMasked, &order.Price,
+		&order.ProductID, &order.ProductSlug, &order.ProductName, &order.FulfillmentMode, &order.CDKMasked, &order.Price,
 		&order.Status, &order.AccountEmail, &order.upstreamTaskID, &order.UpstreamStatus,
 		&order.upstreamFailureReason, &order.QueuePosition, &order.QueueTotal, &order.Progress,
 		&order.ErrorCode, &order.ErrorMessage, &order.BalanceBefore, &order.BalanceAfter,
 		&paidAt, &submittedAt, &completedAt, &refundedAt, &lastSyncedAt,
-		&order.CreatedAt, &order.UpdatedAt, &order.sessionCiphertext, &order.cdkCiphertext,
+		&order.CreatedAt, &order.UpdatedAt, &order.sessionCiphertext, &order.cdkCiphertext, &order.cdkStatus,
 	)
 	if err != nil {
 		return nil, err
@@ -1431,6 +1511,67 @@ func nullTimePointer(value sql.NullTime) *time.Time {
 
 func (s *ManagedRechargeService) appendEvent(ctx context.Context, orderID int64, actorID *int64, eventType string, payload map[string]any) error {
 	return appendManagedRechargeEventTx(ctx, s.db, orderID, actorID, eventType, payload)
+}
+
+func (s *ManagedRechargeService) markExternalOrderIssued(ctx context.Context, orderID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin external CDK issue: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `
+		UPDATE managed_recharge_cdks
+		SET status = 'used', reserved_at = NULL, updated_at = NOW()
+		WHERE id = (SELECT cdk_id FROM managed_recharge_orders WHERE id = $1)
+		  AND status = 'reserved'
+	`, orderID)
+	if err != nil {
+		return fmt.Errorf("consume externally issued CDK: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return fmt.Errorf("external CDK issue did not consume reserved inventory")
+	}
+	result, err = tx.ExecContext(ctx, `
+		UPDATE managed_recharge_orders
+		SET status = 'issued', upstream_status = 'awaiting_user', submitted_at = NOW(),
+		    session_ciphertext = '', error_code = '', error_message = '',
+		    last_synced_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND status = 'paid' AND fulfillment_mode = 'external'
+	`, orderID)
+	if err != nil {
+		return fmt.Errorf("mark external order issued: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return fmt.Errorf("external order was not in paid state")
+	}
+	if err := appendManagedRechargeEventTx(ctx, tx, orderID, nil, "CDK_ISSUED", map[string]any{"fulfillment_mode": ManagedRechargeFulfillmentExternal}); err != nil {
+		return fmt.Errorf("record external CDK issue: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit external CDK issue: %w", err)
+	}
+	return nil
+}
+
+func (s *ManagedRechargeService) attachExternalRedemption(order *ManagedRechargeOrder) error {
+	if order == nil || order.FulfillmentMode != ManagedRechargeFulfillmentExternal || order.PaidAt == nil ||
+		order.Status == ManagedRechargeStatusRefunded || order.cdkStatus != managedRechargeCDKUsed || order.cdkCiphertext == "" {
+		return nil
+	}
+	code, err := s.encryptor.Decrypt(order.cdkCiphertext)
+	if err != nil {
+		return fmt.Errorf("decrypt external redemption CDK: %w", err)
+	}
+	redeemURL, err := url.Parse(s.externalRedeemURL)
+	if err != nil {
+		return fmt.Errorf("parse external redemption URL: %w", err)
+	}
+	query := redeemURL.Query()
+	query.Set("cdk", code)
+	redeemURL.RawQuery = query.Encode()
+	order.RedemptionCode = code
+	order.RedemptionURL = redeemURL.String()
+	return nil
 }
 
 type managedRechargeExecer interface {
@@ -1578,7 +1719,7 @@ func normalizeManagedRechargeLookupStatus(result *managedRechargeLookupResponse)
 
 func managedRechargeStatusNeedsSync(status string) bool {
 	switch status {
-	case ManagedRechargeStatusPaid, ManagedRechargeStatusSubmitting, ManagedRechargeStatusQueued,
+	case ManagedRechargeStatusPaid, ManagedRechargeStatusIssued, ManagedRechargeStatusSubmitting, ManagedRechargeStatusQueued,
 		ManagedRechargeStatusProcessing, ManagedRechargeStatusVerifying,
 		ManagedRechargeStatusActionRequired, ManagedRechargeStatusManualReview:
 		return true

@@ -21,6 +21,7 @@ export interface ManagedRechargeCatalog {
   products: ManagedRechargeProduct[]
   mock_mode: boolean
   mock_step_seconds?: number
+  fulfillment_mode: 'proxy' | 'external'
 }
 
 export type ManagedRechargeMembership = 'free' | 'plus' | 'pro' | 'unknown'
@@ -40,7 +41,10 @@ export interface ManagedRechargeOrder {
   product_id: number
   product_slug: string
   product_name: string
+  fulfillment_mode: 'proxy' | 'external'
   cdk_masked?: string
+  redemption_code?: string
+  redemption_url?: string
   price: number
   status: string
   account_email: string
@@ -112,12 +116,14 @@ export async function validateManagedRechargeSession(
 
 export async function createManagedRechargeOrder(
   productId: number,
-  sessionJson: string,
+  sessionJson: string | undefined,
   idempotencyKey: string,
 ): Promise<ManagedRechargeOrder> {
+  const payload: { product_id: number; session_json?: string } = { product_id: productId }
+  if (sessionJson?.trim()) payload.session_json = sessionJson
   const { data } = await apiClient.post<ManagedRechargeOrder>(
     '/managed-recharge/orders',
-    { product_id: productId, session_json: sessionJson },
+    payload,
     { headers: { 'Idempotency-Key': idempotencyKey }, timeout: 180000 },
   )
   return data

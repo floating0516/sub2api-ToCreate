@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ManagedRechargeView from '../ManagedRechargeView.vue'
-import type { ManagedRechargeCatalog, ManagedRechargeProduct } from '@/api/managedRecharge'
+import type { ManagedRechargeCatalog, ManagedRechargeOrder, ManagedRechargeProduct } from '@/api/managedRecharge'
 
 const routeState = vi.hoisted(() => ({
   query: { plan: 'pro-5x' } as Record<string, unknown>,
@@ -54,6 +54,7 @@ const catalog: ManagedRechargeCatalog = {
   enabled: true,
   balance: 50,
   mock_mode: false,
+  fulfillment_mode: 'proxy',
   products: [
     product({}),
     product({ id: 2, slug: 'gpt-pro-5x', plan_type: 'pro', name: 'Pro（5 倍）', price: 8 }),
@@ -141,6 +142,65 @@ describe('ManagedRechargeView purchase flow', () => {
 
     expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('chatgpt.com/api/auth/session')
     expect(wrapper.text()).toContain('填入模拟 Session')
+
+    wrapper.unmount()
+  })
+
+  it('purchases an external CDK without Session and opens the redemption dialog', async () => {
+    const externalCatalog: ManagedRechargeCatalog = {
+      ...catalog,
+      mock_mode: true,
+      mock_step_seconds: 10,
+      fulfillment_mode: 'external',
+    }
+    const issuedOrder: ManagedRechargeOrder = {
+      id: 31,
+      order_no: 'MR-EXTERNAL-31',
+      user_id: 42,
+      product_id: 2,
+      product_slug: 'gpt-pro-5x',
+      product_name: 'Pro（5 倍）',
+      fulfillment_mode: 'external',
+      redemption_code: 'MOCK-PRO-SUCCESS-031',
+      redemption_url: 'https://redeem.desolate.codes/recharge?cdk=MOCK-PRO-SUCCESS-031',
+      price: 8,
+      status: 'issued',
+      account_email: '',
+      paid_at: '2026-08-22T00:00:00Z',
+      created_at: '2026-08-22T00:00:00Z',
+      updated_at: '2026-08-22T00:00:00Z',
+    }
+    getCatalog.mockResolvedValue(externalCatalog)
+    createOrder.mockResolvedValue(issuedOrder)
+
+    const wrapper = mount(ManagedRechargeView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          BaseDialog: {
+            props: ['show', 'title'],
+            template: '<div v-if="show"><h2>{{ title }}</h2><slot /><slot name="footer" /></div>',
+          },
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="managed-recharge-session-input"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('领取专属 CDK')
+    expect(wrapper.text()).toContain('模拟 CDK 无法在真实兑换页使用')
+    expect(wrapper.get('[data-testid="managed-recharge-step-2"]').text()).toContain('领取 CDK')
+
+    await wrapper.get('[data-testid="managed-recharge-agreement"]').setValue(true)
+    await wrapper.get('#managed-recharge-form').trigger('submit')
+    await flushPromises()
+
+    expect(createOrder).toHaveBeenCalledWith(2, undefined, expect.any(String))
+    expect(wrapper.get('[data-testid="managed-recharge-issued-dialog"]').text()).toContain('MOCK-PRO-SUCCESS-031')
+    const redeemLink = wrapper.get('a[href*="MOCK-PRO-SUCCESS-031"]')
+    expect(redeemLink.attributes('target')).toBe('_blank')
+    expect(redeemLink.text()).toContain('前往兑换')
 
     wrapper.unmount()
   })

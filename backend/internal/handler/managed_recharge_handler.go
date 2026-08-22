@@ -29,7 +29,7 @@ func NewManagedRechargeHandler(managedRechargeService *service.ManagedRechargeSe
 
 type managedRechargeCreateOrderRequest struct {
 	ProductID   int64  `json:"product_id" binding:"required"`
-	SessionJSON string `json:"session_json" binding:"required"`
+	SessionJSON string `json:"session_json"`
 }
 
 type managedRechargeValidateSessionRequest struct {

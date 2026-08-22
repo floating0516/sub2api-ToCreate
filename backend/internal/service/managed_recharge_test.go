@@ -27,10 +27,14 @@ type managedRechargeVerifyOnlyUpstream struct {
 	verifyCalls       int
 	createCalls       int
 	confirmCalls      int
+	validationCalls   int
 	sessionValidation *managedRechargeSessionValidationResponse
+	lookupResponse    *managedRechargeLookupResponse
+	lookupErr         error
 }
 
 func (u *managedRechargeVerifyOnlyUpstream) validateSession(_ context.Context, _ string) (*managedRechargeSessionValidationResponse, error) {
+	u.validationCalls++
 	if u.sessionValidation != nil {
 		return u.sessionValidation, nil
 	}
@@ -53,6 +57,9 @@ func (u *managedRechargeVerifyOnlyUpstream) confirmTask(_ context.Context, _ str
 }
 
 func (u *managedRechargeVerifyOnlyUpstream) lookupTask(_ context.Context, _ string) (*managedRechargeLookupResponse, error) {
+	if u.lookupResponse != nil || u.lookupErr != nil {
+		return u.lookupResponse, u.lookupErr
+	}
 	return &managedRechargeLookupResponse{}, nil
 }
 
@@ -365,4 +372,279 @@ func TestManagedRechargeRealVerificationOnlyModeRejectsOrdersBeforeDatabaseUse(t
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("verification-only order touched the database: %v", err)
 	}
+}
+
+func TestManagedRechargeExternalOrderAcceptsEmptySessionAndReturnsIssuedCDK(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	order := ManagedRechargeOrder{
+		ID:              21,
+		OrderNo:         "MR-EXTERNAL-21",
+		UserID:          42,
+		ProductID:       1,
+		ProductSlug:     "gpt-plus",
+		ProductName:     "Plus",
+		FulfillmentMode: ManagedRechargeFulfillmentExternal,
+		Price:           5,
+		Status:          ManagedRechargeStatusIssued,
+		PaidAt:          &now,
+		LastSyncedAt:    &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	mock.ExpectQuery("SELECT o.id.*WHERE o.user_id = \\$1 AND o.idempotency_key = \\$2").
+		WithArgs(int64(42), "external-existing").
+		WillReturnRows(managedRechargeOrderTestRows(order, "MOCK-PLUS-SUCCESS-021", managedRechargeCDKUsed))
+
+	upstream := &managedRechargeVerifyOnlyUpstream{}
+	service := &ManagedRechargeService{
+		db:                db,
+		encryptor:         managedRechargeTestEncryptor{},
+		upstream:          upstream,
+		featureReady:      true,
+		fulfillmentReady:  true,
+		fulfillmentMode:   ManagedRechargeFulfillmentExternal,
+		externalRedeemURL: "https://redeem.example.test/recharge",
+	}
+	result, err := service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+		ProductID:      1,
+		IdempotencyKey: "external-existing",
+	})
+	if err != nil {
+		t.Fatalf("return existing external order: %v", err)
+	}
+	if result.RedemptionCode != "MOCK-PLUS-SUCCESS-021" || result.RedemptionURL != "https://redeem.example.test/recharge?cdk=MOCK-PLUS-SUCCESS-021" {
+		t.Fatalf("unexpected external redemption details: %+v", result)
+	}
+	if upstream.createCalls != 0 || upstream.confirmCalls != 0 {
+		t.Fatalf("external order called proxy fulfillment: create=%d confirm=%d", upstream.createCalls, upstream.confirmCalls)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("external existing order SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeExternalModeRejectsSessionValidation(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	upstream := &managedRechargeVerifyOnlyUpstream{}
+	service := &ManagedRechargeService{
+		db:              db,
+		encryptor:       managedRechargeTestEncryptor{},
+		upstream:        upstream,
+		featureReady:    true,
+		fulfillmentMode: ManagedRechargeFulfillmentExternal,
+	}
+	_, err = service.ValidateSession(context.Background(), `{"user":{"email":"member@example.com"},"accessToken":"secret"}`)
+	if infraerrors.Reason(err) != "MANAGED_RECHARGE_SESSION_EXTERNAL" {
+		t.Fatalf("external Session validation error reason = %q", infraerrors.Reason(err))
+	}
+	if upstream.validationCalls != 0 {
+		t.Fatalf("external Session was sent upstream %d times", upstream.validationCalls)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("external Session validation touched database: %v", err)
+	}
+}
+
+func TestManagedRechargeExternalRedemptionRequiresUsedInventory(t *testing.T) {
+	service := &ManagedRechargeService{
+		encryptor:         managedRechargeTestEncryptor{},
+		externalRedeemURL: "https://redeem.example.test/recharge",
+	}
+	now := time.Now()
+	order := &ManagedRechargeOrder{
+		FulfillmentMode: ManagedRechargeFulfillmentExternal,
+		Status:          ManagedRechargeStatusManualReview,
+		PaidAt:          &now,
+		cdkCiphertext:   "SECRET-CDK",
+		cdkStatus:       managedRechargeCDKReserved,
+	}
+	if err := service.attachExternalRedemption(order); err != nil {
+		t.Fatalf("attach reserved external CDK: %v", err)
+	}
+	if order.RedemptionCode != "" || order.RedemptionURL != "" {
+		t.Fatalf("reserved CDK was disclosed: %+v", order)
+	}
+
+	order.cdkStatus = managedRechargeCDKUsed
+	if err := service.attachExternalRedemption(order); err != nil {
+		t.Fatalf("attach used external CDK: %v", err)
+	}
+	if order.RedemptionCode != "SECRET-CDK" {
+		t.Fatalf("used CDK was not disclosed to its owner: %+v", order)
+	}
+}
+
+func TestManagedRechargeMarkExternalOrderIssuedConsumesInventoryAtomically(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{db: db}
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE managed_recharge_cdks").
+		WithArgs(int64(22)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE managed_recharge_orders").
+		WithArgs(int64(22)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO managed_recharge_events").
+		WithArgs(int64(22), nil, "CDK_ISSUED", `{"fulfillment_mode":"external"}`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	if err := service.markExternalOrderIssued(context.Background(), 22); err != nil {
+		t.Fatalf("mark external order issued: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("external issue SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeExternalLookupNotFoundRemainsIssued(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	order := ManagedRechargeOrder{
+		ID:              23,
+		OrderNo:         "MR-EXTERNAL-23",
+		UserID:          42,
+		ProductID:       1,
+		ProductSlug:     "gpt-plus",
+		ProductName:     "Plus",
+		FulfillmentMode: ManagedRechargeFulfillmentExternal,
+		Price:           5,
+		Status:          ManagedRechargeStatusIssued,
+		PaidAt:          &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		cdkCiphertext:   "MOCK-PLUS-SUCCESS-023",
+		cdkStatus:       managedRechargeCDKUsed,
+	}
+	mock.ExpectExec("SET last_synced_at = NOW\\(\\), error_code = '', error_message = ''").
+		WithArgs(order.ID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	syncedAt := now.Add(time.Second)
+	stored := order
+	stored.LastSyncedAt = &syncedAt
+	mock.ExpectQuery("SELECT o.id.*WHERE o.id = \\$1 AND o.user_id = \\$2").
+		WithArgs(order.ID, order.UserID).
+		WillReturnRows(managedRechargeOrderTestRows(stored, order.cdkCiphertext, managedRechargeCDKUsed))
+
+	service := &ManagedRechargeService{
+		db:        db,
+		encryptor: managedRechargeTestEncryptor{},
+		upstream: &managedRechargeVerifyOnlyUpstream{
+			lookupErr: &managedRechargeUpstreamHTTPError{StatusCode: 404},
+		},
+	}
+	result, err := service.syncOrderIfNeeded(context.Background(), &order, true)
+	if err != nil {
+		t.Fatalf("sync external order before user redemption: %v", err)
+	}
+	if result.Status != ManagedRechargeStatusIssued || result.ErrorMessage != "" {
+		t.Fatalf("external 404 changed issued order: %+v", result)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("external 404 SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeExternalFailureStaysRetryableWithoutRefund(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	order := ManagedRechargeOrder{
+		ID:              24,
+		OrderNo:         "MR-EXTERNAL-24",
+		UserID:          42,
+		ProductID:       1,
+		ProductSlug:     "gpt-plus",
+		ProductName:     "Plus",
+		FulfillmentMode: ManagedRechargeFulfillmentExternal,
+		Price:           5,
+		Status:          ManagedRechargeStatusProcessing,
+		PaidAt:          &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		cdkCiphertext:   "MOCK-FAIL-REFUND-024",
+		cdkStatus:       managedRechargeCDKUsed,
+	}
+	mock.ExpectExec("SET status = 'issued'").
+		WithArgs(order.ID, "failed", "session_invalid", "上游返回失败").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	stored := order
+	stored.Status = ManagedRechargeStatusIssued
+	stored.ErrorCode = "EXTERNAL_REDEEM_RETRY"
+	stored.ErrorMessage = "上次兑换未完成，CDK 仍归当前订单所有，请前往兑换页重新提交"
+	mock.ExpectQuery("SELECT o.id.*WHERE o.id = \\$1 AND o.user_id = \\$2").
+		WithArgs(order.ID, order.UserID).
+		WillReturnRows(managedRechargeOrderTestRows(stored, order.cdkCiphertext, managedRechargeCDKUsed))
+
+	service := &ManagedRechargeService{
+		db:        db,
+		encryptor: managedRechargeTestEncryptor{},
+		upstream: &managedRechargeVerifyOnlyUpstream{
+			lookupResponse: &managedRechargeLookupResponse{
+				TaskStatus:    "failed",
+				FailureReason: "session_invalid",
+				Progress:      "上游返回失败",
+			},
+		},
+	}
+	result, err := service.syncOrderIfNeeded(context.Background(), &order, true)
+	if err != nil {
+		t.Fatalf("sync failed external redemption: %v", err)
+	}
+	if result.Status != ManagedRechargeStatusIssued || result.ErrorCode != "EXTERNAL_REDEEM_RETRY" || result.RefundedAt != nil {
+		t.Fatalf("external failure was not kept retryable: %+v", result)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("external failure SQL expectations: %v", err)
+	}
+}
+
+func managedRechargeOrderTestRows(order ManagedRechargeOrder, cdkCiphertext, cdkStatus string) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{
+		"id", "order_no", "user_id", "user_email", "username", "product_id", "slug", "name",
+		"fulfillment_mode", "code_masked", "price", "status", "account_email", "upstream_task_id",
+		"upstream_status", "upstream_failure_reason", "queue_position", "queue_total", "progress", "error_code",
+		"error_message", "balance_before", "balance_after", "paid_at", "submitted_at", "completed_at",
+		"refunded_at", "last_synced_at", "created_at", "updated_at", "session_ciphertext", "code_ciphertext", "cdk_status",
+	}).AddRow(
+		order.ID, order.OrderNo, order.UserID, order.UserEmail, order.Username, order.ProductID, order.ProductSlug, order.ProductName,
+		order.FulfillmentMode, order.CDKMasked, order.Price, order.Status, order.AccountEmail, order.upstreamTaskID,
+		order.UpstreamStatus, order.upstreamFailureReason, order.QueuePosition, order.QueueTotal, order.Progress, order.ErrorCode,
+		order.ErrorMessage, order.BalanceBefore, order.BalanceAfter, managedRechargeNullableTime(order.PaidAt),
+		managedRechargeNullableTime(order.SubmittedAt), managedRechargeNullableTime(order.CompletedAt),
+		managedRechargeNullableTime(order.RefundedAt), managedRechargeNullableTime(order.LastSyncedAt), order.CreatedAt, order.UpdatedAt,
+		order.sessionCiphertext, cdkCiphertext, cdkStatus,
+	)
+}
+
+func managedRechargeNullableTime(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }

@@ -33,6 +33,52 @@ func TestManagedRechargeMockProviderUsesConfiguredStep(t *testing.T) {
 	}
 }
 
+func TestManagedRechargeFulfillmentConfigDefaultsToProxy(t *testing.T) {
+	t.Setenv(managedRechargeFulfillmentModeEnv, "")
+	t.Setenv(managedRechargeExternalRedeemURLEnv, "")
+
+	mode, redeemURL, err := managedRechargeFulfillmentConfigFromEnvironment()
+	if err != nil {
+		t.Fatalf("read default fulfillment config: %v", err)
+	}
+	if mode != ManagedRechargeFulfillmentProxy || redeemURL != managedRechargeDefaultRedeemURL {
+		t.Fatalf("default fulfillment config = %q %q", mode, redeemURL)
+	}
+}
+
+func TestManagedRechargeFulfillmentConfigAcceptsExternalHTTPSURL(t *testing.T) {
+	t.Setenv(managedRechargeFulfillmentModeEnv, "external")
+	t.Setenv(managedRechargeExternalRedeemURLEnv, "https://redeem.example.test/recharge")
+
+	mode, redeemURL, err := managedRechargeFulfillmentConfigFromEnvironment()
+	if err != nil {
+		t.Fatalf("read external fulfillment config: %v", err)
+	}
+	if mode != ManagedRechargeFulfillmentExternal || redeemURL != "https://redeem.example.test/recharge" {
+		t.Fatalf("external fulfillment config = %q %q", mode, redeemURL)
+	}
+}
+
+func TestManagedRechargeFulfillmentConfigRejectsUnsafeValues(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		mode string
+		url  string
+	}{
+		{name: "mode", mode: "iframe", url: managedRechargeDefaultRedeemURL},
+		{name: "http", mode: "external", url: "http://redeem.example.test/recharge"},
+		{name: "credentials", mode: "external", url: "https://user:pass@redeem.example.test/recharge"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(managedRechargeFulfillmentModeEnv, test.mode)
+			t.Setenv(managedRechargeExternalRedeemURLEnv, test.url)
+			if _, _, err := managedRechargeFulfillmentConfigFromEnvironment(); err == nil {
+				t.Fatal("unsafe fulfillment configuration was accepted")
+			}
+		})
+	}
+}
+
 func TestManagedRechargeRealFulfillmentDefaultsDisabled(t *testing.T) {
 	t.Setenv(managedRechargeProviderModeEnv, "real")
 	t.Setenv(managedRechargeRealFulfillmentEnv, "")

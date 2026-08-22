@@ -207,7 +207,10 @@
                   <div class="max-w-60 truncate text-gray-700 dark:text-dark-200">{{ order.user_email || order.username || `用户 ${order.user_id}` }}</div>
                   <div class="mt-1 max-w-60 truncate text-xs text-gray-500">{{ order.account_email }}</div>
                 </td>
-                <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-dark-200">{{ order.product_name }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-dark-200">
+                  <div>{{ order.product_name }}</div>
+                  <div class="mt-1 text-xs text-gray-500">{{ order.fulfillment_mode === 'external' ? '外部兑换' : '后端中转' }}</div>
+                </td>
                 <td class="px-4 py-3">
                   <span class="badge" :class="orderStatusClass(order.status)">{{ orderStatusLabel(order.status) }}</span>
                   <div v-if="order.error_message" class="mt-1 max-w-64 text-xs text-red-600 dark:text-red-400">{{ order.error_message }}</div>
@@ -391,7 +394,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'inventory', label: '库存' },
   { key: 'orders', label: '订单' },
 ]
-const orderStatuses = ['validating', 'paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review', 'completed', 'failed', 'refunded']
+const orderStatuses = ['validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review', 'completed', 'failed', 'refunded']
 const activeTab = ref<TabKey>('products')
 const loading = ref(false)
 const saving = ref(false)
@@ -672,7 +675,7 @@ function cdkStatusClass(status: string): string {
 
 function orderStatusLabel(status: string): string {
   return ({
-    validating: '验证库存', paid: '已支付', submitting: '正在提交', queued: '排队中', processing: '处理中',
+    validating: '验证库存', paid: '已支付', issued: '等待用户兑换', submitting: '正在提交', queued: '排队中', processing: '处理中',
     verifying: '确认订阅', action_required: '待补 Session', manual_review: '人工核对', completed: '成功',
     failed: '失败', refunded: '已退款',
   } as Record<string, string>)[status] || status
@@ -686,10 +689,11 @@ function orderStatusClass(status: string): string {
 }
 
 function orderNeedsSync(status: string): boolean {
-  return ['validating', 'paid', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
+  return ['validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
 }
 
 function canRefund(order: ManagedRechargeOrder): boolean {
+  if (order.fulfillment_mode === 'external') return false
   if (order.status !== 'manual_review' || order.error_code !== 'UPSTREAM_TASK_NOT_FOUND' || !order.paid_at) return false
   return Date.now() - new Date(order.paid_at).getTime() >= 10 * 60 * 1000
 }

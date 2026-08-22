@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -17,13 +18,35 @@ const (
 	managedRechargeEnvironmentEnv         = "MANAGED_RECHARGE_ENVIRONMENT"
 	managedRechargeMockStepSecondsEnv     = "MANAGED_RECHARGE_MOCK_STEP_SECONDS"
 	managedRechargeRealFulfillmentEnv     = "MANAGED_RECHARGE_REAL_FULFILLMENT_ENABLED"
+	managedRechargeFulfillmentModeEnv     = "MANAGED_RECHARGE_FULFILLMENT_MODE"
+	managedRechargeExternalRedeemURLEnv   = "MANAGED_RECHARGE_EXTERNAL_REDEEM_URL"
 	managedRechargeMockEnvironment        = "staging"
 	managedRechargeDefaultMockStepSeconds = 10
 	managedRechargeMaxMockStepSeconds     = 300
+	managedRechargeDefaultRedeemURL       = "https://redeem.desolate.codes/recharge"
 
 	managedRechargeMockSessionEmail = "mock@example.com"
 	managedRechargeMockAccessToken  = "mock-access-token"
 )
+
+func managedRechargeFulfillmentConfigFromEnvironment() (string, string, error) {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv(managedRechargeFulfillmentModeEnv)))
+	if mode == "" {
+		mode = ManagedRechargeFulfillmentProxy
+	}
+	if mode != ManagedRechargeFulfillmentProxy && mode != ManagedRechargeFulfillmentExternal {
+		return "", "", fmt.Errorf("%s must be proxy or external", managedRechargeFulfillmentModeEnv)
+	}
+	redeemURL := strings.TrimSpace(os.Getenv(managedRechargeExternalRedeemURLEnv))
+	if redeemURL == "" {
+		redeemURL = managedRechargeDefaultRedeemURL
+	}
+	parsed, err := url.Parse(redeemURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return "", "", fmt.Errorf("%s must be an absolute HTTPS URL without credentials", managedRechargeExternalRedeemURLEnv)
+	}
+	return mode, parsed.String(), nil
+}
 
 var managedRechargeMockCDKPattern = regexp.MustCompile(`^MOCK-(PLUS-SUCCESS|PRO-SUCCESS|SESSION-REQUIRED|FAIL-REFUND)(-[0-9]{3})?$`)
 

@@ -14,12 +14,14 @@ import (
 
 func TestManagedRechargeUserOrderOmitsProviderFields(t *testing.T) {
 	order := managedRechargeUserOrder(&service.ManagedRechargeOrder{
-		CDKMasked:      "abcd...wxyz",
-		UpstreamStatus: "provider-internal-status",
-		Progress:       `{"step":"provider-checkout"}`,
-		ErrorCode:      "UPSTREAM_INTERNAL_CODE",
-		UserEmail:      "user@example.com",
-		Username:       "user-name",
+		CDKMasked:       "abcd...wxyz",
+		RedemptionCode:  "USER-OWNED-CDK",
+		RedemptionURL:   "https://redeem.example.test/recharge?cdk=USER-OWNED-CDK",
+		UpstreamStatus:  "provider-internal-status",
+		Progress:        `{"step":"provider-checkout"}`,
+		ErrorCode:       "UPSTREAM_INTERNAL_CODE",
+		UserEmail:       "user@example.com",
+		Username:        "user-name",
 	})
 	payload, err := json.Marshal(order)
 	if err != nil {
@@ -29,6 +31,11 @@ func TestManagedRechargeUserOrderOmitsProviderFields(t *testing.T) {
 	for _, forbidden := range []string{"cdk_masked", "upstream_status", "progress", "error_code", "user_email", "username", "provider-internal-status", "provider-checkout", "UPSTREAM_INTERNAL_CODE", "abcd...wxyz"} {
 		if strings.Contains(encoded, forbidden) {
 			t.Fatalf("managed recharge user order leaked %q: %s", forbidden, encoded)
+		}
+	}
+	for _, expected := range []string{"redemption_code", "USER-OWNED-CDK", "redemption_url", "https://redeem.example.test/recharge"} {
+		if !strings.Contains(encoded, expected) {
+			t.Fatalf("managed recharge user order omitted %q: %s", expected, encoded)
 		}
 	}
 }

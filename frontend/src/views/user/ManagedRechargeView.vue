@@ -15,7 +15,9 @@
           </button>
           <div class="min-w-0">
             <h1 class="text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">订阅 GPT Plus / Pro</h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">确认套餐与账号后，使用站内余额完成订阅</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
+              {{ isExternalMode ? '使用站内余额购买 CDK，并前往兑换页完成订阅' : '确认套餐与账号后，使用站内余额完成订阅' }}
+            </p>
           </div>
         </div>
         <div class="border-l border-gray-200 pl-4 text-right dark:border-dark-700">
@@ -52,11 +54,12 @@
           <div>
             <div class="font-semibold">模拟测试环境</div>
             <div class="mt-0.5 text-xs leading-5">
-              不会连接真实供货商，仅接受页面提供的假 Session。状态约每 {{ catalog.mock_step_seconds || 10 }} 秒推进一次。
+              <template v-if="isExternalMode">仅验证站内支付与模拟 CDK 发放；模拟 CDK 无法在真实兑换页使用。</template>
+              <template v-else>不会连接真实供货商，仅接受页面提供的假 Session。状态约每 {{ catalog.mock_step_seconds || 10 }} 秒推进一次。</template>
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm shrink-0" @click="fillMockSession">
+        <button v-if="!isExternalMode" type="button" class="btn btn-secondary btn-sm shrink-0" @click="fillMockSession">
           填入模拟 Session
         </button>
       </div>
@@ -127,7 +130,31 @@
             </div>
           </section>
 
-          <section class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+          <section v-if="isExternalMode" class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">2</span>
+              <div>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">领取专属 CDK</h2>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">付款成功后立即发放，不需要在本站提交 Session</p>
+              </div>
+            </div>
+            <div class="grid gap-4 p-5 sm:grid-cols-3">
+              <div class="border-l-2 border-gray-900 pl-3 dark:border-white">
+                <div class="text-xs text-gray-500 dark:text-dark-400">付款</div>
+                <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">余额完成支付</div>
+              </div>
+              <div class="border-l-2 border-gray-300 pl-3 dark:border-dark-500">
+                <div class="text-xs text-gray-500 dark:text-dark-400">领取</div>
+                <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">获得订单专属 CDK</div>
+              </div>
+              <div class="border-l-2 border-gray-300 pl-3 dark:border-dark-500">
+                <div class="text-xs text-gray-500 dark:text-dark-400">兑换</div>
+                <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">前往兑换页提交账号</div>
+              </div>
+            </div>
+          </section>
+
+          <section v-else class="border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
             <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">2</span>
               <div>
@@ -211,7 +238,7 @@
                   <dt class="text-gray-500 dark:text-dark-400">订阅套餐</dt>
                   <dd class="max-w-[11rem] text-right font-medium text-gray-900 dark:text-white">{{ selectedProduct?.name || '尚未选择' }}</dd>
                 </div>
-                <div class="flex items-center justify-between gap-3">
+                <div v-if="!isExternalMode" class="flex items-center justify-between gap-3">
                   <dt class="text-gray-500 dark:text-dark-400">目标账号</dt>
                   <dd class="max-w-[11rem] truncate text-right text-gray-900 dark:text-white" :title="sessionEmail">{{ sessionEmail || '等待识别' }}</dd>
                 </div>
@@ -232,8 +259,9 @@
               </div>
 
               <label class="flex items-start gap-3 text-xs leading-5 text-gray-600 dark:text-dark-300">
-                <input v-model="agreed" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" />
-                <span v-if="catalog?.mock_mode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
+                <input v-model="agreed" data-testid="managed-recharge-agreement" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" />
+                <span v-if="catalog?.mock_mode && !isExternalMode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
+                <span v-else-if="isExternalMode">我确认付款后将获得一枚订单专属 CDK，并前往第三方兑换服务完成账号充值。CDK 发放后不会重新销售。</span>
                 <span v-else>我确认账号归本人所有，并同意 Session 加密保存、临时传输给第三方履约服务；订单完成或退款后清除。</span>
               </label>
 
@@ -253,7 +281,7 @@
               </button>
 
               <p class="text-center text-xs leading-5 text-gray-500 dark:text-dark-400">
-                支付后可在下方查看处理进度；未完成的订单会按规则退款。
+                {{ isExternalMode ? 'CDK 发放后请妥善保存；兑换未完成时可使用同一 CDK 重新提交。' : '支付后可在下方查看处理进度；未完成的订单会按规则退款。' }}
               </p>
             </div>
 
@@ -285,18 +313,38 @@
             <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-800">
               <tr v-for="order in orders" :key="order.id">
                 <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700 dark:text-dark-200">{{ order.order_no }}</td>
-                <td class="max-w-56 truncate px-4 py-3 text-gray-700 dark:text-dark-200">{{ order.account_email }}</td>
+                <td class="max-w-56 truncate px-4 py-3 text-gray-700 dark:text-dark-200">
+                  {{ order.account_email || (order.fulfillment_mode === 'external' ? '在兑换页填写' : '-') }}
+                </td>
                 <td class="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-dark-200">{{ order.product_name }}</td>
                 <td class="px-4 py-3">
-                  <span class="badge" :class="statusClass(order.status)">{{ statusLabel(order.status) }}</span>
+                  <span class="badge" :class="statusClass(order.status)">{{ statusLabel(order.status, order.fulfillment_mode) }}</span>
                   <div v-if="order.queue_position" class="mt-1 text-xs text-gray-500">队列 {{ order.queue_position }}/{{ order.queue_total || order.queue_position }}</div>
                   <div v-if="order.progress" class="mt-1 max-w-72 text-xs text-gray-500 dark:text-dark-400">{{ order.progress }}</div>
                   <div v-if="order.error_message" class="mt-1 max-w-72 text-xs text-red-600 dark:text-red-400">{{ order.error_message }}</div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{{ formatDate(order.created_at) }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right">
+                  <a
+                    v-if="order.fulfillment_mode === 'external' && order.redemption_url"
+                    class="btn btn-primary btn-sm inline-flex"
+                    :href="order.redemption_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Icon name="externalLink" size="sm" class="mr-1.5" />
+                    前往兑换
+                  </a>
                   <button
-                    v-if="order.status === 'action_required'"
+                    v-else-if="order.fulfillment_mode === 'external' && order.status !== 'refunded'"
+                    :data-testid="`managed-recharge-reveal-${order.id}`"
+                    class="btn btn-secondary btn-sm"
+                    @click="revealExternalOrder(order.id)"
+                  >
+                    查看 CDK
+                  </button>
+                  <button
+                    v-else-if="order.status === 'action_required'"
                     class="btn btn-secondary btn-sm"
                     @click="openReplacement(order)"
                   >
@@ -337,6 +385,45 @@
         <button class="btn btn-primary" :disabled="!replacementSession.trim() || replacementSubmitting" @click="submitReplacement">
           {{ replacementSubmitting ? '正在提交' : '提交新 Session' }}
         </button>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog :show="issuedOrder !== null" title="CDK 已发放" width="normal" @close="closeIssuedOrder">
+      <div v-if="issuedOrder" class="space-y-5" data-testid="managed-recharge-issued-dialog">
+        <div class="flex items-start gap-3 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900/60 dark:bg-green-950/20 dark:text-green-200">
+          <Icon name="checkCircle" size="md" class="mt-0.5 shrink-0" />
+          <div>
+            <div class="font-semibold">支付成功，CDK 已归属于当前订单</div>
+            <div class="mt-1 text-xs leading-5">请保存 CDK，然后前往兑换页提交该 CDK 和目标账号 Session。</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs font-medium text-gray-500 dark:text-dark-400">订单号</div>
+          <div class="mt-1 font-mono text-sm text-gray-700 dark:text-dark-200">{{ issuedOrder.order_no }}</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium text-gray-500 dark:text-dark-400">专属 CDK</div>
+          <div class="mt-2 flex items-center gap-2 border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-900">
+            <code class="min-w-0 flex-1 break-all text-sm font-semibold text-gray-900 dark:text-white">{{ issuedOrder.redemption_code }}</code>
+            <button type="button" class="btn btn-secondary h-9 w-9 shrink-0 p-0" :title="codeCopied ? '已复制' : '复制 CDK'" @click="copyIssuedCode">
+              <Icon :name="codeCopied ? 'check' : 'copy'" size="sm" />
+            </button>
+          </div>
+        </div>
+        <p class="text-xs leading-5 text-gray-500 dark:text-dark-400">兑换页面由第三方提供。CDK 是敏感凭证，请勿转发；兑换失败时可以使用同一 CDK 重新提交。</p>
+      </div>
+      <template #footer>
+        <button class="btn btn-secondary" type="button" @click="closeIssuedOrder">稍后处理</button>
+        <a
+          v-if="issuedOrder?.redemption_url"
+          class="btn btn-primary inline-flex"
+          :href="issuedOrder.redemption_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Icon name="externalLink" size="sm" class="mr-2" />
+          前往兑换
+        </a>
       </template>
     </BaseDialog>
   </AppLayout>
@@ -383,6 +470,8 @@ const replacementOrder = ref<ManagedRechargeOrder | null>(null)
 const replacementSession = ref('')
 const replacementError = ref('')
 const replacementSubmitting = ref(false)
+const issuedOrder = ref<ManagedRechargeOrder | null>(null)
+const codeCopied = ref(false)
 let pollTimer: number | null = null
 let sessionValidationTimer: number | null = null
 let sessionValidationRequestID = 0
@@ -390,11 +479,18 @@ const mockSessionExample = JSON.stringify({
   user: { email: 'mock@example.com' },
   accessToken: 'mock-access-token',
 }, null, 2)
-const purchaseSteps = [
-  { title: '选择套餐', description: '确认档位与库存' },
-  { title: '提交账号', description: '粘贴 Session JSON' },
-  { title: '确认支付', description: '余额支付并跟踪进度' },
-]
+const isExternalMode = computed(() => catalog.value?.fulfillment_mode === 'external')
+const purchaseSteps = computed(() => isExternalMode.value
+  ? [
+      { title: '选择套餐', description: '确认档位与库存' },
+      { title: '领取 CDK', description: '支付后立即发放' },
+      { title: '前往兑换', description: '在兑换页提交账号' },
+    ]
+  : [
+      { title: '选择套餐', description: '确认档位与库存' },
+      { title: '提交账号', description: '粘贴 Session JSON' },
+      { title: '确认支付', description: '余额支付并跟踪进度' },
+    ])
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
 const sessionMembershipLabel = computed(() => ({
   free: 'Free',
@@ -424,8 +520,7 @@ const balanceAfterPayment = computed(() => {
 const canSubmit = computed(() => Boolean(
   selectedProduct.value &&
   selectedProduct.value.available_stock > 0 &&
-  sessionEmail.value &&
-  sessionValidationState.value === 'valid' &&
+  (isExternalMode.value || (sessionEmail.value && sessionValidationState.value === 'valid')) &&
   agreed.value &&
   hasEnoughBalance.value,
 ))
@@ -538,12 +633,25 @@ async function submitOrder(): Promise<void> {
   submitting.value = true
   submitError.value = ''
   try {
-    const order = await createManagedRechargeOrder(selectedProduct.value.id, sessionJson.value, newIdempotencyKey())
+    const order = await createManagedRechargeOrder(
+      selectedProduct.value.id,
+      isExternalMode.value ? undefined : sessionJson.value,
+      newIdempotencyKey(),
+    )
     orders.value = [order, ...orders.value.filter((item) => item.id !== order.id)]
-    sessionJson.value = ''
-    resetSessionValidation()
     agreed.value = false
     await loadCatalog()
+    if (isExternalMode.value) {
+      if (order.redemption_code) {
+        issuedOrder.value = order
+        codeCopied.value = false
+      } else {
+        submitError.value = '订单已创建，但 CDK 暂未成功发放，请联系管理员核对订单'
+      }
+    } else {
+      sessionJson.value = ''
+      resetSessionValidation()
+    }
   } catch (error) {
     submitError.value = errorMessage(error)
   } finally {
@@ -552,7 +660,7 @@ async function submitOrder(): Promise<void> {
 }
 
 function isActiveStatus(status: string): boolean {
-  return ['validating', 'paid', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
+  return ['validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
 }
 
 async function refreshOrder(id: number): Promise<void> {
@@ -567,11 +675,17 @@ async function refreshOrder(id: number): Promise<void> {
 }
 
 async function pollActiveOrders(): Promise<void> {
-  const active = orders.value.filter((order) => isActiveStatus(order.status) || order.status === 'action_required')
+  const active = orders.value.filter((order) => {
+    if (!isActiveStatus(order.status) && order.status !== 'action_required') return false
+    if (order.fulfillment_mode === 'external' && order.status === 'issued') return Boolean(order.redemption_code)
+    return true
+  })
   for (const order of active.slice(0, 5)) await refreshOrder(order.id)
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, fulfillmentMode: ManagedRechargeOrder['fulfillment_mode'] = 'proxy'): string {
+  if (status === 'issued') return '等待兑换'
+  if (fulfillmentMode === 'external' && status === 'completed') return '订阅完成'
   return ({
     validating: '验证库存', paid: '已支付', submitting: '正在提交', queued: '排队中', processing: '处理中',
     verifying: '确认订阅', action_required: '需要新 Session', manual_review: '人工核对', completed: '充值成功',
@@ -584,6 +698,48 @@ function statusClass(status: string): string {
   if (status === 'refunded' || status === 'failed') return 'badge-danger'
   if (status === 'action_required' || status === 'manual_review') return 'badge-warning'
   return 'badge-info'
+}
+
+async function revealExternalOrder(id: number): Promise<void> {
+  submitError.value = ''
+  try {
+    const order = await getManagedRechargeOrder(id)
+    const index = orders.value.findIndex((item) => item.id === id)
+    if (index >= 0) orders.value[index] = order
+    if (!order.redemption_code) throw new Error('CDK 暂时无法读取，请稍后重试')
+    issuedOrder.value = order
+    codeCopied.value = false
+  } catch (error) {
+    submitError.value = errorMessage(error)
+  }
+}
+
+function closeIssuedOrder(): void {
+  issuedOrder.value = null
+  codeCopied.value = false
+}
+
+async function copyIssuedCode(): Promise<void> {
+  const code = issuedOrder.value?.redemption_code
+  if (!code) return
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(code)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = code
+      textarea.setAttribute('readonly', 'true')
+      textarea.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const copied = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      if (!copied) throw new Error('copy failed')
+    }
+    codeCopied.value = true
+  } catch {
+    submitError.value = '复制失败，请手动选择 CDK 复制'
+  }
 }
 
 function openReplacement(order: ManagedRechargeOrder): void {
