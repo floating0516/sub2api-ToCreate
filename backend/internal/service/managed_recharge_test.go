@@ -135,3 +135,30 @@ func TestManagedRechargeFailUnpaidOrderDoesNotReleasePaidInventory(t *testing.T)
 		t.Fatalf("paid order cleanup SQL expectations: %v", err)
 	}
 }
+
+func TestManagedRechargeMockModeRejectsNonTestSessionBeforeCreatingOrder(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{
+		db:           db,
+		encryptor:    &plainEncryptor{},
+		upstream:     newManagedRechargeMockUpstream(10 * time.Second),
+		mockMode:     true,
+		featureReady: true,
+	}
+	_, err = service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+		ProductID:      1,
+		Session:        `{"user":{"email":"real@example.com"},"accessToken":"real-token"}`,
+		IdempotencyKey: "mock-session-guard",
+	})
+	if infraerrors.Reason(err) != "MANAGED_RECHARGE_MOCK_SESSION_REQUIRED" {
+		t.Fatalf("mock Session guard error reason = %q", infraerrors.Reason(err))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("mock Session guard touched the database: %v", err)
+	}
+}

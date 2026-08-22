@@ -14,6 +14,24 @@
         </div>
       </header>
 
+      <div
+        v-if="catalog?.mock_mode"
+        class="flex flex-wrap items-center justify-between gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/70 dark:bg-amber-900/20 dark:text-amber-200"
+      >
+        <div class="flex min-w-0 items-start gap-3">
+          <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0" />
+          <div>
+            <div class="font-semibold">模拟测试环境</div>
+            <div class="mt-0.5 text-xs leading-5">
+              不会连接真实供货商，仅接受页面提供的假 Session。状态约每 {{ catalog.mock_step_seconds || 10 }} 秒推进一次。
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm shrink-0" @click="fillMockSession">
+          填入模拟 Session
+        </button>
+      </div>
+
       <div v-if="loading" class="flex min-h-64 items-center justify-center">
         <Icon name="refresh" size="lg" class="animate-spin text-primary-500" />
       </div>
@@ -74,6 +92,7 @@
               <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <label for="managed-recharge-session" class="input-label mb-0">Session JSON</label>
                 <a
+                  v-if="!catalog?.mock_mode"
                   href="https://chatgpt.com/api/auth/session"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -88,7 +107,7 @@
                 class="input min-h-36 resize-y font-mono text-xs"
                 autocomplete="off"
                 spellcheck="false"
-                placeholder='粘贴包含 user 和 accessToken 的完整 JSON'
+                :placeholder="catalog?.mock_mode ? '点击上方按钮填入模拟 Session' : '粘贴包含 user 和 accessToken 的完整 JSON'"
                 @input="validateSession"
               />
               <div v-if="sessionEmail" class="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
@@ -100,7 +119,8 @@
 
             <label class="flex items-start gap-3 text-sm text-gray-600 dark:text-dark-300">
               <input v-model="agreed" type="checkbox" class="mt-0.5 h-4 w-4" />
-              <span>我确认该账号归本人所有，并同意 Session 在本次订单中加密保存、临时传输给第三方履约服务；完成或退款后清除。</span>
+              <span v-if="catalog?.mock_mode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
+              <span v-else>我确认该账号归本人所有，并同意 Session 在本次订单中加密保存、临时传输给第三方履约服务；完成或退款后清除。</span>
             </label>
 
             <div v-if="submitError" class="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/15 dark:text-red-300">
@@ -149,6 +169,7 @@
                 <td class="px-4 py-3">
                   <span class="badge" :class="statusClass(order.status)">{{ statusLabel(order.status) }}</span>
                   <div v-if="order.queue_position" class="mt-1 text-xs text-gray-500">队列 {{ order.queue_position }}/{{ order.queue_total || order.queue_position }}</div>
+                  <div v-if="order.progress" class="mt-1 max-w-72 text-xs text-gray-500 dark:text-dark-400">{{ order.progress }}</div>
                   <div v-if="order.error_message" class="mt-1 max-w-72 text-xs text-red-600 dark:text-red-400">{{ order.error_message }}</div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{{ formatDate(order.created_at) }}</td>
@@ -179,6 +200,14 @@
     <BaseDialog :show="replacementOrder !== null" title="补交 Session" width="normal" @close="closeReplacement">
       <div class="space-y-4">
         <div class="text-sm text-gray-600 dark:text-dark-300">账号：{{ replacementOrder?.account_email }}</div>
+        <button
+          v-if="catalog?.mock_mode"
+          type="button"
+          class="btn btn-secondary btn-sm"
+          @click="replacementSession = mockSessionExample"
+        >
+          填入模拟 Session
+        </button>
         <textarea v-model="replacementSession" class="input min-h-40 font-mono text-xs" autocomplete="off" spellcheck="false" />
         <div v-if="replacementError" class="text-sm text-red-600 dark:text-red-400">{{ replacementError }}</div>
       </div>
@@ -223,6 +252,10 @@ const replacementSession = ref('')
 const replacementError = ref('')
 const replacementSubmitting = ref(false)
 let pollTimer: number | null = null
+const mockSessionExample = JSON.stringify({
+  user: { email: 'mock@example.com' },
+  accessToken: 'mock-access-token',
+}, null, 2)
 
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
 const canSubmit = computed(() => Boolean(
@@ -264,6 +297,11 @@ function validateSession(): void {
   } catch {
     sessionError.value = 'Session JSON 格式不完整'
   }
+}
+
+function fillMockSession(): void {
+  sessionJson.value = mockSessionExample
+  validateSession()
 }
 
 async function loadCatalog(): Promise<void> {

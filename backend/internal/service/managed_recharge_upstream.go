@@ -22,6 +22,14 @@ type managedRechargeUpstreamClient struct {
 	client  *http.Client
 }
 
+type managedRechargeUpstream interface {
+	verifyCDK(ctx context.Context, code string) (*managedRechargeVerifyResponse, error)
+	createTask(ctx context.Context, code, session string) (*managedRechargeCreateResponse, error)
+	confirmTask(ctx context.Context, taskID string) (*managedRechargeConfirmResponse, error)
+	lookupTask(ctx context.Context, code string) (*managedRechargeLookupResponse, error)
+	submitReplacementSession(ctx context.Context, code, session string) (*managedRechargeReplacementSessionResponse, error)
+}
+
 type managedRechargeUpstreamHTTPError struct {
 	StatusCode int
 }

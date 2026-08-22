@@ -19,6 +19,8 @@ export interface ManagedRechargeCatalog {
   enabled: boolean
   balance: number
   products: ManagedRechargeProduct[]
+  mock_mode: boolean
+  mock_step_seconds?: number
 }
 
 export interface ManagedRechargeOrder {

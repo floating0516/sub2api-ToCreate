@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -65,7 +66,9 @@ type ManagedRechargeService struct {
 	encryptor    SecretEncryptor
 	balanceCache managedRechargeBalanceCache
 	authCache    APIKeyAuthCacheInvalidator
-	upstream     *managedRechargeUpstreamClient
+	upstream     managedRechargeUpstream
+	mockMode     bool
+	mockStepSecs int
 	featureReady bool
 }
 
@@ -85,9 +88,11 @@ type ManagedRechargeProduct struct {
 }
 
 type ManagedRechargeCatalog struct {
-	Enabled  bool                     `json:"enabled"`
-	Balance  float64                  `json:"balance"`
-	Products []ManagedRechargeProduct `json:"products"`
+	Enabled         bool                     `json:"enabled"`
+	Balance         float64                  `json:"balance"`
+	Products        []ManagedRechargeProduct `json:"products"`
+	MockMode        bool                     `json:"mock_mode"`
+	MockStepSeconds int                      `json:"mock_step_seconds,omitempty"`
 }
 
 type ManagedRechargeCDK struct {
@@ -164,13 +169,19 @@ func NewManagedRechargeService(
 	balanceCache managedRechargeBalanceCache,
 	authCache APIKeyAuthCacheInvalidator,
 ) *ManagedRechargeService {
+	upstream, mockMode, mockStepSecs, upstreamErr := newManagedRechargeUpstreamFromEnvironment()
+	if upstreamErr != nil {
+		log.Printf("Warning: managed recharge provider is unavailable: %v", upstreamErr)
+	}
 	return &ManagedRechargeService{
 		db:           db,
 		encryptor:    encryptor,
 		balanceCache: balanceCache,
 		authCache:    authCache,
-		upstream:     newManagedRechargeUpstreamClient(),
-		featureReady: db != nil && encryptor != nil,
+		upstream:     upstream,
+		mockMode:     mockMode,
+		mockStepSecs: mockStepSecs,
+		featureReady: db != nil && encryptor != nil && upstreamErr == nil,
 	}
 }
 
@@ -187,9 +198,11 @@ func (s *ManagedRechargeService) GetCatalog(ctx context.Context, userID int64) (
 		return nil, err
 	}
 	return &ManagedRechargeCatalog{
-		Enabled:  s.featureReady && len(products) > 0,
-		Balance:  balance,
-		Products: products,
+		Enabled:         s.featureReady && len(products) > 0,
+		Balance:         balance,
+		Products:        products,
+		MockMode:        s.mockMode,
+		MockStepSeconds: s.mockStepSecs,
 	}, nil
 }
 
@@ -473,6 +486,9 @@ func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, 
 	if err != nil {
 		return nil, err
 	}
+	if s.mockMode && !isManagedRechargeMockSession(session) {
+		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
+	}
 	if existing, err := s.getOrderByIdempotency(ctx, userID, input.IdempotencyKey); err == nil {
 		return existing, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
@@ -700,6 +716,9 @@ func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, u
 	email, err := parseManagedRechargeSession(session)
 	if err != nil {
 		return nil, err
+	}
+	if s.mockMode && !isManagedRechargeMockSession(session) {
+		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
 	}
 	order, err := s.getOrder(ctx, orderID, &userID)
 	if err != nil {
@@ -1360,6 +1379,20 @@ func parseManagedRechargeSession(raw string) (string, error) {
 		return "", infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "Session does not contain an account email")
 	}
 	return email, nil
+}
+
+func isManagedRechargeMockSession(raw string) bool {
+	var payload struct {
+		User struct {
+			Email string `json:"email"`
+		} `json:"user"`
+		AccessToken string `json:"accessToken"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &payload); err != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(payload.User.Email), managedRechargeMockSessionEmail) &&
+		strings.TrimSpace(payload.AccessToken) == managedRechargeMockAccessToken
 }
 
 func normalizeManagedRechargePlanType(value string) string {
