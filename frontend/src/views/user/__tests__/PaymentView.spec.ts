@@ -3,6 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import ManagedRechargeEntryCard from '@/components/payment/ManagedRechargeEntryCard.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import type { CheckoutInfoResponse, MethodLimit, SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
 import type { UserSubscription } from '@/types'
@@ -307,6 +308,67 @@ describe('PaymentView subscription plan grid', () => {
       'sm:grid-cols-2',
       'lg:grid-cols-3',
     ]))
+  })
+})
+
+describe('PaymentView managed recharge entry', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    routeState.path = '/purchase'
+    routeState.query = {}
+    routerReplace.mockReset().mockResolvedValue(undefined)
+    routerPush.mockReset().mockResolvedValue(undefined)
+    routerResolve.mockClear()
+    createOrder.mockReset()
+    refreshUser.mockReset()
+    fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+    showError.mockReset()
+    showInfo.mockReset()
+    showSuccess.mockReset()
+    showWarning.mockReset()
+    bridgeInvoke.mockReset()
+    subscriptionState.activeSubscriptions = []
+    window.localStorage.clear()
+    ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
+  })
+
+  it('places the GPT Plus-Pro entry after the add-on tab and opens its dedicated page', async () => {
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: true,
+      addon_products: [{
+        id: 5,
+        sku: 'addon-usd-30',
+        name: '30 USD add-on',
+        quota_usd: 30,
+        price: 7.99,
+        for_sale: true,
+        sort_order: 20,
+      }],
+    }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid^="payment-tab-"]').map(tab => tab.text())).toEqual([
+      'payment.tabTopUp',
+      'payment.tabSubscribe',
+      'payment.tabAddon',
+      'payment.tabMemberRecharge',
+    ])
+
+    await wrapper.get('[data-testid="payment-tab-member"]').trigger('click')
+    const entryCard = wrapper.getComponent(ManagedRechargeEntryCard)
+    entryCard.vm.$emit('select')
+
+    expect(routerPush).toHaveBeenCalledWith('/member-recharge')
   })
 })
 

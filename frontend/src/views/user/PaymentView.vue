@@ -6,9 +6,10 @@
       </div>
       <template v-else>
         <!-- Tab Switcher (hide during payment and subscription confirm) -->
-        <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan" class="flex space-x-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800">
+        <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan" :class="tabGridClass">
           <button v-for="tab in tabs" :key="tab.key"
-            class="flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all"
+            :data-testid="`payment-tab-${tab.key}`"
+            class="min-h-11 min-w-0 rounded-lg px-2 py-2.5 text-sm font-medium leading-5 transition-all sm:px-4"
             :class="activeTab === tab.key ? 'bg-white text-gray-900 shadow dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
             @click="activeTab = tab.key">{{ tab.label }}</button>
         </div>
@@ -413,8 +414,12 @@
               </button>
             </template>
           </template>
+          <!-- Managed Recharge Tab -->
+          <template v-else-if="activeTab === 'member'">
+            <ManagedRechargeEntryCard @select="openManagedRecharge" />
+          </template>
         </template>
-        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan && activeTab !== 'addon'" class="card p-4">
+        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan && activeTab !== 'addon' && activeTab !== 'member'" class="card p-4">
           <div class="flex flex-col items-center gap-3">
             <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
               class="h-40 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80"
@@ -482,6 +487,7 @@ import {
 } from '@/components/payment/paymentFlow'
 import { platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import { subscriptionAccentBarClass, subscriptionBadgeClass, subscriptionTextClass } from '@/utils/subscriptionColors'
+import ManagedRechargeEntryCard from '@/components/payment/ManagedRechargeEntryCard.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -522,7 +528,9 @@ const submitting = ref(false)
 const balanceSubmitting = ref(false)
 const errorMessage = ref('')
 const errorHintMessage = ref('')
-const activeTab = ref<'recharge' | 'subscription' | 'addon'>('recharge')
+type PaymentTab = 'recharge' | 'subscription' | 'addon' | 'member'
+
+const activeTab = ref<PaymentTab>('recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
@@ -733,14 +741,28 @@ const checkout = ref<CheckoutInfoResponse>({
 })
 
 const tabs = computed(() => {
-  const result: { key: 'recharge' | 'subscription' | 'addon'; label: string }[] = []
+  const result: { key: PaymentTab; label: string }[] = []
   if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
   result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
   if (checkout.value.addon_purchase_enabled && checkout.value.addon_products.length > 0) {
     result.push({ key: 'addon', label: t('payment.tabAddon') })
   }
+  result.push({ key: 'member', label: t('payment.tabMemberRecharge') })
   return result
 })
+
+const tabGridClass = computed(() => [
+  'grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800',
+  tabs.value.length === 2
+    ? 'sm:grid-cols-2'
+    : tabs.value.length === 3
+      ? 'sm:grid-cols-3'
+      : 'sm:grid-cols-4',
+])
+
+function openManagedRecharge() {
+  router.push('/member-recharge')
+}
 
 function formatQuota(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)

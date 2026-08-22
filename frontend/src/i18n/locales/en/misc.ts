@@ -467,6 +467,18 @@ export default {
     tabTopUp: 'Top Up',
     tabSubscribe: 'Subscribe',
     tabAddon: 'Add-ons',
+    tabMemberRecharge: 'Subscribe to GPT Plus-Pro',
+    memberRecharge: {
+      imageAlt: 'GPT Plus and Pro subscription cards',
+      title: 'Subscribe to GPT Plus-Pro',
+      description: 'Choose a membership plan, then track fulfillment progress and order status on the dedicated page.',
+      plus: 'GPT Plus',
+      pro: 'GPT Pro',
+      featurePlan: 'Choose Plus or Pro',
+      featureProgress: 'Track order progress',
+      featureRefund: 'Refund or manual review on failure',
+      subscribeNow: 'Subscribe Now',
+    },
     addon: {
       noSubscription: 'No active subscription',
       noSubscriptionHint: 'An add-on must be attached to an active subscription.',

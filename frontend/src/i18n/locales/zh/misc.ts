@@ -489,6 +489,18 @@ export default {
     tabTopUp: '充值',
     tabSubscribe: '订阅',
     tabAddon: '加油包',
+    tabMemberRecharge: '订阅 GPT Plus-Pro',
+    memberRecharge: {
+      imageAlt: 'GPT Plus 和 Pro 订阅卡片',
+      title: '订阅 GPT Plus-Pro',
+      description: '选择需要的会员套餐，提交后可在专属页面查看充值进度和订单状态。',
+      plus: 'GPT Plus',
+      pro: 'GPT Pro',
+      featurePlan: 'Plus / Pro 套餐可选',
+      featureProgress: '订单进度随时查看',
+      featureRefund: '失败后退款或人工核对',
+      subscribeNow: '立即订阅',
+    },
     addon: {
       noSubscription: '暂无可用订阅',
       noSubscriptionHint: '加油包需要绑定一个有效订阅，请先开通订阅。',

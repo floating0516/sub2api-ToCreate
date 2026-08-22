@@ -193,7 +193,7 @@ export default {
     logout: 'Logout',
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
-    buySubscription: 'Recharge / Subscription',
+    buySubscription: 'Recharge & Subscriptions',
     memberRecharge: 'Member Recharge',
     managedRecharge: 'Recharge Management',
     docs: 'Docs',

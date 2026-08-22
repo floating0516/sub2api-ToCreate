@@ -193,7 +193,7 @@ export default {
     logout: '退出登录',
     github: 'GitHub',
     mySubscriptions: '我的订阅',
-    buySubscription: '充值/订阅',
+    buySubscription: '充值订阅',
     memberRecharge: '会员代充',
     managedRecharge: '代充管理',
     docs: '文档',
