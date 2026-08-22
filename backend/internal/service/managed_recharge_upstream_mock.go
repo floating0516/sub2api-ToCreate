@@ -29,10 +29,10 @@ var managedRechargeMockCDKPattern = regexp.MustCompile(`^MOCK-(PLUS-SUCCESS|PRO-
 type managedRechargeMockScenario string
 
 const (
-	managedRechargeMockPlusSuccess    managedRechargeMockScenario = "PLUS-SUCCESS"
-	managedRechargeMockProSuccess     managedRechargeMockScenario = "PRO-SUCCESS"
-	managedRechargeMockSessionNeeded  managedRechargeMockScenario = "SESSION-REQUIRED"
-	managedRechargeMockFailureRefund  managedRechargeMockScenario = "FAIL-REFUND"
+	managedRechargeMockPlusSuccess   managedRechargeMockScenario = "PLUS-SUCCESS"
+	managedRechargeMockProSuccess    managedRechargeMockScenario = "PRO-SUCCESS"
+	managedRechargeMockSessionNeeded managedRechargeMockScenario = "SESSION-REQUIRED"
+	managedRechargeMockFailureRefund managedRechargeMockScenario = "FAIL-REFUND"
 )
 
 type managedRechargeMockTask struct {
@@ -63,7 +63,7 @@ func newManagedRechargeUpstreamFromEnvironment() (managedRechargeUpstream, bool,
 		if err != nil {
 			return nil, false, 0, err
 		}
-		return newManagedRechargeMockUpstream(time.Duration(stepSeconds)*time.Second), true, stepSeconds, nil
+		return newManagedRechargeMockUpstream(time.Duration(stepSeconds) * time.Second), true, stepSeconds, nil
 	default:
 		return nil, false, 0, fmt.Errorf("unsupported %s value %q", managedRechargeProviderModeEnv, mode)
 	}
