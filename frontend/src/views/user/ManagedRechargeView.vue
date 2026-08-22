@@ -138,13 +138,12 @@
 
             <div class="space-y-4 p-5">
               <details
-                v-if="!catalog?.mock_mode"
                 data-testid="managed-recharge-session-guide"
                 class="group rounded-lg border border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-700/40"
               >
                 <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                   <Icon name="book" size="sm" class="shrink-0 text-primary-600 dark:text-primary-400" />
-                  <span class="min-w-0 flex-1">第一次使用？查看详细获取教程</span>
+                  <span class="min-w-0 flex-1">{{ catalog?.mock_mode ? '真实流程：查看 Session 获取教程' : '第一次使用？查看详细获取教程' }}</span>
                   <Icon name="chevronDown" size="sm" class="shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
                 </summary>
                 <div class="border-t border-gray-200 px-4 py-4 dark:border-dark-600">
@@ -174,7 +173,7 @@
                 </div>
               </details>
 
-              <div v-else class="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200">
+              <div v-if="catalog?.mock_mode" class="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200">
                 <Icon name="beaker" size="md" class="mt-0.5 shrink-0" />
                 <span>点击页面上方“填入模拟 Session”，即可体验账号识别、余额扣款和订单进度。</span>
               </div>

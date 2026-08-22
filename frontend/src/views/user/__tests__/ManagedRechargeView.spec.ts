@@ -108,4 +108,24 @@ describe('ManagedRechargeView purchase flow', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps the real Session guide visible in mock mode', async () => {
+    getCatalog.mockResolvedValue({ ...catalog, mock_mode: true, mock_step_seconds: 10 })
+
+    const wrapper = mount(ManagedRechargeView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          BaseDialog: true,
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('真实流程')
+    expect(wrapper.text()).toContain('填入模拟 Session')
+
+    wrapper.unmount()
+  })
 })
