@@ -12,6 +12,7 @@ const listOrders = vi.hoisted(() => vi.fn())
 const createOrder = vi.hoisted(() => vi.fn())
 const getOrder = vi.hoisted(() => vi.fn())
 const submitReplacement = vi.hoisted(() => vi.fn())
+const validateSession = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -28,6 +29,7 @@ vi.mock('@/api/managedRecharge', () => ({
   createManagedRechargeOrder: createOrder,
   getManagedRechargeOrder: getOrder,
   submitManagedRechargeReplacementSession: submitReplacement,
+  validateManagedRechargeSession: validateSession,
 }))
 
 function product(overrides: Partial<ManagedRechargeProduct>): ManagedRechargeProduct {
@@ -69,6 +71,11 @@ describe('ManagedRechargeView purchase flow', () => {
     createOrder.mockReset()
     getOrder.mockReset()
     submitReplacement.mockReset()
+    validateSession.mockReset().mockResolvedValue({
+      valid: true,
+      email: 'member@example.com',
+      membership: 'plus',
+    })
   })
 
   afterEach(() => {
@@ -76,7 +83,7 @@ describe('ManagedRechargeView purchase flow', () => {
     vi.useRealTimers()
   })
 
-  it('shows a three-step layout, detailed Session guide, and selected plan summary', async () => {
+  it('shows the compact Session guide and automatically validates the account', async () => {
     const wrapper = mount(ManagedRechargeView, {
       global: {
         stubs: {
@@ -90,8 +97,9 @@ describe('ManagedRechargeView purchase flow', () => {
 
     expect(wrapper.findAll('[data-testid^="managed-recharge-step-"]')).toHaveLength(3)
     expect(wrapper.get('[data-testid="managed-recharge-product-2"]').attributes('aria-pressed')).toBe('true')
-    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('复制完整 JSON')
-    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('不要上传截图')
+    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('如何获取 Session？')
+    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('将页面返回的完整 JSON 全部复制')
+    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).not.toContain('不要上传截图')
     expect(wrapper.text()).toContain('支付后余额')
     expect(wrapper.text()).toContain('42.00')
 
@@ -100,8 +108,16 @@ describe('ManagedRechargeView purchase flow', () => {
       accessToken: 'test-token',
     }))
 
-    expect(wrapper.text()).toContain('已识别目标账号')
+    expect(wrapper.text()).toContain('正在验证 Session')
+
+    await vi.advanceTimersByTimeAsync(500)
+    await flushPromises()
+
+    expect(validateSession).toHaveBeenCalledWith(expect.stringContaining('member@example.com'))
+    expect(wrapper.get('[data-testid="managed-recharge-session-result"]').text()).toContain('Session 格式有效')
     expect(wrapper.text()).toContain('member@example.com')
+    expect(wrapper.text()).toContain('当前订阅')
+    expect(wrapper.text()).toContain('Plus')
 
     await wrapper.get('[data-testid="managed-recharge-back"]').trigger('click')
     expect(routerPush).toHaveBeenCalledWith({ path: '/purchase', query: { tab: 'member' } })
@@ -109,7 +125,7 @@ describe('ManagedRechargeView purchase flow', () => {
     wrapper.unmount()
   })
 
-  it('keeps the real Session guide visible in mock mode', async () => {
+  it('keeps the Session link visible in mock mode', async () => {
     getCatalog.mockResolvedValue({ ...catalog, mock_mode: true, mock_step_seconds: 10 })
 
     const wrapper = mount(ManagedRechargeView, {
@@ -123,7 +139,7 @@ describe('ManagedRechargeView purchase flow', () => {
     })
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('真实流程')
+    expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('chatgpt.com/api/auth/session')
     expect(wrapper.text()).toContain('填入模拟 Session')
 
     wrapper.unmount()

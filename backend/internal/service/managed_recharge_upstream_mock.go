@@ -107,6 +107,16 @@ func newManagedRechargeMockUpstream(step time.Duration) *managedRechargeMockUpst
 	}
 }
 
+func (m *managedRechargeMockUpstream) validateSession(_ context.Context, session string) (*managedRechargeSessionValidationResponse, error) {
+	if !isManagedRechargeMockSession(session) {
+		return &managedRechargeSessionValidationResponse{Valid: false, Detail: "mock_session_required"}, nil
+	}
+	return &managedRechargeSessionValidationResponse{
+		Valid: true,
+		Email: managedRechargeMockSessionEmail,
+	}, nil
+}
+
 func (m *managedRechargeMockUpstream) verifyCDK(_ context.Context, code string) (*managedRechargeVerifyResponse, error) {
 	scenario, ok := managedRechargeMockScenarioForCDK(code)
 	if !ok {

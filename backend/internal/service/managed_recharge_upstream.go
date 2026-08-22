@@ -23,11 +23,25 @@ type managedRechargeUpstreamClient struct {
 }
 
 type managedRechargeUpstream interface {
+	validateSession(ctx context.Context, session string) (*managedRechargeSessionValidationResponse, error)
 	verifyCDK(ctx context.Context, code string) (*managedRechargeVerifyResponse, error)
 	createTask(ctx context.Context, code, session string) (*managedRechargeCreateResponse, error)
 	confirmTask(ctx context.Context, taskID string) (*managedRechargeConfirmResponse, error)
 	lookupTask(ctx context.Context, code string) (*managedRechargeLookupResponse, error)
 	submitReplacementSession(ctx context.Context, code, session string) (*managedRechargeReplacementSessionResponse, error)
+}
+
+type managedRechargeSessionValidationResponse struct {
+	Valid        bool                                   `json:"valid"`
+	Email        string                                 `json:"email"`
+	Detail       string                                 `json:"detail"`
+	Subscription *managedRechargeSubscriptionValidation `json:"subscription"`
+}
+
+type managedRechargeSubscriptionValidation struct {
+	PlanType              string `json:"plan_type"`
+	SubscriptionPlan      string `json:"subscription_plan"`
+	HasActiveSubscription bool   `json:"has_active_subscription"`
 }
 
 type managedRechargeUpstreamHTTPError struct {
@@ -91,6 +105,15 @@ func newManagedRechargeUpstreamClient() *managedRechargeUpstreamClient {
 			},
 		},
 	}
+}
+
+func (c *managedRechargeUpstreamClient) validateSession(ctx context.Context, session string) (*managedRechargeSessionValidationResponse, error) {
+	var result managedRechargeSessionValidationResponse
+	err := c.doJSON(ctx, http.MethodPost, "/api/v1/session/validate", map[string]string{
+		"platform": "chatgpt",
+		"token":    session,
+	}, &result)
+	return &result, err
 }
 
 func (c *managedRechargeUpstreamClient) verifyCDK(ctx context.Context, code string) (*managedRechargeVerifyResponse, error) {

@@ -23,6 +23,14 @@ export interface ManagedRechargeCatalog {
   mock_step_seconds?: number
 }
 
+export type ManagedRechargeMembership = 'free' | 'plus' | 'pro' | 'unknown'
+
+export interface ManagedRechargeSessionValidation {
+  valid: boolean
+  email?: string
+  membership: ManagedRechargeMembership
+}
+
 export interface ManagedRechargeOrder {
   id: number
   order_no: string
@@ -88,6 +96,17 @@ export interface ManagedRechargeProductInput {
 
 export async function getManagedRechargeCatalog(): Promise<ManagedRechargeCatalog> {
   const { data } = await apiClient.get<ManagedRechargeCatalog>('/managed-recharge/catalog')
+  return data
+}
+
+export async function validateManagedRechargeSession(
+  sessionJson: string,
+): Promise<ManagedRechargeSessionValidation> {
+  const { data } = await apiClient.post<ManagedRechargeSessionValidation>(
+    '/managed-recharge/session/validate',
+    { session_json: sessionJson },
+    { timeout: 45000 },
+  )
   return data
 }
 

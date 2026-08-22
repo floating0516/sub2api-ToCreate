@@ -86,6 +86,19 @@ func TestManagedRechargeMockSuccessProgression(t *testing.T) {
 	assertManagedRechargeMockLookup(t, upstream, code, "completed", "completed")
 }
 
+func TestManagedRechargeMockSessionValidation(t *testing.T) {
+	upstream := newManagedRechargeMockUpstream(10 * time.Second)
+	result, err := upstream.validateSession(context.Background(), managedRechargeMockSessionForTest())
+	if err != nil || !result.Valid || result.Email != managedRechargeMockSessionEmail {
+		t.Fatalf("validate mock Session result=%+v err=%v", result, err)
+	}
+
+	result, err = upstream.validateSession(context.Background(), `{"user":{"email":"real@example.com"},"accessToken":"real-token"}`)
+	if err != nil || result.Valid {
+		t.Fatalf("mock provider accepted real Session result=%+v err=%v", result, err)
+	}
+}
+
 func TestManagedRechargeMockFailureTriggersDefinitiveFailure(t *testing.T) {
 	upstream, advance := newManagedRechargeMockUpstreamForTest(t)
 	ctx := context.Background()

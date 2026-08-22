@@ -100,6 +100,12 @@ type ManagedRechargeCatalog struct {
 	MockStepSeconds int                      `json:"mock_step_seconds,omitempty"`
 }
 
+type ManagedRechargeSessionValidation struct {
+	Valid      bool   `json:"valid"`
+	Email      string `json:"email,omitempty"`
+	Membership string `json:"membership"`
+}
+
 type ManagedRechargeCDK struct {
 	ID              int64      `json:"id"`
 	ProductID       int64      `json:"product_id"`
@@ -233,6 +239,38 @@ func (s *ManagedRechargeService) ListProducts(ctx context.Context) ([]ManagedRec
 		return nil, err
 	}
 	return s.listProducts(ctx, false)
+}
+
+func (s *ManagedRechargeService) ValidateSession(ctx context.Context, raw string) (*ManagedRechargeSessionValidation, error) {
+	if err := s.requireReady(); err != nil {
+		return nil, err
+	}
+	session := strings.TrimSpace(raw)
+	if session == "" || len(session) > managedRechargeSessionMaxBytes {
+		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "invalid Session payload")
+	}
+	localEmail, err := parseManagedRechargeSession(session)
+	if err != nil {
+		return nil, err
+	}
+
+	validated, err := s.upstream.validateSession(ctx, session)
+	if err != nil {
+		return nil, infraerrors.New(http.StatusBadGateway, "MANAGED_RECHARGE_SESSION_VALIDATION_UNAVAILABLE", "Session validation is temporarily unavailable")
+	}
+	if !validated.Valid {
+		return &ManagedRechargeSessionValidation{Valid: false, Membership: "unknown"}, nil
+	}
+
+	email := strings.TrimSpace(validated.Email)
+	if email == "" {
+		email = localEmail
+	}
+	return &ManagedRechargeSessionValidation{
+		Valid:      true,
+		Email:      email,
+		Membership: managedRechargeMembership(validated.Subscription),
+	}, nil
 }
 
 func (s *ManagedRechargeService) listProducts(ctx context.Context, activeOnly bool) ([]ManagedRechargeProduct, error) {
@@ -1481,6 +1519,23 @@ func normalizeManagedRechargePlanType(value string) string {
 	default:
 		return ""
 	}
+}
+
+func managedRechargeMembership(subscription *managedRechargeSubscriptionValidation) string {
+	if subscription == nil || !subscription.HasActiveSubscription {
+		return "free"
+	}
+	for _, value := range []string{subscription.PlanType, subscription.SubscriptionPlan} {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		normalized = strings.NewReplacer("_", "", "-", "", " ", "").Replace(normalized)
+		if strings.Contains(normalized, "pro") {
+			return "pro"
+		}
+		if strings.Contains(normalized, "plus") {
+			return "plus"
+		}
+	}
+	return "unknown"
 }
 
 func normalizeManagedRechargeAcceptedStatus(status string) string {

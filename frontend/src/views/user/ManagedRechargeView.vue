@@ -131,74 +131,63 @@
             <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">2</span>
               <div>
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">提交目标账号 Session</h2>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">粘贴后会自动识别账号，确认无误再支付</p>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">提交 Session</h2>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">自动验证目标账号与当前订阅</p>
               </div>
             </div>
 
-            <div class="space-y-4 p-5">
-              <details
+            <div class="space-y-5 p-5">
+              <div
                 data-testid="managed-recharge-session-guide"
-                class="group rounded-lg border border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-700/40"
+                class="border-l-2 border-primary-500 pl-4 text-sm text-gray-600 dark:text-dark-300"
               >
-                <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                  <Icon name="book" size="sm" class="shrink-0 text-primary-600 dark:text-primary-400" />
-                  <span class="min-w-0 flex-1">{{ catalog?.mock_mode ? '真实流程：查看 Session 获取教程' : '第一次使用？查看详细获取教程' }}</span>
-                  <Icon name="chevronDown" size="sm" class="shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
-                </summary>
-                <div class="border-t border-gray-200 px-4 py-4 dark:border-dark-600">
-                  <ol class="space-y-4 text-sm text-gray-600 dark:text-dark-300">
-                    <li v-for="(item, index) in sessionGuideSteps" :key="item.title" class="flex gap-3">
-                      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-gray-700 shadow-sm dark:bg-dark-800 dark:text-dark-200">
-                        {{ index + 1 }}
-                      </span>
-                      <span>
-                        <span class="block font-medium text-gray-900 dark:text-white">{{ item.title }}</span>
-                        <span class="mt-1 block text-xs leading-5">{{ item.description }}</span>
-                      </span>
-                    </li>
-                  </ol>
+                <p class="font-medium text-gray-900 dark:text-white">如何获取 Session？</p>
+                <p class="mt-1 leading-6">
+                  登录 ChatGPT 后，在浏览器打开
                   <a
                     href="https://chatgpt.com/api/auth/session"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="btn btn-secondary btn-sm mt-4"
-                  >
-                    <Icon name="externalLink" size="sm" class="mr-2" />
-                    打开 Session 页面
-                  </a>
-                  <p class="mt-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
-                    如果页面显示未登录或内容为空，请先登录需要订阅的 ChatGPT 账号，再刷新 Session 页面。
-                  </p>
-                </div>
-              </details>
-
-              <div v-if="catalog?.mock_mode" class="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200">
-                <Icon name="beaker" size="md" class="mt-0.5 shrink-0" />
-                <span>点击页面上方“填入模拟 Session”，即可体验账号识别、余额扣款和订单进度。</span>
+                    class="font-medium text-primary-600 underline decoration-primary-300 underline-offset-2 dark:text-primary-400"
+                  >https://chatgpt.com/api/auth/session</a>，将页面返回的完整 JSON 全部复制并粘贴到下方输入框。
+                </p>
               </div>
 
               <div>
-                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <label for="managed-recharge-session" class="input-label mb-0">Session JSON</label>
-                  <span class="text-xs text-gray-500 dark:text-dark-400">粘贴时不会自动支付</span>
-                </div>
+                <label for="managed-recharge-session" class="input-label">Session JSON</label>
                 <textarea
                   id="managed-recharge-session"
                   v-model="sessionJson"
                   data-testid="managed-recharge-session-input"
-                  class="input min-h-40 resize-y font-mono text-xs leading-5"
+                  class="input min-h-36 resize-y font-mono text-xs leading-5"
                   autocomplete="off"
                   spellcheck="false"
-                  :placeholder="catalog?.mock_mode ? '点击上方按钮填入模拟 Session' : '粘贴从 { 开始到 } 结束的完整 Session JSON'"
-                  @input="validateSession"
+                  :placeholder="catalog?.mock_mode ? '点击上方按钮填入模拟 Session' : '粘贴完整的 Session JSON'"
+                  @input="scheduleSessionValidation"
                 />
-                <div v-if="sessionEmail" class="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900/60 dark:bg-green-950/20 dark:text-green-300">
-                  <Icon name="checkCircle" size="sm" class="mt-0.5 shrink-0" />
-                  <span class="min-w-0">
-                    <span class="block text-xs">已识别目标账号</span>
-                    <span class="mt-0.5 block break-all font-medium">{{ sessionEmail }}</span>
-                  </span>
+                <div v-if="sessionValidationState === 'checking'" class="mt-3 flex items-center gap-2 text-sm text-gray-500 dark:text-dark-400">
+                  <Icon name="refresh" size="sm" class="animate-spin" />
+                  <span>正在验证 Session</span>
+                </div>
+                <div
+                  v-else-if="sessionValidationState === 'valid'"
+                  data-testid="managed-recharge-session-result"
+                  class="mt-3 border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/60 dark:bg-green-950/20"
+                >
+                  <div class="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-300">
+                    <Icon name="checkCircle" size="sm" />
+                    <span>Session 格式有效</span>
+                  </div>
+                  <dl class="mt-3 grid gap-2 border-t border-green-200/80 pt-3 text-sm dark:border-green-900/60">
+                    <div class="flex items-start justify-between gap-4">
+                      <dt class="text-gray-500 dark:text-dark-400">账号邮箱</dt>
+                      <dd class="min-w-0 break-all text-right font-medium text-gray-900 dark:text-white">{{ sessionEmail }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                      <dt class="text-gray-500 dark:text-dark-400">当前订阅</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white">{{ sessionMembershipLabel }}</dd>
+                    </div>
+                  </dl>
                 </div>
                 <p v-else-if="sessionError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ sessionError }}</p>
               </div>
@@ -268,10 +257,6 @@
               </p>
             </div>
 
-            <div class="flex gap-3 border-t border-gray-200 bg-gray-50 px-5 py-4 text-xs leading-5 text-gray-600 dark:border-dark-700 dark:bg-dark-900/40 dark:text-dark-300">
-              <Icon name="shield" size="md" class="mt-0.5 shrink-0 text-green-600 dark:text-green-400" />
-              <span>请勿把 Session 发送到聊天群、工单截图或其他网站。提交后请保持目标账号登录，直到订单完成。</span>
-            </div>
           </section>
         </aside>
       </form>
@@ -373,7 +358,9 @@ import {
   getManagedRechargeOrder,
   listManagedRechargeOrders,
   submitManagedRechargeReplacementSession,
+  validateManagedRechargeSession,
   type ManagedRechargeCatalog,
+  type ManagedRechargeMembership,
   type ManagedRechargeOrder,
 } from '@/api/managedRecharge'
 
@@ -383,6 +370,8 @@ const catalog = ref<ManagedRechargeCatalog | null>(null)
 const selectedProductId = ref<number | null>(null)
 const sessionJson = ref('')
 const sessionEmail = ref('')
+const sessionMembership = ref<ManagedRechargeMembership>('unknown')
+const sessionValidationState = ref<'idle' | 'checking' | 'valid' | 'invalid' | 'error'>('idle')
 const sessionError = ref('')
 const agreed = ref(false)
 const loading = ref(true)
@@ -395,6 +384,8 @@ const replacementSession = ref('')
 const replacementError = ref('')
 const replacementSubmitting = ref(false)
 let pollTimer: number | null = null
+let sessionValidationTimer: number | null = null
+let sessionValidationRequestID = 0
 const mockSessionExample = JSON.stringify({
   user: { email: 'mock@example.com' },
   accessToken: 'mock-access-token',
@@ -404,30 +395,13 @@ const purchaseSteps = [
   { title: '提交账号', description: '粘贴 Session JSON' },
   { title: '确认支付', description: '余额支付并跟踪进度' },
 ]
-const sessionGuideSteps = [
-  {
-    title: '登录目标 ChatGPT 账号',
-    description: '请在当前浏览器中登录真正需要开通 Plus 或 Pro 的账号，并确认右上角账号信息无误。',
-  },
-  {
-    title: '打开 Session 页面',
-    description: '点击下方按钮，新标签页会显示一段 JSON。如果显示未登录，请先完成 ChatGPT 登录后刷新。',
-  },
-  {
-    title: '复制完整 JSON',
-    description: '全选并复制从 { 开始到 } 结束的全部内容，不要只复制 accessToken，也不要上传截图。',
-  },
-  {
-    title: '粘贴并核对账号',
-    description: '返回本页粘贴 JSON，页面识别出的邮箱必须与需要订阅的账号一致。',
-  },
-  {
-    title: '支付后保持登录',
-    description: '订单处理期间不要退出该 ChatGPT 账号；如状态提示需要新 Session，请按相同步骤重新获取并补交。',
-  },
-]
-
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
+const sessionMembershipLabel = computed(() => ({
+  free: 'Free',
+  plus: 'Plus',
+  pro: 'Pro',
+  unknown: '暂未识别',
+})[sessionMembership.value])
 const requestedPlan = computed(() => normalizeManagedRechargePlanKey(route.query.plan))
 const requestedPlanLabel = computed(() => ({
   plus: 'Plus',
@@ -451,6 +425,7 @@ const canSubmit = computed(() => Boolean(
   selectedProduct.value &&
   selectedProduct.value.available_stock > 0 &&
   sessionEmail.value &&
+  sessionValidationState.value === 'valid' &&
   agreed.value &&
   hasEnoughBalance.value,
 ))
@@ -472,29 +447,64 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString()
 }
 
-function validateSession(): void {
+function resetSessionValidation(): void {
+  if (sessionValidationTimer !== null) {
+    window.clearTimeout(sessionValidationTimer)
+    sessionValidationTimer = null
+  }
+  sessionValidationRequestID += 1
   sessionEmail.value = ''
+  sessionMembership.value = 'unknown'
+  sessionValidationState.value = 'idle'
   sessionError.value = ''
+}
+
+function scheduleSessionValidation(): void {
+  resetSessionValidation()
   const value = sessionJson.value.trim()
   if (!value) return
-  const otpMatch = value.match(/^(.+?)----https?:\/\/.+$/)
-  if (otpMatch?.[1]?.includes('@')) {
-    sessionEmail.value = otpMatch[1].trim()
-    return
-  }
+
+  let localEmail = ''
   try {
     const parsed = JSON.parse(value)
-    const email = String(parsed?.user?.email || parsed?.user?.name || '').trim()
-    if (!parsed?.accessToken || !email) throw new Error('invalid')
-    sessionEmail.value = email
+    localEmail = String(parsed?.user?.email || '').trim()
+    if (!parsed?.accessToken || !localEmail) throw new Error('invalid')
   } catch {
     sessionError.value = 'Session JSON 格式不完整'
+    sessionValidationState.value = 'invalid'
+    return
+  }
+
+  sessionValidationState.value = 'checking'
+  const requestID = sessionValidationRequestID
+  sessionValidationTimer = window.setTimeout(() => {
+    sessionValidationTimer = null
+    void runSessionValidation(value, localEmail, requestID)
+  }, 500)
+}
+
+async function runSessionValidation(value: string, localEmail: string, requestID: number): Promise<void> {
+  try {
+    const result = await validateManagedRechargeSession(value)
+    if (requestID !== sessionValidationRequestID || value !== sessionJson.value.trim()) return
+    if (!result.valid) {
+      sessionValidationState.value = 'invalid'
+      sessionError.value = 'Session 无效或已过期'
+      return
+    }
+    sessionEmail.value = result.email?.trim() || localEmail
+    sessionMembership.value = result.membership || 'unknown'
+    sessionValidationState.value = 'valid'
+  } catch {
+    if (requestID !== sessionValidationRequestID || value !== sessionJson.value.trim()) return
+    sessionValidationState.value = 'error'
+    sessionError.value = '暂时无法验证 Session，请稍后重试'
   }
 }
 
 function fillMockSession(): void {
   sessionJson.value = mockSessionExample
-  validateSession()
+  scheduleSessionValidation()
 }
 
 async function loadCatalog(): Promise<void> {
@@ -531,7 +541,7 @@ async function submitOrder(): Promise<void> {
     const order = await createManagedRechargeOrder(selectedProduct.value.id, sessionJson.value, newIdempotencyKey())
     orders.value = [order, ...orders.value.filter((item) => item.id !== order.id)]
     sessionJson.value = ''
-    sessionEmail.value = ''
+    resetSessionValidation()
     agreed.value = false
     await loadCatalog()
   } catch (error) {
@@ -617,5 +627,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (pollTimer !== null) window.clearInterval(pollTimer)
+  if (sessionValidationTimer !== null) window.clearTimeout(sessionValidationTimer)
+  sessionValidationRequestID += 1
 })
 </script>

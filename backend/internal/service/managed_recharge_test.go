@@ -24,9 +24,17 @@ func (managedRechargeTestEncryptor) BlindIndex(plaintext string) string {
 }
 
 type managedRechargeVerifyOnlyUpstream struct {
-	verifyCalls  int
-	createCalls  int
-	confirmCalls int
+	verifyCalls       int
+	createCalls       int
+	confirmCalls      int
+	sessionValidation *managedRechargeSessionValidationResponse
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) validateSession(_ context.Context, _ string) (*managedRechargeSessionValidationResponse, error) {
+	if u.sessionValidation != nil {
+		return u.sessionValidation, nil
+	}
+	return &managedRechargeSessionValidationResponse{Valid: true, Email: "verified@example.com"}, nil
 }
 
 func (u *managedRechargeVerifyOnlyUpstream) verifyCDK(_ context.Context, _ string) (*managedRechargeVerifyResponse, error) {
@@ -65,6 +73,59 @@ func TestNormalizeManagedRechargePlanType(t *testing.T) {
 		if actual := normalizeManagedRechargePlanType(input); actual != expected {
 			t.Fatalf("normalizeManagedRechargePlanType(%q) = %q, want %q", input, actual, expected)
 		}
+	}
+}
+
+func TestManagedRechargeMembership(t *testing.T) {
+	tests := []struct {
+		name         string
+		subscription *managedRechargeSubscriptionValidation
+		expected     string
+	}{
+		{name: "missing", expected: "free"},
+		{name: "inactive", subscription: &managedRechargeSubscriptionValidation{PlanType: "plus"}, expected: "free"},
+		{name: "plus", subscription: &managedRechargeSubscriptionValidation{PlanType: "chatgpt_plus", HasActiveSubscription: true}, expected: "plus"},
+		{name: "pro 5x", subscription: &managedRechargeSubscriptionValidation{SubscriptionPlan: "ChatGPT Pro 5X", HasActiveSubscription: true}, expected: "pro"},
+		{name: "unknown active", subscription: &managedRechargeSubscriptionValidation{PlanType: "team", HasActiveSubscription: true}, expected: "unknown"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if actual := managedRechargeMembership(test.subscription); actual != test.expected {
+				t.Fatalf("managedRechargeMembership() = %q, want %q", actual, test.expected)
+			}
+		})
+	}
+}
+
+func TestManagedRechargeValidateSessionReturnsVerifiedAccountAndMembership(t *testing.T) {
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	upstream := &managedRechargeVerifyOnlyUpstream{
+		sessionValidation: &managedRechargeSessionValidationResponse{
+			Valid: true,
+			Email: "verified@example.com",
+			Subscription: &managedRechargeSubscriptionValidation{
+				PlanType:              "chatgpt_plus",
+				HasActiveSubscription: true,
+			},
+		},
+	}
+	service := &ManagedRechargeService{
+		db:           db,
+		encryptor:    managedRechargeTestEncryptor{},
+		upstream:     upstream,
+		featureReady: true,
+	}
+	result, err := service.ValidateSession(context.Background(), `{"user":{"email":"local@example.com"},"accessToken":"test-token"}`)
+	if err != nil {
+		t.Fatalf("validate Session: %v", err)
+	}
+	if !result.Valid || result.Email != "verified@example.com" || result.Membership != "plus" {
+		t.Fatalf("unexpected validation result: %+v", result)
 	}
 }
 

@@ -32,6 +32,10 @@ type managedRechargeCreateOrderRequest struct {
 	SessionJSON string `json:"session_json" binding:"required"`
 }
 
+type managedRechargeValidateSessionRequest struct {
+	SessionJSON string `json:"session_json" binding:"required"`
+}
+
 type managedRechargeReplacementSessionRequest struct {
 	SessionJSON string `json:"session_json" binding:"required"`
 }
@@ -56,6 +60,21 @@ func (h *ManagedRechargeHandler) Catalog(c *gin.Context) {
 		return
 	}
 	result, err := h.service.GetCatalog(c.Request.Context(), userID)
+	if response.ErrorFrom(c, err) {
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *ManagedRechargeHandler) ValidateSession(c *gin.Context) {
+	if _, ok := managedRechargeUserID(c); !ok {
+		return
+	}
+	var req managedRechargeValidateSessionRequest
+	if !managedRechargeBindJSON(c, &req, managedRechargeSessionBodyMaxBytes, "Invalid Session request") {
+		return
+	}
+	result, err := h.service.ValidateSession(c.Request.Context(), req.SessionJSON)
 	if response.ErrorFrom(c, err) {
 		return
 	}
