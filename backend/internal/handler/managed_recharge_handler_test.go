@@ -62,6 +62,24 @@ func TestManagedRechargeUserProgressMapsProviderStepsWithoutLeakingRawPayload(t 
 	}
 }
 
+func TestManagedRechargeUserOrderStatusNeverReturnsCDK(t *testing.T) {
+	order := managedRechargeUserOrderStatus(&service.ManagedRechargeOrder{
+		RedemptionCode: "USER-OWNED-CDK",
+		RedemptionURL:  "https://redeem.example.test/recharge?cdk=USER-OWNED-CDK",
+		Status:         service.ManagedRechargeStatusIssued,
+	})
+	payload, err := json.Marshal(order)
+	if err != nil {
+		t.Fatalf("marshal managed recharge status order: %v", err)
+	}
+	encoded := string(payload)
+	for _, forbidden := range []string{"redemption_code", "redemption_url", "USER-OWNED-CDK", "redeem.example.test"} {
+		if strings.Contains(encoded, forbidden) {
+			t.Fatalf("managed recharge status response leaked %q: %s", forbidden, encoded)
+		}
+	}
+}
+
 func TestManagedRechargeBindJSONRejectsOversizedSessionBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

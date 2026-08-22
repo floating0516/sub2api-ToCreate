@@ -143,7 +143,7 @@ func (h *ManagedRechargeHandler) GetOrderStatus(c *gin.Context) {
 	if response.ErrorFrom(c, err) {
 		return
 	}
-	response.Success(c, managedRechargeUserOrder(order))
+	response.Success(c, managedRechargeUserOrderStatus(order))
 }
 
 func (h *ManagedRechargeHandler) SubmitReplacementSession(c *gin.Context) {
@@ -373,6 +373,16 @@ func managedRechargeUserOrder(order *service.ManagedRechargeOrder) *service.Mana
 	result.UserEmail = ""
 	result.Username = ""
 	return &result
+}
+
+func managedRechargeUserOrderStatus(order *service.ManagedRechargeOrder) *service.ManagedRechargeOrder {
+	result := managedRechargeUserOrder(order)
+	if result == nil {
+		return nil
+	}
+	result.RedemptionCode = ""
+	result.RedemptionURL = ""
+	return result
 }
 
 func managedRechargeUserProgress(order *service.ManagedRechargeOrder) string {
