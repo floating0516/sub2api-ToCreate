@@ -66,14 +66,15 @@ type ManagedRechargeSecretProtector interface {
 }
 
 type ManagedRechargeService struct {
-	db           *sql.DB
-	encryptor    ManagedRechargeSecretProtector
-	balanceCache managedRechargeBalanceCache
-	authCache    APIKeyAuthCacheInvalidator
-	upstream     managedRechargeUpstream
-	mockMode     bool
-	mockStepSecs int
-	featureReady bool
+	db               *sql.DB
+	encryptor        ManagedRechargeSecretProtector
+	balanceCache     managedRechargeBalanceCache
+	authCache        APIKeyAuthCacheInvalidator
+	upstream         managedRechargeUpstream
+	mockMode         bool
+	mockStepSecs     int
+	featureReady     bool
+	fulfillmentReady bool
 }
 
 type ManagedRechargeProduct struct {
@@ -185,18 +186,24 @@ func NewManagedRechargeService(
 	authCache APIKeyAuthCacheInvalidator,
 ) *ManagedRechargeService {
 	upstream, mockMode, mockStepSecs, upstreamErr := newManagedRechargeUpstreamFromEnvironment()
+	fulfillmentEnabled, fulfillmentErr := managedRechargeFulfillmentEnabledFromEnvironment(mockMode)
+	if upstreamErr == nil && fulfillmentErr != nil {
+		upstreamErr = fulfillmentErr
+	}
 	if upstreamErr != nil {
 		log.Printf("Warning: managed recharge provider is unavailable: %v", upstreamErr)
 	}
+	featureReady := db != nil && encryptor != nil && upstreamErr == nil
 	return &ManagedRechargeService{
-		db:           db,
-		encryptor:    encryptor,
-		balanceCache: balanceCache,
-		authCache:    authCache,
-		upstream:     upstream,
-		mockMode:     mockMode,
-		mockStepSecs: mockStepSecs,
-		featureReady: db != nil && encryptor != nil && upstreamErr == nil,
+		db:               db,
+		encryptor:        encryptor,
+		balanceCache:     balanceCache,
+		authCache:        authCache,
+		upstream:         upstream,
+		mockMode:         mockMode,
+		mockStepSecs:     mockStepSecs,
+		featureReady:     featureReady,
+		fulfillmentReady: featureReady && fulfillmentEnabled,
 	}
 }
 
@@ -213,7 +220,7 @@ func (s *ManagedRechargeService) GetCatalog(ctx context.Context, userID int64) (
 		return nil, err
 	}
 	return &ManagedRechargeCatalog{
-		Enabled:         s.featureReady && len(products) > 0,
+		Enabled:         s.fulfillmentReady && len(products) > 0,
 		Balance:         balance,
 		Products:        products,
 		MockMode:        s.mockMode,
@@ -528,7 +535,7 @@ func (s *ManagedRechargeService) MoveCDK(ctx context.Context, id, productID int6
 }
 
 func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, input ManagedRechargeCreateOrderInput) (*ManagedRechargeOrder, error) {
-	if err := s.requireReady(); err != nil {
+	if err := s.requireFulfillmentReady(); err != nil {
 		return nil, err
 	}
 	input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
@@ -763,7 +770,7 @@ func (s *ManagedRechargeService) listOrders(ctx context.Context, where string, a
 }
 
 func (s *ManagedRechargeService) SubmitReplacementSession(ctx context.Context, userID, orderID int64, session string) (*ManagedRechargeOrder, error) {
-	if err := s.requireReady(); err != nil {
+	if err := s.requireFulfillmentReady(); err != nil {
 		return nil, err
 	}
 	session = strings.TrimSpace(session)
@@ -1406,6 +1413,16 @@ func appendManagedRechargeEventTx(ctx context.Context, execer managedRechargeExe
 
 func (s *ManagedRechargeService) requireReady() error {
 	if s == nil || !s.featureReady || s.db == nil || s.encryptor == nil || s.upstream == nil {
+		return ErrManagedRechargeUnavailable
+	}
+	return nil
+}
+
+func (s *ManagedRechargeService) requireFulfillmentReady() error {
+	if err := s.requireReady(); err != nil {
+		return err
+	}
+	if !s.fulfillmentReady {
 		return ErrManagedRechargeUnavailable
 	}
 	return nil

@@ -260,11 +260,12 @@ func TestManagedRechargeMockModeRejectsNonTestSessionBeforeCreatingOrder(t *test
 	defer func() { _ = db.Close() }()
 
 	service := &ManagedRechargeService{
-		db:           db,
-		encryptor:    managedRechargeTestEncryptor{},
-		upstream:     newManagedRechargeMockUpstream(10 * time.Second),
-		mockMode:     true,
-		featureReady: true,
+		db:               db,
+		encryptor:        managedRechargeTestEncryptor{},
+		upstream:         newManagedRechargeMockUpstream(10 * time.Second),
+		mockMode:         true,
+		featureReady:     true,
+		fulfillmentReady: true,
 	}
 	_, err = service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
 		ProductID:      1,
@@ -276,5 +277,31 @@ func TestManagedRechargeMockModeRejectsNonTestSessionBeforeCreatingOrder(t *test
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("mock Session guard touched the database: %v", err)
+	}
+}
+
+func TestManagedRechargeRealVerificationOnlyModeRejectsOrdersBeforeDatabaseUse(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{
+		db:           db,
+		encryptor:    managedRechargeTestEncryptor{},
+		upstream:     &managedRechargeVerifyOnlyUpstream{},
+		featureReady: true,
+	}
+	_, err = service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+		ProductID:      1,
+		Session:        `{"user":{"email":"test@example.com"},"accessToken":"token"}`,
+		IdempotencyKey: "verification-only-guard",
+	})
+	if infraerrors.Reason(err) != ErrManagedRechargeUnavailable.Reason {
+		t.Fatalf("verification-only order error reason = %q, want %q", infraerrors.Reason(err), ErrManagedRechargeUnavailable.Reason)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("verification-only order touched the database: %v", err)
 	}
 }

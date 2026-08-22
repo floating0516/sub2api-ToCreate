@@ -33,6 +33,32 @@ func TestManagedRechargeMockProviderUsesConfiguredStep(t *testing.T) {
 	}
 }
 
+func TestManagedRechargeRealFulfillmentDefaultsDisabled(t *testing.T) {
+	t.Setenv(managedRechargeProviderModeEnv, "real")
+	t.Setenv(managedRechargeRealFulfillmentEnv, "")
+
+	enabled, err := managedRechargeFulfillmentEnabledFromEnvironment(false)
+	if err != nil {
+		t.Fatalf("read real fulfillment default: %v", err)
+	}
+	if enabled {
+		t.Fatal("real fulfillment was enabled without explicit opt-in")
+	}
+}
+
+func TestManagedRechargeRealFulfillmentRequiresExplicitTrue(t *testing.T) {
+	t.Setenv(managedRechargeProviderModeEnv, "real")
+	t.Setenv(managedRechargeRealFulfillmentEnv, "true")
+
+	enabled, err := managedRechargeFulfillmentEnabledFromEnvironment(false)
+	if err != nil {
+		t.Fatalf("read real fulfillment opt-in: %v", err)
+	}
+	if !enabled {
+		t.Fatal("explicit real fulfillment opt-in was ignored")
+	}
+}
+
 func TestManagedRechargeMockSuccessProgression(t *testing.T) {
 	upstream, advance := newManagedRechargeMockUpstreamForTest(t)
 	ctx := context.Background()

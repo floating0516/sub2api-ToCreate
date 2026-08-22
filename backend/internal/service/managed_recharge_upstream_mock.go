@@ -16,6 +16,7 @@ const (
 	managedRechargeProviderModeEnv        = "MANAGED_RECHARGE_PROVIDER_MODE"
 	managedRechargeEnvironmentEnv         = "MANAGED_RECHARGE_ENVIRONMENT"
 	managedRechargeMockStepSecondsEnv     = "MANAGED_RECHARGE_MOCK_STEP_SECONDS"
+	managedRechargeRealFulfillmentEnv     = "MANAGED_RECHARGE_REAL_FULFILLMENT_ENABLED"
 	managedRechargeMockEnvironment        = "staging"
 	managedRechargeDefaultMockStepSeconds = 10
 	managedRechargeMaxMockStepSeconds     = 300
@@ -40,6 +41,22 @@ type managedRechargeMockTask struct {
 	scenario               managedRechargeMockScenario
 	createdAt              time.Time
 	replacementSubmittedAt time.Time
+}
+
+func managedRechargeFulfillmentEnabledFromEnvironment(mockMode bool) (bool, error) {
+	if mockMode {
+		return true, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(managedRechargeRealFulfillmentEnv))) {
+	case "":
+		return false, nil
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true or false", managedRechargeRealFulfillmentEnv)
+	}
 }
 
 type managedRechargeMockUpstream struct {
