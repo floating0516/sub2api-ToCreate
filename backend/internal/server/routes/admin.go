@@ -74,7 +74,7 @@ func RegisterAdminRoutes(
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, h)
 
-		registerManagedRechargeRoutes(admin, managedRecharge)
+		registerManagedRechargeRoutes(admin, managedRecharge, stepUpAuth)
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
@@ -133,22 +133,24 @@ func RegisterAdminRoutes(
 	}
 }
 
-func registerManagedRechargeRoutes(admin *gin.RouterGroup, h *handler.ManagedRechargeHandler) {
+func registerManagedRechargeRoutes(admin *gin.RouterGroup, h *handler.ManagedRechargeHandler, stepUpAuth middleware.StepUpAuthMiddleware) {
 	if h == nil {
 		return
 	}
 	managed := admin.Group("/managed-recharge")
+	sensitive := middleware.AlwaysRequireStepUp(stepUpAuth)
 	{
 		managed.GET("/products", h.AdminListProducts)
-		managed.POST("/products", h.AdminCreateProduct)
-		managed.PUT("/products/:id", h.AdminUpdateProduct)
+		managed.POST("/products", sensitive, h.AdminCreateProduct)
+		managed.PUT("/products/:id", sensitive, h.AdminUpdateProduct)
 		managed.GET("/cdks", h.AdminListCDKs)
-		managed.POST("/cdks/import", h.AdminImportCDKs)
-		managed.PUT("/cdks/:id/status", h.AdminSetCDKStatus)
-		managed.PUT("/cdks/:id/product", h.AdminMoveCDK)
+		managed.POST("/cdks/import", sensitive, h.AdminImportCDKs)
+		managed.POST("/cdks/:id/verify", sensitive, h.AdminVerifyCDK)
+		managed.PUT("/cdks/:id/status", sensitive, h.AdminSetCDKStatus)
+		managed.PUT("/cdks/:id/product", sensitive, h.AdminMoveCDK)
 		managed.GET("/orders", h.AdminListOrders)
-		managed.POST("/orders/:id/sync", h.AdminSyncOrder)
-		managed.POST("/orders/:id/refund", h.AdminRefundOrder)
+		managed.POST("/orders/:id/sync", sensitive, h.AdminSyncOrder)
+		managed.POST("/orders/:id/refund", sensitive, h.AdminRefundOrder)
 	}
 }
 

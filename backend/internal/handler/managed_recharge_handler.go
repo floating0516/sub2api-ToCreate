@@ -200,6 +200,18 @@ func (h *ManagedRechargeHandler) AdminListCDKs(c *gin.Context) {
 	response.Success(c, items)
 }
 
+func (h *ManagedRechargeHandler) AdminVerifyCDK(c *gin.Context) {
+	cdkID, ok := managedRechargePathID(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.VerifyCDK(c.Request.Context(), cdkID)
+	if response.ErrorFrom(c, err) {
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *ManagedRechargeHandler) AdminSetCDKStatus(c *gin.Context) {
 	cdkID, ok := managedRechargePathID(c)
 	if !ok {

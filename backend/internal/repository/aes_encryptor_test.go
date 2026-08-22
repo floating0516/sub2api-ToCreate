@@ -119,6 +119,18 @@ func TestAESEncryptor_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestAESEncryptor_BlindIndexIsKeyedAndStable(t *testing.T) {
+	enc1, err := NewAESHexEncryptor(aesHexKey(32, 0x11))
+	require.NoError(t, err)
+	enc2, err := NewAESHexEncryptor(aesHexKey(32, 0x22))
+	require.NoError(t, err)
+
+	first := enc1.BlindIndex("CDK-EXAMPLE")
+	assert.Equal(t, first, enc1.BlindIndex("CDK-EXAMPLE"))
+	assert.NotEqual(t, first, enc2.BlindIndex("CDK-EXAMPLE"))
+	assert.Len(t, first, 64)
+}
+
 // ── IV/Nonce 随机性 ──────────────────────────────────────────────────────────
 
 func TestAESEncryptor_Encrypt_NonceRandomness(t *testing.T) {

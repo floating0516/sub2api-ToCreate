@@ -147,6 +147,7 @@ var auditActionOverrides = map[string]string{
 	"POST /api/v1/managed-recharge/orders":                    "managed_recharge.order.create",
 	"POST /api/v1/managed-recharge/orders/:id/session":        "managed_recharge.session.replace",
 	"POST /api/v1/admin/managed-recharge/cdks/import":         "admin.managed_recharge.cdks.import",
+	"POST /api/v1/admin/managed-recharge/cdks/:id/verify":     "admin.managed_recharge.cdk.verify",
 	"PUT /api/v1/admin/managed-recharge/cdks/:id/product":     "admin.managed_recharge.cdk.move",
 	"POST /api/v1/admin/managed-recharge/orders/:id/sync":     "admin.managed_recharge.order.sync",
 	"POST /api/v1/admin/managed-recharge/orders/:id/refund":   "admin.managed_recharge.order.refund",

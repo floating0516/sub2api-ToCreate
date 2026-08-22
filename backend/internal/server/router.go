@@ -138,15 +138,11 @@ func registerRoutes(
 		cfg,
 	)
 	installTokenHandler := handler.NewInstallTokenHandler(installTokenService)
-	var rechargeEncryptor service.SecretEncryptor
-	if cfg != nil && cfg.Totp.EncryptionKeyConfigured {
-		if encryptor, err := repository.NewAESEncryptor(cfg); err != nil {
-			log.Printf("Warning: managed recharge encryption is unavailable: %v", err)
-		} else {
-			rechargeEncryptor = encryptor
-		}
+	var rechargeEncryptor service.ManagedRechargeSecretProtector
+	if encryptor, err := newManagedRechargeSecretProtector(); err != nil {
+		log.Printf("Warning: managed recharge encryption is unavailable: %v", err)
 	} else {
-		log.Printf("Warning: managed recharge requires a configured persistent TOTP encryption key")
+		rechargeEncryptor = encryptor
 	}
 	var rechargeBalanceCache service.BillingCache
 	if redisClient != nil {

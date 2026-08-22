@@ -3,11 +3,14 @@ package repository
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -15,21 +18,40 @@ import (
 
 // AESEncryptor implements SecretEncryptor using AES-256-GCM
 type AESEncryptor struct {
-	key []byte
+	key           []byte
+	blindIndexKey []byte
 }
 
 // NewAESEncryptor creates a new AES encryptor
 func NewAESEncryptor(cfg *config.Config) (service.SecretEncryptor, error) {
-	key, err := hex.DecodeString(cfg.Totp.EncryptionKey)
+	encryptor, err := NewAESHexEncryptor(cfg.Totp.EncryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid totp encryption key: %w", err)
 	}
+	return encryptor, nil
+}
 
-	if len(key) != 32 {
-		return nil, fmt.Errorf("totp encryption key must be 32 bytes (64 hex chars), got %d bytes", len(key))
+// NewAESHexEncryptor creates an AES encryptor from a dedicated 32-byte hex key.
+func NewAESHexEncryptor(keyHex string) (*AESEncryptor, error) {
+	key, err := hex.DecodeString(strings.TrimSpace(keyHex))
+	if err != nil {
+		return nil, fmt.Errorf("invalid encryption key: %w", err)
 	}
 
-	return &AESEncryptor{key: key}, nil
+	if len(key) != 32 {
+		return nil, fmt.Errorf("encryption key must be 32 bytes (64 hex chars), got %d bytes", len(key))
+	}
+
+	deriver := hmac.New(sha256.New, key)
+	_, _ = deriver.Write([]byte("sub2api/managed-recharge/blind-index/v1"))
+	return &AESEncryptor{key: key, blindIndexKey: deriver.Sum(nil)}, nil
+}
+
+// BlindIndex returns a keyed, non-reversible index suitable for deduplication.
+func (e *AESEncryptor) BlindIndex(plaintext string) string {
+	mac := hmac.New(sha256.New, e.blindIndexKey)
+	_, _ = mac.Write([]byte(plaintext))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // Encrypt encrypts plaintext using AES-256-GCM

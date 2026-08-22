@@ -12,6 +12,8 @@ import (
 // StepUpAuthMiddleware 敏感操作 step-up 2FA 门控中间件类型。
 type StepUpAuthMiddleware gin.HandlerFunc
 
+const forceStepUpContextKey = "sub2api.force_step_up"
+
 // stepUpGrantChecker 抽象 TOTP step-up 授权检查能力（由 TotpService 实现）。
 type stepUpGrantChecker interface {
 	HasStepUpGrant(ctx context.Context, userID int64, sessionKey string) (bool, error)
@@ -51,6 +53,19 @@ func NewStepUpAuthMiddleware(
 	settingService *service.SettingService,
 ) StepUpAuthMiddleware {
 	return StepUpAuthMiddleware(stepUpAuth(totpService, userService, stepUpSettingsOrNil(settingService)))
+}
+
+// AlwaysRequireStepUp turns the configured step-up middleware into a fail-closed
+// route guard even when the global optional step-up setting is disabled.
+func AlwaysRequireStepUp(stepUp StepUpAuthMiddleware) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if stepUp == nil {
+			AbortWithError(c, 503, "STEP_UP_UNAVAILABLE", "Step-up verification service unavailable")
+			return
+		}
+		c.Set(forceStepUpContextKey, true)
+		gin.HandlerFunc(stepUp)(c)
+	}
 }
 
 // stepUpSettingsOrNil 将可能为 nil 的具体指针归一化为接口，
@@ -97,7 +112,7 @@ func EnforceStepUpAlways(
 func enforceStepUp(c *gin.Context, grantChecker stepUpGrantChecker, userReader stepUpUserReader, settings stepUpSettingReader) bool {
 	// 功能开关关闭时直接放行（含 admin API key），恢复门控引入前的行为。
 	// settings 为 nil 时保持门控（fail-closed）：正常装配不会出现 nil。
-	if settings != nil && !settings.IsStepUpEnabled(c.Request.Context()) {
+	if !c.GetBool(forceStepUpContextKey) && settings != nil && !settings.IsStepUpEnabled(c.Request.Context()) {
 		return true
 	}
 

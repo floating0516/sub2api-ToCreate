@@ -65,6 +65,17 @@ export interface ManagedRechargeCDK {
   updated_at: string
 }
 
+export interface ManagedRechargeCDKVerification {
+  id: number
+  valid: boolean
+  expected_plan_type: 'plus' | 'pro'
+  actual_plan_type?: 'plus' | 'pro'
+  plan_name?: string
+  processing_mode?: string
+  matches_product: boolean
+  verification_scope: 'verify_only'
+}
+
 export interface ManagedRechargeProductInput {
   slug: string
   plan_type: 'plus' | 'pro'
@@ -158,6 +169,15 @@ export async function adminListManagedRechargeCDKs(params: {
 
 export async function adminSetManagedRechargeCDKStatus(id: number, status: string): Promise<void> {
   await apiClient.put(`/admin/managed-recharge/cdks/${id}/status`, { status })
+}
+
+export async function adminVerifyManagedRechargeCDK(id: number): Promise<ManagedRechargeCDKVerification> {
+  const { data } = await apiClient.post<ManagedRechargeCDKVerification>(
+    `/admin/managed-recharge/cdks/${id}/verify`,
+    undefined,
+    { timeout: 60000 },
+  )
+  return data
 }
 
 export async function adminMoveManagedRechargeCDK(id: number, productId: number): Promise<void> {

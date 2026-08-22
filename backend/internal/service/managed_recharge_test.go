@@ -19,6 +19,39 @@ func (managedRechargeTestEncryptor) Decrypt(ciphertext string) (string, error) {
 	return ciphertext, nil
 }
 
+func (managedRechargeTestEncryptor) BlindIndex(plaintext string) string {
+	return plaintext
+}
+
+type managedRechargeVerifyOnlyUpstream struct {
+	verifyCalls  int
+	createCalls  int
+	confirmCalls int
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) verifyCDK(_ context.Context, _ string) (*managedRechargeVerifyResponse, error) {
+	u.verifyCalls++
+	return &managedRechargeVerifyResponse{Valid: true, PlanType: "plus", PlanName: "ChatGPT Plus", ProcessingMode: "auto"}, nil
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) createTask(_ context.Context, _, _ string) (*managedRechargeCreateResponse, error) {
+	u.createCalls++
+	return &managedRechargeCreateResponse{TaskID: "unexpected"}, nil
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) confirmTask(_ context.Context, _ string) (*managedRechargeConfirmResponse, error) {
+	u.confirmCalls++
+	return &managedRechargeConfirmResponse{Status: "queued"}, nil
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) lookupTask(_ context.Context, _ string) (*managedRechargeLookupResponse, error) {
+	return &managedRechargeLookupResponse{}, nil
+}
+
+func (u *managedRechargeVerifyOnlyUpstream) submitReplacementSession(_ context.Context, _, _ string) (*managedRechargeReplacementSessionResponse, error) {
+	return &managedRechargeReplacementSessionResponse{}, nil
+}
+
 func TestNormalizeManagedRechargePlanType(t *testing.T) {
 	tests := map[string]string{
 		"plus":         "plus",
@@ -121,6 +154,79 @@ func TestManagedRechargeMarkTaskCreatedRequiresPaidOrder(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("markTaskCreated SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeMarkTaskCreatedClearsStoredSession(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{db: db}
+	mock.ExpectExec("(?s)SET status = 'submitting'.*session_ciphertext = ''").
+		WithArgs(int64(18), "task-18").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := service.markTaskCreated(context.Background(), 18, "task-18"); err != nil {
+		t.Fatalf("mark task created: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("mark task created SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeManualReviewClearsStoredSession(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := &ManagedRechargeService{db: db}
+	mock.ExpectExec("(?s)SET status = 'manual_review'.*session_ciphertext = ''").
+		WithArgs(int64(19), "UNCERTAIN", "manual review").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := service.markManualReview(context.Background(), 19, "UNCERTAIN", "manual review"); err != nil {
+		t.Fatalf("mark manual review: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("manual review SQL expectations: %v", err)
+	}
+}
+
+func TestManagedRechargeVerifyCDKDoesNotCreateOrConfirmTask(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	upstream := &managedRechargeVerifyOnlyUpstream{}
+	service := &ManagedRechargeService{
+		db:           db,
+		encryptor:    managedRechargeTestEncryptor{},
+		upstream:     upstream,
+		featureReady: true,
+	}
+	mock.ExpectQuery("SELECT c.code_ciphertext, p.plan_type").
+		WithArgs(int64(17)).
+		WillReturnRows(sqlmock.NewRows([]string{"code_ciphertext", "plan_type"}).AddRow("CDK-SECRET", "plus"))
+
+	result, err := service.VerifyCDK(context.Background(), 17)
+	if err != nil {
+		t.Fatalf("verify CDK: %v", err)
+	}
+	if !result.Valid || !result.MatchesProduct || result.VerificationScope != "verify_only" {
+		t.Fatalf("unexpected verification result: %+v", result)
+	}
+	if upstream.verifyCalls != 1 || upstream.createCalls != 0 || upstream.confirmCalls != 0 {
+		t.Fatalf("unexpected upstream calls: verify=%d create=%d confirm=%d", upstream.verifyCalls, upstream.createCalls, upstream.confirmCalls)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("verify CDK SQL expectations: %v", err)
 	}
 }
 

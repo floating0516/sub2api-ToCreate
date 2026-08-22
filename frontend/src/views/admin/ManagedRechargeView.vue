@@ -136,25 +136,35 @@
                 <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{{ cdk.expires_at ? formatDate(cdk.expires_at) : '长期有效' }}</td>
                 <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{{ cdk.reserved_order_id || '-' }}</td>
                 <td class="px-4 py-3 text-right">
-                  <button
-                    v-if="cdk.status === 'available'"
-                    class="btn btn-secondary btn-sm"
-                    :disabled="workingCDKs.has(cdk.id)"
-                    title="停用"
-                    @click="setCDKStatus(cdk.id, 'disabled')"
-                  >
-                    <Icon name="ban" size="sm" />
-                  </button>
-                  <button
-                    v-else-if="cdk.status === 'disabled' || cdk.status === 'invalid'"
-                    class="btn btn-secondary btn-sm"
-                    :disabled="workingCDKs.has(cdk.id)"
-                    title="恢复为可用"
-                    @click="setCDKStatus(cdk.id, 'available')"
-                  >
-                    <Icon name="check" size="sm" />
-                  </button>
-                  <span v-else class="text-gray-400">-</span>
+                  <div class="flex justify-end gap-2">
+                    <button
+                      v-if="cdk.status !== 'reserved'"
+                      class="btn btn-secondary btn-sm"
+                      :disabled="workingCDKs.has(cdk.id)"
+                      title="仅验证，不创建充值任务"
+                      @click="verifyCDK(cdk)"
+                    >
+                      <Icon name="shield" size="sm" />
+                    </button>
+                    <button
+                      v-if="cdk.status === 'available'"
+                      class="btn btn-secondary btn-sm"
+                      :disabled="workingCDKs.has(cdk.id)"
+                      title="停用"
+                      @click="setCDKStatus(cdk.id, 'disabled')"
+                    >
+                      <Icon name="ban" size="sm" />
+                    </button>
+                    <button
+                      v-else-if="cdk.status === 'disabled' || cdk.status === 'invalid'"
+                      class="btn btn-secondary btn-sm"
+                      :disabled="workingCDKs.has(cdk.id)"
+                      title="恢复为可用"
+                      @click="setCDKStatus(cdk.id, 'available')"
+                    >
+                      <Icon name="check" size="sm" />
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="!loading && cdks.length === 0">
@@ -316,6 +326,35 @@
         <button class="btn btn-danger" :disabled="saving" @click="confirmRefund">{{ saving ? '处理中' : '确认退款' }}</button>
       </template>
     </BaseDialog>
+
+    <BaseDialog :show="verificationResult !== null" title="CDK 验证结果" width="normal" @close="verificationResult = null">
+      <div v-if="verificationResult" class="space-y-4 text-sm">
+        <div class="flex items-center justify-between border-b border-gray-200 pb-3 dark:border-dark-700">
+          <span class="text-gray-500 dark:text-dark-400">验证状态</span>
+          <span class="badge" :class="verificationResult.valid ? 'badge-success' : 'badge-danger'">
+            {{ verificationResult.valid ? 'CDK 有效' : 'CDK 无效' }}
+          </span>
+        </div>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-gray-700 dark:text-dark-200">
+          <dt class="text-gray-500 dark:text-dark-400">库存套餐</dt>
+          <dd class="text-right">{{ planTypeLabel(verificationResult.expected_plan_type) }}</dd>
+          <dt class="text-gray-500 dark:text-dark-400">验证套餐</dt>
+          <dd class="text-right">{{ verificationResult.actual_plan_type ? planTypeLabel(verificationResult.actual_plan_type) : '-' }}</dd>
+          <dt class="text-gray-500 dark:text-dark-400">套餐匹配</dt>
+          <dd class="text-right">{{ verificationResult.matches_product ? '匹配' : '不匹配' }}</dd>
+          <dt class="text-gray-500 dark:text-dark-400">处理模式</dt>
+          <dd class="text-right">{{ verificationResult.processing_mode || '-' }}</dd>
+        </dl>
+        <p class="border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/15 dark:text-blue-300">
+          本次只验证有效性，没有创建充值任务，也没有提交 Session。
+        </p>
+      </div>
+      <template #footer>
+        <button class="btn btn-primary" @click="verificationResult = null">关闭</button>
+      </template>
+    </BaseDialog>
+
+    <TotpStepUpDialog :controller="managedRechargeStepUp" />
   </AppLayout>
 </template>
 
@@ -324,6 +363,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
+import { isStepUpBlocked, isStepUpCancelled, stepUpBlockReason, useStepUp } from '@/composables/useStepUp'
 import {
   adminCreateManagedRechargeProduct,
   adminImportManagedRechargeCDKs,
@@ -335,7 +376,9 @@ import {
   adminSetManagedRechargeCDKStatus,
   adminSyncManagedRechargeOrder,
   adminUpdateManagedRechargeProduct,
+  adminVerifyManagedRechargeCDK,
   type ManagedRechargeCDK,
+  type ManagedRechargeCDKVerification,
   type ManagedRechargeOrder,
   type ManagedRechargeProduct,
   type ManagedRechargeProductInput,
@@ -366,8 +409,10 @@ const productDialogOpen = ref(false)
 const editingProduct = ref<ManagedRechargeProduct | null>(null)
 const importDialogOpen = ref(false)
 const refundOrder = ref<ManagedRechargeOrder | null>(null)
+const verificationResult = ref<ManagedRechargeCDKVerification | null>(null)
 const productForm = reactive<ManagedRechargeProductInput>(emptyProductForm())
 const importForm = reactive({ product_id: 0, codes: '', expires_at: '' })
+const managedRechargeStepUp = useStepUp()
 
 const activeProducts = computed(() => products.value.filter((item) => item.active).length)
 const availableStock = computed(() => products.value.reduce((total, item) => total + item.available_stock, 0))
@@ -380,6 +425,15 @@ function emptyProductForm(): ManagedRechargeProductInput {
 function errorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'message' in error) return String(error.message)
   return '请求失败，请稍后重试'
+}
+
+function protectedActionError(error: unknown): string {
+  if (isStepUpBlocked(error)) {
+    return stepUpBlockReason(error) === 'STEP_UP_ADMIN_API_KEY_FORBIDDEN'
+      ? '管理 API Key 不能操作 CDK，请使用管理员网页登录并完成二次验证'
+      : '请先在个人资料中启用 TOTP 二次验证'
+  }
+  return errorMessage(error)
 }
 
 function formatAmount(value: number): string {
@@ -459,15 +513,16 @@ async function saveProduct(): Promise<void> {
   dialogError.value = ''
   try {
     if (editingProduct.value) {
-      await adminUpdateManagedRechargeProduct(editingProduct.value.id, { ...productForm })
+      const productID = editingProduct.value.id
+      await managedRechargeStepUp.run(() => adminUpdateManagedRechargeProduct(productID, { ...productForm }))
     } else {
-      await adminCreateManagedRechargeProduct({ ...productForm })
+      await managedRechargeStepUp.run(() => adminCreateManagedRechargeProduct({ ...productForm }))
     }
     closeProductDialog()
     await loadProducts()
     showNotice('套餐已保存')
   } catch (error) {
-    dialogError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) dialogError.value = protectedActionError(error)
   } finally {
     saving.value = false
   }
@@ -491,16 +546,17 @@ async function importCDKs(): Promise<void> {
   saving.value = true
   dialogError.value = ''
   try {
-    const result = await adminImportManagedRechargeCDKs({
+    const importInput = {
       product_id: importForm.product_id,
       codes: parsedImportCodes.value,
       expires_at: importForm.expires_at ? new Date(importForm.expires_at).toISOString() : undefined,
-    })
+    }
+    const result = await managedRechargeStepUp.run(() => adminImportManagedRechargeCDKs(importInput))
     closeImportDialog()
     await Promise.all([loadProducts(), loadCDKs()])
     showNotice(`已导入 ${result.imported} 枚，跳过 ${result.skipped} 枚`)
   } catch (error) {
-    dialogError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) dialogError.value = protectedActionError(error)
   } finally {
     saving.value = false
   }
@@ -511,10 +567,10 @@ async function setCDKStatus(id: number, status: string): Promise<void> {
   workingCDKs.value = new Set(workingCDKs.value)
   pageError.value = ''
   try {
-    await adminSetManagedRechargeCDKStatus(id, status)
+    await managedRechargeStepUp.run(() => adminSetManagedRechargeCDKStatus(id, status))
     await Promise.all([loadProducts(), loadCDKs()])
   } catch (error) {
-    pageError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
   } finally {
     workingCDKs.value.delete(id)
     workingCDKs.value = new Set(workingCDKs.value)
@@ -530,12 +586,26 @@ async function moveCDK(cdk: ManagedRechargeCDK, event: Event): Promise<void> {
   workingCDKs.value = new Set(workingCDKs.value)
   pageError.value = ''
   try {
-    await adminMoveManagedRechargeCDK(cdk.id, productID)
+    await managedRechargeStepUp.run(() => adminMoveManagedRechargeCDK(cdk.id, productID))
     await Promise.all([loadProducts(), loadCDKs()])
     showNotice('CDK 已移动到新套餐')
   } catch (error) {
     select.value = String(previousProductID)
-    pageError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
+  } finally {
+    workingCDKs.value.delete(cdk.id)
+    workingCDKs.value = new Set(workingCDKs.value)
+  }
+}
+
+async function verifyCDK(cdk: ManagedRechargeCDK): Promise<void> {
+  workingCDKs.value.add(cdk.id)
+  workingCDKs.value = new Set(workingCDKs.value)
+  pageError.value = ''
+  try {
+    verificationResult.value = await managedRechargeStepUp.run(() => adminVerifyManagedRechargeCDK(cdk.id))
+  } catch (error) {
+    if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
   } finally {
     workingCDKs.value.delete(cdk.id)
     workingCDKs.value = new Set(workingCDKs.value)
@@ -547,11 +617,11 @@ async function syncOrder(id: number): Promise<void> {
   workingOrders.value = new Set(workingOrders.value)
   pageError.value = ''
   try {
-    const updated = await adminSyncManagedRechargeOrder(id)
+    const updated = await managedRechargeStepUp.run(() => adminSyncManagedRechargeOrder(id))
     const index = orders.value.findIndex((item) => item.id === id)
     if (index >= 0) orders.value[index] = updated
   } catch (error) {
-    pageError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
   } finally {
     workingOrders.value.delete(id)
     workingOrders.value = new Set(workingOrders.value)
@@ -568,14 +638,14 @@ async function confirmRefund(): Promise<void> {
   saving.value = true
   pageError.value = ''
   try {
-    const updated = await adminRefundManagedRechargeOrder(id)
+    const updated = await managedRechargeStepUp.run(() => adminRefundManagedRechargeOrder(id))
     const index = orders.value.findIndex((item) => item.id === id)
     if (index >= 0) orders.value[index] = updated
     refundOrder.value = null
     await loadProducts()
     showNotice('订单已退款，关联 CDK 已隔离')
   } catch (error) {
-    pageError.value = errorMessage(error)
+    if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
   } finally {
     saving.value = false
   }

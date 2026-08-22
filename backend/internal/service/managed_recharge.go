@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -61,9 +60,14 @@ type managedRechargeBalanceCache interface {
 	InvalidateUserBalance(ctx context.Context, userID int64) error
 }
 
+type ManagedRechargeSecretProtector interface {
+	SecretEncryptor
+	BlindIndex(plaintext string) string
+}
+
 type ManagedRechargeService struct {
 	db           *sql.DB
-	encryptor    SecretEncryptor
+	encryptor    ManagedRechargeSecretProtector
 	balanceCache managedRechargeBalanceCache
 	authCache    APIKeyAuthCacheInvalidator
 	upstream     managedRechargeUpstream
@@ -163,9 +167,20 @@ type ManagedRechargeImportResult struct {
 	Skipped  int `json:"skipped"`
 }
 
+type ManagedRechargeCDKVerification struct {
+	ID                int64  `json:"id"`
+	Valid             bool   `json:"valid"`
+	ExpectedPlanType  string `json:"expected_plan_type"`
+	ActualPlanType    string `json:"actual_plan_type,omitempty"`
+	PlanName          string `json:"plan_name,omitempty"`
+	ProcessingMode    string `json:"processing_mode,omitempty"`
+	MatchesProduct    bool   `json:"matches_product"`
+	VerificationScope string `json:"verification_scope"`
+}
+
 func NewManagedRechargeService(
 	db *sql.DB,
-	encryptor SecretEncryptor,
+	encryptor ManagedRechargeSecretProtector,
 	balanceCache managedRechargeBalanceCache,
 	authCache APIKeyAuthCacheInvalidator,
 ) *ManagedRechargeService {
@@ -345,8 +360,7 @@ func (s *ManagedRechargeService) ImportCDKs(ctx context.Context, adminID, produc
 			result.Skipped++
 			continue
 		}
-		hash := sha256.Sum256([]byte(code))
-		hashString := hex.EncodeToString(hash[:])
+		hashString := s.encryptor.BlindIndex(code)
 		if _, ok := seen[hashString]; ok {
 			result.Skipped++
 			continue
@@ -377,6 +391,49 @@ func (s *ManagedRechargeService) ImportCDKs(ctx context.Context, adminID, produc
 		return nil, fmt.Errorf("commit managed recharge CDK import: %w", err)
 	}
 	return result, nil
+}
+
+func (s *ManagedRechargeService) VerifyCDK(ctx context.Context, id int64) (*ManagedRechargeCDKVerification, error) {
+	if err := s.requireReady(); err != nil {
+		return nil, err
+	}
+	if id <= 0 {
+		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_CDK_INVALID", "invalid CDK")
+	}
+
+	var ciphertext, expectedPlanType string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT c.code_ciphertext, p.plan_type
+		FROM managed_recharge_cdks c
+		JOIN managed_recharge_products p ON p.id = c.product_id
+		WHERE c.id = $1
+	`, id).Scan(&ciphertext, &expectedPlanType)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, infraerrors.New(http.StatusNotFound, "MANAGED_RECHARGE_CDK_NOT_FOUND", "CDK not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load managed recharge CDK for verification: %w", err)
+	}
+
+	code, err := s.encryptor.Decrypt(ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt managed recharge CDK for verification: %w", err)
+	}
+	verified, err := s.upstream.verifyCDK(ctx, code)
+	if err != nil {
+		return nil, infraerrors.New(http.StatusBadGateway, "MANAGED_RECHARGE_UPSTREAM_UNAVAILABLE", "recharge provider is temporarily unavailable")
+	}
+	actualPlanType := normalizeManagedRechargePlanType(verified.PlanType)
+	return &ManagedRechargeCDKVerification{
+		ID:                id,
+		Valid:             verified.Valid,
+		ExpectedPlanType:  normalizeManagedRechargePlanType(expectedPlanType),
+		ActualPlanType:    actualPlanType,
+		PlanName:          strings.TrimSpace(verified.PlanName),
+		ProcessingMode:    strings.TrimSpace(verified.ProcessingMode),
+		MatchesProduct:    verified.Valid && actualPlanType != "" && actualPlanType == normalizeManagedRechargePlanType(expectedPlanType),
+		VerificationScope: "verify_only",
+	}, nil
 }
 
 func (s *ManagedRechargeService) ListCDKs(ctx context.Context, productID int64, status string, limit int) ([]ManagedRechargeCDK, error) {
@@ -1204,7 +1261,8 @@ func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userI
 func (s *ManagedRechargeService) markTaskCreated(ctx context.Context, orderID int64, taskID string) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE managed_recharge_orders
-		SET status = 'submitting', upstream_task_id = $2, upstream_status = 'created', updated_at = NOW()
+		SET status = 'submitting', upstream_task_id = $2, upstream_status = 'created',
+		    session_ciphertext = '', updated_at = NOW()
 		WHERE id = $1 AND status = 'paid'
 	`, orderID, taskID)
 	if err != nil {
@@ -1220,7 +1278,7 @@ func (s *ManagedRechargeService) markManualReview(ctx context.Context, orderID i
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE managed_recharge_orders
 		SET status = 'manual_review', error_code = $2, error_message = $3,
-		    last_synced_at = NOW(), updated_at = NOW()
+		    session_ciphertext = '', last_synced_at = NOW(), updated_at = NOW()
 		WHERE id = $1 AND status NOT IN ('completed', 'refunded')
 	`, orderID, code, message)
 	return err
