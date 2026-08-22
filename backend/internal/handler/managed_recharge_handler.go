@@ -129,6 +129,22 @@ func (h *ManagedRechargeHandler) GetOrder(c *gin.Context) {
 	response.Success(c, managedRechargeUserOrder(order))
 }
 
+func (h *ManagedRechargeHandler) GetOrderStatus(c *gin.Context) {
+	userID, ok := managedRechargeUserID(c)
+	if !ok {
+		return
+	}
+	orderID, ok := managedRechargePathID(c)
+	if !ok {
+		return
+	}
+	order, err := h.service.GetOrderStatus(c.Request.Context(), userID, orderID)
+	if response.ErrorFrom(c, err) {
+		return
+	}
+	response.Success(c, managedRechargeUserOrder(order))
+}
+
 func (h *ManagedRechargeHandler) SubmitReplacementSession(c *gin.Context) {
 	userID, ok := managedRechargeUserID(c)
 	if !ok {
@@ -351,9 +367,62 @@ func managedRechargeUserOrder(order *service.ManagedRechargeOrder) *service.Mana
 	result := *order
 	result.CDKMasked = ""
 	result.UpstreamStatus = ""
-	result.Progress = ""
+	result.Progress = managedRechargeUserProgress(order)
 	result.ErrorCode = ""
 	result.UserEmail = ""
 	result.Username = ""
 	return &result
+}
+
+func managedRechargeUserProgress(order *service.ManagedRechargeOrder) string {
+	if order == nil {
+		return ""
+	}
+	switch order.Status {
+	case service.ManagedRechargeStatusValidating:
+		return "正在确认库存与订单"
+	case service.ManagedRechargeStatusPaid, service.ManagedRechargeStatusSubmitting:
+		return "支付成功，正在提交兑换任务"
+	case service.ManagedRechargeStatusIssued:
+		return "CDK 已发放，等待前往兑换页提交"
+	case service.ManagedRechargeStatusQueued:
+		return "兑换任务已进入处理队列"
+	case service.ManagedRechargeStatusProcessing:
+		return managedRechargeProcessingSummary(order.Progress)
+	case service.ManagedRechargeStatusVerifying:
+		return "付款已完成，正在确认订阅状态"
+	case service.ManagedRechargeStatusActionRequired:
+		return "需要前往兑换页补交新的 Session"
+	case service.ManagedRechargeStatusManualReview:
+		return "订单正在人工核对"
+	case service.ManagedRechargeStatusCompleted:
+		return "订阅已确认完成"
+	case service.ManagedRechargeStatusFailed:
+		return "订单未完成"
+	case service.ManagedRechargeStatusRefunded:
+		return "订单未完成，余额已退回"
+	default:
+		return ""
+	}
+}
+
+func managedRechargeProcessingSummary(raw string) string {
+	var progress struct {
+		Step string `json:"step"`
+	}
+	if json.Unmarshal([]byte(raw), &progress) == nil {
+		switch strings.ToLower(strings.TrimSpace(progress.Step)) {
+		case "login", "login_email", "login_otp", "navigate":
+			return "正在验证目标账号"
+		case "checkout", "filling":
+			return "正在创建订阅订单"
+		case "submitting", "3ds_pending":
+			return "正在提交付款"
+		case "verifying", "upgrading", "paid", "canceling", "cancel_retry":
+			return "付款已完成，正在确认订阅状态"
+		case "completed":
+			return "订阅已确认完成"
+		}
+	}
+	return "兑换服务正在处理"
 }

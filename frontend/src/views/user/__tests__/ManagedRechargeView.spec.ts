@@ -11,6 +11,7 @@ const getCatalog = vi.hoisted(() => vi.fn())
 const listOrders = vi.hoisted(() => vi.fn())
 const createOrder = vi.hoisted(() => vi.fn())
 const getOrder = vi.hoisted(() => vi.fn())
+const getOrderStatus = vi.hoisted(() => vi.fn())
 const submitReplacement = vi.hoisted(() => vi.fn())
 const validateSession = vi.hoisted(() => vi.fn())
 
@@ -28,6 +29,7 @@ vi.mock('@/api/managedRecharge', () => ({
   listManagedRechargeOrders: listOrders,
   createManagedRechargeOrder: createOrder,
   getManagedRechargeOrder: getOrder,
+  getManagedRechargeOrderStatus: getOrderStatus,
   submitManagedRechargeReplacementSession: submitReplacement,
   validateManagedRechargeSession: validateSession,
 }))
@@ -71,6 +73,7 @@ describe('ManagedRechargeView purchase flow', () => {
     listOrders.mockReset().mockResolvedValue([])
     createOrder.mockReset()
     getOrder.mockReset()
+    getOrderStatus.mockReset()
     submitReplacement.mockReset()
     validateSession.mockReset().mockResolvedValue({
       valid: true,
@@ -201,6 +204,63 @@ describe('ManagedRechargeView purchase flow', () => {
     const redeemLink = wrapper.get('a[href*="MOCK-PRO-SUCCESS-031"]')
     expect(redeemLink.attributes('target')).toBe('_blank')
     expect(redeemLink.text()).toContain('前往兑换')
+
+    wrapper.unmount()
+  })
+
+  it('polls external order status without revealing the CDK', async () => {
+    const externalCatalog: ManagedRechargeCatalog = {
+      ...catalog,
+      fulfillment_mode: 'external',
+    }
+    const issuedOrder: ManagedRechargeOrder = {
+      id: 41,
+      order_no: 'MR-EXTERNAL-41',
+      user_id: 42,
+      product_id: 2,
+      product_slug: 'gpt-pro-5x',
+      product_name: 'Pro（5 倍）',
+      fulfillment_mode: 'external',
+      price: 8,
+      status: 'issued',
+      account_email: '',
+      progress: 'CDK 已发放，等待前往兑换页提交',
+      last_synced_at: '2026-08-22T00:00:00Z',
+      paid_at: '2026-08-22T00:00:00Z',
+      created_at: '2026-08-22T00:00:00Z',
+      updated_at: '2026-08-22T00:00:00Z',
+    }
+    const queuedOrder = {
+      ...issuedOrder,
+      status: 'queued',
+      progress: '兑换任务已进入处理队列',
+      queue_position: 2,
+      queue_total: 4,
+      last_synced_at: '2026-08-22T00:00:10Z',
+    }
+    getCatalog.mockResolvedValue(externalCatalog)
+    listOrders.mockResolvedValue([issuedOrder])
+    getOrderStatus.mockResolvedValue(queuedOrder)
+
+    const wrapper = mount(ManagedRechargeView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          BaseDialog: true,
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    await vi.advanceTimersByTimeAsync(10000)
+    await flushPromises()
+
+    expect(getOrderStatus).toHaveBeenCalledWith(41)
+    expect(getOrder).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('兑换任务已进入处理队列')
+    expect(wrapper.text()).toContain('队列 2/4')
+    expect(wrapper.text()).toContain('查看 CDK')
 
     wrapper.unmount()
   })

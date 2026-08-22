@@ -140,6 +140,7 @@ func RegisterUserRoutes(
 				managed.POST("/orders", panelRateLimiter.Heavy(), managedRecharge.CreateOrder)
 				managed.GET("/orders", managedRecharge.ListOrders)
 				managed.GET("/orders/:id", managedRecharge.GetOrder)
+				managed.GET("/orders/:id/status", managedRecharge.GetOrderStatus)
 				managed.POST("/orders/:id/session", panelRateLimiter.Heavy(), managedRecharge.SubmitReplacementSession)
 			}
 		}

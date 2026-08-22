@@ -815,6 +815,17 @@ func (s *ManagedRechargeService) GetOrder(ctx context.Context, userID, orderID i
 	return order, nil
 }
 
+// GetOrderStatus synchronizes a user order without decrypting or returning its CDK.
+// The separate status path lets the frontend poll safely while keeping secret
+// disclosure behind the explicit "view CDK" action.
+func (s *ManagedRechargeService) GetOrderStatus(ctx context.Context, userID, orderID int64) (*ManagedRechargeOrder, error) {
+	order, err := s.getOrder(ctx, orderID, &userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.syncOrderIfNeeded(ctx, order, false)
+}
+
 func (s *ManagedRechargeService) AdminGetOrder(ctx context.Context, orderID int64, forceSync bool) (*ManagedRechargeOrder, error) {
 	order, err := s.getOrder(ctx, orderID, nil)
 	if err != nil {

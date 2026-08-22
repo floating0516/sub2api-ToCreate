@@ -141,6 +141,11 @@ export async function getManagedRechargeOrder(id: number): Promise<ManagedRechar
   return data
 }
 
+export async function getManagedRechargeOrderStatus(id: number): Promise<ManagedRechargeOrder> {
+  const { data } = await apiClient.get<ManagedRechargeOrder>(`/managed-recharge/orders/${id}/status`)
+  return data
+}
+
 export async function submitManagedRechargeReplacementSession(
   id: number,
   sessionJson: string,

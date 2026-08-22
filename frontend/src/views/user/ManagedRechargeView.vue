@@ -261,7 +261,7 @@
               <label class="flex items-start gap-3 text-xs leading-5 text-gray-600 dark:text-dark-300">
                 <input v-model="agreed" data-testid="managed-recharge-agreement" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" />
                 <span v-if="catalog?.mock_mode && !isExternalMode">我确认当前仅提交页面提供的模拟凭证，用于验证扣款、进度、补交和退款流程。</span>
-                <span v-else-if="isExternalMode">我确认付款后将获得一枚订单专属 CDK，并前往第三方兑换服务完成账号充值。CDK 发放后不会重新销售。</span>
+                <span v-else-if="isExternalMode">我确认付款后将获得一枚订单专属 CDK，并前往第三方兑换服务完成账号充值。CDK 发放即视为交付，不支持自动退款；未完成时可使用同一 CDK 重试。</span>
                 <span v-else>我确认账号归本人所有，并同意 Session 加密保存、临时传输给第三方履约服务；订单完成或退款后清除。</span>
               </label>
 
@@ -322,6 +322,9 @@
                   <div v-if="order.queue_position" class="mt-1 text-xs text-gray-500">队列 {{ order.queue_position }}/{{ order.queue_total || order.queue_position }}</div>
                   <div v-if="order.progress" class="mt-1 max-w-72 text-xs text-gray-500 dark:text-dark-400">{{ order.progress }}</div>
                   <div v-if="order.error_message" class="mt-1 max-w-72 text-xs text-red-600 dark:text-red-400">{{ order.error_message }}</div>
+                  <div v-if="order.fulfillment_mode === 'external' && order.last_synced_at" class="mt-1 text-xs text-gray-400 dark:text-dark-500">
+                    状态由兑换服务同步 · {{ formatSyncTime(order.last_synced_at) }}
+                  </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{{ formatDate(order.created_at) }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right">
@@ -394,7 +397,7 @@
           <Icon name="checkCircle" size="md" class="mt-0.5 shrink-0" />
           <div>
             <div class="font-semibold">支付成功，CDK 已归属于当前订单</div>
-            <div class="mt-1 text-xs leading-5">请保存 CDK，然后前往兑换页提交该 CDK 和目标账号 Session。</div>
+            <div class="mt-1 text-xs leading-5">请保存 CDK，然后前往兑换页提交目标账号。本站会继续同步兑换进度。</div>
           </div>
         </div>
         <div>
@@ -410,7 +413,7 @@
             </button>
           </div>
         </div>
-        <p class="text-xs leading-5 text-gray-500 dark:text-dark-400">兑换页面由第三方提供。CDK 是敏感凭证，请勿转发；兑换失败时可以使用同一 CDK 重新提交。</p>
+        <p class="text-xs leading-5 text-gray-500 dark:text-dark-400">兑换页面由第三方提供。CDK 是敏感凭证，请勿转发；发放后不支持自动退款，兑换未完成时可使用同一 CDK 重试或联系客服核对。</p>
       </div>
       <template #footer>
         <button class="btn btn-secondary" type="button" @click="closeIssuedOrder">稍后处理</button>
@@ -443,6 +446,7 @@ import {
   createManagedRechargeOrder,
   getManagedRechargeCatalog,
   getManagedRechargeOrder,
+  getManagedRechargeOrderStatus,
   listManagedRechargeOrders,
   submitManagedRechargeReplacementSession,
   validateManagedRechargeSession,
@@ -530,7 +534,17 @@ function goBack(): void {
 }
 
 function errorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) return String(error.message)
+  const structured = error as { reason?: string; code?: string; message?: string } | null
+  const reason = structured?.reason || structured?.code || ''
+  const knownMessages: Record<string, string> = {
+    MANAGED_RECHARGE_OUT_OF_STOCK: '当前套餐已售罄，请选择其他套餐或稍后再试',
+    INSUFFICIENT_BALANCE: '站内余额不足，请先充值余额',
+    MANAGED_RECHARGE_UPSTREAM_UNAVAILABLE: '兑换服务暂时不可用，本次不会扣款，请稍后重试',
+    MANAGED_RECHARGE_UNAVAILABLE: '会员订阅服务暂未开放',
+    MANAGED_RECHARGE_PRODUCT_INVALID: '所选套餐已下架，请刷新页面后重新选择',
+  }
+  if (knownMessages[reason]) return knownMessages[reason]
+  if (structured?.message) return structured.message
   return '请求失败，请稍后重试'
 }
 
@@ -540,6 +554,10 @@ function formatAmount(value: number): string {
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleString()
+}
+
+function formatSyncTime(value: string): string {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function resetSessionValidation(): void {
@@ -665,9 +683,16 @@ function isActiveStatus(status: string): boolean {
 
 async function refreshOrder(id: number): Promise<void> {
   try {
-    const updated = await getManagedRechargeOrder(id)
+    const updated = await getManagedRechargeOrderStatus(id)
     const index = orders.value.findIndex((item) => item.id === id)
-    if (index >= 0) orders.value[index] = updated
+    if (index >= 0) {
+      const current = orders.value[index]
+      orders.value[index] = {
+        ...updated,
+        redemption_code: updated.redemption_code || current.redemption_code,
+        redemption_url: updated.redemption_url || current.redemption_url,
+      }
+    }
     await loadCatalog()
   } catch {
     // Keep the last known order state when synchronization is temporarily unavailable.
@@ -677,7 +702,6 @@ async function refreshOrder(id: number): Promise<void> {
 async function pollActiveOrders(): Promise<void> {
   const active = orders.value.filter((order) => {
     if (!isActiveStatus(order.status) && order.status !== 'action_required') return false
-    if (order.fulfillment_mode === 'external' && order.status === 'issued') return Boolean(order.redemption_code)
     return true
   })
   for (const order of active.slice(0, 5)) await refreshOrder(order.id)
