@@ -400,6 +400,14 @@ func TestEnhanceCSPPolicy(t *testing.T) {
 		assert.Equal(t, 1, countDirectiveValue(enhanced, "style-src", AirwallexDemoCheckoutDomain))
 		assert.Equal(t, 1, countDirectiveValue(enhanced, "frame-src", AirwallexDemoCheckoutDomain))
 	})
+
+	t.Run("allows_only_the_configured_ldxp_shop_origin", func(t *testing.T) {
+		policy := "default-src 'self'; frame-src 'self'"
+		enhanced := enhanceCSPPolicy(policy)
+
+		assert.Equal(t, 1, countDirectiveValue(enhanced, "frame-src", LdxpShopDomain))
+		assert.Equal(t, 0, countDirectiveValue(enhanced, "frame-src", "https://*.ldxp.cn"))
+	})
 }
 
 func countDirectiveValue(policy, directive, value string) int {

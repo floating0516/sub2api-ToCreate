@@ -469,6 +469,12 @@ export default {
     tabAddon: 'Add-ons',
     tabMemberRecharge: 'Subscribe to GPT Plus-Pro',
     memberRecharge: {
+      shopTitle: 'Subscribe to GPT Plus / Pro',
+      shopSubtitle: 'Choose a product and complete checkout on this page',
+      reloadShop: 'Reload shop',
+      openShop: 'Open in new window',
+      iframeTitle: 'GPT Plus / Pro subscription shop',
+      backToPurchase: 'Back to purchases',
       subscribeNow: 'Subscribe Now',
       plans: {
         plus: {

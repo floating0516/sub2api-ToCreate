@@ -3,7 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
-import ManagedRechargeEntryCard from '@/components/payment/ManagedRechargeEntryCard.vue'
+import LdxpShopEmbed from '@/components/payment/LdxpShopEmbed.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import type { CheckoutInfoResponse, MethodLimit, SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
 import type { UserSubscription } from '@/types'
@@ -332,7 +332,7 @@ describe('PaymentView managed recharge entry', () => {
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
   })
 
-  it('places the GPT Plus-Pro entry after the add-on tab and opens its dedicated page', async () => {
+  it('places the GPT Plus-Pro entry after the add-on tab and embeds the shop', async () => {
     getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
       addon_purchase_enabled: true,
       addon_products: [{
@@ -365,13 +365,8 @@ describe('PaymentView managed recharge entry', () => {
     ])
 
     await wrapper.get('[data-testid="payment-tab-member"]').trigger('click')
-    const entryCard = wrapper.getComponent(ManagedRechargeEntryCard)
-    entryCard.vm.$emit('select', 'pro-5x')
-
-    expect(routerPush).toHaveBeenCalledWith({
-      path: '/member-recharge',
-      query: { plan: 'pro-5x' },
-    })
+    expect(wrapper.findComponent(LdxpShopEmbed).exists()).toBe(true)
+    expect(routerPush).not.toHaveBeenCalled()
   })
 
   it('restores the GPT Plus-Pro tab when returning from the dedicated page', async () => {
@@ -390,7 +385,7 @@ describe('PaymentView managed recharge entry', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="payment-tab-member"]').classes()).toContain('bg-white')
-    expect(wrapper.findComponent(ManagedRechargeEntryCard).exists()).toBe(true)
+    expect(wrapper.findComponent(LdxpShopEmbed).exists()).toBe(true)
   })
 })
 

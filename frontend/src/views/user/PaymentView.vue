@@ -416,7 +416,7 @@
           </template>
           <!-- Managed Recharge Tab -->
           <template v-else-if="activeTab === 'member'">
-            <ManagedRechargeEntryCard @select="openManagedRecharge" />
+            <LdxpShopEmbed />
           </template>
         </template>
         <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan && activeTab !== 'addon' && activeTab !== 'member'" class="card p-4">
@@ -487,8 +487,7 @@ import {
 } from '@/components/payment/paymentFlow'
 import { platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import { subscriptionAccentBarClass, subscriptionBadgeClass, subscriptionTextClass } from '@/utils/subscriptionColors'
-import ManagedRechargeEntryCard from '@/components/payment/ManagedRechargeEntryCard.vue'
-import type { ManagedRechargePlanKey } from '@/components/payment/managedRechargePlans'
+import LdxpShopEmbed from '@/components/payment/LdxpShopEmbed.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -760,10 +759,6 @@ const tabGridClass = computed(() => [
       ? 'sm:grid-cols-3'
       : 'sm:grid-cols-4',
 ])
-
-function openManagedRecharge(plan: ManagedRechargePlanKey) {
-  router.push({ path: '/member-recharge', query: { plan } })
-}
 
 function formatQuota(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)

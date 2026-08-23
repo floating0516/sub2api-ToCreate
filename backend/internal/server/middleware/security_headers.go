@@ -47,6 +47,8 @@ const (
 	AirwallexDemoStaticDomain = "https://static-demo.airwallex.com"
 	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
 	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
+	// LdxpShopDomain is the hosted storefront embedded by the GPT membership purchase tab.
+	LdxpShopDomain = "https://pay.ldxp.cn"
 )
 
 var requiredCSPDirectiveValues = []struct {
@@ -80,6 +82,7 @@ var requiredCSPDirectiveValues = []struct {
 	{"style-src", AirwallexDemoStaticDomain},
 	{"style-src", AirwallexDemoCheckoutDomain},
 	{"frame-src", AirwallexDemoCheckoutDomain},
+	{"frame-src", LdxpShopDomain},
 }
 
 // GenerateNonce generates a cryptographically secure random nonce.
