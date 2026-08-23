@@ -100,6 +100,39 @@ describe('PaymentStatusPanel', () => {
     expect(wrapper.emitted('success')).toHaveLength(1)
   })
 
+  it('waits for managed recharge fulfillment to complete before reporting success', async () => {
+    pollOrderStatus
+      .mockResolvedValueOnce(orderFactory('RECHARGING'))
+      .mockResolvedValueOnce(orderFactory('COMPLETED'))
+
+    const wrapper = mount(PaymentStatusPanel, {
+      props: {
+        orderId: 43,
+        qrCode: 'https://pay.example.com/qr/43',
+        expiresAt: '2099-01-01T12:30:00Z',
+        paymentType: 'alipay',
+        orderType: 'managed_recharge',
+      },
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(wrapper.emitted('success')).toBeUndefined()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.result.success')
+    expect(wrapper.emitted('success')).toHaveLength(1)
+  })
+
   it('shows reopen button in QR mode when payUrl is also available', async () => {
     const openSpy = vi.spyOn(window, 'open').mockReturnValue({ closed: false } as Window)
 

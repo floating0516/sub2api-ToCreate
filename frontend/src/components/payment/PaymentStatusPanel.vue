@@ -22,7 +22,9 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountSymbol }}{{ paidOrder.amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">
+                  {{ props.orderType === 'managed_recharge' ? formatGatewayAmount(paidOrder.amount, paidOrder.currency) : creditedAmountSymbol + paidOrder.amount.toFixed(2) }}
+                </span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
@@ -346,6 +348,7 @@ function formatGatewayAmount(value: number, currency?: string | null): string {
 }
 
 function isSuccessStatus(status: string | null | undefined): boolean {
+  if (props.orderType === 'managed_recharge') return status === 'COMPLETED'
   return status === 'COMPLETED' || status === 'PAID' || status === 'RECHARGING'
 }
 

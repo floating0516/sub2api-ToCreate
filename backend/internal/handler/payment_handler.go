@@ -31,6 +31,14 @@ func NewPaymentHandler(paymentService *service.PaymentService, configService *se
 	}
 }
 
+func (h *PaymentHandler) BindManagedRechargeService(managedRechargeService *service.ManagedRechargeService) {
+	if h == nil || h.paymentService == nil || managedRechargeService == nil {
+		return
+	}
+	h.paymentService.SetManagedRechargeService(managedRechargeService)
+	managedRechargeService.SetPaymentService(h.paymentService)
+}
+
 // GetPaymentConfig returns the payment system configuration.
 // GET /api/v1/payment/config
 func (h *PaymentHandler) GetPaymentConfig(c *gin.Context) {

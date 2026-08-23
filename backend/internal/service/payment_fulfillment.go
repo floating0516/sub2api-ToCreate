@@ -224,7 +224,45 @@ func (s *PaymentService) executeFulfillment(ctx context.Context, oid int64) erro
 	if o.OrderType == payment.OrderTypeAddon {
 		return s.ExecuteAddonFulfillment(ctx, oid)
 	}
+	if o.OrderType == payment.OrderTypeManagedRecharge {
+		return s.ExecuteManagedRechargeFulfillment(ctx, oid)
+	}
 	return s.ExecuteBalanceFulfillment(ctx, oid)
+}
+
+func (s *PaymentService) ExecuteManagedRechargeFulfillment(ctx context.Context, oid int64) error {
+	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
+	if err != nil {
+		return infraerrors.NotFound("NOT_FOUND", "order not found")
+	}
+	if o.Status == OrderStatusCompleted {
+		return nil
+	}
+	if psIsRefundStatus(o.Status) {
+		return infraerrors.BadRequest("INVALID_STATUS", "refund-related order cannot fulfill")
+	}
+	if o.Status != OrderStatusPaid && o.Status != OrderStatusFailed && o.Status != OrderStatusRecharging {
+		return infraerrors.BadRequest("INVALID_STATUS", "order cannot fulfill in status "+o.Status)
+	}
+	if s.managedRechargeService == nil {
+		return ErrManagedRechargeUnavailable
+	}
+	snapshot := psOrderProviderSnapshot(o)
+	if snapshot == nil || snapshot.ManagedRechargeOrderID <= 0 {
+		return infraerrors.BadRequest("MANAGED_RECHARGE_PAYMENT_LINK_MISSING", "managed recharge payment link is missing")
+	}
+	lease, err := s.acquirePaymentFulfillmentLease(ctx, o)
+	if err != nil {
+		return err
+	}
+	if lease == nil {
+		return nil
+	}
+	if err := s.managedRechargeService.FulfillPaidPaymentOrder(ctx, snapshot.ManagedRechargeOrderID, o.ID); err != nil {
+		s.markFailed(ctx, oid, lease, err)
+		return err
+	}
+	return s.markCompleted(ctx, o, lease, "MANAGED_RECHARGE_SUCCESS")
 }
 
 func (s *PaymentService) ExecuteBalanceFulfillment(ctx context.Context, oid int64) error {

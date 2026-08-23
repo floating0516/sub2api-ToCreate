@@ -29,6 +29,20 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if normalized := NormalizeVisibleMethod(req.PaymentType); normalized != "" {
 		req.PaymentType = normalized
 	}
+	var managedRecharge *ManagedRechargePaymentSelection
+	if req.OrderType == payment.OrderTypeManagedRecharge {
+		if req.PaymentType != payment.TypeAlipay {
+			return nil, infraerrors.BadRequest("MANAGED_RECHARGE_ALIPAY_REQUIRED", "managed recharge only supports Alipay")
+		}
+		if s.managedRechargeService == nil {
+			return nil, ErrManagedRechargeUnavailable
+		}
+		var err error
+		managedRecharge, err = s.managedRechargeService.ValidatePaymentSelection(ctx, req.UserID, req.ManagedRechargeOrderID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	cfg, err := s.configService.GetPaymentConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get payment config: %w", err)
@@ -68,10 +82,16 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	} else if addon != nil {
 		orderAmount = addon.product.Price
 		limitAmount = addon.product.Price
+	} else if managedRecharge != nil {
+		orderAmount = managedRecharge.Price
+		limitAmount = managedRecharge.Price
 	} else if req.OrderType == payment.OrderTypeBalance {
 		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
 	}
 	feeRate := cfg.RechargeFeeRate
+	if managedRecharge != nil {
+		feeRate = 0
+	}
 	methodCurrency := payment.DefaultPaymentCurrency
 	if s.configService != nil {
 		methodCurrency, err = s.configService.ValidateMethodCurrencyConsistency(ctx, req.PaymentType)
@@ -116,11 +136,20 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s.invokeProvider(ctx, order, req, cfg, limitAmount, payAmountStr, payAmount, plan, addon, sel)
+	if managedRecharge != nil {
+		if err := s.managedRechargeService.AttachPaymentOrder(ctx, managedRecharge.OrderID, order.ID, order.ExpiresAt); err != nil {
+			_, _ = s.entClient.PaymentOrder.UpdateOneID(order.ID).SetStatus(OrderStatusFailed).SetFailedReason(err.Error()).Save(ctx)
+			return nil, err
+		}
+	}
+	resp, err := s.invokeProvider(ctx, order, req, cfg, limitAmount, payAmountStr, payAmount, plan, addon, managedRecharge, sel)
 	if err != nil {
 		_, _ = s.entClient.PaymentOrder.UpdateOneID(order.ID).
 			SetStatus(OrderStatusFailed).
 			Save(ctx)
+		if managedRecharge != nil {
+			_ = s.managedRechargeService.ReleaseUnpaidPaymentOrder(ctx, order.ID, "PAYMENT_PROVIDER_FAILED", "支付宝订单创建失败，请重新提交")
+		}
 		return nil, err
 	}
 	return resp, nil
@@ -134,6 +163,9 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 		return s.validateSubOrder(ctx, req)
 	}
 	if req.OrderType == payment.OrderTypeAddon {
+		return nil, nil
+	}
+	if req.OrderType == payment.OrderTypeManagedRecharge {
 		return nil, nil
 	}
 	if req.OrderType != payment.OrderTypeBalance {
@@ -288,6 +320,9 @@ func buildPaymentOrderProviderSnapshot(sel *payment.InstanceSelection, req Creat
 
 	snapshot := map[string]any{}
 	snapshot["schema_version"] = 2
+	if req.ManagedRechargeOrderID > 0 {
+		snapshot["managed_recharge_order_id"] = req.ManagedRechargeOrderID
+	}
 
 	instanceID := strings.TrimSpace(sel.InstanceID)
 	if instanceID != "" {
@@ -424,7 +459,7 @@ func (s *PaymentService) usesOfficialWxpayVisibleMethod(ctx context.Context) boo
 	return inst.ProviderKey == payment.TypeWxpay
 }
 
-func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, limitAmount float64, payAmountStr string, payAmount float64, plan *dbent.SubscriptionPlan, addon *addonOrderSelection, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
+func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, limitAmount float64, payAmountStr string, payAmount float64, plan *dbent.SubscriptionPlan, addon *addonOrderSelection, managedRecharge *ManagedRechargePaymentSelection, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
 	prov, err := provider.CreateProvider(sel.ProviderKey, sel.InstanceID, sel.Config)
 	if err != nil {
 		slog.Error("[PaymentService] CreateProvider failed", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
@@ -440,7 +475,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		return nil, infraerrors.ServiceUnavailable("PAYMENT_PROVIDER_MISCONFIGURED", "provider_misconfigured").
 			WithMetadata(map[string]string{"provider": sel.ProviderKey, "instance_id": sel.InstanceID})
 	}
-	subject := s.buildPaymentSubject(plan, addon, limitAmount, cfg, sel)
+	subject := s.buildPaymentSubject(plan, addon, managedRecharge, limitAmount, cfg, sel)
 	outTradeNo := order.OutTradeNo
 	canonicalReturnURL, err := CanonicalizeReturnURL(req.ReturnURL, req.SrcHost, req.SrcURL)
 	if err != nil {
@@ -558,7 +593,7 @@ func selectedInstanceSupportedTypes(sel *payment.InstanceSelection) string {
 	return sel.SupportedTypes
 }
 
-func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, addon *addonOrderSelection, limitAmount float64, cfg *PaymentConfig, sel *payment.InstanceSelection) string {
+func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, addon *addonOrderSelection, managedRecharge *ManagedRechargePaymentSelection, limitAmount float64, cfg *PaymentConfig, sel *payment.InstanceSelection) string {
 	if plan != nil {
 		productName := plan.ProductName
 		if productName == "" {
@@ -568,6 +603,9 @@ func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, addon
 	}
 	if subject := addonPaymentSubject(addon); subject != "" {
 		return applyPaymentProductNameAffix(subject, cfg)
+	}
+	if managedRecharge != nil {
+		return applyPaymentProductNameAffix("GPT member subscription "+managedRecharge.ProductName, cfg)
 	}
 	currency := payment.DefaultPaymentCurrency
 	if sel != nil {
@@ -866,6 +904,32 @@ func (s *PaymentService) GetOrder(ctx context.Context, orderID, userID int64) (*
 		return nil, infraerrors.Forbidden("FORBIDDEN", "no permission for this order")
 	}
 	return o, nil
+}
+
+func (s *PaymentService) GetCreateOrderResponse(ctx context.Context, userID, orderID int64) (*CreateOrderResponse, error) {
+	order, err := s.GetOrder(ctx, orderID, userID)
+	if err != nil {
+		return nil, err
+	}
+	paymentMode := ""
+	if snapshot := psOrderProviderSnapshot(order); snapshot != nil {
+		paymentMode = snapshot.PaymentMode
+	}
+	return &CreateOrderResponse{
+		OrderID:      order.ID,
+		Amount:       order.Amount,
+		PayAmount:    order.PayAmount,
+		FeeRate:      order.FeeRate,
+		Status:       order.Status,
+		ResultType:   payment.CreatePaymentResultOrderCreated,
+		PaymentType:  order.PaymentType,
+		OutTradeNo:   order.OutTradeNo,
+		PayURL:       psStringValue(order.PayURL),
+		QRCode:       psStringValue(order.QrCode),
+		Currency:     PaymentOrderCurrency(order),
+		ExpiresAt:    order.ExpiresAt,
+		PaymentMode:  paymentMode,
+	}, nil
 }
 
 func (s *PaymentService) GetOrderByID(ctx context.Context, orderID int64) (*dbent.PaymentOrder, error) {

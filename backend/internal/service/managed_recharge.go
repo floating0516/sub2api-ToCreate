@@ -15,10 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 const (
+	ManagedRechargeStatusAwaitingPayment = "awaiting_payment"
 	ManagedRechargeStatusValidating     = "validating"
 	ManagedRechargeStatusPaid           = "paid"
 	ManagedRechargeStatusIssued         = "issued"
@@ -82,6 +84,7 @@ type ManagedRechargeService struct {
 	fulfillmentReady  bool
 	fulfillmentMode   string
 	externalRedeemURL string
+	paymentService    *PaymentService
 }
 
 type ManagedRechargeProduct struct {
@@ -102,6 +105,7 @@ type ManagedRechargeProduct struct {
 type ManagedRechargeCatalog struct {
 	Enabled         bool                     `json:"enabled"`
 	Balance         float64                  `json:"balance"`
+	PaymentMethod   string                   `json:"payment_method"`
 	Products        []ManagedRechargeProduct `json:"products"`
 	MockMode        bool                     `json:"mock_mode"`
 	MockStepSeconds int                      `json:"mock_step_seconds,omitempty"`
@@ -142,6 +146,9 @@ type ManagedRechargeOrder struct {
 	RedemptionURL         string     `json:"redemption_url,omitempty"`
 	Price                 float64    `json:"price"`
 	Status                string     `json:"status"`
+	PaymentOrderID        *int64     `json:"payment_order_id,omitempty"`
+	PaymentStatus         string     `json:"payment_status,omitempty"`
+	PaymentExpiresAt      *time.Time `json:"payment_expires_at,omitempty"`
 	AccountEmail          string     `json:"account_email"`
 	UpstreamStatus        string     `json:"upstream_status,omitempty"`
 	QueuePosition         int        `json:"queue_position,omitempty"`
@@ -179,6 +186,23 @@ type ManagedRechargeCreateOrderInput struct {
 	ProductID      int64
 	Session        string
 	IdempotencyKey string
+	ClientIP       string
+	IsMobile       bool
+	SrcHost        string
+	SrcURL         string
+	ReturnURL      string
+	Locale         string
+}
+
+type ManagedRechargeCheckout struct {
+	Order   *ManagedRechargeOrder `json:"order"`
+	Payment *CreateOrderResponse  `json:"payment,omitempty"`
+}
+
+type ManagedRechargePaymentSelection struct {
+	OrderID     int64
+	Price       float64
+	ProductName string
 }
 
 type ManagedRechargeImportResult struct {
@@ -231,9 +255,16 @@ func NewManagedRechargeService(
 	}
 }
 
+func (s *ManagedRechargeService) SetPaymentService(paymentService *PaymentService) {
+	if s == nil {
+		return
+	}
+	s.paymentService = paymentService
+}
+
 func (s *ManagedRechargeService) GetCatalog(ctx context.Context, userID int64) (*ManagedRechargeCatalog, error) {
 	if s == nil || s.db == nil {
-		return &ManagedRechargeCatalog{Enabled: false, Products: []ManagedRechargeProduct{}}, nil
+		return &ManagedRechargeCatalog{Enabled: false, PaymentMethod: "alipay", Products: []ManagedRechargeProduct{}}, nil
 	}
 	var balance float64
 	if err := s.db.QueryRowContext(ctx, `SELECT balance FROM users WHERE id = $1 AND deleted_at IS NULL`, userID).Scan(&balance); err != nil {
@@ -246,6 +277,7 @@ func (s *ManagedRechargeService) GetCatalog(ctx context.Context, userID int64) (
 	return &ManagedRechargeCatalog{
 		Enabled:         s.fulfillmentReady && len(products) > 0,
 		Balance:         balance,
+		PaymentMethod:   "alipay",
 		Products:        products,
 		MockMode:        s.mockMode,
 		MockStepSeconds: s.mockStepSecs,
@@ -594,7 +626,384 @@ func (s *ManagedRechargeService) MoveCDK(ctx context.Context, id, productID int6
 	return nil
 }
 
-func (s *ManagedRechargeService) CreateOrder(ctx context.Context, userID int64, input ManagedRechargeCreateOrderInput) (*ManagedRechargeOrder, error) {
+func (s *ManagedRechargeService) CreateCheckout(ctx context.Context, userID int64, input ManagedRechargeCreateOrderInput) (*ManagedRechargeCheckout, error) {
+	if err := s.requireFulfillmentReady(); err != nil {
+		return nil, err
+	}
+	if s.paymentService == nil {
+		return nil, infraerrors.ServiceUnavailable("MANAGED_RECHARGE_PAYMENT_UNAVAILABLE", "Alipay checkout is not configured")
+	}
+	input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
+	if input.ProductID <= 0 || input.IdempotencyKey == "" || len(input.IdempotencyKey) > 128 {
+		return nil, infraerrors.BadRequest("MANAGED_RECHARGE_REQUEST_INVALID", "invalid recharge request")
+	}
+
+	session := strings.TrimSpace(input.Session)
+	accountEmail := ""
+	sessionCiphertext := ""
+	if s.fulfillmentMode != ManagedRechargeFulfillmentExternal {
+		if session == "" || len(session) > managedRechargeSessionMaxBytes {
+			return nil, infraerrors.BadRequest("MANAGED_RECHARGE_SESSION_INVALID", "invalid Session payload")
+		}
+		var err error
+		accountEmail, err = parseManagedRechargeSession(session)
+		if err != nil {
+			return nil, err
+		}
+		if s.mockMode && !isManagedRechargeMockSession(session) {
+			return nil, infraerrors.BadRequest("MANAGED_RECHARGE_MOCK_SESSION_REQUIRED", "mock mode only accepts the provided test Session")
+		}
+		sessionCiphertext, err = s.encryptor.Encrypt(session)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt managed recharge Session: %w", err)
+		}
+	}
+
+	if existing, err := s.getOrderByIdempotency(ctx, userID, input.IdempotencyKey); err == nil {
+		if existing.PaymentOrderID != nil {
+			paymentResponse, paymentErr := s.paymentService.GetCreateOrderResponse(ctx, userID, *existing.PaymentOrderID)
+			if paymentErr != nil {
+				return nil, paymentErr
+			}
+			if err := s.attachExternalRedemption(existing); err != nil {
+				return nil, err
+			}
+			return &ManagedRechargeCheckout{Order: existing, Payment: paymentResponse}, nil
+		}
+		if existing.Status != ManagedRechargeStatusAwaitingPayment {
+			if err := s.attachExternalRedemption(existing); err != nil {
+				return nil, err
+			}
+			return &ManagedRechargeCheckout{Order: existing}, nil
+		}
+		paymentResponse, paymentErr := s.createAlipayPayment(ctx, userID, existing, input)
+		if paymentErr != nil {
+			_ = s.failUnpaidOrder(context.Background(), existing.ID, "PAYMENT_PROVIDER_FAILED", "支付宝订单创建失败，请重新提交", false)
+			return nil, paymentErr
+		}
+		updated, getErr := s.GetOrder(ctx, userID, existing.ID, false)
+		if getErr != nil {
+			return nil, getErr
+		}
+		return &ManagedRechargeCheckout{Order: updated, Payment: paymentResponse}, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
+	orderCtx, cancelOrder := context.WithTimeout(context.Background(), managedRechargeOrderTimeout)
+	defer cancelOrder()
+	product, err := s.getActiveProduct(orderCtx, input.ProductID)
+	if err != nil {
+		return nil, err
+	}
+	orderNo, err := newManagedRechargeOrderNo()
+	if err != nil {
+		return nil, fmt.Errorf("generate managed recharge order number: %w", err)
+	}
+	var orderID int64
+	err = s.db.QueryRowContext(orderCtx, `
+		INSERT INTO managed_recharge_orders
+		    (order_no, user_id, product_id, idempotency_key, price, status, account_email, session_ciphertext, fulfillment_mode)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (user_id, idempotency_key) DO NOTHING
+		RETURNING id
+	`, orderNo, userID, product.ID, input.IdempotencyKey, product.Price, ManagedRechargeStatusAwaitingPayment, accountEmail, sessionCiphertext, s.fulfillmentMode).Scan(&orderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		existing, getErr := s.getOrderByIdempotency(orderCtx, userID, input.IdempotencyKey)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if existing.PaymentOrderID == nil {
+			return nil, infraerrors.Conflict("MANAGED_RECHARGE_ORDER_CONFLICT", "recharge order is being created")
+		}
+		paymentResponse, paymentErr := s.paymentService.GetCreateOrderResponse(orderCtx, userID, *existing.PaymentOrderID)
+		if paymentErr != nil {
+			return nil, paymentErr
+		}
+		return &ManagedRechargeCheckout{Order: existing, Payment: paymentResponse}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("create managed recharge order: %w", err)
+	}
+
+	cleanupUnpaid := true
+	defer func() {
+		if cleanupUnpaid {
+			_ = s.runRecovery(func(recoveryCtx context.Context) error {
+				return s.failUnpaidOrder(recoveryCtx, orderID, "ORDER_INTERRUPTED", "订单创建被中断，请重新提交", false)
+			})
+		}
+	}()
+
+	var reserved *ManagedRechargeCDK
+	var plaintextCode string
+	for attempt := 0; attempt < managedRechargeReserveAttempts; attempt++ {
+		reserved, err = s.reserveNextCDK(orderCtx, orderID, product.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrManagedRechargeNoInventory
+			}
+			return nil, err
+		}
+		plaintextCode, err = s.encryptor.Decrypt(reserved.codeCiphertext)
+		if err != nil {
+			if recoveryErr := s.quarantineReservedCDK(orderCtx, orderID, "CDK_DECRYPT_FAILED"); recoveryErr != nil {
+				return nil, recoveryErr
+			}
+			continue
+		}
+		verified, verifyErr := s.upstream.verifyCDK(orderCtx, plaintextCode)
+		if verifyErr != nil {
+			return nil, infraerrors.New(http.StatusBadGateway, "MANAGED_RECHARGE_UPSTREAM_UNAVAILABLE", "recharge provider is temporarily unavailable")
+		}
+		if verified.Valid {
+			actualPlanType := normalizeManagedRechargePlanType(verified.PlanType)
+			if actualPlanType == product.PlanType {
+				break
+			}
+			if recoveryErr := s.reassignMismatchedCDK(orderCtx, orderID, product.PlanType, actualPlanType); recoveryErr != nil {
+				return nil, recoveryErr
+			}
+			reserved = nil
+			plaintextCode = ""
+			continue
+		}
+		if recoveryErr := s.quarantineReservedCDK(orderCtx, orderID, "CDK_INVALID"); recoveryErr != nil {
+			return nil, recoveryErr
+		}
+		reserved = nil
+		plaintextCode = ""
+	}
+	if reserved == nil || plaintextCode == "" {
+		return nil, ErrManagedRechargeNoInventory
+	}
+
+	prepared, err := s.getOrder(orderCtx, orderID, &userID)
+	if err != nil {
+		return nil, err
+	}
+	paymentResponse, err := s.createAlipayPayment(orderCtx, userID, prepared, input)
+	if err != nil {
+		return nil, err
+	}
+	cleanupUnpaid = false
+	updated, err := s.GetOrder(orderCtx, userID, orderID, false)
+	if err != nil {
+		return nil, err
+	}
+	return &ManagedRechargeCheckout{Order: updated, Payment: paymentResponse}, nil
+}
+
+func (s *ManagedRechargeService) createAlipayPayment(ctx context.Context, userID int64, order *ManagedRechargeOrder, input ManagedRechargeCreateOrderInput) (*CreateOrderResponse, error) {
+	if order == nil {
+		return nil, ErrManagedRechargeOrderMissing
+	}
+	return s.paymentService.CreateOrder(ctx, CreateOrderRequest{
+		UserID:                  userID,
+		Amount:                  order.Price,
+		PaymentType:             payment.TypeAlipay,
+		ClientIP:                input.ClientIP,
+		IsMobile:                input.IsMobile,
+		SrcHost:                 input.SrcHost,
+		SrcURL:                  input.SrcURL,
+		ReturnURL:               input.ReturnURL,
+		PaymentSource:            "managed_recharge_alipay",
+		OrderType:                payment.OrderTypeManagedRecharge,
+		Locale:                   input.Locale,
+		ManagedRechargeOrderID: order.ID,
+	})
+}
+
+func (s *ManagedRechargeService) ValidatePaymentSelection(ctx context.Context, userID, orderID int64) (*ManagedRechargePaymentSelection, error) {
+	if s == nil || s.db == nil || orderID <= 0 {
+		return nil, ErrManagedRechargeOrderMissing
+	}
+	var selection ManagedRechargePaymentSelection
+	var status, cdkStatus string
+	var paymentOrderID sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT o.id, o.price, p.name, o.status, COALESCE(c.status, ''), o.payment_order_id
+		FROM managed_recharge_orders o
+		JOIN managed_recharge_products p ON p.id = o.product_id
+		LEFT JOIN managed_recharge_cdks c ON c.id = o.cdk_id
+		WHERE o.id = $1 AND o.user_id = $2
+	`, orderID, userID).Scan(&selection.OrderID, &selection.Price, &selection.ProductName, &status, &cdkStatus, &paymentOrderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrManagedRechargeOrderMissing
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load managed recharge payment selection: %w", err)
+	}
+	if status != ManagedRechargeStatusAwaitingPayment || cdkStatus != managedRechargeCDKReserved || paymentOrderID.Valid {
+		return nil, infraerrors.Conflict("MANAGED_RECHARGE_NOT_PAYABLE", "managed recharge order is not awaiting payment")
+	}
+	return &selection, nil
+}
+
+func (s *ManagedRechargeService) ValidateRefundablePaymentOrder(ctx context.Context, paymentOrderID int64) error {
+	var status, fulfillmentMode, errorCode string
+	var paidAt sql.NullTime
+	err := s.db.QueryRowContext(ctx, `
+		SELECT status, fulfillment_mode, error_code, paid_at
+		FROM managed_recharge_orders
+		WHERE payment_order_id = $1
+	`, paymentOrderID).Scan(&status, &fulfillmentMode, &errorCode, &paidAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrManagedRechargeOrderMissing
+	}
+	if err != nil {
+		return err
+	}
+	if fulfillmentMode == ManagedRechargeFulfillmentExternal {
+		return infraerrors.Conflict("MANAGED_RECHARGE_EXTERNAL_CDK_ISSUED", "externally issued CDKs cannot be refunded automatically")
+	}
+	if status != ManagedRechargeStatusManualReview || !paidAt.Valid {
+		return infraerrors.Conflict("MANAGED_RECHARGE_REFUND_REVIEW_REQUIRED", "managed recharge order is not eligible for refund")
+	}
+	if errorCode == "UPSTREAM_CREATE_REJECTED" || errorCode == "PAYMENT_AFTER_CANCELLATION" {
+		return nil
+	}
+	if errorCode == "UPSTREAM_TASK_NOT_FOUND" && time.Since(paidAt.Time) >= managedRechargePaidReviewTTL {
+		return nil
+	}
+	return infraerrors.Conflict("MANAGED_RECHARGE_REFUND_SYNC_REQUIRED", "provider must confirm that no task exists before refunding")
+}
+
+func (s *ManagedRechargeService) AttachPaymentOrder(ctx context.Context, orderID, paymentOrderID int64, expiresAt time.Time) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE managed_recharge_orders
+		SET payment_order_id = $2, updated_at = NOW()
+		WHERE id = $1 AND status = 'awaiting_payment' AND payment_order_id IS NULL AND paid_at IS NULL
+	`, orderID, paymentOrderID)
+	if err != nil {
+		return fmt.Errorf("attach managed recharge payment order: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return infraerrors.Conflict("MANAGED_RECHARGE_PAYMENT_CONFLICT", "managed recharge payment order is already attached")
+	}
+	_ = expiresAt
+	return s.appendEvent(ctx, orderID, nil, "ALIPAY_ORDER_CREATED", map[string]any{"payment_order_id": paymentOrderID})
+}
+
+func (s *ManagedRechargeService) ReleaseUnpaidPaymentOrder(ctx context.Context, paymentOrderID int64, code, message string) error {
+	var orderID int64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id FROM managed_recharge_orders
+		WHERE payment_order_id = $1 AND paid_at IS NULL
+	`, paymentOrderID).Scan(&orderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.failUnpaidOrder(ctx, orderID, code, message, false)
+}
+
+func (s *ManagedRechargeService) FulfillPaidPaymentOrder(ctx context.Context, orderID, paymentOrderID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `
+		UPDATE managed_recharge_orders
+		SET status = 'paid', paid_at = COALESCE(paid_at, NOW()), error_code = '', error_message = '', updated_at = NOW()
+		WHERE id = $1 AND payment_order_id = $2 AND status = 'awaiting_payment'
+	`, orderID, paymentOrderID)
+	if err != nil {
+		return fmt.Errorf("mark managed recharge Alipay order paid: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected == 1 {
+		if err := appendManagedRechargeEventTx(ctx, tx, orderID, nil, "ALIPAY_PAID", map[string]any{"payment_order_id": paymentOrderID}); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	order, err := s.getOrder(ctx, orderID, nil)
+	if err != nil {
+		return err
+	}
+	if order.PaymentOrderID == nil || *order.PaymentOrderID != paymentOrderID {
+		return infraerrors.Conflict("MANAGED_RECHARGE_PAYMENT_MISMATCH", "managed recharge payment order mismatch")
+	}
+	if order.Status != ManagedRechargeStatusPaid {
+		switch order.Status {
+		case ManagedRechargeStatusIssued, ManagedRechargeStatusSubmitting, ManagedRechargeStatusQueued,
+			ManagedRechargeStatusProcessing, ManagedRechargeStatusVerifying, ManagedRechargeStatusActionRequired,
+			ManagedRechargeStatusManualReview, ManagedRechargeStatusCompleted, ManagedRechargeStatusRefunded:
+			return nil
+		case ManagedRechargeStatusFailed:
+			if order.ErrorCode == "PAYMENT_CANCELLED" || order.ErrorCode == "PAYMENT_EXPIRED" {
+				_ = s.markManualReview(ctx, orderID, "PAYMENT_AFTER_CANCELLATION", "支付宝已到账，但原订单已关闭，请管理员核对并原路退款")
+				return nil
+			}
+			return infraerrors.Conflict("MANAGED_RECHARGE_NOT_PAYABLE", "managed recharge order is not payable")
+		default:
+			return infraerrors.Conflict("MANAGED_RECHARGE_NOT_PAYABLE", "managed recharge order is not payable")
+		}
+	}
+	if order.cdkCiphertext == "" || order.cdkStatus != managedRechargeCDKReserved {
+		_ = s.markManualReview(ctx, orderID, "CDK_RESERVATION_MISSING", "支付成功，但库存状态需要人工核对")
+		return nil
+	}
+	if order.FulfillmentMode == ManagedRechargeFulfillmentExternal {
+		if err := s.markExternalOrderIssued(ctx, orderID); err != nil {
+			_ = s.markManualReview(ctx, orderID, "CDK_ISSUE_FAILED", "支付成功，但 CDK 发放状态需要人工核对")
+		}
+		return nil
+	}
+
+	code, err := s.encryptor.Decrypt(order.cdkCiphertext)
+	if err != nil {
+		_ = s.markManualReview(ctx, orderID, "CDK_DECRYPT_FAILED", "支付成功，但库存读取失败，需要人工核对")
+		return nil
+	}
+	session, err := s.encryptor.Decrypt(order.sessionCiphertext)
+	if err != nil {
+		_ = s.markManualReview(ctx, orderID, "SESSION_DECRYPT_FAILED", "支付成功，但账号凭证读取失败，需要人工核对")
+		return nil
+	}
+
+	fulfillCtx, cancel := context.WithTimeout(context.Background(), managedRechargeFulfillTimeout)
+	defer cancel()
+	created, createErr := s.upstream.createTask(fulfillCtx, code, session)
+	if createErr != nil {
+		_ = s.markManualReview(fulfillCtx, orderID, "UPSTREAM_CREATE_UNCERTAIN", "支付成功，上游提交结果需要人工核对")
+		return nil
+	}
+	if strings.TrimSpace(created.TaskID) == "" {
+		_ = s.markManualReview(fulfillCtx, orderID, "UPSTREAM_CREATE_REJECTED", "充值任务未被受理，请管理员核对并原路退款")
+		return nil
+	}
+	if err := s.markTaskCreated(fulfillCtx, orderID, created.TaskID); err != nil {
+		return err
+	}
+	confirmed, confirmErr := s.upstream.confirmTask(fulfillCtx, created.TaskID)
+	if confirmErr != nil {
+		_ = s.markManualReview(fulfillCtx, orderID, "UPSTREAM_CONFIRM_UNCERTAIN", "支付成功，上游确认结果需要人工核对")
+		return nil
+	}
+	status := normalizeManagedRechargeAcceptedStatus(confirmed.Status)
+	if status == "" {
+		_ = s.markManualReview(fulfillCtx, orderID, "UPSTREAM_CONFIRM_UNCERTAIN", "支付成功，上游确认结果需要人工核对")
+		return nil
+	}
+	_, err = s.db.ExecContext(fulfillCtx, `
+		UPDATE managed_recharge_orders
+		SET status = $2, upstream_status = $3, submitted_at = NOW(), last_synced_at = NOW(),
+		    error_code = '', error_message = '', updated_at = NOW()
+		WHERE id = $1 AND status NOT IN ('refunded', 'completed')
+	`, orderID, status, confirmed.Status)
+	return err
+}
+
+// createLegacyBalanceOrder is retained only for regression coverage of orders
+// created before the Alipay-only checkout was introduced. It is not routed.
+func (s *ManagedRechargeService) createLegacyBalanceOrder(ctx context.Context, userID int64, input ManagedRechargeCreateOrderInput) (*ManagedRechargeOrder, error) {
 	if err := s.requireFulfillmentReady(); err != nil {
 		return nil, err
 	}
@@ -973,7 +1382,9 @@ func (s *ManagedRechargeService) AdminRefundOrder(ctx context.Context, adminID, 
 	if order.Status != ManagedRechargeStatusManualReview {
 		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_REFUND_REVIEW_REQUIRED", "only manual-review orders can be refunded")
 	}
-	if order.ErrorCode != "UPSTREAM_TASK_NOT_FOUND" || time.Since(*order.PaidAt) < managedRechargePaidReviewTTL {
+	refundableCreateRejection := order.PaymentOrderID != nil && (order.ErrorCode == "UPSTREAM_CREATE_REJECTED" || order.ErrorCode == "PAYMENT_AFTER_CANCELLATION")
+	refundableMissingTask := order.ErrorCode == "UPSTREAM_TASK_NOT_FOUND" && time.Since(*order.PaidAt) >= managedRechargePaidReviewTTL
+	if !refundableCreateRejection && !refundableMissingTask {
 		return nil, infraerrors.New(http.StatusConflict, "MANAGED_RECHARGE_REFUND_SYNC_REQUIRED", "provider must confirm that no task exists before refunding")
 	}
 	if err := s.refundOrder(ctx, orderID, order.UserID, "ADMIN_REFUND", "管理员已退款"); err != nil {
@@ -997,6 +1408,10 @@ func (s *ManagedRechargeService) syncOrderIfNeeded(ctx context.Context, order *M
 			return nil, err
 		}
 		return s.getOrder(ctx, order.ID, &order.UserID)
+	}
+	if order.Status == ManagedRechargeStatusManualReview &&
+		(order.ErrorCode == "UPSTREAM_CREATE_REJECTED" || order.ErrorCode == "PAYMENT_AFTER_CANCELLATION") {
+		return order, nil
 	}
 	if !managedRechargeStatusNeedsSync(order.Status) || order.cdkCiphertext == "" {
 		return order, nil
@@ -1336,6 +1751,14 @@ func (s *ManagedRechargeService) reassignMismatchedCDK(ctx context.Context, orde
 }
 
 func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userID int64, code, message string) error {
+	var paymentOrderID sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT payment_order_id FROM managed_recharge_orders WHERE id = $1`, orderID).Scan(&paymentOrderID); err != nil {
+		return err
+	}
+	if paymentOrderID.Valid {
+		return s.refundAlipayOrder(ctx, orderID, userID, paymentOrderID.Int64, code, message)
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin managed recharge refund: %w", err)
@@ -1391,6 +1814,67 @@ func (s *ManagedRechargeService) refundOrder(ctx context.Context, orderID, userI
 	}
 	s.invalidateBalanceCaches(userID)
 	return nil
+}
+
+func (s *ManagedRechargeService) refundAlipayOrder(ctx context.Context, orderID, userID, paymentOrderID int64, code, message string) error {
+	if s.paymentService == nil {
+		return infraerrors.ServiceUnavailable("MANAGED_RECHARGE_REFUND_UNAVAILABLE", "Alipay refund service is unavailable")
+	}
+	paymentOrder, err := s.paymentService.GetOrder(ctx, paymentOrderID, userID)
+	if err != nil {
+		return err
+	}
+	plan, early, err := s.paymentService.PrepareRefund(ctx, paymentOrderID, paymentOrder.Amount, message, false, false)
+	if err != nil {
+		return err
+	}
+	if early != nil {
+		return infraerrors.Conflict("MANAGED_RECHARGE_REFUND_REVIEW_REQUIRED", early.Warning)
+	}
+	result, err := s.paymentService.ExecuteRefund(ctx, plan)
+	if err != nil {
+		return err
+	}
+	if result == nil || !result.Success {
+		warning := "支付宝退款结果需要人工核对"
+		if result != nil && strings.TrimSpace(result.Warning) != "" {
+			warning = result.Warning
+		}
+		_ = s.markManualReview(ctx, orderID, "ALIPAY_REFUND_PENDING", warning)
+		return infraerrors.Conflict("MANAGED_RECHARGE_REFUND_PENDING", warning)
+	}
+	return s.markAlipayRefunded(ctx, orderID, code, message)
+}
+
+func (s *ManagedRechargeService) markAlipayRefunded(ctx context.Context, orderID int64, code, message string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE managed_recharge_cdks
+		SET status = 'invalid', reserved_order_id = NULL, reserved_at = NULL, updated_at = NOW()
+		WHERE reserved_order_id = $1 AND status = 'reserved'
+	`, orderID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `
+		UPDATE managed_recharge_orders
+		SET status = 'refunded', session_ciphertext = '', error_code = $2, error_message = $3,
+		    refunded_at = COALESCE(refunded_at, NOW()), updated_at = NOW()
+		WHERE id = $1 AND status NOT IN ('completed', 'refunded')
+	`, orderID, code, message)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return tx.Commit()
+	}
+	if err := appendManagedRechargeEventTx(ctx, tx, orderID, nil, "ALIPAY_REFUNDED", map[string]any{}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *ManagedRechargeService) markTaskCreated(ctx context.Context, orderID int64, taskID string) error {
@@ -1474,6 +1958,7 @@ func (s *ManagedRechargeService) getOrder(ctx context.Context, orderID int64, us
 const managedRechargeOrderSelect = `
 	SELECT o.id, o.order_no, o.user_id, COALESCE(u.email, ''), COALESCE(u.username, ''),
 	       o.product_id, p.slug, p.name, o.fulfillment_mode, COALESCE(c.code_masked, ''), o.price, o.status,
+	       o.payment_order_id, COALESCE(po.status, ''), po.expires_at,
 	       o.account_email, o.upstream_task_id, o.upstream_status, o.upstream_failure_reason,
 	       o.queue_position, o.queue_total, o.progress, o.error_code, o.error_message,
 	       COALESCE(o.balance_before, 0), COALESCE(o.balance_after, 0),
@@ -1484,6 +1969,7 @@ const managedRechargeOrderSelect = `
 	JOIN managed_recharge_products p ON p.id = o.product_id
 	JOIN users u ON u.id = o.user_id
 	LEFT JOIN managed_recharge_cdks c ON c.id = o.cdk_id
+	LEFT JOIN payment_orders po ON po.id = o.payment_order_id
 `
 
 type managedRechargeRowScanner interface {
@@ -1492,11 +1978,13 @@ type managedRechargeRowScanner interface {
 
 func scanManagedRechargeOrder(scanner managedRechargeRowScanner) (*ManagedRechargeOrder, error) {
 	var order ManagedRechargeOrder
-	var paidAt, submittedAt, completedAt, refundedAt, lastSyncedAt sql.NullTime
+	var paymentOrderID sql.NullInt64
+	var paymentExpiresAt, paidAt, submittedAt, completedAt, refundedAt, lastSyncedAt sql.NullTime
 	err := scanner.Scan(
 		&order.ID, &order.OrderNo, &order.UserID, &order.UserEmail, &order.Username,
 		&order.ProductID, &order.ProductSlug, &order.ProductName, &order.FulfillmentMode, &order.CDKMasked, &order.Price,
-		&order.Status, &order.AccountEmail, &order.upstreamTaskID, &order.UpstreamStatus,
+		&order.Status, &paymentOrderID, &order.PaymentStatus, &paymentExpiresAt,
+		&order.AccountEmail, &order.upstreamTaskID, &order.UpstreamStatus,
 		&order.upstreamFailureReason, &order.QueuePosition, &order.QueueTotal, &order.Progress,
 		&order.ErrorCode, &order.ErrorMessage, &order.BalanceBefore, &order.BalanceAfter,
 		&paidAt, &submittedAt, &completedAt, &refundedAt, &lastSyncedAt,
@@ -1505,6 +1993,10 @@ func scanManagedRechargeOrder(scanner managedRechargeRowScanner) (*ManagedRechar
 	if err != nil {
 		return nil, err
 	}
+	if paymentOrderID.Valid {
+		order.PaymentOrderID = &paymentOrderID.Int64
+	}
+	order.PaymentExpiresAt = nullTimePointer(paymentExpiresAt)
 	order.PaidAt = nullTimePointer(paidAt)
 	order.SubmittedAt = nullTimePointer(submittedAt)
 	order.CompletedAt = nullTimePointer(completedAt)
@@ -1750,13 +2242,13 @@ func normalizeManagedRechargeFailure(reason string) string {
 	normalized := strings.ToLower(reason)
 	switch {
 	case strings.Contains(normalized, "session"):
-		return "Session 已失效，余额已退回"
+		return "Session 已失效，款项将原路退回"
 	case strings.Contains(normalized, "existing_entitlement"), strings.Contains(normalized, "subscription"):
-		return "账号当前订阅状态不符合充值条件，余额已退回"
+		return "账号当前订阅状态不符合充值条件，款项将原路退回"
 	case strings.Contains(normalized, "account"):
-		return "账号暂时不符合充值条件，余额已退回"
+		return "账号暂时不符合充值条件，款项将原路退回"
 	default:
-		return "充值未完成，余额已退回"
+		return "充值未完成，款项将原路退回"
 	}
 }
 

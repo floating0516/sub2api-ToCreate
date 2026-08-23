@@ -166,6 +166,9 @@ func TestManagedRechargeRefundRejectsCompletedUpstream(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	service := &ManagedRechargeService{db: db}
+	mock.ExpectQuery("SELECT payment_order_id FROM managed_recharge_orders").
+		WithArgs(int64(9)).
+		WillReturnRows(sqlmock.NewRows([]string{"payment_order_id"}).AddRow(nil))
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT price, status, paid_at, user_id, upstream_status").
 		WithArgs(int64(9)).
@@ -190,6 +193,9 @@ func TestManagedRechargeRefundIsNoopWhenAlreadyRefunded(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	service := &ManagedRechargeService{db: db}
+	mock.ExpectQuery("SELECT payment_order_id FROM managed_recharge_orders").
+		WithArgs(int64(10)).
+		WillReturnRows(sqlmock.NewRows([]string{"payment_order_id"}).AddRow(nil))
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT price, status, paid_at, user_id, upstream_status").
 		WithArgs(int64(10)).
@@ -335,7 +341,7 @@ func TestManagedRechargeMockModeRejectsNonTestSessionBeforeCreatingOrder(t *test
 		featureReady:     true,
 		fulfillmentReady: true,
 	}
-	_, err = service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+	_, err = service.createLegacyBalanceOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
 		ProductID:      1,
 		Session:        `{"user":{"email":"real@example.com"},"accessToken":"real-token"}`,
 		IdempotencyKey: "mock-session-guard",
@@ -361,7 +367,7 @@ func TestManagedRechargeRealVerificationOnlyModeRejectsOrdersBeforeDatabaseUse(t
 		upstream:     &managedRechargeVerifyOnlyUpstream{},
 		featureReady: true,
 	}
-	_, err = service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+	_, err = service.createLegacyBalanceOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
 		ProductID:      1,
 		Session:        `{"user":{"email":"test@example.com"},"accessToken":"token"}`,
 		IdempotencyKey: "verification-only-guard",
@@ -411,7 +417,7 @@ func TestManagedRechargeExternalOrderAcceptsEmptySessionAndReturnsIssuedCDK(t *t
 		fulfillmentMode:   ManagedRechargeFulfillmentExternal,
 		externalRedeemURL: "https://redeem.example.test/recharge",
 	}
-	result, err := service.CreateOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
+	result, err := service.createLegacyBalanceOrder(context.Background(), 42, ManagedRechargeCreateOrderInput{
 		ProductID:      1,
 		IdempotencyKey: "external-existing",
 	})
@@ -627,19 +633,27 @@ func TestManagedRechargeExternalFailureStaysRetryableWithoutRefund(t *testing.T)
 func managedRechargeOrderTestRows(order ManagedRechargeOrder, cdkCiphertext, cdkStatus string) *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
 		"id", "order_no", "user_id", "user_email", "username", "product_id", "slug", "name",
-		"fulfillment_mode", "code_masked", "price", "status", "account_email", "upstream_task_id",
+		"fulfillment_mode", "code_masked", "price", "status", "payment_order_id", "payment_status", "payment_expires_at", "account_email", "upstream_task_id",
 		"upstream_status", "upstream_failure_reason", "queue_position", "queue_total", "progress", "error_code",
 		"error_message", "balance_before", "balance_after", "paid_at", "submitted_at", "completed_at",
 		"refunded_at", "last_synced_at", "created_at", "updated_at", "session_ciphertext", "code_ciphertext", "cdk_status",
 	}).AddRow(
 		order.ID, order.OrderNo, order.UserID, order.UserEmail, order.Username, order.ProductID, order.ProductSlug, order.ProductName,
-		order.FulfillmentMode, order.CDKMasked, order.Price, order.Status, order.AccountEmail, order.upstreamTaskID,
+		order.FulfillmentMode, order.CDKMasked, order.Price, order.Status, managedRechargeNullableInt64(order.PaymentOrderID), order.PaymentStatus,
+		managedRechargeNullableTime(order.PaymentExpiresAt), order.AccountEmail, order.upstreamTaskID,
 		order.UpstreamStatus, order.upstreamFailureReason, order.QueuePosition, order.QueueTotal, order.Progress, order.ErrorCode,
 		order.ErrorMessage, order.BalanceBefore, order.BalanceAfter, managedRechargeNullableTime(order.PaidAt),
 		managedRechargeNullableTime(order.SubmittedAt), managedRechargeNullableTime(order.CompletedAt),
 		managedRechargeNullableTime(order.RefundedAt), managedRechargeNullableTime(order.LastSyncedAt), order.CreatedAt, order.UpdatedAt,
 		order.sessionCiphertext, cdkCiphertext, cdkStatus,
 	)
+}
+
+func managedRechargeNullableInt64(value *int64) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func managedRechargeNullableTime(value *time.Time) any {

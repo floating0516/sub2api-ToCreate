@@ -16,15 +16,13 @@
           <div class="min-w-0">
             <h1 class="text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">订阅 GPT Plus / Pro</h1>
             <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
-              {{ isExternalMode ? '使用站内余额购买 CDK，并前往兑换页完成订阅' : '确认套餐与账号后，使用站内余额完成订阅' }}
+              {{ isExternalMode ? '支付宝付款后领取 CDK，并前往兑换页完成订阅' : '确认套餐与账号后，使用支付宝完成订阅' }}
             </p>
           </div>
         </div>
         <div class="border-l border-gray-200 pl-4 text-right dark:border-dark-700">
-          <div class="text-xs text-gray-500 dark:text-dark-400">可用余额</div>
-          <div class="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
-            {{ formatAmount(catalog?.balance || 0) }}
-          </div>
+          <div class="text-xs text-gray-500 dark:text-dark-400">支付方式</div>
+          <div class="mt-1 text-base font-semibold text-[#1677ff]">支付宝</div>
         </div>
       </header>
 
@@ -54,7 +52,7 @@
           <div>
             <div class="font-semibold">模拟测试环境</div>
             <div class="mt-0.5 text-xs leading-5">
-              <template v-if="isExternalMode">仅验证站内支付与模拟 CDK 发放；模拟 CDK 无法在真实兑换页使用。</template>
+              <template v-if="isExternalMode">仅验证支付宝下单与模拟 CDK 发放；模拟 CDK 无法在真实兑换页使用。</template>
               <template v-else>不会连接真实供货商，仅接受页面提供的假 Session。状态约每 {{ catalog.mock_step_seconds || 10 }} 秒推进一次。</template>
             </div>
           </div>
@@ -67,6 +65,28 @@
       <div v-if="loading" class="flex min-h-64 items-center justify-center">
         <Icon name="refresh" size="lg" class="animate-spin text-primary-500" />
       </div>
+
+      <section v-else-if="paymentState" class="mx-auto w-full max-w-md">
+        <div class="mb-4 border-b border-gray-200 pb-4 text-center dark:border-dark-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">支付宝付款</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">付款确认后才会发放 CDK 或提交充值任务</p>
+        </div>
+        <PaymentStatusPanel
+          :order-id="paymentState.order_id"
+          :amount="paymentState.amount"
+          :pay-amount="paymentState.pay_amount"
+          :qr-code="paymentState.qr_code || ''"
+          :expires-at="paymentState.expires_at"
+          payment-type="alipay"
+          :pay-url="paymentState.pay_url"
+          order-type="managed_recharge"
+          :currency="paymentState.currency || 'CNY'"
+          :out-trade-no="paymentState.out_trade_no"
+          :mobile-alipay-deep-link="paymentState.alipay_mobile_precreate_deep_link === true"
+          @success="handlePaymentSuccess"
+          @done="handlePaymentDone"
+        />
+      </section>
 
       <div v-else-if="!catalog?.enabled" class="border border-gray-200 bg-white p-8 text-center dark:border-dark-700 dark:bg-dark-800">
         <Icon name="cube" size="xl" class="mx-auto text-gray-400" />
@@ -125,7 +145,7 @@
                     </span>
                   </span>
                 </span>
-                <span class="shrink-0 text-base font-semibold text-gray-900 dark:text-white">{{ formatAmount(product.price) }}</span>
+                <span class="shrink-0 text-base font-semibold text-gray-900 dark:text-white">¥{{ formatAmount(product.price) }}</span>
               </button>
             </div>
           </section>
@@ -141,7 +161,7 @@
             <div class="grid gap-4 p-5 sm:grid-cols-3">
               <div class="border-l-2 border-gray-900 pl-3 dark:border-white">
                 <div class="text-xs text-gray-500 dark:text-dark-400">付款</div>
-                <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">余额完成支付</div>
+                <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">支付宝完成支付</div>
               </div>
               <div class="border-l-2 border-gray-300 pl-3 dark:border-dark-500">
                 <div class="text-xs text-gray-500 dark:text-dark-400">领取</div>
@@ -228,7 +248,7 @@
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white dark:bg-white dark:text-dark-900">3</span>
               <div>
                 <h2 class="text-sm font-semibold text-gray-900 dark:text-white">确认并支付</h2>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">支付方式：站内余额</p>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">支付方式：支付宝</p>
               </div>
             </div>
 
@@ -244,19 +264,9 @@
                 </div>
                 <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-dark-700">
                   <dt class="text-gray-500 dark:text-dark-400">应付金额</dt>
-                  <dd class="text-xl font-semibold text-gray-900 dark:text-white">{{ formatAmount(selectedProduct?.price || 0) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3 text-xs">
-                  <dt class="text-gray-500 dark:text-dark-400">支付后余额</dt>
-                  <dd :class="!selectedProduct || hasEnoughBalance ? 'text-gray-700 dark:text-dark-200' : 'text-red-600 dark:text-red-400'">
-                    {{ formatAmount(balanceAfterPayment) }}
-                  </dd>
+                  <dd class="text-xl font-semibold text-gray-900 dark:text-white">¥{{ formatAmount(selectedProduct?.price || 0) }}</dd>
                 </div>
               </dl>
-
-              <div v-if="selectedProduct && !hasEnoughBalance" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
-                余额不足，还差 {{ formatAmount(selectedProduct.price - (catalog?.balance || 0)) }}
-              </div>
 
               <label class="flex items-start gap-3 text-xs leading-5 text-gray-600 dark:text-dark-300">
                 <input v-model="agreed" data-testid="managed-recharge-agreement" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" />
@@ -277,7 +287,7 @@
               >
                 <Icon v-if="submitting" name="refresh" size="sm" class="mr-2 animate-spin" />
                 <Icon v-else name="creditCard" size="sm" class="mr-2" />
-                {{ submitting ? '正在提交' : `余额支付 ${formatAmount(selectedProduct?.price || 0)}` }}
+                {{ submitting ? '正在创建支付宝订单' : `支付宝支付 ¥${formatAmount(selectedProduct?.price || 0)}` }}
               </button>
 
               <p class="text-center text-xs leading-5 text-gray-500 dark:text-dark-400">
@@ -438,6 +448,8 @@ import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
+import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import {
   findManagedRechargeProduct,
   normalizeManagedRechargePlanKey,
@@ -454,6 +466,7 @@ import {
   type ManagedRechargeMembership,
   type ManagedRechargeOrder,
 } from '@/api/managedRecharge'
+import type { CreateOrderResult } from '@/types/payment'
 
 const route = useRoute()
 const router = useRouter()
@@ -476,6 +489,8 @@ const replacementError = ref('')
 const replacementSubmitting = ref(false)
 const issuedOrder = ref<ManagedRechargeOrder | null>(null)
 const codeCopied = ref(false)
+const paymentState = ref<CreateOrderResult | null>(null)
+const paymentManagedOrderId = ref<number | null>(null)
 let pollTimer: number | null = null
 let sessionValidationTimer: number | null = null
 let sessionValidationRequestID = 0
@@ -487,13 +502,13 @@ const isExternalMode = computed(() => catalog.value?.fulfillment_mode === 'exter
 const purchaseSteps = computed(() => isExternalMode.value
   ? [
       { title: '选择套餐', description: '确认档位与库存' },
-      { title: '领取 CDK', description: '支付后立即发放' },
+      { title: '支付宝付款', description: '到账后立即发放' },
       { title: '前往兑换', description: '在兑换页提交账号' },
     ]
   : [
       { title: '选择套餐', description: '确认档位与库存' },
       { title: '提交账号', description: '粘贴 Session JSON' },
-      { title: '确认支付', description: '余额支付并跟踪进度' },
+      { title: '支付宝付款', description: '到账后跟踪进度' },
     ])
 const selectedProduct = computed(() => catalog.value?.products.find((item) => item.id === selectedProductId.value) || null)
 const sessionMembershipLabel = computed(() => ({
@@ -513,20 +528,11 @@ const requestedPlanUnavailable = computed(() => Boolean(
   catalog.value &&
   !findManagedRechargeProduct(catalog.value.products, requestedPlan.value),
 ))
-const hasEnoughBalance = computed(() => Boolean(
-  selectedProduct.value &&
-  (catalog.value?.balance || 0) >= selectedProduct.value.price,
-))
-const balanceAfterPayment = computed(() => {
-  if (!selectedProduct.value) return catalog.value?.balance || 0
-  return Math.max(0, (catalog.value?.balance || 0) - selectedProduct.value.price)
-})
 const canSubmit = computed(() => Boolean(
   selectedProduct.value &&
   selectedProduct.value.available_stock > 0 &&
   (isExternalMode.value || (sessionEmail.value && sessionValidationState.value === 'valid')) &&
-  agreed.value &&
-  hasEnoughBalance.value,
+  agreed.value,
 ))
 
 function goBack(): void {
@@ -538,9 +544,10 @@ function errorMessage(error: unknown): string {
   const reason = structured?.reason || structured?.code || ''
   const knownMessages: Record<string, string> = {
     MANAGED_RECHARGE_OUT_OF_STOCK: '当前套餐已售罄，请选择其他套餐或稍后再试',
-    INSUFFICIENT_BALANCE: '站内余额不足，请先充值余额',
     MANAGED_RECHARGE_UPSTREAM_UNAVAILABLE: '兑换服务暂时不可用，本次不会扣款，请稍后重试',
     MANAGED_RECHARGE_UNAVAILABLE: '会员订阅服务暂未开放',
+    MANAGED_RECHARGE_PAYMENT_UNAVAILABLE: '支付宝支付暂不可用，请稍后重试',
+    MANAGED_RECHARGE_ALIPAY_REQUIRED: '会员订阅仅支持支付宝支付',
     MANAGED_RECHARGE_PRODUCT_INVALID: '所选套餐已下架，请刷新页面后重新选择',
   }
   if (knownMessages[reason]) return knownMessages[reason]
@@ -651,22 +658,29 @@ async function submitOrder(): Promise<void> {
   submitting.value = true
   submitError.value = ''
   try {
-    const order = await createManagedRechargeOrder(
+    const checkout = await createManagedRechargeOrder(
       selectedProduct.value.id,
       isExternalMode.value ? undefined : sessionJson.value,
       newIdempotencyKey(),
+      `${window.location.origin}/member-recharge`,
+      isMobileDevice(),
     )
+    const order = checkout.order
     orders.value = [order, ...orders.value.filter((item) => item.id !== order.id)]
     agreed.value = false
     await loadCatalog()
-    if (isExternalMode.value) {
-      if (order.redemption_code) {
-        issuedOrder.value = order
-        codeCopied.value = false
-      } else {
-        submitError.value = '订单已创建，但 CDK 暂未成功发放，请联系管理员核对订单'
+    if (checkout.payment) {
+      paymentManagedOrderId.value = order.id
+      paymentState.value = checkout.payment
+      if (!isExternalMode.value) {
+        sessionJson.value = ''
+        resetSessionValidation()
       }
-    } else {
+      launchAlipayWindow(checkout.payment)
+    } else if (isExternalMode.value && order.redemption_code) {
+      issuedOrder.value = order
+      codeCopied.value = false
+    } else if (!isExternalMode.value) {
       sessionJson.value = ''
       resetSessionValidation()
     }
@@ -677,8 +691,36 @@ async function submitOrder(): Promise<void> {
   }
 }
 
+function isMobileDevice(): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent)
+}
+
+function launchAlipayWindow(payment: CreateOrderResult): void {
+  if (!payment.pay_url || payment.qr_code) return
+  if (isMobileDevice()) {
+    window.location.href = payment.pay_url
+    return
+  }
+  const popup = window.open(payment.pay_url, 'paymentPopup', getPaymentPopupFeatures())
+  if (!popup || popup.closed) window.location.href = payment.pay_url
+}
+
+async function handlePaymentSuccess(): Promise<void> {
+  await Promise.all([loadCatalog(), loadOrders()])
+  const orderID = paymentManagedOrderId.value
+  if (!orderID || !isExternalMode.value) return
+  const order = orders.value.find((item) => item.id === orderID)
+  if (order?.status === 'issued') await revealExternalOrder(orderID)
+}
+
+async function handlePaymentDone(): Promise<void> {
+  paymentState.value = null
+  paymentManagedOrderId.value = null
+  await Promise.all([loadCatalog(), loadOrders()])
+}
+
 function isActiveStatus(status: string): boolean {
-  return ['validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
+  return ['awaiting_payment', 'validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'manual_review'].includes(status)
 }
 
 async function refreshOrder(id: number): Promise<void> {
@@ -711,6 +753,7 @@ function statusLabel(status: string, fulfillmentMode: ManagedRechargeOrder['fulf
   if (status === 'issued') return '等待兑换'
   if (fulfillmentMode === 'external' && status === 'completed') return '订阅完成'
   return ({
+    awaiting_payment: '等待付款',
     validating: '验证库存', paid: '已支付', submitting: '正在提交', queued: '排队中', processing: '处理中',
     verifying: '确认订阅', action_required: '需要新 Session', manual_review: '人工核对', completed: '充值成功',
     failed: '未完成', refunded: '已退款',

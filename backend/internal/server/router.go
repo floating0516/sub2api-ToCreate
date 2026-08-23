@@ -149,6 +149,7 @@ func registerRoutes(
 		rechargeBalanceCache = repository.NewBillingCache(redisClient)
 	}
 	managedRechargeService := service.NewManagedRechargeService(db, rechargeEncryptor, rechargeBalanceCache, apiKeyService)
+	h.Payment.BindManagedRechargeService(managedRechargeService)
 	managedRechargeHandler := handler.NewManagedRechargeHandler(managedRechargeService)
 
 	// 注册各模块路由

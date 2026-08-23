@@ -137,6 +137,17 @@ func (s *PaymentService) cancelCore(ctx context.Context, o *dbent.PaymentOrder, 
 			auditAction = "ORDER_EXPIRED"
 		}
 		s.writeAuditLog(ctx, o.ID, auditAction, op, map[string]any{"detail": ad})
+		if o.OrderType == payment.OrderTypeManagedRecharge && s.managedRechargeService != nil {
+			code := "PAYMENT_CANCELLED"
+			message := "支付宝订单已取消，请重新提交"
+			if fs == OrderStatusExpired {
+				code = "PAYMENT_EXPIRED"
+				message = "支付宝订单已超时，请重新提交"
+			}
+			if releaseErr := s.managedRechargeService.ReleaseUnpaidPaymentOrder(ctx, o.ID, code, message); releaseErr != nil {
+				slog.Warn("release managed recharge inventory after payment cancellation failed", "orderID", o.ID, "error", releaseErr)
+			}
+		}
 	}
 	return checkPaidResultCancelled, nil
 }

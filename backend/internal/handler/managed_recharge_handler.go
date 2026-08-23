@@ -31,6 +31,8 @@ func NewManagedRechargeHandler(managedRechargeService *service.ManagedRechargeSe
 type managedRechargeCreateOrderRequest struct {
 	ProductID   int64  `json:"product_id" binding:"required"`
 	SessionJSON string `json:"session_json"`
+	ReturnURL   string `json:"return_url"`
+	IsMobile    *bool  `json:"is_mobile,omitempty"`
 }
 
 type managedRechargeValidateSessionRequest struct {
@@ -91,15 +93,25 @@ func (h *ManagedRechargeHandler) CreateOrder(c *gin.Context) {
 	if !managedRechargeBindJSON(c, &req, managedRechargeSessionBodyMaxBytes, "Invalid recharge request") {
 		return
 	}
-	result, err := h.service.CreateOrder(c.Request.Context(), userID, service.ManagedRechargeCreateOrderInput{
+	mobile := isMobile(c)
+	if req.IsMobile != nil {
+		mobile = *req.IsMobile
+	}
+	result, err := h.service.CreateCheckout(c.Request.Context(), userID, service.ManagedRechargeCreateOrderInput{
 		ProductID:      req.ProductID,
 		Session:        req.SessionJSON,
 		IdempotencyKey: c.GetHeader("Idempotency-Key"),
+		ClientIP:       c.ClientIP(),
+		IsMobile:       mobile,
+		SrcHost:        c.Request.Host,
+		SrcURL:         c.Request.Referer(),
+		ReturnURL:      req.ReturnURL,
+		Locale:         c.GetHeader("Accept-Language"),
 	})
 	if response.ErrorFrom(c, err) {
 		return
 	}
-	response.Created(c, managedRechargeUserOrder(result))
+	response.Created(c, managedRechargeUserCheckout(result))
 }
 
 func (h *ManagedRechargeHandler) ListOrders(c *gin.Context) {
@@ -361,6 +373,15 @@ func managedRechargeUserOrders(orders []service.ManagedRechargeOrder) []service.
 	return result
 }
 
+func managedRechargeUserCheckout(checkout *service.ManagedRechargeCheckout) *service.ManagedRechargeCheckout {
+	if checkout == nil {
+		return nil
+	}
+	result := *checkout
+	result.Order = managedRechargeUserOrder(checkout.Order)
+	return &result
+}
+
 func managedRechargeUserOrder(order *service.ManagedRechargeOrder) *service.ManagedRechargeOrder {
 	if order == nil {
 		return nil
@@ -390,6 +411,8 @@ func managedRechargeUserProgress(order *service.ManagedRechargeOrder) string {
 		return ""
 	}
 	switch order.Status {
+	case service.ManagedRechargeStatusAwaitingPayment:
+		return "等待支付宝付款"
 	case service.ManagedRechargeStatusValidating:
 		return "正在确认库存与订单"
 	case service.ManagedRechargeStatusPaid, service.ManagedRechargeStatusSubmitting:
@@ -411,7 +434,7 @@ func managedRechargeUserProgress(order *service.ManagedRechargeOrder) string {
 	case service.ManagedRechargeStatusFailed:
 		return "订单未完成"
 	case service.ManagedRechargeStatusRefunded:
-		return "订单未完成，余额已退回"
+		return "订单未完成，款项已退回"
 	default:
 		return ""
 	}

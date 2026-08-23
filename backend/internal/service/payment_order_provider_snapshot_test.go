@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"testing"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/stretchr/testify/require"
 )
@@ -146,6 +147,21 @@ func TestBuildPaymentOrderProviderSnapshot_IncludesAlipayMerchantIdentity(t *tes
 
 	require.Equal(t, "alipay-app-21", snapshot["merchant_app_id"])
 	require.NotContains(t, snapshot, "privateKey")
+}
+
+func TestBuildPaymentOrderProviderSnapshot_LinksManagedRechargeOrder(t *testing.T) {
+	t.Parallel()
+
+	snapshot := buildPaymentOrderProviderSnapshot(&payment.InstanceSelection{
+		InstanceID:  "31",
+		ProviderKey: payment.TypeAlipay,
+		Config:      map[string]string{"appId": "alipay-app-31"},
+	}, CreateOrderRequest{ManagedRechargeOrderID: 902})
+
+	require.Equal(t, int64(902), snapshot["managed_recharge_order_id"])
+	parsed := psOrderProviderSnapshot(&dbent.PaymentOrder{ProviderSnapshot: snapshot})
+	require.NotNil(t, parsed)
+	require.Equal(t, int64(902), parsed.ManagedRechargeOrderID)
 }
 
 func TestBuildPaymentOrderProviderSnapshot_IncludesEasyPayMerchantIdentity(t *testing.T) {

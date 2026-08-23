@@ -55,6 +55,7 @@ function product(overrides: Partial<ManagedRechargeProduct>): ManagedRechargePro
 const catalog: ManagedRechargeCatalog = {
   enabled: true,
   balance: 50,
+  payment_method: 'alipay',
   mock_mode: false,
   fulfillment_mode: 'proxy',
   products: [
@@ -104,8 +105,8 @@ describe('ManagedRechargeView purchase flow', () => {
     expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('如何获取 Session？')
     expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).toContain('将页面返回的完整 JSON 全部复制')
     expect(wrapper.get('[data-testid="managed-recharge-session-guide"]').text()).not.toContain('不要上传截图')
-    expect(wrapper.text()).toContain('支付后余额')
-    expect(wrapper.text()).toContain('42.00')
+    expect(wrapper.text()).toContain('支付方式')
+    expect(wrapper.text()).toContain('支付宝')
 
     await wrapper.get('[data-testid="managed-recharge-session-input"]').setValue(JSON.stringify({
       user: { email: 'member@example.com' },
@@ -149,14 +150,14 @@ describe('ManagedRechargeView purchase flow', () => {
     wrapper.unmount()
   })
 
-  it('purchases an external CDK without Session and opens the redemption dialog', async () => {
+  it('creates an Alipay checkout for an external CDK without Session', async () => {
     const externalCatalog: ManagedRechargeCatalog = {
       ...catalog,
       mock_mode: true,
       mock_step_seconds: 10,
       fulfillment_mode: 'external',
     }
-    const issuedOrder: ManagedRechargeOrder = {
+    const awaitingOrder: ManagedRechargeOrder = {
       id: 31,
       order_no: 'MR-EXTERNAL-31',
       user_id: 42,
@@ -164,17 +165,26 @@ describe('ManagedRechargeView purchase flow', () => {
       product_slug: 'gpt-pro-5x',
       product_name: 'Pro（5 倍）',
       fulfillment_mode: 'external',
-      redemption_code: 'MOCK-PRO-SUCCESS-031',
-      redemption_url: 'https://redeem.desolate.codes/recharge?cdk=MOCK-PRO-SUCCESS-031',
       price: 8,
-      status: 'issued',
+      status: 'awaiting_payment',
       account_email: '',
-      paid_at: '2026-08-22T00:00:00Z',
       created_at: '2026-08-22T00:00:00Z',
       updated_at: '2026-08-22T00:00:00Z',
     }
     getCatalog.mockResolvedValue(externalCatalog)
-    createOrder.mockResolvedValue(issuedOrder)
+    createOrder.mockResolvedValue({
+      order: awaitingOrder,
+      payment: {
+        order_id: 81,
+        amount: 8,
+        pay_amount: 8,
+        fee_rate: 0,
+        expires_at: '2026-08-22T00:30:00Z',
+        payment_type: 'alipay',
+        out_trade_no: 'sub2_test_alipay',
+        qr_code: 'https://qr.example.test/alipay',
+      },
+    })
 
     const wrapper = mount(ManagedRechargeView, {
       global: {
@@ -184,6 +194,7 @@ describe('ManagedRechargeView purchase flow', () => {
             props: ['show', 'title'],
             template: '<div v-if="show"><h2>{{ title }}</h2><slot /><slot name="footer" /></div>',
           },
+          PaymentStatusPanel: { template: '<div data-testid="alipay-payment-panel">支付宝付款中</div>' },
           Icon: true,
         },
       },
@@ -193,17 +204,14 @@ describe('ManagedRechargeView purchase flow', () => {
     expect(wrapper.find('[data-testid="managed-recharge-session-input"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('领取专属 CDK')
     expect(wrapper.text()).toContain('模拟 CDK 无法在真实兑换页使用')
-    expect(wrapper.get('[data-testid="managed-recharge-step-2"]').text()).toContain('领取 CDK')
+    expect(wrapper.get('[data-testid="managed-recharge-step-2"]').text()).toContain('支付宝付款')
 
     await wrapper.get('[data-testid="managed-recharge-agreement"]').setValue(true)
     await wrapper.get('#managed-recharge-form').trigger('submit')
     await flushPromises()
 
-    expect(createOrder).toHaveBeenCalledWith(2, undefined, expect.any(String))
-    expect(wrapper.get('[data-testid="managed-recharge-issued-dialog"]').text()).toContain('MOCK-PRO-SUCCESS-031')
-    const redeemLink = wrapper.get('a[href*="MOCK-PRO-SUCCESS-031"]')
-    expect(redeemLink.attributes('target')).toBe('_blank')
-    expect(redeemLink.text()).toContain('前往兑换')
+    expect(createOrder).toHaveBeenCalledWith(2, undefined, expect.any(String), expect.stringContaining('/member-recharge'), expect.any(Boolean))
+    expect(wrapper.get('[data-testid="alipay-payment-panel"]').text()).toContain('支付宝付款中')
 
     wrapper.unmount()
   })

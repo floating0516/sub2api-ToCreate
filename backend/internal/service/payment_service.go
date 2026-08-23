@@ -72,22 +72,23 @@ func generateRandomString(n int) string {
 }
 
 type CreateOrderRequest struct {
-	UserID          int64
-	Amount          float64
-	PaymentType     string
-	OpenID          string
-	ClientIP        string
-	IsMobile        bool
-	IsWeChatBrowser bool
-	SrcHost         string
-	SrcURL          string
-	ReturnURL       string
-	PaymentSource   string
-	OrderType       string
-	PlanID          int64
-	AddonProductID  int64
-	SubscriptionID  int64
-	Locale          string
+	UserID                 int64
+	Amount                 float64
+	PaymentType            string
+	OpenID                 string
+	ClientIP               string
+	IsMobile               bool
+	IsWeChatBrowser        bool
+	SrcHost                string
+	SrcURL                 string
+	ReturnURL              string
+	PaymentSource          string
+	OrderType              string
+	PlanID                 int64
+	AddonProductID         int64
+	SubscriptionID         int64
+	Locale                 string
+	ManagedRechargeOrderID int64
 }
 
 type CreateOrderResponse struct {
@@ -246,6 +247,7 @@ type PaymentService struct {
 	resumeService            *PaymentResumeService
 	affiliateService         *AffiliateService
 	notificationEmailService *NotificationEmailService
+	managedRechargeService   *ManagedRechargeService
 }
 
 func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService) *PaymentService {
@@ -260,6 +262,13 @@ func (s *PaymentService) SetNotificationEmailService(notificationEmailService *N
 
 func (s *PaymentService) SetAuthCacheInvalidator(authCacheInvalidator APIKeyAuthCacheInvalidator) {
 	s.authCacheInvalidator = authCacheInvalidator
+}
+
+func (s *PaymentService) SetManagedRechargeService(managedRechargeService *ManagedRechargeService) {
+	if s == nil {
+		return
+	}
+	s.managedRechargeService = managedRechargeService
 }
 
 // --- Provider Registry ---

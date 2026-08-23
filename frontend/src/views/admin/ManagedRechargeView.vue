@@ -321,7 +321,7 @@
 
     <BaseDialog :show="refundOrder !== null" title="确认人工退款" width="normal" @close="refundOrder = null">
       <div class="space-y-3 text-sm text-gray-600 dark:text-dark-300">
-        <p>订单 {{ refundOrder?.order_no }} 将退回 {{ formatAmount(refundOrder?.price || 0) }} 至用户余额。</p>
+        <p>订单 {{ refundOrder?.order_no }} 将通过原支付宝订单退回 ¥{{ formatAmount(refundOrder?.price || 0) }}。</p>
         <p class="border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/15 dark:text-amber-300">退款后关联 CDK 会被隔离，不会自动回到可售库存。</p>
       </div>
       <template #footer>
@@ -646,7 +646,7 @@ async function confirmRefund(): Promise<void> {
     if (index >= 0) orders.value[index] = updated
     refundOrder.value = null
     await loadProducts()
-    showNotice('订单已退款，关联 CDK 已隔离')
+    showNotice('支付宝退款已完成，关联 CDK 已隔离')
   } catch (error) {
     if (!isStepUpCancelled(error)) pageError.value = protectedActionError(error)
   } finally {
@@ -675,6 +675,7 @@ function cdkStatusClass(status: string): string {
 
 function orderStatusLabel(status: string): string {
   return ({
+    awaiting_payment: '等待支付宝付款',
     validating: '验证库存', paid: '已支付', issued: '等待用户兑换', submitting: '正在提交', queued: '排队中', processing: '处理中',
     verifying: '确认订阅', action_required: '待补 Session', manual_review: '人工核对', completed: '成功',
     failed: '失败', refunded: '已退款',
@@ -689,13 +690,15 @@ function orderStatusClass(status: string): string {
 }
 
 function orderNeedsSync(status: string): boolean {
-  return ['validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
+  return ['awaiting_payment', 'validating', 'paid', 'issued', 'submitting', 'queued', 'processing', 'verifying', 'action_required', 'manual_review'].includes(status)
 }
 
 function canRefund(order: ManagedRechargeOrder): boolean {
   if (order.fulfillment_mode === 'external') return false
-  if (order.status !== 'manual_review' || order.error_code !== 'UPSTREAM_TASK_NOT_FOUND' || !order.paid_at) return false
-  return Date.now() - new Date(order.paid_at).getTime() >= 10 * 60 * 1000
+  if (order.status !== 'manual_review' || !order.paid_at) return false
+  if (order.payment_order_id && ['UPSTREAM_CREATE_REJECTED', 'PAYMENT_AFTER_CANCELLATION'].includes(order.error_code || '')) return true
+  return order.error_code === 'UPSTREAM_TASK_NOT_FOUND'
+    && Date.now() - new Date(order.paid_at).getTime() >= 10 * 60 * 1000
 }
 
 onMounted(loadAll)

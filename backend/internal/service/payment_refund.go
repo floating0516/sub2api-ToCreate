@@ -236,6 +236,17 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 	if amt <= 0 {
 		amt = o.Amount
 	}
+	if o.OrderType == payment.OrderTypeManagedRecharge {
+		if s.managedRechargeService == nil {
+			return nil, nil, ErrManagedRechargeUnavailable
+		}
+		if math.Abs(amt-o.Amount) > paymentAmountToleranceForCurrency(PaymentOrderCurrency(o)) {
+			return nil, nil, infraerrors.BadRequest("MANAGED_RECHARGE_PARTIAL_REFUND_UNSUPPORTED", "managed recharge orders only support full refunds")
+		}
+		if err := s.managedRechargeService.ValidateRefundablePaymentOrder(ctx, o.ID); err != nil {
+			return nil, nil, err
+		}
+	}
 	orderCurrency := PaymentOrderCurrency(o)
 	if amt-o.Amount > paymentAmountToleranceForCurrency(orderCurrency) {
 		return nil, nil, infraerrors.BadRequest("REFUND_AMOUNT_EXCEEDED", "refund amount exceeds recharge")
@@ -258,6 +269,10 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 }
 
 func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, p *RefundPlan, force bool) *RefundResult {
+	if o.OrderType == payment.OrderTypeManagedRecharge {
+		p.DeductionType = payment.DeductionTypeNone
+		return nil
+	}
 	if o.OrderType == payment.OrderTypeSubscription {
 		p.DeductionType = payment.DeductionTypeSubscription
 		if o.SubscriptionGroupID != nil && o.SubscriptionDays != nil {
@@ -508,6 +523,9 @@ func (s *PaymentService) finalizePendingRefundSuccess(ctx context.Context, p *Re
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit refund finalization: %w", err)
 	}
+	if err = s.syncManagedRechargeRefund(ctx, p.Order); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -619,7 +637,21 @@ func (s *PaymentService) markRefundOk(ctx context.Context, p *RefundPlan) (*Refu
 		return nil, fmt.Errorf("mark refund: %w", err)
 	}
 	s.writeAuditLog(ctx, p.OrderID, "REFUND_SUCCESS", "admin", map[string]any{"refundAmount": p.RefundAmount, "reason": p.Reason, "balanceDeducted": p.BalanceToDeduct, "force": p.Force})
+	if err := s.syncManagedRechargeRefund(ctx, p.Order); err != nil {
+		return nil, err
+	}
 	return &RefundResult{Success: true, BalanceDeducted: p.BalanceToDeduct, SubDaysDeducted: p.SubDaysToDeduct}, nil
+}
+
+func (s *PaymentService) syncManagedRechargeRefund(ctx context.Context, order *dbent.PaymentOrder) error {
+	if order == nil || order.OrderType != payment.OrderTypeManagedRecharge || s.managedRechargeService == nil {
+		return nil
+	}
+	snapshot := psOrderProviderSnapshot(order)
+	if snapshot == nil || snapshot.ManagedRechargeOrderID <= 0 {
+		return nil
+	}
+	return s.managedRechargeService.markAlipayRefunded(ctx, snapshot.ManagedRechargeOrderID, "ALIPAY_REFUNDED", "支付宝退款已完成")
 }
 
 func (s *PaymentService) markRefundOkTx(ctx context.Context, client *dbent.Client, p *RefundPlan) (*RefundResult, error) {

@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import type { CreateOrderResult } from '@/types/payment'
 
 export interface ManagedRechargeProduct {
   id: number
@@ -18,6 +19,7 @@ export interface ManagedRechargeProduct {
 export interface ManagedRechargeCatalog {
   enabled: boolean
   balance: number
+  payment_method: 'alipay'
   products: ManagedRechargeProduct[]
   mock_mode: boolean
   mock_step_seconds?: number
@@ -47,6 +49,9 @@ export interface ManagedRechargeOrder {
   redemption_url?: string
   price: number
   status: string
+  payment_order_id?: number
+  payment_status?: string
+  payment_expires_at?: string
   account_email: string
   upstream_status?: string
   queue_position?: number
@@ -63,6 +68,11 @@ export interface ManagedRechargeOrder {
   last_synced_at?: string
   created_at: string
   updated_at: string
+}
+
+export interface ManagedRechargeCheckout {
+  order: ManagedRechargeOrder
+  payment?: CreateOrderResult
 }
 
 export interface ManagedRechargeCDK {
@@ -118,10 +128,16 @@ export async function createManagedRechargeOrder(
   productId: number,
   sessionJson: string | undefined,
   idempotencyKey: string,
-): Promise<ManagedRechargeOrder> {
-  const payload: { product_id: number; session_json?: string } = { product_id: productId }
+  returnUrl: string,
+  isMobile: boolean,
+): Promise<ManagedRechargeCheckout> {
+  const payload: { product_id: number; session_json?: string; return_url: string; is_mobile: boolean } = {
+    product_id: productId,
+    return_url: returnUrl,
+    is_mobile: isMobile,
+  }
   if (sessionJson?.trim()) payload.session_json = sessionJson
-  const { data } = await apiClient.post<ManagedRechargeOrder>(
+  const { data } = await apiClient.post<ManagedRechargeCheckout>(
     '/managed-recharge/orders',
     payload,
     { headers: { 'Idempotency-Key': idempotencyKey }, timeout: 180000 },
