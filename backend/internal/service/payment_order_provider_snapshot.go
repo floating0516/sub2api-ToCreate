@@ -11,13 +11,13 @@ import (
 )
 
 type paymentOrderProviderSnapshot struct {
-	SchemaVersion            int
-	ProviderInstanceID       string
-	ProviderKey              string
-	PaymentMode              string
-	MerchantAppID            string
-	MerchantID               string
-	Currency                 string
+	SchemaVersion          int
+	ProviderInstanceID     string
+	ProviderKey            string
+	PaymentMode            string
+	MerchantAppID          string
+	MerchantID             string
+	Currency               string
 	ManagedRechargeOrderID int64
 }
 
@@ -27,13 +27,13 @@ func psOrderProviderSnapshot(order *dbent.PaymentOrder) *paymentOrderProviderSna
 	}
 
 	snapshot := &paymentOrderProviderSnapshot{
-		SchemaVersion:            psSnapshotIntValue(order.ProviderSnapshot["schema_version"]),
-		ProviderInstanceID:       psSnapshotStringValue(order.ProviderSnapshot["provider_instance_id"]),
-		ProviderKey:              psSnapshotStringValue(order.ProviderSnapshot["provider_key"]),
-		PaymentMode:              psSnapshotStringValue(order.ProviderSnapshot["payment_mode"]),
-		MerchantAppID:            psSnapshotStringValue(order.ProviderSnapshot["merchant_app_id"]),
-		MerchantID:               psSnapshotStringValue(order.ProviderSnapshot["merchant_id"]),
-		Currency:                 psSnapshotStringValue(order.ProviderSnapshot["currency"]),
+		SchemaVersion:          psSnapshotIntValue(order.ProviderSnapshot["schema_version"]),
+		ProviderInstanceID:     psSnapshotStringValue(order.ProviderSnapshot["provider_instance_id"]),
+		ProviderKey:            psSnapshotStringValue(order.ProviderSnapshot["provider_key"]),
+		PaymentMode:            psSnapshotStringValue(order.ProviderSnapshot["payment_mode"]),
+		MerchantAppID:          psSnapshotStringValue(order.ProviderSnapshot["merchant_app_id"]),
+		MerchantID:             psSnapshotStringValue(order.ProviderSnapshot["merchant_id"]),
+		Currency:               psSnapshotStringValue(order.ProviderSnapshot["currency"]),
 		ManagedRechargeOrderID: int64(psSnapshotIntValue(order.ProviderSnapshot["managed_recharge_order_id"])),
 	}
 	if snapshot.SchemaVersion == 0 &&

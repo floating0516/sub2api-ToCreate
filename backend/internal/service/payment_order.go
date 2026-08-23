@@ -916,19 +916,19 @@ func (s *PaymentService) GetCreateOrderResponse(ctx context.Context, userID, ord
 		paymentMode = snapshot.PaymentMode
 	}
 	return &CreateOrderResponse{
-		OrderID:      order.ID,
-		Amount:       order.Amount,
-		PayAmount:    order.PayAmount,
-		FeeRate:      order.FeeRate,
-		Status:       order.Status,
-		ResultType:   payment.CreatePaymentResultOrderCreated,
-		PaymentType:  order.PaymentType,
-		OutTradeNo:   order.OutTradeNo,
-		PayURL:       psStringValue(order.PayURL),
-		QRCode:       psStringValue(order.QrCode),
-		Currency:     PaymentOrderCurrency(order),
-		ExpiresAt:    order.ExpiresAt,
-		PaymentMode:  paymentMode,
+		OrderID:     order.ID,
+		Amount:      order.Amount,
+		PayAmount:   order.PayAmount,
+		FeeRate:     order.FeeRate,
+		Status:      order.Status,
+		ResultType:  payment.CreatePaymentResultOrderCreated,
+		PaymentType: order.PaymentType,
+		OutTradeNo:  order.OutTradeNo,
+		PayURL:      psStringValue(order.PayURL),
+		QRCode:      psStringValue(order.QrCode),
+		Currency:    PaymentOrderCurrency(order),
+		ExpiresAt:   order.ExpiresAt,
+		PaymentMode: paymentMode,
 	}, nil
 }
 

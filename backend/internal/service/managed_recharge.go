@@ -21,18 +21,18 @@ import (
 
 const (
 	ManagedRechargeStatusAwaitingPayment = "awaiting_payment"
-	ManagedRechargeStatusValidating     = "validating"
-	ManagedRechargeStatusPaid           = "paid"
-	ManagedRechargeStatusIssued         = "issued"
-	ManagedRechargeStatusSubmitting     = "submitting"
-	ManagedRechargeStatusQueued         = "queued"
-	ManagedRechargeStatusProcessing     = "processing"
-	ManagedRechargeStatusVerifying      = "verifying"
-	ManagedRechargeStatusActionRequired = "action_required"
-	ManagedRechargeStatusManualReview   = "manual_review"
-	ManagedRechargeStatusCompleted      = "completed"
-	ManagedRechargeStatusFailed         = "failed"
-	ManagedRechargeStatusRefunded       = "refunded"
+	ManagedRechargeStatusValidating      = "validating"
+	ManagedRechargeStatusPaid            = "paid"
+	ManagedRechargeStatusIssued          = "issued"
+	ManagedRechargeStatusSubmitting      = "submitting"
+	ManagedRechargeStatusQueued          = "queued"
+	ManagedRechargeStatusProcessing      = "processing"
+	ManagedRechargeStatusVerifying       = "verifying"
+	ManagedRechargeStatusActionRequired  = "action_required"
+	ManagedRechargeStatusManualReview    = "manual_review"
+	ManagedRechargeStatusCompleted       = "completed"
+	ManagedRechargeStatusFailed          = "failed"
+	ManagedRechargeStatusRefunded        = "refunded"
 
 	ManagedRechargeFulfillmentProxy    = "proxy"
 	ManagedRechargeFulfillmentExternal = "external"
@@ -799,17 +799,17 @@ func (s *ManagedRechargeService) createAlipayPayment(ctx context.Context, userID
 		return nil, ErrManagedRechargeOrderMissing
 	}
 	return s.paymentService.CreateOrder(ctx, CreateOrderRequest{
-		UserID:                  userID,
-		Amount:                  order.Price,
-		PaymentType:             payment.TypeAlipay,
-		ClientIP:                input.ClientIP,
-		IsMobile:                input.IsMobile,
-		SrcHost:                 input.SrcHost,
-		SrcURL:                  input.SrcURL,
-		ReturnURL:               input.ReturnURL,
-		PaymentSource:            "managed_recharge_alipay",
-		OrderType:                payment.OrderTypeManagedRecharge,
-		Locale:                   input.Locale,
+		UserID:                 userID,
+		Amount:                 order.Price,
+		PaymentType:            payment.TypeAlipay,
+		ClientIP:               input.ClientIP,
+		IsMobile:               input.IsMobile,
+		SrcHost:                input.SrcHost,
+		SrcURL:                 input.SrcURL,
+		ReturnURL:              input.ReturnURL,
+		PaymentSource:          "managed_recharge_alipay",
+		OrderType:              payment.OrderTypeManagedRecharge,
+		Locale:                 input.Locale,
 		ManagedRechargeOrderID: order.ID,
 	})
 }
