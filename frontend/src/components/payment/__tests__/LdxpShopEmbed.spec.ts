@@ -39,8 +39,8 @@ describe('LdxpShopEmbed', () => {
     const frame = wrapper.get('[data-testid="ldxp-shop-frame"]')
     const externalLink = wrapper.get('a[target="_blank"]')
 
-    expect(frame.attributes('src')).toBe('https://pay.ldxp.cn/shop/FIDK51J9')
-    expect(externalLink.attributes('href')).toBe('https://pay.ldxp.cn/shop/FIDK51J9')
+    expect(frame.attributes('src')).toBe('https://pay.ldxp.cn/shop/ToCreate')
+    expect(externalLink.attributes('href')).toBe('https://pay.ldxp.cn/shop/ToCreate')
     expect(frame.attributes('referrerpolicy')).toBe('strict-origin-when-cross-origin')
 
     await frame.trigger('load')

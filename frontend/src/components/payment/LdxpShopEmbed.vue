@@ -62,7 +62,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
-const SHOP_URL = 'https://pay.ldxp.cn/shop/FIDK51J9'
+const SHOP_URL = 'https://pay.ldxp.cn/shop/ToCreate'
 const LOADING_FALLBACK_MS = 7000
 
 const { t } = useI18n()
