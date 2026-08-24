@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import LdxpShopEmbed from '../LdxpShopEmbed.vue'
@@ -22,6 +22,10 @@ const i18n = createI18n({
 })
 
 describe('LdxpShopEmbed', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('embeds the configured Chain Shop and provides a new-window fallback', async () => {
     const wrapper = mount(LdxpShopEmbed, {
       global: {
@@ -40,6 +44,24 @@ describe('LdxpShopEmbed', () => {
     expect(frame.attributes('referrerpolicy')).toBe('strict-origin-when-cross-origin')
 
     await frame.trigger('load')
+    expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(false)
+  })
+
+  it('reveals the iframe when the upstream page does not emit a load event', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(LdxpShopEmbed, {
+      global: {
+        plugins: [i18n],
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(7000)
+
     expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(false)
   })
 })

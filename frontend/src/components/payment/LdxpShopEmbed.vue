@@ -51,25 +51,51 @@
         allow="payment; clipboard-read; clipboard-write"
         referrerpolicy="strict-origin-when-cross-origin"
         data-testid="ldxp-shop-frame"
-        @load="loading = false"
+        @load="handleFrameLoad"
       />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
 const SHOP_URL = 'https://pay.ldxp.cn/shop/FIDK51J9'
+const LOADING_FALLBACK_MS = 7000
 
 const { t } = useI18n()
 const loading = ref(true)
 const frameKey = ref(0)
+let loadingTimer: ReturnType<typeof setTimeout> | undefined
+
+function clearLoadingTimer() {
+  if (loadingTimer !== undefined) {
+    clearTimeout(loadingTimer)
+    loadingTimer = undefined
+  }
+}
+
+function startLoadingTimer() {
+  clearLoadingTimer()
+  loadingTimer = setTimeout(() => {
+    loading.value = false
+    loadingTimer = undefined
+  }, LOADING_FALLBACK_MS)
+}
+
+function handleFrameLoad() {
+  clearLoadingTimer()
+  loading.value = false
+}
 
 function reloadShop() {
   loading.value = true
   frameKey.value += 1
+  startLoadingTimer()
 }
+
+onMounted(startLoadingTimer)
+onBeforeUnmount(clearLoadingTimer)
 </script>
