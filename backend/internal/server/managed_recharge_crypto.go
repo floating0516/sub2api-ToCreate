@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -36,7 +37,16 @@ func loadManagedRechargeEncryptionKey() (string, error) {
 		return inlineKey, nil
 	}
 
-	info, err := os.Stat(keyFile)
+	// keyFile is a startup-only path supplied by the server operator through
+	// the process environment; request data cannot influence it.
+	//nolint:gosec // G703: the configured path is an intentional operator trust boundary.
+	file, err := os.Open(keyFile)
+	if err != nil {
+		return "", fmt.Errorf("open managed recharge encryption key file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	info, err := file.Stat()
 	if err != nil {
 		return "", fmt.Errorf("stat managed recharge encryption key file: %w", err)
 	}
@@ -49,9 +59,12 @@ func loadManagedRechargeEncryptionKey() (string, error) {
 	if info.Size() > managedRechargeEncryptionKeyMaxSize {
 		return "", fmt.Errorf("managed recharge encryption key file is too large")
 	}
-	payload, err := os.ReadFile(keyFile)
+	payload, err := io.ReadAll(io.LimitReader(file, managedRechargeEncryptionKeyMaxSize+1))
 	if err != nil {
 		return "", fmt.Errorf("read managed recharge encryption key file: %w", err)
+	}
+	if len(payload) > managedRechargeEncryptionKeyMaxSize {
+		return "", fmt.Errorf("managed recharge encryption key file is too large")
 	}
 	key := strings.TrimSpace(string(payload))
 	if key == "" {
