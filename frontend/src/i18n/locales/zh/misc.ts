@@ -492,10 +492,8 @@ export default {
     tabMemberRecharge: '订阅 GPT Plus-Pro',
     memberRecharge: {
       shopTitle: '订阅 GPT Plus / Pro',
-      shopSubtitle: '选择商品并在当前页面完成下单',
-      reloadShop: '重新加载小店',
-      openShop: '新窗口打开',
-      iframeTitle: 'GPT Plus / Pro 订阅小店',
+      shopSubtitle: '商品选择与支付将在链动小铺完成',
+      openShop: '前往链动小铺',
       backToPurchase: '返回充值订阅',
       subscribeNow: '立即订阅',
       plans: {

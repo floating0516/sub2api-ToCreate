@@ -470,10 +470,8 @@ export default {
     tabMemberRecharge: 'Subscribe to GPT Plus-Pro',
     memberRecharge: {
       shopTitle: 'Subscribe to GPT Plus / Pro',
-      shopSubtitle: 'Choose a product and complete checkout on this page',
-      reloadShop: 'Reload shop',
-      openShop: 'Open in new window',
-      iframeTitle: 'GPT Plus / Pro subscription shop',
+      shopSubtitle: 'Choose a product and complete payment in Chain Shop',
+      openShop: 'Continue to Chain Shop',
       backToPurchase: 'Back to purchases',
       subscribeNow: 'Subscribe Now',
       plans: {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import LdxpShopEmbed from '../LdxpShopEmbed.vue'
@@ -11,10 +11,8 @@ const i18n = createI18n({
       payment: {
         memberRecharge: {
           shopTitle: '订阅 GPT Plus / Pro',
-          shopSubtitle: '选择商品并在当前页面完成下单',
-          reloadShop: '重新加载小店',
-          openShop: '新窗口打开',
-          iframeTitle: 'GPT Plus / Pro 订阅小店',
+          shopSubtitle: '商品选择与支付将在链动小铺完成',
+          openShop: '前往链动小铺',
         },
       },
     },
@@ -22,11 +20,7 @@ const i18n = createI18n({
 })
 
 describe('LdxpShopEmbed', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('embeds the configured Chain Shop and provides a new-window fallback', async () => {
+  it('opens the configured Chain Shop in a top-level window', () => {
     const wrapper = mount(LdxpShopEmbed, {
       global: {
         plugins: [i18n],
@@ -36,32 +30,11 @@ describe('LdxpShopEmbed', () => {
       },
     })
 
-    const frame = wrapper.get('[data-testid="ldxp-shop-frame"]')
-    const externalLink = wrapper.get('a[target="_blank"]')
+    const externalLink = wrapper.get('[data-testid="ldxp-shop-link"]')
 
-    expect(frame.attributes('src')).toBe('https://pay.ldxp.cn/shop/ToCreate')
     expect(externalLink.attributes('href')).toBe('https://pay.ldxp.cn/shop/ToCreate')
-    expect(frame.attributes('referrerpolicy')).toBe('strict-origin-when-cross-origin')
-
-    await frame.trigger('load')
-    expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(false)
-  })
-
-  it('reveals the iframe when the upstream page does not emit a load event', async () => {
-    vi.useFakeTimers()
-    const wrapper = mount(LdxpShopEmbed, {
-      global: {
-        plugins: [i18n],
-        stubs: {
-          Icon: true,
-        },
-      },
-    })
-
-    expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(true)
-
-    await vi.advanceTimersByTimeAsync(7000)
-
-    expect(wrapper.find('[data-testid="ldxp-shop-loading"]').exists()).toBe(false)
+    expect(externalLink.attributes('target')).toBe('_blank')
+    expect(externalLink.attributes('rel')).toBe('noopener noreferrer')
+    expect(wrapper.find('iframe').exists()).toBe(false)
   })
 })

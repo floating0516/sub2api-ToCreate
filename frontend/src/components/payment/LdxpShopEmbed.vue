@@ -3,99 +3,39 @@
     data-testid="ldxp-shop-embed"
     class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800"
   >
-    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-dark-700 sm:px-5">
-      <div class="min-w-0">
-        <h2 class="text-base font-semibold text-gray-900 dark:text-white">
-          {{ t('payment.memberRecharge.shopTitle') }}
-        </h2>
-        <p class="mt-0.5 text-sm text-gray-500 dark:text-dark-400">
-          {{ t('payment.memberRecharge.shopSubtitle') }}
-        </p>
-      </div>
-
-      <div class="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          class="btn btn-secondary h-9 w-9 p-0"
-          :title="t('payment.memberRecharge.reloadShop')"
-          :aria-label="t('payment.memberRecharge.reloadShop')"
-          @click="reloadShop"
-        >
-          <Icon name="refresh" size="sm" />
-        </button>
-        <a
-          :href="SHOP_URL"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="btn btn-secondary h-9 gap-2 px-3"
-        >
-          <Icon name="externalLink" size="sm" />
-          <span>{{ t('payment.memberRecharge.openShop') }}</span>
-        </a>
-      </div>
+    <header class="border-b border-gray-200 px-4 py-3 dark:border-dark-700 sm:px-5">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+        {{ t('payment.memberRecharge.shopTitle') }}
+      </h2>
     </header>
 
-    <div class="relative h-[75vh] min-h-[620px] max-h-[900px] bg-white">
-      <div
-        v-if="loading"
-        class="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-dark-900"
-        data-testid="ldxp-shop-loading"
-      >
-        <Icon name="refresh" size="lg" class="animate-spin text-primary-500" />
+    <div class="flex min-h-[360px] flex-col items-center justify-center px-6 py-12 text-center">
+      <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300">
+        <Icon name="externalLink" size="lg" />
       </div>
-      <iframe
-        :key="frameKey"
-        :src="SHOP_URL"
-        :title="t('payment.memberRecharge.iframeTitle')"
-        class="block h-full w-full border-0 bg-white"
-        allow="payment; clipboard-read; clipboard-write"
-        referrerpolicy="strict-origin-when-cross-origin"
-        data-testid="ldxp-shop-frame"
-        @load="handleFrameLoad"
-      />
+      <p class="mt-5 max-w-md text-sm leading-6 text-gray-500 dark:text-dark-400">
+        {{ t('payment.memberRecharge.shopSubtitle') }}
+      </p>
+      <a
+        :href="SHOP_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn btn-primary mt-6 h-11 gap-2 px-5"
+        data-testid="ldxp-shop-link"
+      >
+        <Icon name="externalLink" size="sm" />
+        <span>{{ t('payment.memberRecharge.openShop') }}</span>
+      </a>
+      <span class="mt-3 text-xs text-gray-400 dark:text-dark-500">pay.ldxp.cn</span>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
 const SHOP_URL = 'https://pay.ldxp.cn/shop/ToCreate'
-const LOADING_FALLBACK_MS = 7000
 
 const { t } = useI18n()
-const loading = ref(true)
-const frameKey = ref(0)
-let loadingTimer: ReturnType<typeof setTimeout> | undefined
-
-function clearLoadingTimer() {
-  if (loadingTimer !== undefined) {
-    clearTimeout(loadingTimer)
-    loadingTimer = undefined
-  }
-}
-
-function startLoadingTimer() {
-  clearLoadingTimer()
-  loadingTimer = setTimeout(() => {
-    loading.value = false
-    loadingTimer = undefined
-  }, LOADING_FALLBACK_MS)
-}
-
-function handleFrameLoad() {
-  clearLoadingTimer()
-  loading.value = false
-}
-
-function reloadShop() {
-  loading.value = true
-  frameKey.value += 1
-  startLoadingTimer()
-}
-
-onMounted(startLoadingTimer)
-onBeforeUnmount(clearLoadingTimer)
 </script>
