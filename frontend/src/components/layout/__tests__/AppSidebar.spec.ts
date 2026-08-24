@@ -81,8 +81,9 @@ describe('AppSidebar user-page switches', () => {
 })
 
 describe('AppSidebar subscription entries', () => {
-  it('hides legacy admin subscription management while keeping user subscriptions and purchases', () => {
-    expect(componentSource).not.toContain("{ path: '/admin/subscriptions'")
+  it('hides managed recharge while keeping subscription management and user purchases', () => {
+    expect(componentSource).not.toContain("{ path: '/admin/managed-recharge'")
+    expect(componentSource).toContain("{ path: '/admin/subscriptions'")
     expect(componentSource).toContain("{ path: '/subscriptions'")
     expect(componentSource).toContain("{ path: '/purchase'")
   })
