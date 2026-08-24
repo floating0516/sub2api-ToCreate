@@ -32,6 +32,7 @@ func provideDrainStop(
 	quotaFlusher *service.UserPlatformQuotaUsageFlusher,
 	upstreamBillingProbe *service.UpstreamBillingProbeService,
 	ollamaCloudUsage *service.OllamaCloudUsageService,
+	openAIAutoReset *service.OpenAIQuotaAutoResetService,
 ) DrainStop {
 	var once sync.Once
 	return func() {
@@ -64,6 +65,7 @@ func provideDrainStop(
 				{"UserPlatformQuotaUsageFlusher", quotaFlusher.Stop},
 				{"UpstreamBillingProbeService", upstreamBillingProbe.Stop},
 				{"OllamaCloudUsageService", ollamaCloudUsage.Stop},
+				{"OpenAIQuotaAutoResetService", openAIAutoReset.Stop},
 			}
 
 			var wg sync.WaitGroup

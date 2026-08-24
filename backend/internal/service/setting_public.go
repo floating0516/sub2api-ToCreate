@@ -238,6 +238,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyUserOrdersEnabled,
 		SettingKeyModelPlazaEnabled,
 		SettingKeyModelPlazaRequireAuth,
+		SettingKeyPluginManagementEnabled,
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
@@ -367,8 +368,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		UserRedeemEnabled:        !isFalseSettingValue(settings[SettingKeyUserRedeemEnabled]),
 		UserOrdersEnabled:        !isFalseSettingValue(settings[SettingKeyUserOrdersEnabled]),
 
-		ModelPlazaEnabled:     settings[SettingKeyModelPlazaEnabled] == "true",
-		ModelPlazaRequireAuth: settings[SettingKeyModelPlazaRequireAuth] == "true",
+		ModelPlazaEnabled:       settings[SettingKeyModelPlazaEnabled] == "true",
+		ModelPlazaRequireAuth:   settings[SettingKeyModelPlazaRequireAuth] == "true",
+		PluginManagementEnabled: settings[SettingKeyPluginManagementEnabled] == "true",
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
 
@@ -631,6 +633,7 @@ type PublicSettingsInjectionPayload struct {
 	UserOrdersEnabled          bool `json:"user_orders_enabled"`
 	ModelPlazaEnabled          bool `json:"model_plaza_enabled"`
 	ModelPlazaRequireAuth      bool `json:"model_plaza_require_auth"`
+	PluginManagementEnabled    bool `json:"plugin_management_enabled"`
 	AffiliateEnabled           bool `json:"affiliate_enabled"`
 	RiskControlEnabled         bool `json:"risk_control_enabled"`
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
@@ -715,6 +718,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		UserOrdersEnabled:                    settings.UserOrdersEnabled,
 		ModelPlazaEnabled:                    settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth:                settings.ModelPlazaRequireAuth,
+		PluginManagementEnabled:              settings.PluginManagementEnabled,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
