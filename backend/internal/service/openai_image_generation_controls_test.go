@@ -135,6 +135,32 @@ func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(
 	}
 }
 
+func TestOpenAIGatewayServiceForward_RejectsInvalidResponsesLiteBeforeHostedImageBridgeFallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{}
+	svc := newOpenAIImageGenerationControlTestService(upstream)
+	svc.cfg.Gateway.CodexImageGenerationBridgeEnabled = true
+	c, recorder := newOpenAIImageGenerationControlTestContext(true, "codex_cli_rs/0.98.0")
+	c.Request.Header.Set(responsesLiteHeader, "true")
+	account := newOpenAIImageGenerationControlTestOAuthAccount()
+
+	result, err := svc.Forward(context.Background(), c, account, []byte(`{
+		"model":"gpt-5.4",
+		"input":"write code",
+		"stream":false,
+		"tools":[{"type":"function","name":"shell"}],
+		"parallel_tool_calls":"false"
+	}`))
+
+	require.ErrorContains(t, err, "parallel_tool_calls to be a boolean")
+	require.Nil(t, result)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Equal(t, "invalid_request_error", gjson.GetBytes(recorder.Body.Bytes(), "error.type").String())
+	require.Equal(t, "parallel_tool_calls", gjson.GetBytes(recorder.Body.Bytes(), "error.param").String())
+	require.Nil(t, upstream.lastReq, "invalid Lite request must not reach upstream after bridge fallback")
+}
+
 func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallbackExclusions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

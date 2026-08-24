@@ -73,6 +73,22 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			body,
 			isOpenAIResponsesCompactPath(c),
 		) {
+			// The hosted image bridge intentionally forwards a non-Lite request,
+			// but malformed Lite-only fields must still be rejected at ingress.
+			// Discard the normalized payload so the downgrade keeps its existing
+			// non-Lite request shape.
+			if _, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(body); liteErr != nil {
+				param := "tools"
+				var validationErr *openAIResponsesLiteValidationError
+				if errors.As(liteErr, &validationErr) {
+					param = validationErr.param
+				}
+				setOpsUpstreamError(c, http.StatusBadRequest, liteErr.Error(), "")
+				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
+					"type": "invalid_request_error", "message": liteErr.Error(), "param": param,
+				}})
+				return nil, liteErr
+			}
 			c.Request.Header.Del(responsesLiteHeader)
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Downgraded Responses Lite request for hosted image_generation bridge")
 		}

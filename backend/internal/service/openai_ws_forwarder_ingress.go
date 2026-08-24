@@ -323,6 +323,16 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				normalized,
 				false,
 			) {
+			// Validate the original Lite contract before removing its metadata.
+			// The normalized bytes are deliberately discarded because the hosted
+			// image bridge needs the existing non-Lite request shape.
+			if _, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(normalized); liteErr != nil {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
+					coderws.StatusPolicyViolation,
+					liteErr.Error(),
+					liteErr,
+				)
+			}
 			next, deleteErr := sjson.DeleteBytes(normalized, "client_metadata."+responsesLiteWSMetadataKey)
 			if deleteErr != nil {
 				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", deleteErr)
