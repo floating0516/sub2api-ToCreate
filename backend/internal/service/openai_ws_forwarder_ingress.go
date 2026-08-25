@@ -339,6 +339,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", deleteErr)
 			}
 			normalized = next
+			responsesLite = false
 			logOpenAIWSModeInfo("ingress_ws_responses_lite_downgraded_for_hosted_image_bridge account_id=%d", account.ID)
 		}
 		accountIdentitySourceRaw := append([]byte(nil), normalized...)
