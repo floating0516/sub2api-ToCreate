@@ -249,7 +249,7 @@ const { t } = useI18n()
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-:global(.dark) .tc-home {
+:global(html.dark .tc-home) {
   --tc-paper: #171916;
   --tc-paper-strong: #20231f;
   --tc-surface: #232620;
@@ -371,7 +371,7 @@ const { t } = useI18n()
   font-size: 12px;
 }
 
-:global(.dark) .tc-login-button {
+:global(html.dark .tc-login-button) {
   color: #1d211d;
   background: #f0eee8;
 }
@@ -540,7 +540,7 @@ const { t } = useI18n()
   transition: transform 380ms ease, box-shadow 380ms ease;
 }
 
-:global(.dark) .tc-gateway-card {
+:global(html.dark .tc-gateway-card) {
   box-shadow: 0 30px 65px rgba(0, 0, 0, 0.34), 0 5px 16px rgba(0, 0, 0, 0.2);
 }
 

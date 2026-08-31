@@ -108,7 +108,7 @@ onMounted(() => {
   place-items: center;
 }
 
-:global(.dark) .tc-auth-shell {
+:global(html.dark .tc-auth-shell) {
   --auth-paper: #171916;
   --auth-surface: #232620;
   --auth-ink: #f1eee7;
@@ -154,7 +154,7 @@ onMounted(() => {
   box-shadow: 0 34px 86px rgba(46, 38, 31, 0.15), 0 7px 24px rgba(46, 38, 31, 0.07);
 }
 
-:global(.dark) .tc-auth-frame {
+:global(html.dark .tc-auth-frame) {
   box-shadow: 0 34px 86px rgba(0, 0, 0, 0.38), 0 7px 24px rgba(0, 0, 0, 0.22);
 }
 
