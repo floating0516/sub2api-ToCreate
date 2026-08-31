@@ -108,6 +108,7 @@ export interface TrendParams {
   group_id?: number
   request_type?: UsageRequestType
   stream?: boolean
+  native_compaction_v2?: boolean | null
   billing_type?: number | null
   billing_mode?: string | null
   timezone?: string
@@ -368,6 +369,7 @@ export async function getDashboardModels(params?: {
   group_id?: number
   request_type?: UsageRequestType
   stream?: boolean
+  native_compaction_v2?: boolean | null
   billing_type?: number | null
   billing_mode?: string | null
   timezone?: string

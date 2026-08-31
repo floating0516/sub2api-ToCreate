@@ -56,17 +56,30 @@ func StartOpenAICompactSSEKeepalive(c *gin.Context, interval time.Duration) func
 	if !openAICompactClientWantsStream(c) {
 		return func() {}
 	}
-	return startOpenAISSEKeepalive(c, openAICompactSSEKeepaliveKey, interval, openAICompactKeepalivePayload)
+	return startOpenAISSEKeepalive(c, interval)
+}
+
+// startOpenAISSEKeepalive 是不检查 compact 标记的内部入口，供【已经确定处于
+// SSE 流式上下文】的调用方使用（例如 /v1/responses 透传：进入流式循环时上游
+// 已返回 text/event-stream，SSE 响应头也已设好）。
+//
+// 心跳字节由 OpenAICompactKeepaliveAdjustedWrittenSize 统一排除，因此不会污染
+// "是否已向客户端写出语义响应"的 failover 判定（见 #3887）。
+func startOpenAISSEKeepalive(c *gin.Context, interval time.Duration) func() {
+	if c == nil || c.Writer == nil || interval <= 0 {
+		return func() {}
+	}
+	return startOpenAISSEKeepaliveWithPayload(c, openAICompactSSEKeepaliveKey, interval, openAICompactKeepalivePayload)
 }
 
 // StartOpenAIMessagesSSEKeepalive starts Anthropic ping events while an OpenAI
 // /v1/messages bridge request waits for upstream response headers. The caller
 // must invoke the returned stop function before starting another attempt.
 func StartOpenAIMessagesSSEKeepalive(c *gin.Context, interval time.Duration) func() {
-	return startOpenAISSEKeepalive(c, openAIMessagesSSEKeepaliveKey, interval, openAIMessagesKeepalivePayload)
+	return startOpenAISSEKeepaliveWithPayload(c, openAIMessagesSSEKeepaliveKey, interval, openAIMessagesKeepalivePayload)
 }
 
-func startOpenAISSEKeepalive(c *gin.Context, key string, interval time.Duration, payload []byte) func() {
+func startOpenAISSEKeepaliveWithPayload(c *gin.Context, key string, interval time.Duration, payload []byte) func() {
 	if c == nil || c.Writer == nil || interval <= 0 || len(payload) == 0 {
 		return func() {}
 	}
