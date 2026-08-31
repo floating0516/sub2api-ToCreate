@@ -528,8 +528,8 @@ func TestUsageLogRepositoryUsageAggregatesFilterNativeCompactionV2(t *testing.T)
 	t.Run("trend bypasses preaggregate", func(t *testing.T) {
 		db, mock := newSQLMock(t)
 		repo := &usageLogRepository{sql: db}
-		mock.ExpectQuery("(?s)FROM usage_logs.*AND native_compaction_v2 = \\$3").
-			WithArgs(start, end, true).
+		mock.ExpectQuery("(?s)FROM usage_logs.*AND native_compaction_v2 = \\$4").
+			WithArgs(start, end, "UTC", true).
 			WillReturnRows(sqlmock.NewRows([]string{"date", "requests", "input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens", "total_tokens", "cost", "actual_cost"}))
 
 		_, err := repo.GetUsageTrendWithUsageFilters(context.Background(), start, end, "day", filters)
