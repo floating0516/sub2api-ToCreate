@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +50,7 @@ func TestDelayedFirstUseAnchorsMonthlyWindowAtSubscriptionStart(t *testing.T) {
 
 	require.NoError(t, svc.CheckAndActivateWindow(context.Background(), sub))
 
-	require.Equal(t, startsAt, repo.dailyStart)
+	require.Equal(t, timezone.StartOfDay(activatedAt), repo.dailyStart)
 	require.Equal(t, startsAt, repo.periodicStart)
 	monthlyWindowStart := repo.periodicStart
 	resetAt, ok := sub.automaticWindowStartAt(&monthlyWindowStart, 30*24*time.Hour, startsAt.Add(30*24*time.Hour))

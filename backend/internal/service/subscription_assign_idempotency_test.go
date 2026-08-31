@@ -9,6 +9,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/dgraph-io/ristretto"
 	"github.com/stretchr/testify/require"
 )
@@ -424,7 +425,7 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 	require.False(t, sub.StartsAt.Before(before))
 	require.False(t, sub.StartsAt.After(after))
 	require.Equal(t, sub.StartsAt.AddDate(0, 0, 30), sub.ExpiresAt)
-	require.Equal(t, sub.StartsAt, *sub.DailyWindowStart)
+	require.Equal(t, timezone.StartOfDay(sub.StartsAt), *sub.DailyWindowStart)
 	require.Equal(t, sub.StartsAt, *sub.WeeklyWindowStart)
 	require.Equal(t, sub.StartsAt, *sub.MonthlyWindowStart)
 	require.Zero(t, sub.DailyUsageUSD)

@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/dgraph-io/ristretto"
 	"golang.org/x/sync/singleflight"
 )
@@ -400,13 +401,14 @@ func (s *SubscriptionService) withSubscriptionUpdateTx(ctx context.Context, fn f
 
 func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, startsAt, expiresAt time.Time) *UserSubscription {
 	renewed := *existingSub
-	windowStart := startsAt
+	dailyWindowStart := timezone.StartOfDay(startsAt)
+	periodicWindowStart := startsAt
 	renewed.StartsAt = startsAt
 	renewed.ExpiresAt = expiresAt
 	renewed.Status = SubscriptionStatusActive
-	renewed.DailyWindowStart = &windowStart
-	renewed.WeeklyWindowStart = &windowStart
-	renewed.MonthlyWindowStart = &windowStart
+	renewed.DailyWindowStart = &dailyWindowStart
+	renewed.WeeklyWindowStart = &periodicWindowStart
+	renewed.MonthlyWindowStart = &periodicWindowStart
 	renewed.DailyUsageUSD = 0
 	renewed.WeeklyUsageUSD = 0
 	renewed.MonthlyUsageUSD = 0
@@ -440,7 +442,7 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 		expiresAt = MaxExpiresAt
 	}
 
-	dailyWindowStart := now
+	dailyWindowStart := timezone.StartOfDay(now)
 	weeklyWindowStart := now
 	monthlyWindowStart := now
 	sub := &UserSubscription{
@@ -1107,8 +1109,8 @@ func subscriptionWindowAnchor(sub *UserSubscription) time.Time {
 	return sub.StartsAt
 }
 
-func dailyWindowStartFor(sub *UserSubscription, now time.Time) time.Time {
-	return currentRollingWindowStart(subscriptionWindowAnchor(sub), now, 24*time.Hour)
+func dailyWindowStartFor(_ *UserSubscription, now time.Time) time.Time {
+	return timezone.StartOfDay(now)
 }
 
 func weeklyWindowStartFor(sub *UserSubscription, now time.Time) time.Time {
@@ -1129,11 +1131,11 @@ func (s *SubscriptionService) checkAndActivateWindowAt(ctx context.Context, sub 
 		return nil
 	}
 
-	windowStart := subscriptionWindowAnchor(sub)
-	if windowStart.IsZero() {
-		windowStart = now
+	periodicWindowStart := subscriptionWindowAnchor(sub)
+	if periodicWindowStart.IsZero() {
+		periodicWindowStart = now
 	}
-	return s.userSubRepo.ActivateWindows(ctx, sub.ID, windowStart, windowStart)
+	return s.userSubRepo.ActivateWindows(ctx, sub.ID, timezone.StartOfDay(now), periodicWindowStart)
 }
 
 // AdminResetQuota manually resets the daily, weekly, and/or monthly usage windows.
@@ -1149,7 +1151,7 @@ func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionI
 	}
 	now := s.currentTime()
 	if sub.StartsAt.IsZero() {
-		if err := s.userSubRepo.ResetUsageWindows(ctx, sub.ID, resetDaily, resetWeekly, resetMonthly, now, now); err != nil {
+		if err := s.userSubRepo.ResetUsageWindows(ctx, sub.ID, resetDaily, resetWeekly, resetMonthly, timezone.StartOfDay(now), now); err != nil {
 			return nil, err
 		}
 	} else {
@@ -1188,21 +1190,15 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 	now := s.currentTime()
 	needsInvalidateCache := false
 
-	// 日窗口重置（24小时）。One-time daily quotas are intentionally not
-	// automatically replenished.
-	if !sub.HasOneTimeDailyQuota() {
-		if windowStart, ok := sub.automaticWindowStartAt(sub.DailyWindowStart, 24*time.Hour, now); ok {
-			if !sub.StartsAt.IsZero() {
-				windowStart = dailyWindowStartFor(sub, now)
-			}
-			expectedWindowStart := sub.DailyWindowStart
-			if err := s.userSubRepo.ResetDailyUsage(ctx, sub.ID, expectedWindowStart, windowStart); err != nil {
-				return err
-			}
-			sub.DailyWindowStart = &windowStart
-			sub.DailyUsageUSD = 0
-			needsInvalidateCache = true
+	// 日窗口按配置时区的日历日重置；一次性日额度不会自动补充。
+	if windowStart, ok := sub.automaticDailyWindowStartAt(now); ok {
+		expectedWindowStart := sub.DailyWindowStart
+		if err := s.userSubRepo.ResetDailyUsage(ctx, sub.ID, expectedWindowStart, windowStart); err != nil {
+			return err
 		}
+		sub.DailyWindowStart = &windowStart
+		sub.DailyUsageUSD = 0
+		needsInvalidateCache = true
 	}
 
 	// 周窗口重置（7天）

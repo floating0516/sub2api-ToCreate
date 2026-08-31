@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,7 +59,7 @@ func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *tes
 	require.True(t, renewed.StartsAt.After(oldStart), "重新购买过期订阅时应重置当前周期 StartsAt")
 	require.False(t, renewed.ExpiresAt.After(renewed.StartsAt.AddDate(0, 0, 1)))
 	require.NotNil(t, renewed.DailyWindowStart)
-	require.Equal(t, renewed.StartsAt, *renewed.DailyWindowStart)
+	require.Equal(t, timezone.StartOfDay(renewed.StartsAt), *renewed.DailyWindowStart)
 	require.Equal(t, 0.0, renewed.DailyUsageUSD)
 	require.Equal(t, 0.0, renewed.WeeklyUsageUSD)
 	require.Equal(t, 0.0, renewed.MonthlyUsageUSD)
@@ -110,7 +111,7 @@ func TestUserSubscriptionNeedsDailyReset_DailyCardKeepsOneTimeQuota(t *testing.T
 
 func TestUserSubscriptionNeedsDailyReset_MultiDaySubscriptionStillRefreshes(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := start
+	dailyWindowStart := timezone.StartOfDay(start)
 	sub := &UserSubscription{
 		StartsAt:         start,
 		ExpiresAt:        start.AddDate(0, 0, 2),
@@ -118,7 +119,7 @@ func TestUserSubscriptionNeedsDailyReset_MultiDaySubscriptionStillRefreshes(t *t
 	}
 
 	require.False(t, sub.HasOneTimeDailyQuota())
-	require.True(t, sub.NeedsDailyResetAt(dailyWindowStart.Add(24*time.Hour)), "多日订阅仍应按 starts_at 锚定的 24 小时日窗口刷新")
+	require.True(t, sub.NeedsDailyResetAt(dailyWindowStart.AddDate(0, 0, 1)), "多日订阅应在配置时区次日 0 点刷新")
 }
 
 func TestUserSubscriptionDailyResetTime_DailyCardReturnsExpiry(t *testing.T) {
@@ -183,11 +184,13 @@ func TestCheckAndResetWindows_MultiDaySubscriptionStillResetsDailyUsage(t *testi
 	require.Equal(t, 0.0, sub.DailyUsageUSD)
 }
 
-func TestCheckAndResetWindows_TwoDaySubscriptionDoesNotResetAtMidnight(t *testing.T) {
-	startsAt := time.Now().Add(-12 * time.Hour)
-	dailyWindowStart := startsAt
+func TestCheckAndResetWindows_TwoDaySubscriptionDoesNotResetBeforeMidnight(t *testing.T) {
+	now := time.Date(2026, 7, 29, 23, 30, 0, 0, timezone.Location())
+	startsAt := now.Add(-12 * time.Hour)
+	dailyWindowStart := timezone.StartOfDay(now)
 	repo := &dailyResetTrackingUserSubRepo{}
 	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc.now = func() time.Time { return now }
 	sub := &UserSubscription{
 		ID:               1,
 		UserID:           10,
@@ -201,15 +204,17 @@ func TestCheckAndResetWindows_TwoDaySubscriptionDoesNotResetAtMidnight(t *testin
 	err := svc.CheckAndResetWindows(context.Background(), sub)
 
 	require.NoError(t, err)
-	require.False(t, repo.resetDailyCalled, "2 天卡不应因跨自然日 0 点刷新 daily usage")
+	require.False(t, repo.resetDailyCalled, "当天 0 点之后不应重复刷新 daily usage")
 	require.Equal(t, 10.0, sub.DailyUsageUSD)
 }
 
-func TestCheckAndResetWindows_TwoDaySubscriptionResetsAtRollingDayBoundary(t *testing.T) {
-	startsAt := time.Now().Add(-25 * time.Hour)
-	dailyWindowStart := startsAt
+func TestCheckAndResetWindows_TwoDaySubscriptionResetsAtMidnight(t *testing.T) {
+	now := time.Date(2026, 7, 30, 0, 0, 1, 0, timezone.Location())
+	startsAt := now.Add(-12 * time.Hour)
+	dailyWindowStart := timezone.StartOfDay(now).AddDate(0, 0, -1)
 	repo := &dailyResetTrackingUserSubRepo{}
 	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc.now = func() time.Time { return now }
 	sub := &UserSubscription{
 		ID:               1,
 		UserID:           10,
@@ -223,10 +228,10 @@ func TestCheckAndResetWindows_TwoDaySubscriptionResetsAtRollingDayBoundary(t *te
 	err := svc.CheckAndResetWindows(context.Background(), sub)
 
 	require.NoError(t, err)
-	require.True(t, repo.resetDailyCalled, "2 天卡应在 starts_at+24h 后刷新 daily usage")
+	require.True(t, repo.resetDailyCalled, "2 天卡应在配置时区次日 0 点刷新 daily usage")
 	require.Equal(t, 0.0, sub.DailyUsageUSD)
 	require.NotNil(t, sub.DailyWindowStart)
-	require.WithinDuration(t, startsAt.Add(24*time.Hour), *sub.DailyWindowStart, time.Second)
+	require.Equal(t, timezone.StartOfDay(now), *sub.DailyWindowStart)
 }
 
 func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuotaAfterMidnight(t *testing.T) {
@@ -262,10 +267,11 @@ func (s *subscriptionQuotaCacheStub) GetSubscriptionCache(context.Context, int64
 	return s.data, nil
 }
 
-func TestBillingCacheSubscriptionEligibility_AllowsCachedDailyUsageAfterRollingReset(t *testing.T) {
+func TestBillingCacheSubscriptionEligibility_AllowsCachedDailyUsageAfterMidnightReset(t *testing.T) {
 	dailyLimit := 10.0
-	startsAt := time.Now().Add(-25 * time.Hour)
-	dailyWindowStart := startsAt
+	now := time.Now()
+	startsAt := now.Add(-25 * time.Hour)
+	dailyWindowStart := timezone.StartOfDay(now).AddDate(0, 0, -1)
 	group := &Group{ID: 20, DailyLimitUSD: &dailyLimit}
 	sub := &UserSubscription{
 		StartsAt:         startsAt,
@@ -280,13 +286,14 @@ func TestBillingCacheSubscriptionEligibility_AllowsCachedDailyUsageAfterRollingR
 
 	err := svc.checkSubscriptionEligibility(context.Background(), 10, group, sub)
 
-	require.NoError(t, err, "过了 starts_at 锚定的 24 小时窗口后，缓存中的旧 daily usage 不应继续拦截")
+	require.NoError(t, err, "跨过配置时区 0 点后，缓存中的旧 daily usage 不应继续拦截")
 }
 
-func TestBillingCacheSubscriptionEligibility_BlocksCachedDailyUsageBeforeRollingReset(t *testing.T) {
+func TestBillingCacheSubscriptionEligibility_BlocksCachedDailyUsageBeforeMidnightReset(t *testing.T) {
 	dailyLimit := 10.0
-	startsAt := time.Now().Add(-23 * time.Hour)
-	dailyWindowStart := startsAt
+	now := time.Now()
+	startsAt := now.Add(-23 * time.Hour)
+	dailyWindowStart := timezone.StartOfDay(now)
 	group := &Group{ID: 20, DailyLimitUSD: &dailyLimit}
 	sub := &UserSubscription{
 		StartsAt:         startsAt,

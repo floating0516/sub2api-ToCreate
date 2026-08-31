@@ -929,7 +929,7 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 
 	// 检查限额（使用传入的Group限额配置）。Redis subscription cache stores usage
 	// totals only, so use the request's subscription snapshot to decide whether a
-	// rolling quota window has already expired. Window maintenance will persist
+	// quota window has already expired. Window maintenance will persist
 	// the reset asynchronously on the subscription service path.
 	dailyUsage := subData.DailyUsage
 	weeklyUsage := subData.WeeklyUsage
