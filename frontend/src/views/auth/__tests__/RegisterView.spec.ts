@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterView from '@/views/auth/RegisterView.vue'
+import { consumeFullRegistrationDraft, storeFullRegistrationDraft } from '@/utils/registrationDraft'
 
-const { getPublicSettingsMock, registerMock, showErrorMock } = vi.hoisted(() => ({
-  getPublicSettingsMock: vi.fn(),
+const { fetchPublicSettingsMock, registerMock, routeQuery, showErrorMock } = vi.hoisted(() => ({
+  fetchPublicSettingsMock: vi.fn(),
   registerMock: vi.fn(),
+  routeQuery: { full: '1' } as Record<string, string>,
   showErrorMock: vi.fn()
 }))
 
@@ -27,7 +29,7 @@ const publicSettings = {
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useRoute: () => ({ query: {} })
+  useRoute: () => ({ path: '/register', query: routeQuery })
 }))
 
 vi.mock('vue-i18n', () => ({
@@ -48,25 +50,24 @@ vi.mock('vue-i18n', () => ({
 vi.mock('@/stores', () => ({
   useAuthStore: () => ({ register: (...args: unknown[]) => registerMock(...args) }),
   useAppStore: () => ({
+    siteLogo: '',
+    fetchPublicSettings: (...args: unknown[]) => fetchPublicSettingsMock(...args),
     showError: (...args: unknown[]) => showErrorMock(...args),
     showSuccess: vi.fn(),
     showWarning: vi.fn()
   })
 }))
 
-vi.mock('@/api/auth', async () => {
-  const actual = await vi.importActual<typeof import('@/api/auth')>('@/api/auth')
-  return {
-    ...actual,
-    getPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args)
-  }
-})
-
 function mountRegister() {
   return mount(RegisterView, {
     global: {
       stubs: {
         AuthLayout: { template: '<div><slot /><slot name="footer" /></div>' },
+        EmailFirstAuthDialog: {
+          name: 'EmailFirstAuthDialog',
+          props: ['presentation', 'intent', 'initialEmail'],
+          template: '<div data-testid="unified-registration" />'
+        },
         Icon: true,
         TurnstileWidget: { template: '<div data-testid="turnstile-widget" />' },
         LoginAgreementPrompt: true,
@@ -83,11 +84,39 @@ function mountRegister() {
 
 describe('RegisterView invitation layout', () => {
   beforeEach(() => {
-    getPublicSettingsMock.mockReset()
+    fetchPublicSettingsMock.mockReset()
     registerMock.mockReset()
     showErrorMock.mockReset()
-    getPublicSettingsMock.mockResolvedValue(publicSettings)
+    fetchPublicSettingsMock.mockResolvedValue(publicSettings)
     registerMock.mockResolvedValue({})
+    routeQuery.full = '1'
+    delete routeQuery.email
+    sessionStorage.clear()
+  })
+
+  it('uses the shared email-first component for the default registration route', async () => {
+    delete routeQuery.full
+    routeQuery.email = 'preset@example.com'
+
+    const wrapper = mountRegister()
+    await flushPromises()
+
+    const unifiedRegistration = wrapper.getComponent({ name: 'EmailFirstAuthDialog' })
+    expect(unifiedRegistration.props('presentation')).toBe('embedded')
+    expect(unifiedRegistration.props('intent')).toBe('register')
+    expect(unifiedRegistration.props('initialEmail')).toBe('preset@example.com')
+    expect(wrapper.find('#email').exists()).toBe(false)
+  })
+
+  it('restores and consumes the one-time draft in the full registration fallback', async () => {
+    storeFullRegistrationDraft({ email: 'draft@example.com', password: 'secret-123' })
+
+    const wrapper = mountRegister()
+    await flushPromises()
+
+    expect((wrapper.get('#email').element as HTMLInputElement).value).toBe('draft@example.com')
+    expect((wrapper.get('#password').element as HTMLInputElement).value).toBe('secret-123')
+    expect(consumeFullRegistrationDraft()).toBeNull()
   })
 
   it('keeps the optional affiliate invitation field before Turnstile', async () => {
@@ -106,7 +135,7 @@ describe('RegisterView invitation layout', () => {
   })
 
   it('uses the mandatory invitation field without duplicating the affiliate field', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       invitation_code_enabled: true
     })
@@ -119,7 +148,7 @@ describe('RegisterView invitation layout', () => {
   })
 
   it('submits a non-whitelist email domain so the backend can enforce its registration quota', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       turnstile_enabled: false,
       registration_email_suffix_whitelist: ['allowed.com'],
@@ -140,7 +169,7 @@ describe('RegisterView invitation layout', () => {
   })
 
   it('shows the localized registration domain quota message returned by the backend', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       turnstile_enabled: false,
       registration_email_suffix_whitelist: ['allowed.com'],
@@ -165,7 +194,7 @@ describe('RegisterView invitation layout', () => {
 
   // 域名限量注册开关默认关闭：恢复 PR5423 之前的客户端白名单预检，非白名单域名不发起注册请求。
   it('rejects a non-whitelist email domain locally when the domain quota switch is disabled', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       turnstile_enabled: false,
       registration_email_suffix_whitelist: ['allowed.com']
@@ -185,7 +214,7 @@ describe('RegisterView invitation layout', () => {
   })
 
   it('still submits whitelisted email domains when the domain quota switch is disabled', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       turnstile_enabled: false,
       registration_email_suffix_whitelist: ['allowed.com']

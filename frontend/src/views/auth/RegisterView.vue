@@ -1,6 +1,17 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <EmailFirstAuthDialog
+      v-if="!showFullRegistration"
+      :open="true"
+      presentation="embedded"
+      intent="register"
+      :initial-email="initialRegistrationEmail"
+      :site-name="siteName"
+      :site-logo="siteLogo"
+      dashboard-path="/dashboard"
+    />
+
+    <div v-else class="space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -319,7 +330,7 @@
 
     <!-- Footer -->
     <template #footer>
-      <p class="text-gray-500 dark:text-dark-400">
+      <p v-if="showFullRegistration" class="text-gray-500 dark:text-dark-400">
         {{ t('auth.alreadyHaveAccount') }}
         <router-link
           to="/login"
@@ -337,6 +348,7 @@ import { computed, ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
+import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
 import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
 import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
 import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
@@ -347,7 +359,6 @@ import TurnstileWidget from '@/components/CaptchaChallenge.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
   buildOAuthLoginStartURL,
-  getPublicSettings,
   isWeChatWebOAuthEnabled,
   startOAuthLogin,
   type OAuthLoginStart,
@@ -367,6 +378,8 @@ import {
   resolveAffiliateReferralCode
 } from '@/utils/oauthAffiliate'
 import type { LoginAgreementDocument } from '@/types'
+import { consumeFullRegistrationDraft } from '@/utils/registrationDraft'
+import { sanitizeUrl } from '@/utils/url'
 
 const { t, locale } = useI18n()
 const LOGIN_AGREEMENT_STORAGE_KEY = 'sub2api_login_agreement_consent'
@@ -377,6 +390,16 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+
+const showFullRegistration = computed(() => route.query.full === '1')
+const initialRegistrationEmail = computed(() => {
+  const value = route.query.email
+  return typeof value === 'string' ? value.trim() : ''
+})
+const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', {
+  allowRelative: true,
+  allowDataUrl: true
+}))
 
 // ==================== State ====================
 
@@ -517,6 +540,12 @@ function syncAffiliateReferralCode(): string {
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  const draft = consumeFullRegistrationDraft()
+  if (draft) {
+    formData.email = draft.email
+    formData.password = draft.password
+  }
+
   const emailParam = route.query.email
   if (typeof emailParam === 'string') {
     formData.email = emailParam.trim()
@@ -525,7 +554,8 @@ onMounted(async () => {
   syncAffiliateReferralCode()
 
   try {
-    const settings = await getPublicSettings()
+    const settings = await appStore.fetchPublicSettings()
+    if (!settings) throw new Error('Public settings unavailable')
     registrationEnabled.value = settings.registration_enabled
     emailVerifyEnabled.value = settings.email_verify_enabled
     promoCodeEnabled.value = settings.promo_code_enabled
@@ -576,6 +606,13 @@ watch(
   () => [route.query.aff, route.query.aff_code],
   () => {
     syncAffiliateReferralCode()
+  }
+)
+
+watch(
+  () => route.query.email,
+  value => {
+    if (typeof value === 'string') formData.email = value.trim()
   }
 )
 

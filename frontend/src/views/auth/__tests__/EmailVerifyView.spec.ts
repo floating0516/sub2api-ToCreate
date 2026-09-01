@@ -135,6 +135,36 @@ describe('EmailVerifyView', () => {
     setTokenMock.mockResolvedValue({})
   })
 
+  it('returns to the full registration fallback with the email preserved', async () => {
+    sessionStorage.setItem(
+      'register_data',
+      JSON.stringify({ email: 'return@example.com', password: 'secret-123' })
+    )
+    const wrapper = mount(EmailVerifyView, {
+      global: {
+        stubs: {
+          AuthLayout: { template: '<div><slot /><slot name="footer" /></div>' },
+          Icon: true,
+          TurnstileWidget: true,
+          transition: false,
+        },
+      },
+    })
+
+    await flushPromises()
+    const backButton = wrapper.findAll('button').find(button =>
+      button.text().includes('auth.backToRegistration')
+    )
+    expect(backButton).toBeDefined()
+    await backButton!.trigger('click')
+
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/register',
+      query: { full: '1', email: 'return@example.com' },
+    })
+  })
+
   it('acquires a fresh Tencent proof for each resend action', async () => {
     getPublicSettingsMock.mockResolvedValue({
       turnstile_enabled: false,

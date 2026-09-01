@@ -762,8 +762,14 @@ function handleBack(): void {
   // Clear session data
   sessionStorage.removeItem('register_data')
 
-  // Go back to registration
-  router.push('/register')
+  // Verification page is retained for the full registration fallback.
+  router.push({
+    path: '/register',
+    query: {
+      full: '1',
+      ...(email.value ? { email: email.value } : {})
+    }
+  })
 }
 
 function buildEmailSuffixNotAllowedMessage(): string {
