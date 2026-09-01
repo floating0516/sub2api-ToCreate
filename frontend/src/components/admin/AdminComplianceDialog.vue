@@ -179,7 +179,7 @@ async function submit(): Promise<void> {
 
 async function logout(): Promise<void> {
   await authStore.logout()
-  window.location.href = '/login'
+  window.location.replace('/home')
 }
 </script>
 
