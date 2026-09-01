@@ -35,11 +35,15 @@
             <Icon v-if="isDark" name="sun" size="sm" />
             <Icon v-else name="moon" size="sm" />
           </button>
-          <router-link :to="isAuthenticated ? dashboardPath : '/login'" class="tc-login-button">
+          <router-link v-if="isAuthenticated" :to="dashboardPath" class="tc-login-button">
             <span v-if="isAuthenticated" class="tc-user-initial">{{ userInitial }}</span>
-            {{ isAuthenticated ? t('home.dashboard') : t('home.login') }}
+            {{ t('home.dashboard') }}
             <Icon name="arrowRight" size="xs" />
           </router-link>
+          <button v-else type="button" class="tc-login-button" @click="authDialogOpen = true">
+            {{ t('home.login') }}
+            <Icon name="arrowRight" size="xs" />
+          </button>
         </div>
       </nav>
     </header>
@@ -59,10 +63,14 @@
           <p class="tc-hero-description">{{ t('home.heroDescription') }}</p>
 
           <div class="tc-hero-actions">
-            <router-link :to="isAuthenticated ? dashboardPath : '/login'" class="tc-primary-action">
-              {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
+            <router-link v-if="isAuthenticated" :to="dashboardPath" class="tc-primary-action">
+              {{ t('home.goToDashboard') }}
               <Icon name="arrowRight" size="sm" />
             </router-link>
+            <button v-else type="button" class="tc-primary-action" @click="authDialogOpen = true">
+              {{ t('home.getStarted') }}
+              <Icon name="arrowRight" size="sm" />
+            </button>
             <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="tc-secondary-action">
               <Icon name="book" size="sm" />
               {{ t('home.viewDocs') }}
@@ -200,11 +208,20 @@
       <p>&copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
       <a :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub</a>
     </footer>
+
+    <EmailFirstAuthDialog
+      v-model:open="authDialogOpen"
+      :site-name="siteName"
+      :site-logo="siteLogo"
+      :dashboard-path="dashboardPath"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 
@@ -227,6 +244,7 @@ defineEmits<{
 }>()
 
 const { t } = useI18n()
+const authDialogOpen = ref(false)
 </script>
 
 <style scoped>
@@ -366,8 +384,10 @@ const { t } = useI18n()
   min-height: 36px;
   gap: 7px;
   padding: 0 14px;
+  border: 0;
   color: #fff;
   background: var(--tc-ink);
+  cursor: pointer;
   font-size: 12px;
 }
 
@@ -489,9 +509,11 @@ const { t } = useI18n()
 
 .tc-primary-action {
   min-width: 154px;
+  border: 0;
   color: #fff;
   background: var(--tc-brand-deep);
   box-shadow: 0 12px 24px color-mix(in srgb, var(--tc-brand-deep) 20%, transparent);
+  cursor: pointer;
 }
 
 .tc-secondary-action {

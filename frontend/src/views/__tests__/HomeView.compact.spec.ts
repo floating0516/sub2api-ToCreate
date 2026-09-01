@@ -50,6 +50,7 @@ function mountHome(settings: Record<string, unknown> = {}) {
         RouterLink: RouterLinkStub,
         LocaleSwitcher: { template: '<div data-testid="locale-switcher" />' },
         Icon: { template: '<span data-testid="icon" />' },
+        EmailFirstAuthDialog: { template: '<div data-testid="email-auth-stub" />' },
       },
     },
   })

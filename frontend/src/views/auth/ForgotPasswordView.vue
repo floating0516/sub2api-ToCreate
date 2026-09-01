@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
 import Icon from '@/components/icons/Icon.vue'
@@ -142,6 +143,7 @@ import { useAppStore } from '@/stores'
 import { getPublicSettings, forgotPassword } from '@/api/auth'
 
 const { t } = useI18n()
+const route = useRoute()
 
 // ==================== Stores ====================
 
@@ -205,6 +207,11 @@ watch(validationToastMessage, (value, previousValue) => {
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  const emailParam = route.query.email
+  if (typeof emailParam === 'string') {
+    formData.email = emailParam.trim()
+  }
+
   try {
     const settings = await getPublicSettings()
     turnstileEnabled.value = settings.turnstile_enabled
