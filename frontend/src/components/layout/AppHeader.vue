@@ -223,6 +223,7 @@
               <div class="border-t border-gray-100 py-1 dark:border-dark-700">
                 <button
                   @click="handleLogout"
+                  data-testid="app-header-logout"
                   class="dropdown-item w-full text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                 >
                   <svg
@@ -350,10 +351,10 @@ async function handleLogout() {
   try {
     await authStore.logout()
   } catch (error) {
-    // Ignore logout errors - still redirect to login
+    // Ignore logout errors - local auth state is cleared by the store.
     console.error('Logout error:', error)
   }
-  await router.push('/login')
+  await router.replace('/home')
 }
 
 function handleReplayGuide() {
