@@ -797,7 +797,7 @@ onBeforeUnmount(() => {
   animation: email-auth-dialog-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-:global(html.dark) .email-auth-dialog {
+:global(html.dark .email-auth-dialog) {
   --auth-bg: #222520;
   --auth-surface: #1b1e1a;
   --auth-ink: #f2efe8;
@@ -1041,7 +1041,7 @@ onBeforeUnmount(() => {
   transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
-:global(html.dark) .email-auth-primary {
+:global(html.dark .email-auth-primary) {
   color: #20231f;
   background: #e0b08c;
   box-shadow: 0 9px 20px rgba(0, 0, 0, 0.2);
@@ -1210,7 +1210,7 @@ onBeforeUnmount(() => {
   animation: email-auth-success-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-:global(html.dark) .email-auth-success-mark { color: #79bdb0; }
+:global(html.dark .email-auth-success-mark) { color: #79bdb0; }
 
 .email-auth-legal {
   margin: 8px 0 0;
@@ -1233,7 +1233,7 @@ onBeforeUnmount(() => {
     transform: translateY(-1px);
   }
 
-  :global(html.dark) .email-auth-primary:not(:disabled):hover { background: #ecc09e; }
+  :global(html.dark .email-auth-primary:not(:disabled):hover) { background: #ecc09e; }
 }
 
 @media (max-width: 520px) {
