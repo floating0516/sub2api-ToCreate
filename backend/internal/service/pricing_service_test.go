@@ -462,9 +462,11 @@ func TestPricingService_CorrectsKnownLegacyGPT56Rates(t *testing.T) {
 	require.InDelta(t, 2.4e-6, merged["gpt-5.6-luna"].OutputCostPerTokenPriority, 1e-12)
 	require.InDelta(t, 0.25e-6, merged["gpt-5.6-luna"].CacheCreationInputTokenCost, 1e-12)
 	require.InDelta(t, 0.02e-6, merged["gpt-5.6-luna"].CacheReadInputTokenCost, 1e-12)
-	require.Equal(t, 272000, merged["gpt-5.6-luna"].LongContextInputTokenThreshold)
-	require.InDelta(t, 2.0, merged["gpt-5.6-luna"].LongContextInputCostMultiplier, 1e-12)
-	require.InDelta(t, 1.5, merged["gpt-5.6-luna"].LongContextOutputCostMultiplier, 1e-12)
+	// The correction only fixes known stale base rates. Long-context ladders are
+	// data-driven from the catalog's above-tier fields and must not be invented.
+	require.Zero(t, merged["gpt-5.6-luna"].LongContextInputTokenThreshold)
+	require.Zero(t, merged["gpt-5.6-luna"].LongContextInputCostMultiplier)
+	require.Zero(t, merged["gpt-5.6-luna"].LongContextOutputCostMultiplier)
 }
 
 func TestPricingService_PreservesFutureGPT56RemoteRates(t *testing.T) {
