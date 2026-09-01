@@ -166,7 +166,14 @@
               {{ t('auth.createAccount') }}
             </button>
           </div>
-          <button type="button" class="email-auth-text-button" :disabled="busy" @click="openFullFlow('/login')">
+          <button
+            v-if="hasAlternativeLoginMethods"
+            type="button"
+            class="email-auth-text-button"
+            :disabled="busy"
+            data-testid="email-auth-other-methods"
+            @click="openAlternativeMethods"
+          >
             {{ t('auth.emailFirst.otherLoginMethods') }}
           </button>
         </template>
@@ -243,6 +250,78 @@
               {{ t('auth.signIn') }}
             </button>
           </div>
+        </template>
+
+        <template v-else-if="step === 'methods'">
+          <header class="email-auth-copy">
+            <p>{{ t('auth.emailFirst.otherMethodsEyebrow') }}</p>
+            <h2 id="email-auth-title">{{ t('auth.emailFirst.otherMethodsTitle') }}</h2>
+            <span>{{ t('auth.emailFirst.otherMethodsDescription') }}</span>
+          </header>
+
+          <div class="email-auth-method-list" data-testid="email-auth-methods">
+            <button
+              v-if="passkeyLoginAvailable"
+              type="button"
+              class="email-auth-method-button"
+              :disabled="busy"
+              data-testid="email-auth-passkey"
+              @click="handlePasskeyLogin"
+            >
+              <Icon name="key" size="sm" />
+              {{ busy ? t('auth.passkeySigningIn') : t('auth.passkeySignIn') }}
+            </button>
+
+            <EmailOAuthButtons
+              :disabled="busy"
+              :github-enabled="settings?.github_oauth_enabled"
+              :google-enabled="settings?.google_oauth_enabled"
+              :show-divider="false"
+              @start="handleOAuthStart"
+            />
+            <LinuxDoOAuthSection
+              v-if="settings?.linuxdo_oauth_enabled"
+              :disabled="busy"
+              :show-divider="false"
+              @start="handleOAuthStart"
+            />
+            <DingTalkOAuthSection
+              v-if="settings?.dingtalk_oauth_enabled"
+              :disabled="busy"
+              :show-divider="false"
+              @start="handleOAuthStart"
+            />
+            <WechatOAuthSection
+              v-if="wechatOAuthAvailable"
+              :disabled="busy"
+              :show-divider="false"
+              @start="handleOAuthStart"
+            />
+            <OidcOAuthSection
+              v-if="settings?.oidc_oauth_enabled"
+              :disabled="busy"
+              :provider-name="settings?.oidc_oauth_provider_name || 'OIDC'"
+              :show-divider="false"
+              @start="handleOAuthStart"
+            />
+          </div>
+
+          <p
+            v-if="errorMessage"
+            class="email-auth-message email-auth-method-error is-error"
+            role="status"
+          >
+            {{ errorMessage }}
+          </p>
+          <button
+            type="button"
+            class="email-auth-text-button"
+            :disabled="busy"
+            data-testid="email-auth-email-password"
+            @click="returnToPasswordLogin"
+          >
+            {{ t('auth.emailFirst.emailPasswordMethod') }}
+          </button>
         </template>
 
         <template v-else-if="step === 'verification' || step === 'totp'">
@@ -348,16 +427,27 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import DingTalkOAuthSection from '@/components/auth/DingTalkOAuthSection.vue'
+import EmailOAuthButtons from '@/components/auth/EmailOAuthButtons.vue'
 import Icon from '@/components/icons/Icon.vue'
+import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
+import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
+import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
 import { useAppStore, useAuthStore } from '@/stores'
-import { isTotp2FARequired, sendVerifyCode } from '@/api/auth'
+import {
+  buildOAuthLoginStartURL,
+  isTotp2FARequired,
+  isWeChatWebOAuthEnabled,
+  sendVerifyCode,
+  type OAuthLoginStart
+} from '@/api/auth'
 import type { PublicSettings, TotpLoginResponse } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { clearAllAffiliateReferralCodes, resolveAffiliateReferralCode } from '@/utils/oauthAffiliate'
 import { isRegistrationEmailSuffixAllowed } from '@/utils/registrationEmailPolicy'
 import { storeFullRegistrationDraft } from '@/utils/registrationDraft'
 
-type AuthStep = 'email' | 'login' | 'register' | 'verification' | 'totp' | 'preparing' | 'success'
+type AuthStep = 'email' | 'login' | 'register' | 'methods' | 'verification' | 'totp' | 'preparing' | 'success'
 
 interface AuthDialogDelays {
   preparing: number
@@ -420,7 +510,7 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 const delays = computed(() => ({ ...defaultDelays, ...props.delays }))
 const isEmbedded = computed(() => props.presentation === 'embedded')
 const canClose = computed(() => !busy.value && step.value !== 'preparing' && step.value !== 'success')
-const showBackButton = computed(() => ['login', 'register', 'verification', 'totp'].includes(step.value))
+const showBackButton = computed(() => ['login', 'register', 'methods', 'verification', 'totp'].includes(step.value))
 const hasCaptcha = computed(() => Boolean(
   settings.value?.turnstile_enabled ||
   settings.value?.tencent_captcha_enabled ||
@@ -428,6 +518,21 @@ const hasCaptcha = computed(() => Boolean(
 ))
 const loginNeedsFullPage = computed(() => Boolean(
   hasCaptcha.value || settings.value?.login_agreement_enabled
+))
+const passkeyLoginAvailable = computed(() => Boolean(
+  settings.value?.passkey_enabled && typeof window.PublicKeyCredential !== 'undefined'
+))
+const wechatOAuthAvailable = computed(() => isWeChatWebOAuthEnabled(settings.value))
+const hasAlternativeLoginMethods = computed(() => Boolean(
+  !settings.value?.backend_mode_enabled && (
+    passkeyLoginAvailable.value ||
+    settings.value?.linuxdo_oauth_enabled ||
+    settings.value?.dingtalk_oauth_enabled ||
+    wechatOAuthAvailable.value ||
+    settings.value?.oidc_oauth_enabled ||
+    settings.value?.github_oauth_enabled ||
+    settings.value?.google_oauth_enabled
+  )
 ))
 const registrationNeedsFullPage = computed(() => Boolean(
   loginNeedsFullPage.value ||
@@ -526,6 +631,10 @@ function goBack(): void {
   clearError()
   code.value = ''
 
+  if (step.value === 'methods') {
+    step.value = 'login'
+    return
+  }
   if (step.value === 'verification') {
     clearCountdown()
     step.value = 'register'
@@ -582,6 +691,20 @@ function switchToLogin(): void {
   step.value = 'login'
 }
 
+async function openAlternativeMethods(): Promise<void> {
+  clearError()
+  if (loginNeedsFullPage.value) {
+    await openFullFlow('/login')
+    return
+  }
+  step.value = 'methods'
+}
+
+function returnToPasswordLogin(): void {
+  clearError()
+  step.value = 'login'
+}
+
 async function openFullFlow(path: string): Promise<void> {
   const preservedEmail = email.value
   resolveAffiliateReferralCode(route.query.aff, route.query.aff_code)
@@ -591,6 +714,9 @@ async function openFullFlow(path: string): Promise<void> {
     if (typeof value === 'string' && value) query[key] = value
   }
   query.email = preservedEmail
+  if (path === '/login' && loginNeedsFullPage.value) {
+    query.full = '1'
+  }
   if (path === '/register' && registrationNeedsFullPage.value) {
     query.full = '1'
     storeFullRegistrationDraft({ email: preservedEmail, password: password.value })
@@ -600,6 +726,29 @@ async function openFullFlow(path: string): Promise<void> {
     resetDialog()
   }
   await router.push({ path, query })
+}
+
+async function handlePasskeyLogin(): Promise<void> {
+  if (busy.value) return
+  clearError()
+  busy.value = true
+  try {
+    await authStore.loginWithPasskey()
+    await finishAuthentication()
+  } catch (error: unknown) {
+    const fallback = error instanceof DOMException && error.name === 'NotAllowedError'
+      ? t('auth.passkeyCancelled')
+      : t('auth.passkeyFailed')
+    errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', fallback)
+    busy.value = false
+  }
+}
+
+function handleOAuthStart(request: OAuthLoginStart): void {
+  if (busy.value) return
+  clearError()
+  busy.value = true
+  window.location.href = buildOAuthLoginStartURL(request)
 }
 
 async function submitLogin(): Promise<void> {
@@ -1170,6 +1319,49 @@ onBeforeUnmount(() => {
   font-size: 9px;
 }
 
+.email-auth-method-list {
+  display: grid;
+  gap: 10px;
+}
+
+.email-auth-method-button,
+:deep(.email-auth-method-list .btn) {
+  width: 100%;
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--auth-line);
+  border-radius: 8px;
+  color: var(--auth-ink);
+  background: var(--auth-surface);
+  box-shadow: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 680;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.email-auth-method-button:disabled,
+:deep(.email-auth-method-list .btn:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+:deep(.email-auth-method-list > div),
+:deep(.email-auth-method-list .grid) {
+  gap: 10px;
+  margin: 0;
+}
+
+.email-auth-method-error {
+  min-height: 0;
+  text-align: center;
+}
+
 .email-auth-otp {
   position: relative;
   display: grid;
@@ -1306,6 +1498,13 @@ onBeforeUnmount(() => {
   }
 
   :global(html.dark .email-auth-primary:not(:disabled):hover) { background: #ecc09e; }
+
+  .email-auth-method-button:not(:disabled):hover,
+  :deep(.email-auth-method-list .btn:not(:disabled):hover) {
+    border-color: color-mix(in srgb, var(--auth-brand) 38%, transparent);
+    background: var(--auth-bg);
+    transform: translateY(-1px);
+  }
 }
 
 @media (max-width: 520px) {

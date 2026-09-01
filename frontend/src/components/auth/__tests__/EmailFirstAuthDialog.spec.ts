@@ -21,6 +21,7 @@ const {
   authStore: {
     login: vi.fn(),
     login2FA: vi.fn(),
+    loginWithPasskey: vi.fn(),
     register: vi.fn(),
   },
   pushMock: vi.fn(),
@@ -75,6 +76,14 @@ const simpleSettings = {
   tencent_captcha_enabled: false,
   aliyun_captcha_enabled: false,
   backend_mode_enabled: false,
+  passkey_enabled: false,
+  linuxdo_oauth_enabled: false,
+  dingtalk_oauth_enabled: false,
+  wechat_oauth_enabled: false,
+  oidc_oauth_enabled: false,
+  oidc_oauth_provider_name: 'OIDC',
+  github_oauth_enabled: false,
+  google_oauth_enabled: false,
 }
 
 function mountDialog(props: Record<string, unknown> = {}) {
@@ -108,6 +117,7 @@ describe('EmailFirstAuthDialog', () => {
     appStore.fetchPublicSettings.mockReset()
     authStore.login.mockReset()
     authStore.login2FA.mockReset()
+    authStore.loginWithPasskey.mockReset()
     authStore.register.mockReset()
     pushMock.mockReset()
     sendVerifyCodeMock.mockReset()
@@ -117,6 +127,7 @@ describe('EmailFirstAuthDialog', () => {
     sessionStorage.clear()
     sendVerifyCodeMock.mockResolvedValue({ message: 'sent', countdown: 60 })
     authStore.login.mockResolvedValue({ access_token: 'token', user: {} })
+    authStore.loginWithPasskey.mockResolvedValue({})
     authStore.register.mockResolvedValue({})
   })
 
@@ -156,6 +167,52 @@ describe('EmailFirstAuthDialog', () => {
 
     expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('user@example.com')
+  })
+
+  it('hides the alternative-method entry when no alternative provider is enabled', async () => {
+    const wrapper = mountDialog()
+
+    await continueWithEmail(wrapper)
+
+    expect(wrapper.find('[data-testid="email-auth-other-methods"]').exists()).toBe(false)
+  })
+
+  it('keeps enabled OAuth methods inside the new dialog', async () => {
+    appStore.cachedPublicSettings = {
+      ...simpleSettings,
+      oidc_oauth_enabled: true,
+      oidc_oauth_provider_name: 'Lihe ID',
+    }
+    const wrapper = mountDialog()
+
+    await continueWithEmail(wrapper)
+    await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="email-auth-methods"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('auth.oidc.signIn')
+    expect(pushMock).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="email-auth-email-password"]').trigger('click')
+    expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
+  })
+
+  it('uses the real passkey login from the inline method step', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      configurable: true,
+      value: class PublicKeyCredential {},
+    })
+    appStore.cachedPublicSettings = { ...simpleSettings, passkey_enabled: true }
+    const wrapper = mountDialog()
+
+    await continueWithEmail(wrapper)
+    await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
+    await wrapper.get('[data-testid="email-auth-passkey"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.loginWithPasskey).toHaveBeenCalledOnce()
+    await vi.runAllTimersAsync()
+    expect(pushMock).toHaveBeenCalledWith('/dashboard')
+    Reflect.deleteProperty(window, 'PublicKeyCredential')
   })
 
   it('reuses the email-first flow as an embedded registration page', async () => {
@@ -292,7 +349,26 @@ describe('EmailFirstAuthDialog', () => {
     expect(authStore.login).not.toHaveBeenCalled()
     expect(pushMock).toHaveBeenCalledWith({
       path: '/login',
-      query: { email: 'user@example.com' },
+      query: { email: 'user@example.com', full: '1' },
+    })
+  })
+
+  it('uses the full login compatibility page for protected alternative methods', async () => {
+    appStore.cachedPublicSettings = {
+      ...simpleSettings,
+      turnstile_enabled: true,
+      oidc_oauth_enabled: true,
+    }
+    const wrapper = mountDialog()
+    await continueWithEmail(wrapper)
+
+    await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="email-auth-methods"]').exists()).toBe(false)
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/login',
+      query: { email: 'user@example.com', full: '1' },
     })
   })
 })
