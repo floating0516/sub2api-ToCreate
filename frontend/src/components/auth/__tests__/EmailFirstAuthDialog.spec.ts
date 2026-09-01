@@ -1,4 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
 
@@ -109,6 +111,16 @@ describe('EmailFirstAuthDialog', () => {
   afterEach(() => {
     vi.useRealTimers()
     document.body.style.overflow = ''
+  })
+
+  it('uses the scoped-selector form that preserves html.dark rules during compilation', () => {
+    const filename = resolve('src/components/auth/EmailFirstAuthDialog.vue')
+    const source = readFileSync(filename, 'utf8')
+
+    expect(source).toContain(':global(html.dark .email-auth-dialog)')
+    expect(source).toContain(':global(html.dark .email-auth-primary)')
+    expect(source).toContain(':global(html.dark .email-auth-success-mark)')
+    expect(source).not.toMatch(/:global\(html\.dark\)\s+\.email-auth/)
   })
 
   it('shows an inline error for an invalid email', async () => {
