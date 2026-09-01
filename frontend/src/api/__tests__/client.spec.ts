@@ -310,6 +310,43 @@ describe('API Client', () => {
   // --- 401 Token 刷新 ---
 
   describe('401 Token 刷新', () => {
+    it('认证提交接口 401 保留当前页面并返回表单错误', async () => {
+      const originalLocation = window.location
+      Object.defineProperty(window, 'location', {
+        value: { ...originalLocation, pathname: '/home', href: '/home' },
+        writable: true,
+      })
+
+      const adapter = vi.fn().mockRejectedValue({
+        response: {
+          status: 401,
+          data: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
+        },
+        config: {
+          url: '/auth/login',
+          headers: {},
+        },
+        code: 'ERR_BAD_REQUEST',
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(apiClient.post('/auth/login', {
+        email: 'user@example.com',
+        password: 'wrong-password',
+      })).rejects.toMatchObject({
+        status: 401,
+        code: 'INVALID_CREDENTIALS',
+      })
+
+      expect(window.location.pathname).toBe('/home')
+      expect(window.location.href).toBe('/home')
+
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+      })
+    })
+
     it('无 refresh_token 时 401 清除 localStorage', async () => {
       localStorage.setItem('auth_token', 'expired-token')
       // 不设置 refresh_token

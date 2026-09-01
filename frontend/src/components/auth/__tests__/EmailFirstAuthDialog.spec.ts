@@ -174,6 +174,25 @@ describe('EmailFirstAuthDialog', () => {
     expect(pushMock).toHaveBeenCalledWith('/dashboard')
   })
 
+  it('keeps a failed real login inside the dialog', async () => {
+    authStore.login.mockRejectedValueOnce({
+      status: 401,
+      code: 'INVALID_CREDENTIALS',
+      message: 'Invalid email or password',
+    })
+    const wrapper = mountDialog()
+    await continueWithEmail(wrapper)
+
+    await wrapper.get('[data-testid="email-auth-password"]').setValue('wrong-password')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="email-auth-dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Invalid email or password')
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
   it('falls back to the full login page when captcha protection is enabled', async () => {
     appStore.cachedPublicSettings = { ...simpleSettings, turnstile_enabled: true }
     const wrapper = mountDialog()
