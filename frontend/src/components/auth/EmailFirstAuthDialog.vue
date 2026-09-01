@@ -1,6 +1,12 @@
 <template>
-  <div v-if="open" class="email-auth-layer" aria-live="polite">
+  <div
+    v-if="open"
+    class="email-auth-layer"
+    :class="{ 'is-embedded': isEmbedded }"
+    aria-live="polite"
+  >
     <button
+      v-if="!isEmbedded"
       type="button"
       class="email-auth-backdrop"
       :aria-label="t('common.close')"
@@ -9,8 +15,8 @@
 
     <section
       class="email-auth-dialog"
-      role="dialog"
-      aria-modal="true"
+      :role="isEmbedded ? 'region' : 'dialog'"
+      :aria-modal="isEmbedded ? undefined : 'true'"
       aria-labelledby="email-auth-title"
       data-testid="email-auth-dialog"
     >
@@ -25,7 +31,7 @@
         <Icon name="arrowLeft" size="sm" />
       </button>
       <button
-        v-if="canClose"
+        v-if="!isEmbedded && canClose"
         type="button"
         class="email-auth-icon-button email-auth-close"
         :aria-label="t('common.close')"
@@ -349,6 +355,7 @@ import type { PublicSettings, TotpLoginResponse } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { clearAllAffiliateReferralCodes, resolveAffiliateReferralCode } from '@/utils/oauthAffiliate'
 import { isRegistrationEmailSuffixAllowed } from '@/utils/registrationEmailPolicy'
+import { storeFullRegistrationDraft } from '@/utils/registrationDraft'
 
 type AuthStep = 'email' | 'login' | 'register' | 'verification' | 'totp' | 'preparing' | 'success'
 
@@ -357,15 +364,24 @@ interface AuthDialogDelays {
   success: number
 }
 
+type AuthPresentation = 'dialog' | 'embedded'
+type AuthIntent = 'authenticate' | 'register'
+
 const props = withDefaults(defineProps<{
   open: boolean
   siteName: string
   siteLogo?: string
   dashboardPath: string
   delays?: Partial<AuthDialogDelays>
+  presentation?: AuthPresentation
+  intent?: AuthIntent
+  initialEmail?: string
 }>(), {
   siteLogo: '',
-  delays: () => ({})
+  delays: () => ({}),
+  presentation: 'dialog',
+  intent: 'authenticate',
+  initialEmail: ''
 })
 
 const emit = defineEmits<{
@@ -384,7 +400,7 @@ const defaultDelays: AuthDialogDelays = {
 }
 
 const step = ref<AuthStep>('email')
-const email = ref('')
+const email = ref(normalizeEmail(props.initialEmail))
 const password = ref('')
 const confirmPassword = ref('')
 const code = ref('')
@@ -402,6 +418,7 @@ const codeInputRef = ref<HTMLInputElement | null>(null)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const delays = computed(() => ({ ...defaultDelays, ...props.delays }))
+const isEmbedded = computed(() => props.presentation === 'embedded')
 const canClose = computed(() => !busy.value && step.value !== 'preparing' && step.value !== 'success')
 const showBackButton = computed(() => ['login', 'register', 'verification', 'totp'].includes(step.value))
 const hasCaptcha = computed(() => Boolean(
@@ -415,7 +432,13 @@ const loginNeedsFullPage = computed(() => Boolean(
 const registrationNeedsFullPage = computed(() => Boolean(
   loginNeedsFullPage.value ||
   settings.value?.invitation_code_enabled ||
-  settings.value?.promo_code_enabled
+  settings.value?.promo_code_enabled ||
+  settings.value?.affiliate_enabled ||
+  settings.value?.linuxdo_oauth_enabled ||
+  settings.value?.wechat_oauth_enabled ||
+  settings.value?.oidc_oauth_enabled ||
+  settings.value?.github_oauth_enabled ||
+  settings.value?.google_oauth_enabled
 ))
 const canRegister = computed(() => Boolean(
   settings.value?.registration_enabled && !settings.value?.backend_mode_enabled
@@ -479,7 +502,7 @@ async function ensureSettings(): Promise<void> {
 
 function resetDialog(): void {
   step.value = 'email'
-  email.value = ''
+  email.value = normalizeEmail(props.initialEmail)
   password.value = ''
   confirmPassword.value = ''
   code.value = ''
@@ -532,6 +555,10 @@ async function submitEmail(): Promise<void> {
   }
 
   email.value = normalizeEmail(email.value)
+  if (props.intent === 'register') {
+    startRegistration()
+    return
+  }
   step.value = 'login'
 }
 
@@ -558,9 +585,21 @@ function switchToLogin(): void {
 async function openFullFlow(path: string): Promise<void> {
   const preservedEmail = email.value
   resolveAffiliateReferralCode(route.query.aff, route.query.aff_code)
-  emit('update:open', false)
-  resetDialog()
-  await router.push({ path, query: { email: preservedEmail } })
+  const query: Record<string, string> = {}
+  for (const key of ['promo', 'aff', 'aff_code', 'redirect']) {
+    const value = route.query[key]
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  query.email = preservedEmail
+  if (path === '/register' && registrationNeedsFullPage.value) {
+    query.full = '1'
+    storeFullRegistrationDraft({ email: preservedEmail, password: password.value })
+  }
+  if (!isEmbedded.value) {
+    emit('update:open', false)
+    resetDialog()
+  }
+  await router.push({ path, query })
 }
 
 async function submitLogin(): Promise<void> {
@@ -713,28 +752,37 @@ async function finishAuthentication(): Promise<void> {
   await wait(delays.value.preparing)
   step.value = 'success'
   await wait(delays.value.success)
-  emit('update:open', false)
+  if (!isEmbedded.value) {
+    emit('update:open', false)
+  }
   resetDialog()
   await router.push(props.dashboardPath)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && props.open) closeDialog()
+  if (event.key === 'Escape' && props.open && !isEmbedded.value) closeDialog()
 }
 
 watch(
   () => props.open,
   async open => {
     if (!open) {
-      document.body.style.overflow = ''
+      if (!isEmbedded.value) document.body.style.overflow = ''
       return
     }
-    document.body.style.overflow = 'hidden'
+    if (!isEmbedded.value) document.body.style.overflow = 'hidden'
     await ensureSettings()
     await nextTick()
     window.setTimeout(() => emailInputRef.value?.focus(), 60)
   },
   { immediate: true }
+)
+
+watch(
+  () => props.initialEmail,
+  value => {
+    if (step.value === 'email') email.value = normalizeEmail(value)
+  }
 )
 
 watch(step, async currentStep => {
@@ -748,7 +796,7 @@ watch(step, async currentStep => {
 window.addEventListener('keydown', handleKeydown)
 
 onBeforeUnmount(() => {
-  document.body.style.overflow = ''
+  if (!isEmbedded.value) document.body.style.overflow = ''
   window.removeEventListener('keydown', handleKeydown)
   clearCountdown()
 })
@@ -762,6 +810,14 @@ onBeforeUnmount(() => {
   display: grid;
   padding: 20px;
   place-items: center;
+}
+
+.email-auth-layer.is-embedded {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  display: block;
+  padding: 0;
 }
 
 .email-auth-backdrop {
@@ -797,6 +853,18 @@ onBeforeUnmount(() => {
   animation: email-auth-dialog-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.email-auth-layer.is-embedded .email-auth-dialog {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
 :global(html.dark .email-auth-dialog) {
   --auth-bg: #222520;
   --auth-surface: #1b1e1a;
@@ -808,6 +876,10 @@ onBeforeUnmount(() => {
   --auth-brand-soft: #3b3028;
   --auth-danger: #e18e7e;
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.46), 0 7px 24px rgba(0, 0, 0, 0.25);
+}
+
+:global(html.dark .email-auth-layer.is-embedded .email-auth-dialog) {
+  box-shadow: none;
 }
 
 .email-auth-dialog *,

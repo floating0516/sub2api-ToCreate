@@ -10,6 +10,7 @@ const {
   appStore,
   authStore,
   pushMock,
+  routeState,
   sendVerifyCodeMock,
   clearAffiliateMock,
 } = vi.hoisted(() => ({
@@ -23,12 +24,13 @@ const {
     register: vi.fn(),
   },
   pushMock: vi.fn(),
+  routeState: { path: '/', query: {} as Record<string, string> },
   sendVerifyCodeMock: vi.fn(),
   clearAffiliateMock: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => routeState,
   useRouter: () => ({ push: pushMock }),
 }))
 
@@ -75,7 +77,7 @@ const simpleSettings = {
   backend_mode_enabled: false,
 }
 
-function mountDialog() {
+function mountDialog(props: Record<string, unknown> = {}) {
   return mount(EmailFirstAuthDialog, {
     props: {
       open: true,
@@ -83,6 +85,7 @@ function mountDialog() {
       siteLogo: '',
       dashboardPath: '/dashboard',
       delays: { preparing: 0, success: 0 },
+      ...props,
     },
     global: {
       stubs: {
@@ -109,6 +112,9 @@ describe('EmailFirstAuthDialog', () => {
     pushMock.mockReset()
     sendVerifyCodeMock.mockReset()
     clearAffiliateMock.mockReset()
+    routeState.path = '/'
+    routeState.query = {}
+    sessionStorage.clear()
     sendVerifyCodeMock.mockResolvedValue({ message: 'sent', countdown: 60 })
     authStore.login.mockResolvedValue({ access_token: 'token', user: {} })
     authStore.register.mockResolvedValue({})
@@ -150,6 +156,64 @@ describe('EmailFirstAuthDialog', () => {
 
     expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('user@example.com')
+  })
+
+  it('reuses the email-first flow as an embedded registration page', async () => {
+    routeState.path = '/register'
+    const wrapper = mountDialog({
+      presentation: 'embedded',
+      intent: 'register',
+      initialEmail: ' Preset@Example.com ',
+    })
+
+    expect(wrapper.find('.email-auth-backdrop').exists()).toBe(false)
+    expect(wrapper.find('.email-auth-close').exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('')
+    expect(wrapper.get('[data-testid="email-auth-email"]').element).toHaveProperty(
+      'value',
+      'preset@example.com',
+    )
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="email-auth-register-password"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="email-auth-password"]').exists()).toBe(false)
+  })
+
+  it('falls back to the full registration form for complex public settings', async () => {
+    routeState.path = '/register'
+    appStore.cachedPublicSettings = { ...simpleSettings, invitation_code_enabled: true }
+    const wrapper = mountDialog({ presentation: 'embedded', intent: 'register' })
+
+    await continueWithEmail(wrapper)
+    await wrapper.get('[data-testid="email-auth-register-password"]').setValue('secret12')
+    await wrapper.get('[data-testid="email-auth-confirm-password"]').setValue('secret12')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(sendVerifyCodeMock).not.toHaveBeenCalled()
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/register',
+      query: { email: 'user@example.com', full: '1' },
+    })
+  })
+
+  it('routes the homepage dialog directly to the full registration fallback', async () => {
+    appStore.cachedPublicSettings = { ...simpleSettings, promo_code_enabled: true }
+    const wrapper = mountDialog()
+
+    await continueWithEmail(wrapper)
+    await wrapper.get('[data-testid="email-auth-start-register"]').trigger('click')
+    await wrapper.get('[data-testid="email-auth-register-password"]').setValue('secret12')
+    await wrapper.get('[data-testid="email-auth-confirm-password"]').setValue('secret12')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/register',
+      query: { email: 'user@example.com', full: '1' },
+    })
   })
 
   it('uses the real registration email-code and account APIs', async () => {
