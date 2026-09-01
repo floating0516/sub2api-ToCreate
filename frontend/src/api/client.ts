@@ -237,8 +237,9 @@ apiClient.interceptors.response.use(
         if ((hasToken || sentAuth) && !isAuthEndpoint) {
           sessionStorage.setItem('auth_expired', '1')
         }
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
+        // Credential endpoints use 401 for expected form errors. Let their callers
+        // render the response inline instead of replacing the current auth flow.
+        if (!isAuthEndpoint && !window.location.pathname.includes('/login')) {
           window.location.href = '/login'
         }
       }
