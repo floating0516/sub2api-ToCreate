@@ -191,10 +191,8 @@ type PricingRemoteClient interface {
 // LiteLLMRawEntry 用于解析原始JSON数据
 type LiteLLMRawEntry struct {
 	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
-	InputCostPerTokenAbove272kTokens    *float64 `json:"input_cost_per_token_above_272k_tokens"`
 	InputCostPerTokenPriority           *float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  *float64 `json:"output_cost_per_token"`
-	OutputCostPerTokenAbove272kTokens   *float64 `json:"output_cost_per_token_above_272k_tokens"`
 	OutputCostPerTokenPriority          *float64 `json:"output_cost_per_token_priority"`
 	CacheCreationInputTokenCost         *float64 `json:"cache_creation_input_token_cost"`
 	CacheCreationInputTokenCostPriority *float64 `json:"cache_creation_input_token_cost_priority"`
@@ -544,19 +542,6 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 		if entry.LongContextOutputCostMultiplier != nil {
 			pricing.LongContextOutputCostMultiplier = *entry.LongContextOutputCostMultiplier
-		}
-		if pricing.LongContextInputTokenThreshold == 0 &&
-			entry.InputCostPerTokenAbove272kTokens != nil &&
-			entry.InputCostPerToken != nil &&
-			*entry.InputCostPerToken > 0 {
-			pricing.LongContextInputTokenThreshold = openAIGPT54LongContextInputThreshold
-			pricing.LongContextInputCostMultiplier = *entry.InputCostPerTokenAbove272kTokens / *entry.InputCostPerToken
-		}
-		if pricing.LongContextOutputCostMultiplier == 0 &&
-			entry.OutputCostPerTokenAbove272kTokens != nil &&
-			entry.OutputCostPerToken != nil &&
-			*entry.OutputCostPerToken > 0 {
-			pricing.LongContextOutputCostMultiplier = *entry.OutputCostPerTokenAbove272kTokens / *entry.OutputCostPerToken
 		}
 		if entry.OutputCostPerImage != nil {
 			pricing.OutputCostPerImage = *entry.OutputCostPerImage
