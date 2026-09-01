@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
+import enCommon from '@/i18n/locales/en/common'
+import zhCommon from '@/i18n/locales/zh/common'
 
 const {
   appStore,
@@ -125,6 +127,11 @@ describe('EmailFirstAuthDialog', () => {
     expect(source).toContain(':global(html.dark .email-auth-primary)')
     expect(source).toContain(':global(html.dark .email-auth-success-mark)')
     expect(source).not.toMatch(/:global\(html\.dark\)\s+\.email-auth/)
+  })
+
+  it('localizes invalid credential responses from the real login API', () => {
+    expect(enCommon.auth.errors.INVALID_CREDENTIALS).toBe('Invalid email or password.')
+    expect(zhCommon.auth.errors.INVALID_CREDENTIALS).toBe('邮箱或密码不正确')
   })
 
   it('shows an inline error for an invalid email', async () => {
