@@ -517,6 +517,11 @@ function syncAffiliateReferralCode(): string {
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  const emailParam = route.query.email
+  if (typeof emailParam === 'string') {
+    formData.email = emailParam.trim()
+  }
+
   syncAffiliateReferralCode()
 
   try {

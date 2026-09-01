@@ -8,6 +8,10 @@ const forgotPasswordMock = vi.fn()
 const verifyActionMock = vi.fn()
 const captchaResetMock = vi.fn()
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} })
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
