@@ -169,6 +169,18 @@ describe('EmailFirstAuthDialog', () => {
     expect(wrapper.text()).toContain('user@example.com')
   })
 
+  it('lets visitors create an account from the first email step', async () => {
+    const wrapper = mountDialog()
+
+    await wrapper.get('[data-testid="email-auth-email"]').setValue(' User@Example.com ')
+    await wrapper.get('[data-testid="email-auth-create-account"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="email-auth-register-password"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="email-auth-password"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('user@example.com')
+  })
+
   it('hides the alternative-method entry when no alternative provider is enabled', async () => {
     const wrapper = mountDialog()
 

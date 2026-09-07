@@ -76,25 +76,28 @@
             <p class="email-auth-message" :class="{ 'is-error': Boolean(errorMessage) }" role="status">
               {{ errorMessage || t('auth.emailFirst.emailHint') }}
             </p>
-            <button
-              type="submit"
-              class="email-auth-primary"
-              :disabled="busy || settingsLoading"
-              data-testid="email-auth-continue"
-            >
-              <span v-if="settingsLoading" class="email-auth-spinner" aria-hidden="true" />
-              <template v-if="settingsLoading">{{ t('common.loading') }}</template>
-              <template v-else>
-                {{ t('auth.emailFirst.continueWithEmail') }}
-                <Icon name="arrowRight" size="sm" />
-              </template>
-            </button>
+            <div class="email-auth-choice" :class="{ 'is-single': Boolean(settings) && !canRegister }">
+              <button
+                type="submit"
+                :class="intent === 'register' ? 'email-auth-secondary' : 'email-auth-primary'"
+                :disabled="busy || settingsLoading"
+                data-testid="email-auth-continue"
+              >
+                <span v-if="settingsLoading" class="email-auth-spinner" aria-hidden="true" />
+                {{ settingsLoading ? t('common.loading') : t('auth.signIn') }}
+              </button>
+              <button
+                v-if="!settings || canRegister"
+                type="button"
+                :class="intent === 'register' ? 'email-auth-primary' : 'email-auth-secondary'"
+                :disabled="busy || settingsLoading"
+                data-testid="email-auth-create-account"
+                @click="continueToRegister"
+              >
+                {{ t('auth.createAccount') }}
+              </button>
+            </div>
           </form>
-
-          <div class="email-auth-trust">
-            <span><Icon name="shield" size="xs" />{{ t('auth.emailFirst.realAccount') }}</span>
-            <span><Icon name="lock" size="xs" />{{ t('auth.emailFirst.secureSession') }}</span>
-          </div>
         </template>
 
         <template v-else-if="step === 'login'">
@@ -652,23 +655,33 @@ function goBack(): void {
   step.value = 'email'
 }
 
-async function submitEmail(): Promise<void> {
+async function acceptEmail(): Promise<boolean> {
   clearError()
   if (!isValidEmail(email.value)) {
     errorMessage.value = t('auth.invalidEmail')
-    return
+    return false
   }
   if (!settings.value) {
     await ensureSettings()
-    if (!settings.value) return
+    if (!settings.value) return false
   }
 
   email.value = normalizeEmail(email.value)
+  return true
+}
+
+async function submitEmail(): Promise<void> {
+  if (!await acceptEmail()) return
   if (props.intent === 'register') {
     startRegistration()
     return
   }
-  step.value = 'login'
+  switchToLogin()
+}
+
+async function continueToRegister(): Promise<void> {
+  if (!await acceptEmail()) return
+  startRegistration()
 }
 
 function startRegistration(): void {
@@ -1276,7 +1289,35 @@ onBeforeUnmount(() => {
   box-shadow: 0 9px 20px rgba(0, 0, 0, 0.2);
 }
 
+.email-auth-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.email-auth-choice.is-single {
+  grid-template-columns: 1fr;
+}
+
+.email-auth-secondary {
+  width: 100%;
+  height: 47px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--auth-line);
+  border-radius: 8px;
+  color: var(--auth-ink);
+  background: color-mix(in srgb, var(--auth-surface) 88%, transparent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 720;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
 .email-auth-primary:disabled,
+.email-auth-secondary:disabled,
 .email-auth-text-button:disabled,
 .email-auth-switch button:disabled {
   cursor: not-allowed;
@@ -1375,7 +1416,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 7px;
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: text;
 }
 
@@ -1386,7 +1427,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   outline: 0;
   opacity: 0;
   cursor: text;
@@ -1396,24 +1437,25 @@ onBeforeUnmount(() => {
   height: 48px;
   display: grid;
   border: 1px solid var(--auth-line);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--auth-ink);
   background: var(--auth-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 17px;
   font-weight: 650;
   place-items: center;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 
-.email-auth-otp > span.is-current {
-  border-color: color-mix(in srgb, var(--auth-brand) 55%, transparent);
+.email-auth-otp:focus-within > span.is-current,
+.email-auth-otp > span.is-filled + span:not(.is-filled) {
+  border-color: color-mix(in srgb, var(--auth-brand) 48%, transparent);
   background: var(--auth-bg);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-brand) 8%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-brand) 7%, transparent);
 }
 
 .email-auth-otp > span.is-filled {
-  border-color: color-mix(in srgb, var(--auth-brand) 28%, transparent);
+  border-color: color-mix(in srgb, var(--auth-brand) 24%, transparent);
   background: var(--auth-brand-soft);
   transform: translateY(-1px);
 }
@@ -1502,6 +1544,12 @@ onBeforeUnmount(() => {
   .email-auth-primary:not(:disabled):hover {
     background: #75472d;
     box-shadow: 0 11px 24px rgba(95, 58, 34, 0.22);
+    transform: translateY(-1px);
+  }
+
+  .email-auth-secondary:not(:disabled):hover {
+    border-color: color-mix(in srgb, var(--auth-brand) 40%, transparent);
+    background: var(--auth-bg);
     transform: translateY(-1px);
   }
 

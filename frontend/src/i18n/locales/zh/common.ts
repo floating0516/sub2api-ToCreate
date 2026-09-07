@@ -286,7 +286,7 @@ export default {
     emailFirst: {
       welcome: '欢迎使用 {siteName}',
       title: '登录或创建账户',
-      emailDescription: '输入邮箱后继续。',
+      emailDescription: '输入邮箱，然后选择登录或创建账户。',
       emailHint: '请输入邮箱。',
       continueWithEmail: '使用邮箱继续',
       realAccount: '真实账户',

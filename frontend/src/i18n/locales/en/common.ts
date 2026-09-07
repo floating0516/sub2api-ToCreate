@@ -287,7 +287,7 @@ export default {
     emailFirst: {
       welcome: 'WELCOME TO {siteName}',
       title: 'Log in or sign up',
-      emailDescription: 'Enter your email to continue.',
+      emailDescription: 'Enter your email, then sign in or create an account.',
       emailHint: 'Enter your email.',
       continueWithEmail: 'Continue with email',
       realAccount: 'Real account',
