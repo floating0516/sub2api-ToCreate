@@ -527,7 +527,7 @@ func (r *apiKeyRepository) getLiheBoundAPIKeyForAuth(ctx context.Context, id int
 				group.FieldAllowMessagesDispatch,
 				group.FieldDefaultMappedModel,
 				group.FieldMessagesDispatchModelConfig,
-				group.FieldModelsListConfig,
+				group.FieldModelAllowlist,
 				group.FieldRpmLimit,
 				group.FieldPeakRateEnabled,
 				group.FieldPeakStart,
