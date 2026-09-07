@@ -113,6 +113,24 @@ async function continueWithEmail(wrapper: ReturnType<typeof mountDialog>, value 
   await flushPromises()
 }
 
+async function continueWithRegisteredEmail(
+  wrapper: ReturnType<typeof mountDialog>,
+  value = ' User@Example.com ',
+) {
+  checkRegistrationEmailMock.mockRejectedValueOnce({ reason: 'EMAIL_EXISTS' })
+  await continueWithEmail(wrapper, value)
+}
+
+async function createAccountFromEmail(
+  wrapper: ReturnType<typeof mountDialog>,
+  value = ' User@Example.com ',
+) {
+  checkRegistrationEmailMock.mockResolvedValueOnce({ available: true })
+  await wrapper.get('[data-testid="email-auth-email"]').setValue(value)
+  await wrapper.get('[data-testid="email-auth-create-account"]').trigger('click')
+  await flushPromises()
+}
+
 describe('EmailFirstAuthDialog', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -156,6 +174,8 @@ describe('EmailFirstAuthDialog', () => {
     expect(zhCommon.auth.errors.INVALID_CREDENTIALS).toBe('邮箱或密码不正确')
     expect(enCommon.auth.errors.EMAIL_EXISTS).toBe('This email is already registered. Please sign in instead.')
     expect(zhCommon.auth.errors.EMAIL_EXISTS).toBe('该邮箱已经存在，请返回登录')
+    expect(enCommon.auth.errors.EMAIL_NOT_REGISTERED).toBe('This email is not registered yet.')
+    expect(zhCommon.auth.errors.EMAIL_NOT_REGISTERED).toBe('该邮箱还没注册')
   })
 
   it('shows an inline error for an invalid email', async () => {
@@ -170,10 +190,22 @@ describe('EmailFirstAuthDialog', () => {
   it('normalizes the email before showing the real password login step', async () => {
     const wrapper = mountDialog()
 
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
+    expect(checkRegistrationEmailMock).toHaveBeenCalledWith('user@example.com')
     expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('user@example.com')
+  })
+
+  it('keeps an unregistered email on the first step when signing in', async () => {
+    const wrapper = mountDialog()
+
+    await continueWithEmail(wrapper)
+
+    expect(checkRegistrationEmailMock).toHaveBeenCalledWith('user@example.com')
+    expect(wrapper.find('[data-testid="email-auth-password"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="email-auth-email"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('auth.errors.EMAIL_NOT_REGISTERED')
   })
 
   it('lets visitors create an account from the first email step', async () => {
@@ -205,7 +237,7 @@ describe('EmailFirstAuthDialog', () => {
   it('hides the alternative-method entry when no alternative provider is enabled', async () => {
     const wrapper = mountDialog()
 
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
     expect(wrapper.find('[data-testid="email-auth-other-methods"]').exists()).toBe(false)
   })
@@ -218,7 +250,7 @@ describe('EmailFirstAuthDialog', () => {
     }
     const wrapper = mountDialog()
 
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
     await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
 
     expect(wrapper.get('[data-testid="email-auth-methods"]').exists()).toBe(true)
@@ -237,7 +269,7 @@ describe('EmailFirstAuthDialog', () => {
     appStore.cachedPublicSettings = { ...simpleSettings, passkey_enabled: true }
     const wrapper = mountDialog()
 
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
     await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
     await wrapper.get('[data-testid="email-auth-passkey"]').trigger('click')
     await flushPromises()
@@ -293,8 +325,7 @@ describe('EmailFirstAuthDialog', () => {
     appStore.cachedPublicSettings = { ...simpleSettings, promo_code_enabled: true }
     const wrapper = mountDialog()
 
-    await continueWithEmail(wrapper)
-    await wrapper.get('[data-testid="email-auth-start-register"]').trigger('click')
+    await createAccountFromEmail(wrapper)
     await wrapper.get('[data-testid="email-auth-register-password"]').setValue('secret12')
     await wrapper.get('[data-testid="email-auth-confirm-password"]').setValue('secret12')
     await wrapper.get('form').trigger('submit')
@@ -308,9 +339,7 @@ describe('EmailFirstAuthDialog', () => {
 
   it('uses the real registration email-code and account APIs', async () => {
     const wrapper = mountDialog()
-    await continueWithEmail(wrapper)
-
-    await wrapper.get('[data-testid="email-auth-start-register"]').trigger('click')
+    await createAccountFromEmail(wrapper)
     await wrapper.get('[data-testid="email-auth-register-password"]').setValue('secret12')
     await wrapper.get('[data-testid="email-auth-confirm-password"]').setValue('secret12')
     await wrapper.get('form').trigger('submit')
@@ -335,7 +364,7 @@ describe('EmailFirstAuthDialog', () => {
 
   it('submits password login through the auth store', async () => {
     const wrapper = mountDialog()
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
     await wrapper.get('[data-testid="email-auth-password"]').setValue('secret12')
     await wrapper.get('form').trigger('submit')
@@ -358,7 +387,7 @@ describe('EmailFirstAuthDialog', () => {
       message: 'Invalid email or password',
     })
     const wrapper = mountDialog()
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
     await wrapper.get('[data-testid="email-auth-password"]').setValue('wrong-password')
     await wrapper.get('form').trigger('submit')
@@ -373,7 +402,7 @@ describe('EmailFirstAuthDialog', () => {
   it('falls back to the full login page when captcha protection is enabled', async () => {
     appStore.cachedPublicSettings = { ...simpleSettings, turnstile_enabled: true }
     const wrapper = mountDialog()
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
     await wrapper.get('[data-testid="email-auth-password"]').setValue('secret12')
     await wrapper.get('form').trigger('submit')
@@ -393,7 +422,7 @@ describe('EmailFirstAuthDialog', () => {
       oidc_oauth_enabled: true,
     }
     const wrapper = mountDialog()
-    await continueWithEmail(wrapper)
+    await continueWithRegisteredEmail(wrapper)
 
     await wrapper.get('[data-testid="email-auth-other-methods"]').trigger('click')
     await flushPromises()

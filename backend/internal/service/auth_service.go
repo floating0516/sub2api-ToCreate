@@ -404,15 +404,9 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, loc
 }
 
 // CheckRegistrationEmail reports whether a new account can be created for email.
-// Existing addresses return ErrEmailExists so the client can send the user back
-// to login without sending a verification email.
+// Existing addresses return ErrEmailExists first so login can treat that as
+// "this inbox already has an account" even when registration is closed.
 func (s *AuthService) CheckRegistrationEmail(ctx context.Context, email string) error {
-	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
-		return ErrRegDisabled
-	}
-	if isReservedEmail(email) {
-		return ErrEmailReserved
-	}
 	existsEmail, err := s.existsByEmailOrAlias(ctx, email)
 	if err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Database error checking registration email: %v", err)
@@ -420,6 +414,12 @@ func (s *AuthService) CheckRegistrationEmail(ctx context.Context, email string) 
 	}
 	if existsEmail {
 		return ErrEmailExists
+	}
+	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
+		return ErrRegDisabled
+	}
+	if isReservedEmail(email) {
+		return ErrEmailReserved
 	}
 	return nil
 }

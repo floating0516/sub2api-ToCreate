@@ -248,6 +248,7 @@ export default {
       INVALID_CREDENTIALS: 'Invalid email or password.',
       USER_NOT_ACTIVE: 'Account has been disabled.',
       EMAIL_EXISTS: 'This email is already registered. Please sign in instead.',
+      EMAIL_NOT_REGISTERED: 'This email is not registered yet.',
     },
     registrationFailed: 'Registration failed. Please try again.',
     emailDomainRegistrationLimit:

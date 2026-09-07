@@ -248,6 +248,7 @@ export default {
       INVALID_CREDENTIALS: '邮箱或密码不正确',
       USER_NOT_ACTIVE: '账号已被禁用',
       EMAIL_EXISTS: '该邮箱已经存在，请返回登录',
+      EMAIL_NOT_REGISTERED: '该邮箱还没注册',
     },
     registrationFailed: '注册失败，请重试。',
     emailDomainRegistrationLimit:

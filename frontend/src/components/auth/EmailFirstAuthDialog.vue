@@ -78,10 +78,11 @@
             </p>
             <div class="email-auth-choice" :class="{ 'is-single': Boolean(settings) && !canRegister }">
               <button
-                type="submit"
+                type="button"
                 :class="intent === 'register' ? 'email-auth-secondary' : 'email-auth-primary'"
                 :disabled="busy || settingsLoading"
                 data-testid="email-auth-continue"
+                @click="continueToLogin"
               >
                 <span v-if="settingsLoading" class="email-auth-spinner" aria-hidden="true" />
                 {{ settingsLoading ? t('common.loading') : t('auth.signIn') }}
@@ -672,18 +673,29 @@ async function acceptEmail(): Promise<boolean> {
 }
 
 async function submitEmail(): Promise<void> {
-  if (!await acceptEmail()) return
   if (props.intent === 'register') {
-    if (!await ensureEmailAvailableForRegistration()) return
-    startRegistration()
+    await continueToRegister()
     return
   }
-  switchToLogin()
+  await continueToLogin()
 }
 
 function handleExistingEmail(): void {
   switchToLogin()
   errorMessage.value = t('auth.errors.EMAIL_EXISTS')
+}
+
+function handleUnregisteredEmail(): void {
+  errorMessage.value = t('auth.errors.EMAIL_NOT_REGISTERED')
+}
+
+function isExistingEmailError(error: unknown): boolean {
+  return extractApiErrorCode(error) === 'EMAIL_EXISTS'
+}
+
+function isUnregisteredEmailError(error: unknown): boolean {
+  const code = extractApiErrorCode(error)
+  return code === 'REGISTRATION_DISABLED' || code === 'EMAIL_RESERVED'
 }
 
 async function ensureEmailAvailableForRegistration(): Promise<boolean> {
@@ -692,7 +704,7 @@ async function ensureEmailAvailableForRegistration(): Promise<boolean> {
     await checkRegistrationEmail(email.value)
     return true
   } catch (error: unknown) {
-    if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+    if (isExistingEmailError(error)) {
       handleExistingEmail()
       return false
     }
@@ -701,6 +713,33 @@ async function ensureEmailAvailableForRegistration(): Promise<boolean> {
   } finally {
     busy.value = false
   }
+}
+
+async function ensureEmailRegisteredForLogin(): Promise<boolean> {
+  busy.value = true
+  try {
+    await checkRegistrationEmail(email.value)
+    handleUnregisteredEmail()
+    return false
+  } catch (error: unknown) {
+    if (isExistingEmailError(error)) {
+      return true
+    }
+    if (isUnregisteredEmailError(error)) {
+      handleUnregisteredEmail()
+      return false
+    }
+    errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', t('auth.loginFailed'))
+    return false
+  } finally {
+    busy.value = false
+  }
+}
+
+async function continueToLogin(): Promise<void> {
+  if (!await acceptEmail()) return
+  if (!await ensureEmailRegisteredForLogin()) return
+  switchToLogin()
 }
 
 async function continueToRegister(): Promise<void> {
