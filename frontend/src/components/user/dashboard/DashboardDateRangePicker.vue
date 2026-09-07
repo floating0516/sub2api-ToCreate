@@ -406,8 +406,8 @@ onUnmounted(() => {
 :global(html.dark .dashboard-date-trigger),
 :global(html.dark .dashboard-date-popover),
 :global(html.dark .dashboard-date-field input) {
-  border-color: #374151;
-  color: #d1d5db;
+  border-color: rgba(240, 238, 230, 0.12);
+  color: #d8d5ce;
   color-scheme: dark;
 }
 
@@ -419,7 +419,7 @@ onUnmounted(() => {
 
 :global(html.dark .dashboard-date-preset:hover),
 :global(html.dark .dashboard-date-cancel:hover) {
-  color: #f9fafb;
+  color: #f1eee7;
 }
 
 :global(html.dark .dashboard-date-preset-active) {
@@ -428,8 +428,8 @@ onUnmounted(() => {
 }
 
 :global(html.dark .dashboard-date-apply) {
-  background: #f3f4f6;
-  color: #111827;
+  background: #f1eee7;
+  color: #171916;
 }
 
 @media (min-width: 1181px) and (max-height: 1050px) {

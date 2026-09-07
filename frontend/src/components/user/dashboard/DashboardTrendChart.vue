@@ -83,16 +83,17 @@ const hexToRgba = (color: string, opacity: number): string => {
 
 const chartOption = computed<EChartsOption>(() => {
   const dark = isDark.value
-  const axisColor = dark ? '#9ca3af' : '#7c838d'
-  const gridColor = dark ? '#283342' : '#e9ebee'
-  const tooltipBackground = dark ? '#111827' : '#ffffff'
-  const tooltipBorder = dark ? '#374151' : '#e2e5e9'
-  const tooltipText = dark ? '#d1d5db' : '#4b5563'
-  const tooltipTitle = dark ? '#f9fafb' : '#111318'
+  const axisColor = dark ? '#b6b7b0' : '#6f726c'
+  const gridColor = dark ? 'rgba(240, 238, 230, 0.08)' : 'rgba(42, 47, 40, 0.08)'
+  const tooltipBackground = dark ? '#232620' : '#fffefb'
+  const tooltipBorder = dark ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.12)'
+  const tooltipText = dark ? '#b6b7b0' : '#6f726c'
+  const tooltipTitle = dark ? '#f1eee7' : '#3e413b'
+  const chartSurface = dark ? '#232620' : '#fffefb'
   const showSymbols = props.labels.length <= 31
 
   return {
-    backgroundColor: dark ? '#111827' : '#ffffff',
+    backgroundColor: chartSurface,
     animation: true,
     animationThreshold: 2000,
     animationDuration: 300,
@@ -126,7 +127,7 @@ const chartOption = computed<EChartsOption>(() => {
       axisPointer: {
         type: 'line',
         lineStyle: {
-          color: dark ? '#4b5563' : '#cfd4da',
+          color: dark ? 'rgba(227, 180, 143, 0.45)' : 'rgba(170, 113, 73, 0.35)',
           width: 1,
           type: 'dashed'
         }
@@ -205,7 +206,7 @@ const chartOption = computed<EChartsOption>(() => {
         lineStyle: { width: 2.8 },
         itemStyle: {
           color: item.color,
-          borderColor: dark ? '#111827' : '#ffffff',
+          borderColor: chartSurface,
           borderWidth: 2,
           shadowBlur: 7,
           shadowColor: hexToRgba(item.color, 0.28)
@@ -235,7 +236,7 @@ onUnmounted(() => {
   position: relative;
   height: 350px;
   min-height: 350px;
-  background: var(--dashboard-surface, #fff);
+  background: var(--dashboard-surface, #fffefb);
   transition: background-color 160ms ease;
 }
 
@@ -250,7 +251,7 @@ onUnmounted(() => {
   z-index: 2;
   display: grid;
   place-items: center;
-  background: rgb(255 255 255 / 64%);
+  background: color-mix(in srgb, var(--dashboard-surface, #fffefb) 64%, transparent);
   backdrop-filter: blur(1.5px);
 }
 
@@ -258,16 +259,8 @@ onUnmounted(() => {
   display: grid;
   height: 100%;
   place-items: center;
-  color: #9ca3af;
+  color: var(--dashboard-subtle, #999b94);
   font-size: 13px;
-}
-
-:global(html.dark .dashboard-trend-stage) {
-  background: #111827;
-}
-
-:global(html.dark .dashboard-chart-loading) {
-  background: rgb(17 24 39 / 64%);
 }
 
 @media (min-width: 1181px) and (max-height: 1050px) {

@@ -1083,6 +1083,10 @@ onBeforeUnmount(() => {
   animation: email-auth-backdrop-in 180ms ease-out both;
 }
 
+:global(html.dark .email-auth-backdrop) {
+  background: rgba(12, 13, 11, 0.62);
+}
+
 .email-auth-dialog {
   --auth-bg: #fffefb;
   --auth-surface: #fbfaf7;
@@ -1126,10 +1130,24 @@ onBeforeUnmount(() => {
 }
 
 :global(html.dark .email-auth-dialog) {
+  --auth-bg: #232620;
+  --auth-surface: #2a2d27;
+  --auth-ink: #f1eee7;
+  --auth-muted: #b6b7b0;
+  --auth-subtle: #858981;
+  --auth-line: rgba(240, 238, 230, 0.12);
+  --auth-brand: #d09a71;
+  --auth-brand-deep: #c08a60;
+  --auth-brand-soft: #3a2a1c;
+  --auth-danger: #e07a7a;
+  border-color: rgba(240, 238, 230, 0.12);
+  background:
+    radial-gradient(circle at 50% -13%, rgba(208, 154, 113, 0.16), transparent 170px),
+    var(--auth-bg);
   box-shadow:
     0 36px 90px rgba(0, 0, 0, 0.46),
     0 8px 26px rgba(0, 0, 0, 0.25),
-    inset 0 1px rgba(255, 255, 255, 0.85);
+    inset 0 1px rgba(255, 255, 255, 0.06);
 }
 
 :global(html.dark .email-auth-layer.is-embedded .email-auth-dialog) {
@@ -1521,10 +1539,10 @@ onBeforeUnmount(() => {
 .email-auth-otp > span {
   height: 52px;
   display: grid;
-  border: 1px solid rgba(61, 54, 47, 0.14);
+  border: 1px solid var(--auth-line);
   border-radius: 9px;
-  color: #423e38;
-  background: #fbfaf7;
+  color: var(--auth-ink);
+  background: var(--auth-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 18px;
   font-weight: 650;
@@ -1535,14 +1553,14 @@ onBeforeUnmount(() => {
 
 .email-auth-otp:focus-within > span.is-current,
 .email-auth-otp > span.is-filled + span:not(.is-filled) {
-  border-color: rgba(181, 126, 84, 0.48);
-  background: #fffefb;
-  box-shadow: 0 0 0 2px rgba(185, 130, 88, 0.07);
+  border-color: color-mix(in srgb, var(--auth-brand) 48%, transparent);
+  background: var(--auth-bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-brand) 12%, transparent);
 }
 
 .email-auth-otp > span.is-filled {
-  border-color: rgba(143, 113, 88, 0.24);
-  background: #f7f2ec;
+  border-color: color-mix(in srgb, var(--auth-brand) 24%, transparent);
+  background: var(--auth-brand-soft);
   transform: translateY(-1px);
 }
 
@@ -1610,15 +1628,15 @@ onBeforeUnmount(() => {
   height: 62px;
   display: grid;
   margin-bottom: 25px;
-  border: 1px solid color-mix(in srgb, #237a70 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--auth-brand) 30%, transparent);
   border-radius: 50%;
-  color: #237a70;
-  background: color-mix(in srgb, #237a70 11%, var(--auth-bg));
+  color: var(--auth-brand-deep);
+  background: color-mix(in srgb, var(--auth-brand) 11%, var(--auth-bg));
   place-items: center;
   animation: email-auth-success-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-:global(html.dark .email-auth-success-mark) { color: #79bdb0; }
+:global(html.dark .email-auth-success-mark) { color: #e3b48f; }
 
 .email-auth-legal {
   margin: 8px 0 0;

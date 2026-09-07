@@ -612,6 +612,7 @@ onMounted(refreshDashboard)
   width: 100%;
   color: var(--dashboard-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  transition: background-color 180ms ease, color 180ms ease;
   letter-spacing: 0;
 }
 
@@ -638,7 +639,7 @@ onMounted(refreshDashboard)
   border-radius: 12px;
   background: var(--dashboard-surface);
   box-shadow: 0 1px 2px rgb(17 24 39 / 2%);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
 .dashboard-metric-card:hover {

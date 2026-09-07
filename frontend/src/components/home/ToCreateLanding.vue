@@ -248,6 +248,7 @@ onMounted(async () => {
   color: var(--tc-ink);
   background: var(--tc-paper);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 :global(html.dark .tc-home) {
@@ -380,7 +381,7 @@ onMounted(async () => {
   display: grid;
   border-radius: 50%;
   color: #fff;
-  background: #237a70;
+  background: #aa7149;
   font-size: 10px;
   place-items: center;
 }

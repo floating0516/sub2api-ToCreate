@@ -468,52 +468,51 @@ watch(
   font-size: 13px;
 }
 
-:global(.dark) .daily-report-narrative {
-  border-color: #275b43;
-  background: #142d22;
+:global(html.dark) .daily-report-narrative {
+  border-color: #8a5a38;
+  background: #3a2a1c;
 }
 
-:global(.dark) .daily-report-narrative-copy > p {
-  color: #c5ead5;
+:global(html.dark) .daily-report-narrative-copy > p {
+  color: #f1eee7;
 }
 
-:global(.dark) .daily-report-meta {
-  color: #91b7a1;
+:global(html.dark) .daily-report-meta {
+  color: #b6b7b0;
 }
 
-:global(.dark) .daily-report-comparison {
-  background: #204d37;
-  color: #9ce0ba;
+:global(html.dark) .daily-report-comparison {
+  background: #5c4030;
+  color: #e3b48f;
 }
 
-:global(.dark) .daily-report-metrics,
-:global(.dark) .daily-report-metrics > div + div,
-:global(.dark) .daily-report-model-row,
-:global(.dark) .daily-report-model-stats > div + div,
-:global(.dark) .daily-report-empty {
-  border-color: #303b49;
+:global(html.dark) .daily-report-metrics,
+:global(html.dark) .daily-report-metrics > div + div,
+:global(html.dark) .daily-report-model-row,
+:global(html.dark) .daily-report-model-stats > div + div,
+:global(html.dark) .daily-report-empty {
+  border-color: rgba(240, 238, 230, 0.12);
 }
 
-:global(.dark) .daily-report-model-row {
-  background: #19222d;
+:global(html.dark) .daily-report-model-row {
+  background: #232620;
 }
 
-:global(.dark) .daily-report-metrics dd,
-:global(.dark) .daily-report-models h4,
-:global(.dark) .daily-report-model-heading strong {
-  color: #e5e7eb;
+:global(html.dark) .daily-report-models h4,
+:global(html.dark) .daily-report-model-heading strong {
+  color: #f1eee7;
 }
 
-:global(.dark) .daily-report-metrics dd,
-:global(.dark) .daily-report-model-share,
-:global(.dark) .daily-report-model-stats dd {
-  color: #8bd7ad;
+:global(html.dark) .daily-report-metrics dd,
+:global(html.dark) .daily-report-model-share,
+:global(html.dark) .daily-report-model-stats dd {
+  color: #e3b48f;
 }
 
-:global(.dark) .daily-report-model-rank,
-:global(.dark) .daily-report-model-track {
-  background: #273342;
-  color: #b8c2cf;
+:global(html.dark) .daily-report-model-rank,
+:global(html.dark) .daily-report-model-track {
+  background: #343730;
+  color: #b6b7b0;
 }
 
 @media (max-width: 720px) {
@@ -537,9 +536,9 @@ watch(
     border-top: 1px solid #e5e7eb;
   }
 
-  :global(.dark) .daily-report-metrics > div:nth-child(even),
-  :global(.dark) .daily-report-metrics > div:nth-child(n + 3) {
-    border-color: #303b49;
+  :global(html.dark) .daily-report-metrics > div:nth-child(even),
+  :global(html.dark) .daily-report-metrics > div:nth-child(n + 3) {
+    border-color: rgba(240, 238, 230, 0.12);
   }
 }
 
