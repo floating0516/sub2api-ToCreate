@@ -594,15 +594,15 @@ onMounted(refreshDashboard)
 
 <style scoped>
 .dashboard-page {
-  --dashboard-border: #e4e7eb;
-  --dashboard-text: #111318;
-  --dashboard-muted: #6b7280;
-  --dashboard-subtle: #9ca3af;
-  --dashboard-surface: #fff;
-  --dashboard-surface-subtle: #f7f8f9;
-  --dashboard-surface-active: #fff;
-  --dashboard-divider: #eff1f3;
-  --dashboard-skeleton: #f0f1f3;
+  --dashboard-border: rgba(42, 47, 40, 0.12);
+  --dashboard-text: #262823;
+  --dashboard-muted: #6f726c;
+  --dashboard-subtle: #999b94;
+  --dashboard-surface: #fffefb;
+  --dashboard-surface-subtle: #f6f4ef;
+  --dashboard-surface-active: #fffefb;
+  --dashboard-divider: rgba(42, 47, 40, 0.1);
+  --dashboard-skeleton: #eeebe3;
   display: grid;
   gap: 20px;
   width: 100%;
@@ -818,8 +818,9 @@ onMounted(refreshDashboard)
 
 .dashboard-title-row h2 {
   color: var(--dashboard-text);
-  font-size: 15px;
-  font-weight: 650;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 22px;
 }
 
@@ -970,15 +971,15 @@ onMounted(refreshDashboard)
 }
 
 :global(html.dark .dashboard-page) {
-  --dashboard-border: #2d3745;
-  --dashboard-text: #f3f4f6;
-  --dashboard-muted: #a6adb7;
-  --dashboard-subtle: #7f8792;
-  --dashboard-surface: #111827;
-  --dashboard-surface-subtle: #172130;
-  --dashboard-surface-active: #263142;
-  --dashboard-divider: #283342;
-  --dashboard-skeleton: #263142;
+  --dashboard-border: rgba(240, 238, 230, 0.12);
+  --dashboard-text: #f1eee7;
+  --dashboard-muted: #b6b7b0;
+  --dashboard-subtle: #858981;
+  --dashboard-surface: #232620;
+  --dashboard-surface-subtle: #1b1d19;
+  --dashboard-surface-active: #232620;
+  --dashboard-divider: rgba(240, 238, 230, 0.1);
+  --dashboard-skeleton: #343730;
   color-scheme: dark;
 }
 
