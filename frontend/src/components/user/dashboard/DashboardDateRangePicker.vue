@@ -241,11 +241,11 @@ onUnmounted(() => {
 
 .dashboard-date-trigger:hover,
 .dashboard-date-trigger-open {
-  border-color: #cfd4da;
+  border-color: rgba(170, 113, 73, 0.45);
 }
 
 .dashboard-date-trigger-open {
-  box-shadow: 0 0 0 3px rgb(17 24 39 / 5%);
+  box-shadow: 0 0 0 3px rgb(170 113 73 / 12%);
 }
 
 .dashboard-date-icon,
@@ -302,8 +302,8 @@ onUnmounted(() => {
 }
 
 .dashboard-date-preset-active {
-  background: #f0fdf7;
-  color: #18794e;
+  background: #f8f1ea;
+  color: #895634;
   font-weight: 600;
 }
 
@@ -349,8 +349,8 @@ onUnmounted(() => {
 }
 
 .dashboard-date-field input:focus {
-  border-color: #aeb5be;
-  box-shadow: 0 0 0 3px rgb(17 24 39 / 4%);
+  border-color: rgba(170, 113, 73, 0.45);
+  box-shadow: 0 0 0 3px rgb(170 113 73 / 12%);
 }
 
 .dashboard-date-arrow {
@@ -414,7 +414,7 @@ onUnmounted(() => {
 :global(html.dark .dashboard-date-trigger:hover),
 :global(html.dark .dashboard-date-trigger-open),
 :global(html.dark .dashboard-date-field input:focus) {
-  border-color: #4b5563;
+  border-color: rgba(208, 154, 113, 0.45);
 }
 
 :global(html.dark .dashboard-date-preset:hover),
@@ -423,8 +423,8 @@ onUnmounted(() => {
 }
 
 :global(html.dark .dashboard-date-preset-active) {
-  background: #15352b;
-  color: #6ee7b7;
+  background: #3a2a1c;
+  color: #e3b48f;
 }
 
 :global(html.dark .dashboard-date-apply) {

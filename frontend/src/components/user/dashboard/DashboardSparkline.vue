@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
   color?: string
 }>(), {
   values: () => [],
-  color: '#22a06b'
+  color: '#aa7149'
 })
 
 const points = computed(() => {

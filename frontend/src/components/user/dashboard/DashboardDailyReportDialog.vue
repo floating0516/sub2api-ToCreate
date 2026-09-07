@@ -255,9 +255,9 @@ watch(
 .daily-report-narrative {
   display: flex;
   gap: 16px;
-  border: 1px solid #b7e4cc;
+  border: 1px solid #e8c9a3;
   border-radius: 8px;
-  background: #effaf4;
+  background: #f8f1ea;
   padding: 20px;
 }
 
@@ -268,8 +268,8 @@ watch(
   flex: 0 0 42px;
   place-items: center;
   border-radius: 8px;
-  background: #168a58;
-  color: #fff;
+  background: #aa7149;
+  color: #fffefb;
 }
 
 .daily-report-narrative-copy {
@@ -278,7 +278,7 @@ watch(
 
 .daily-report-narrative-copy > p {
   white-space: pre-line;
-  color: #173d2c;
+  color: #3d2618;
   font-size: 15px;
   line-height: 1.75;
 }
@@ -289,15 +289,15 @@ watch(
   align-items: center;
   gap: 8px 12px;
   margin-top: 12px;
-  color: #527061;
+  color: #6f726c;
   font-size: 12px;
 }
 
 .daily-report-comparison {
   border-radius: 999px;
-  background: #d9f3e5;
+  background: #f0e0d0;
   padding: 3px 8px;
-  color: #126b45;
+  color: #895634;
   font-weight: 600;
 }
 
@@ -325,7 +325,7 @@ watch(
 .daily-report-metrics dd {
   margin-top: 5px;
   overflow: hidden;
-  color: #145c3d;
+  color: #895634;
   font-size: 24px;
   font-weight: 800;
   line-height: 1.2;
@@ -408,7 +408,7 @@ watch(
 }
 
 .daily-report-model-share {
-  color: #145c3d;
+  color: #895634;
   font-size: 11px;
   font-weight: 700;
 }
@@ -424,7 +424,7 @@ watch(
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #28a96b;
+  background: #aa7149;
 }
 
 .daily-report-model-stats {
@@ -450,7 +450,7 @@ watch(
 .daily-report-model-stats dd {
   margin-top: 2px;
   overflow: hidden;
-  color: #145c3d;
+  color: #895634;
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;

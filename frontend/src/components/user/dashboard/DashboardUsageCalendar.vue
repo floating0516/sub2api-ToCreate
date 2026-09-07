@@ -147,6 +147,15 @@ import {
   getCalendarWeekCount,
   getVisibleCalendarStartDate
 } from './dashboardCalendarLayout'
+import {
+  activityAccent,
+  activityEmpty,
+  activityEmptyDark,
+  activityHeatmapDark,
+  activityHeatmapLight,
+  activitySurface,
+  activitySurfaceDark,
+} from './dashboardActivityTheme'
 
 use([
   CanvasRenderer,
@@ -184,8 +193,8 @@ const calendarCellSize = ref(14)
 const calendarWeekCount = ref(FULL_CALENDAR_WEEK_COUNT)
 const calendarPage = ref(0)
 const updateOptions = { notMerge: false, lazyUpdate: false }
-const lightColors = ['#e8f5ee', '#bfe7cf', '#80cfa4', '#43b67d', '#168a58']
-const darkColors = ['#173329', '#1d4b38', '#236747', '#2d875a', '#42b875']
+const lightColors = activityHeatmapLight
+const darkColors = activityHeatmapDark
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 let themeObserver: MutationObserver | null = null
 let calendarResizeObserver: ResizeObserver | null = null
@@ -398,9 +407,9 @@ const chartOption = computed<EChartsOption>(() => {
   const sortedValues = values.map(([, value]) => value).sort((left, right) => left - right)
   const scaleCeiling = sortedValues[Math.floor((sortedValues.length - 1) * 0.95)] || 0
   const maxValue = Math.max(1, scaleCeiling)
-  const surface = dark ? '#111827' : '#ffffff'
-  const empty = dark ? '#1c2634' : '#f0f2f4'
-  const text = dark ? '#9ca3af' : '#7c838d'
+  const surface = dark ? activitySurfaceDark : activitySurface
+  const empty = dark ? activityEmptyDark : activityEmpty
+  const text = dark ? '#b6b7b0' : '#6f726c'
 
   return {
     backgroundColor: surface,
@@ -414,12 +423,12 @@ const chartOption = computed<EChartsOption>(() => {
     },
     tooltip: {
       confine: true,
-      backgroundColor: dark ? '#111827' : '#ffffff',
-      borderColor: dark ? '#374151' : '#e2e5e9',
+      backgroundColor: dark ? activitySurfaceDark : activitySurface,
+      borderColor: dark ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.12)',
       borderWidth: 1,
       padding: [9, 11],
       textStyle: {
-        color: dark ? '#d1d5db' : '#4b5563',
+        color: dark ? '#f1eee7' : '#3e413b',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: 12
       },
@@ -481,11 +490,11 @@ const chartOption = computed<EChartsOption>(() => {
       },
       emphasis: {
         itemStyle: {
-          borderColor: dark ? '#d1d5db' : '#374151',
-          borderWidth: 1,
+          borderColor: dark ? '#e3b48f' : activityAccent,
+          borderWidth: 1.5,
           borderRadius: 3,
-          shadowBlur: 7,
-          shadowColor: 'rgba(17, 24, 39, 0.18)'
+          shadowBlur: 8,
+          shadowColor: dark ? 'rgba(227, 180, 143, 0.28)' : 'rgba(170, 113, 73, 0.28)'
         }
       }
     }]
@@ -557,8 +566,9 @@ onUnmounted(() => {
 .dashboard-calendar-heading-button > span {
   overflow: hidden;
   color: var(--dashboard-text, #111318);
-  font-size: 15px;
-  font-weight: 650;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -574,19 +584,22 @@ onUnmounted(() => {
   background: transparent;
   color: var(--dashboard-text, #111318);
   cursor: pointer;
+  transition: color 160ms ease;
 }
 
 .dashboard-calendar-heading-button svg {
   flex: 0 0 auto;
-  color: #168a58;
+  color: #aa7149;
+  transition: color 160ms ease;
 }
 
-.dashboard-calendar-heading-button:hover > span {
-  color: #168a58;
+.dashboard-calendar-heading-button:hover > span,
+.dashboard-calendar-heading-button:hover svg {
+  color: #895634;
 }
 
 .dashboard-calendar-heading-button:focus-visible {
-  outline: 2px solid #168a58;
+  outline: 2px solid #aa7149;
   outline-offset: 4px;
 }
 
@@ -752,6 +765,7 @@ onUnmounted(() => {
   border-radius: 6px;
   background: var(--dashboard-surface, #fff);
   color: var(--dashboard-muted, #6b7280);
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
 }
 
 .dashboard-calendar-navigation button:not(:disabled) {
@@ -759,7 +773,9 @@ onUnmounted(() => {
 }
 
 .dashboard-calendar-navigation button:not(:disabled):hover {
-  color: var(--dashboard-text, #111318);
+  border-color: rgba(170, 113, 73, 0.35);
+  background: #f8f1ea;
+  color: #895634;
 }
 
 .dashboard-calendar-navigation button:disabled {
@@ -798,9 +814,9 @@ onUnmounted(() => {
 }
 
 .dashboard-calendar-modes button.active {
-  background: var(--dashboard-surface-active, #fff);
-  color: var(--dashboard-text, #111318);
-  box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
+  background: #f8f1ea;
+  color: #895634;
+  box-shadow: 0 1px 2px rgb(137 86 52 / 8%);
 }
 
 .dashboard-calendar-stage {
@@ -821,7 +837,7 @@ onUnmounted(() => {
   z-index: 2;
   display: grid;
   place-items: center;
-  background: rgb(255 255 255 / 64%);
+  background: rgb(255 254 251 / 64%);
   backdrop-filter: blur(1.5px);
 }
 
@@ -854,19 +870,26 @@ onUnmounted(() => {
 }
 
 :global(html.dark .dashboard-calendar-stage) {
-  background: #111827;
+  background: #232620;
 }
 
 :global(html.dark .dashboard-calendar-loading) {
-  background: rgb(17 24 39 / 64%);
+  background: rgb(35 38 32 / 64%);
+}
+
+:global(html.dark .dashboard-calendar-navigation button:not(:disabled):hover) {
+  border-color: rgba(227, 180, 143, 0.35);
+  background: #3a2a1c;
+  color: #e3b48f;
 }
 
 :global(html.dark .dashboard-calendar-modes) {
-  border-color: #374151;
+  border-color: rgba(240, 238, 230, 0.12);
 }
 
 :global(html.dark .dashboard-calendar-modes button.active) {
-  color: #f9fafb;
+  background: #3a2a1c;
+  color: #e3b48f;
   box-shadow: none;
 }
 

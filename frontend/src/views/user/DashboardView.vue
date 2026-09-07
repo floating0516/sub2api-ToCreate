@@ -158,6 +158,7 @@ import type {
 } from '@/types'
 import type { UserPaymentSummary } from '@/types/payment'
 import { formatDateLocalInput } from '@/utils/format'
+import { activityAccent } from '@/components/user/dashboard/dashboardActivityTheme'
 
 type Granularity = 'day' | 'hour'
 type GroupMode = 'model' | 'api_key'
@@ -177,7 +178,7 @@ interface MetricDetail {
 }
 
 const MODEL_COLOR_PALETTE = [
-  '#22a06b',
+  activityAccent,
   '#3b82f6',
   '#8b5cf6',
   '#d97738',
@@ -191,7 +192,7 @@ const MODEL_COLOR_PALETTE = [
   '#729b24'
 ]
 const MAX_CHART_MODEL_SERIES = 8
-const API_KEY_COLOR = '#22a06b'
+const API_KEY_COLOR = activityAccent
 const DAY_MS = 86_400_000
 const CALENDAR_DAY_COUNT = 365
 
@@ -601,6 +602,9 @@ onMounted(refreshDashboard)
   --dashboard-surface: #fffefb;
   --dashboard-surface-subtle: #f6f4ef;
   --dashboard-surface-active: #fffefb;
+  --dashboard-body-text: #3e413b;
+  --dashboard-accent: #aa7149;
+  --dashboard-accent-deep: #895634;
   --dashboard-divider: rgba(42, 47, 40, 0.1);
   --dashboard-skeleton: #eeebe3;
   display: grid;
@@ -634,6 +638,12 @@ onMounted(refreshDashboard)
   border-radius: 12px;
   background: var(--dashboard-surface);
   box-shadow: 0 1px 2px rgb(17 24 39 / 2%);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.dashboard-metric-card:hover {
+  border-color: rgba(170, 113, 73, 0.28);
+  box-shadow: 0 8px 20px rgba(42, 47, 40, 0.05);
 }
 
 .dashboard-metric-grid {
@@ -826,7 +836,7 @@ onMounted(refreshDashboard)
 
 .dashboard-info {
   display: inline-flex;
-  color: #a1a7b0;
+  color: var(--dashboard-subtle);
 }
 
 .dashboard-chart-scope {
@@ -836,7 +846,7 @@ onMounted(refreshDashboard)
 
 .dashboard-chart-scope {
   margin-left: 4px;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--dashboard-divider);
   padding-left: 10px;
 }
 
@@ -899,7 +909,7 @@ onMounted(refreshDashboard)
   height: 38px;
   align-items: center;
   gap: 2px;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--dashboard-border);
   border-radius: 8px;
   background: var(--dashboard-surface-subtle);
   padding: 3px;
@@ -910,15 +920,20 @@ onMounted(refreshDashboard)
   min-width: 48px;
   border-radius: 6px;
   padding: 0 10px;
-  color: #747b85;
+  color: var(--dashboard-muted);
   font-size: 12px;
   font-weight: 600;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-segmented button:hover {
+  color: var(--dashboard-accent-deep);
 }
 
 .dashboard-segmented button.active {
-  background: var(--dashboard-surface-active);
-  color: var(--dashboard-text);
-  box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
+  background: #f8f1ea;
+  color: var(--dashboard-accent-deep);
+  box-shadow: 0 1px 2px rgb(137 86 52 / 8%);
 }
 
 .dashboard-select-shell {
@@ -932,11 +947,11 @@ onMounted(refreshDashboard)
   height: 100%;
   overflow: hidden;
   appearance: none;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--dashboard-border);
   border-radius: 8px;
   background: var(--dashboard-surface);
   padding: 0 32px 0 11px;
-  color: #4b525c;
+  color: var(--dashboard-body-text);
   font-size: 12px;
   font-weight: 500;
   outline: none;
@@ -946,7 +961,7 @@ onMounted(refreshDashboard)
 
 .dashboard-select-shell select:hover,
 .dashboard-select-shell select:focus {
-  border-color: #cbd0d7;
+  border-color: rgba(170, 113, 73, 0.45);
 }
 
 .dashboard-select-shell > svg {
@@ -978,6 +993,9 @@ onMounted(refreshDashboard)
   --dashboard-surface: #232620;
   --dashboard-surface-subtle: #1b1d19;
   --dashboard-surface-active: #232620;
+  --dashboard-body-text: #d8d5ce;
+  --dashboard-accent: #d09a71;
+  --dashboard-accent-deep: #e3b48f;
   --dashboard-divider: rgba(240, 238, 230, 0.1);
   --dashboard-skeleton: #343730;
   color-scheme: dark;
@@ -989,23 +1007,29 @@ onMounted(refreshDashboard)
   box-shadow: none;
 }
 
+:global(html.dark .dashboard-metric-card:hover) {
+  border-color: rgba(208, 154, 113, 0.35);
+  box-shadow: none;
+}
+
 :global(html.dark .dashboard-segmented) {
-  border-color: #374151;
+  border-color: var(--dashboard-border);
 }
 
 :global(html.dark .dashboard-segmented button.active) {
-  color: #f9fafb;
+  background: #3a2a1c;
+  color: #e3b48f;
 }
 
 :global(html.dark .dashboard-select-shell select) {
-  border-color: #374151;
+  border-color: var(--dashboard-border);
   background: var(--dashboard-surface);
-  color: #d1d5db;
+  color: #d8d5ce;
 }
 
 :global(html.dark .dashboard-select-shell select:hover),
 :global(html.dark .dashboard-select-shell select:focus) {
-  border-color: #4b5563;
+  border-color: rgba(208, 154, 113, 0.45);
 }
 
 :global(html.dark .dashboard-chart-scope) {
