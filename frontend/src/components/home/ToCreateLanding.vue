@@ -10,6 +10,7 @@
         <div class="tc-nav-links">
           <a href="#capabilities">{{ t('home.solutions.title') }}</a>
           <a href="#models">{{ t('home.providers.title') }}</a>
+          <router-link to="/custom/codex-claude-import">{{ t('quickStart.title') }}</router-link>
           <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer">
             {{ t('home.docs') }}
           </a>
@@ -71,6 +72,10 @@
               {{ t('home.getStarted') }}
               <Icon name="arrowRight" size="sm" />
             </button>
+            <router-link to="/custom/codex-claude-import" class="tc-secondary-action">
+              <Icon name="bolt" size="sm" />
+              {{ t('quickStart.title') }}
+            </router-link>
             <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="tc-secondary-action">
               <Icon name="book" size="sm" />
               {{ t('home.viewDocs') }}
@@ -94,7 +99,7 @@
             <i />
           </div>
           <div class="tc-service-chip tc-service-gpt">
-            <span class="tc-provider-mark tc-provider-gpt">G</span>
+            <span class="tc-provider-mark tc-provider-gpt">O</span>
             <span><small>{{ t('home.redesign.routing') }}</small>GPT</span>
             <i />
           </div>
@@ -110,7 +115,7 @@
                 <p>{{ t('home.redesign.gatewayStatus') }}</p>
                 <strong>{{ t('home.redesign.operational') }}</strong>
               </div>
-              <span class="tc-uptime"><i /> 99.98%</span>
+              <span class="tc-uptime"><i /> {{ t('home.redesign.demoLabel') }}</span>
             </div>
 
             <div class="tc-route-chart" aria-hidden="true">
@@ -120,7 +125,7 @@
                 <circle class="tc-chart-halo" cx="460" cy="7" r="8" />
                 <circle class="tc-chart-point" cx="460" cy="7" r="3.5" />
               </svg>
-              <div><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>NOW</span></div>
+              <div><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>{{ t('home.redesign.demoNow') }}</span></div>
             </div>
 
             <div class="tc-request-list">
@@ -130,12 +135,12 @@
               </div>
               <div class="tc-request-row">
                 <span class="tc-request-icon"><Icon name="sparkles" size="sm" /></span>
-                <span class="tc-request-main">claude-sonnet-4<small>8,420 tokens</small></span>
+                <span class="tc-request-main">Claude<small>{{ t('home.redesign.exampleRequest') }}</small></span>
                 <strong>200 OK</strong>
               </div>
               <div class="tc-request-row tc-request-delayed">
                 <span class="tc-request-icon"><Icon name="cpu" size="sm" /></span>
-                <span class="tc-request-main">gpt-5.2-codex<small>3,106 tokens</small></span>
+                <span class="tc-request-main">GPT<small>{{ t('home.redesign.exampleRequest') }}</small></span>
                 <strong>200 OK</strong>
               </div>
             </div>
@@ -143,7 +148,7 @@
 
           <div class="tc-route-pulse">
             <span><Icon name="swap" size="sm" /></span>
-            <span><small>{{ t('home.redesign.smartRoute') }}</small><strong>312 ms</strong></span>
+            <span><small>{{ t('home.redesign.smartRoute') }}</small><strong>{{ t('home.redesign.exampleLatency') }}</strong></span>
           </div>
         </div>
       </section>
@@ -151,7 +156,7 @@
       <section id="models" class="tc-model-strip" :aria-label="t('home.providers.title')">
         <div><span class="tc-model-symbol tc-symbol-claude">C</span><strong>Claude</strong><small>{{ t('home.providers.supported') }}</small></div>
         <i />
-        <div><span class="tc-model-symbol tc-symbol-gpt">G</span><strong>GPT</strong><small>{{ t('home.providers.supported') }}</small></div>
+        <div><span class="tc-model-symbol tc-symbol-gpt">O</span><strong>GPT</strong><small>{{ t('home.providers.supported') }}</small></div>
         <i />
         <div><span class="tc-model-symbol tc-symbol-gemini">G</span><strong>Gemini</strong><small>{{ t('home.providers.supported') }}</small></div>
         <i />
@@ -192,7 +197,7 @@
         </div>
         <div class="tc-terminal-card terminal-container">
           <div class="tc-terminal-bar"><span /><span /><span /><small>terminal</small></div>
-          <code><i>$</i> curl {{ siteName.toLowerCase() }}.api/v1/messages</code>
+          <code><i>$</i> curl {{ exampleApiUrl }}/v1/messages</code>
           <p><Icon name="check" size="xs" /> {{ t('home.redesign.routeReady') }}</p>
           <p><Icon name="check" size="xs" /> {{ t('home.redesign.usageVisible') }}</p>
           <strong><i /> {{ t('home.redesign.readyForRequests') }}</strong>
@@ -206,7 +211,7 @@
         <span>{{ siteName }}</span>
       </span>
       <p>&copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
-      <a :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a v-if="githubUrl" :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub</a>
     </footer>
 
     <EmailFirstAuthDialog
@@ -219,13 +224,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   siteName: string
   siteLogo: string
   siteSubtitle: string
@@ -235,9 +240,13 @@ defineProps<{
   userInitial: string
   isDark: boolean
   currentYear: number
-  githubUrl: string
+  githubUrl?: string
+  apiBaseUrl?: string
   showModelPlazaEntry: boolean
-}>()
+}>(), {
+  githubUrl: '',
+  apiBaseUrl: '',
+})
 
 defineEmits<{
   (event: 'toggle-theme'): void
@@ -245,6 +254,15 @@ defineEmits<{
 
 const { t } = useI18n()
 const authDialogOpen = ref(false)
+
+const exampleApiUrl = computed(() => {
+  const raw = props.apiBaseUrl.trim() || 'https://api.lihe.chat'
+  try {
+    return new URL(raw).origin
+  } catch {
+    return raw.replace(/\/+$/, '')
+  }
+})
 </script>
 
 <style scoped>
@@ -261,7 +279,7 @@ const authDialogOpen = ref(false)
   --tc-teal: #237a70;
   --tc-teal-soft: #e2efeb;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
   color: var(--tc-ink);
   background: var(--tc-paper);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -471,6 +489,7 @@ const authDialogOpen = ref(false)
   font-size: 70px;
   font-weight: 500;
   line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .tc-hero h2 {
@@ -482,6 +501,7 @@ const authDialogOpen = ref(false)
   font-style: italic;
   font-weight: 400;
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .tc-hero-description {
@@ -494,6 +514,7 @@ const authDialogOpen = ref(false)
 
 .tc-hero-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 11px;
   margin-top: 30px;
@@ -1241,14 +1262,35 @@ const authDialogOpen = ref(false)
 }
 
 @media (max-width: 980px) {
+  .tc-nav {
+    height: auto;
+    min-height: 66px;
+    flex-wrap: wrap;
+    padding: 12px 0 10px;
+    row-gap: 10px;
+  }
+
   .tc-nav-links {
-    display: none;
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px 18px;
+    margin-left: 0;
   }
 
   .tc-hero {
     grid-template-columns: 1fr;
     gap: 20px;
     padding-top: 72px;
+  }
+
+  .tc-hero h1 {
+    font-size: 52px;
+  }
+
+  .tc-hero h2 {
+    font-size: 32px;
   }
 
   .tc-hero-copy {
@@ -1307,7 +1349,8 @@ const authDialogOpen = ref(false)
   }
 
   .tc-nav {
-    height: 60px;
+    height: auto;
+    min-height: 60px;
   }
 
   .tc-wordmark > span:last-child,
@@ -1326,11 +1369,13 @@ const authDialogOpen = ref(false)
   }
 
   .tc-hero h1 {
-    font-size: 50px;
+    font-size: 34px;
+    line-height: 1.1;
   }
 
   .tc-hero h2 {
-    font-size: 38px;
+    font-size: 22px;
+    line-height: 1.25;
   }
 
   .tc-hero-description {
@@ -1351,7 +1396,7 @@ const authDialogOpen = ref(false)
 
   .tc-section-heading h2,
   .tc-developer-copy h2 {
-    font-size: 38px;
+    font-size: 28px;
   }
 
   .tc-feature-grid {

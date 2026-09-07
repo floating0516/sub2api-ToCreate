@@ -99,7 +99,7 @@
     :user-initial="userInitial"
     :is-dark="isDark"
     :current-year="currentYear"
-    :github-url="githubUrl"
+    :api-base-url="apiBaseUrl"
     :show-model-plaza-entry="showModelPlazaEntry"
     @toggle-theme="toggleTheme"
   />
@@ -134,7 +134,10 @@ const isHomeContentUrl = computed(() => {
 })
 
 const isDark = ref(document.documentElement.classList.contains('dark'))
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
+const apiBaseUrl = computed(() => {
+  const configured = appStore.cachedPublicSettings?.api_base_url || appStore.apiBaseUrl || ''
+  return typeof configured === 'string' ? configured : ''
+})
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const modelPlazaRequiresAuth = computed(
