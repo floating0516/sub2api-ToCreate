@@ -99,6 +99,53 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// publicCatalogPlan is the marketing-safe subset of a for-sale plan.
+type publicCatalogPlan struct {
+	ID            int64    `json:"id"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	Price         float64  `json:"price"`
+	OriginalPrice *float64 `json:"original_price,omitempty"`
+	Currency      string   `json:"currency,omitempty"`
+	ValidityDays  int      `json:"validity_days"`
+	ValidityUnit  string   `json:"validity_unit"`
+	Features      []string `json:"features"`
+	SortOrder     int      `json:"sort_order"`
+}
+
+func publicCatalogPlans(plans []*dbent.SubscriptionPlan) []publicCatalogPlan {
+	result := make([]publicCatalogPlan, 0, len(plans))
+	for _, p := range plans {
+		if p == nil {
+			continue
+		}
+		result = append(result, publicCatalogPlan{
+			ID:            int64(p.ID),
+			Name:          p.Name,
+			Description:   p.Description,
+			Price:         p.Price,
+			OriginalPrice: p.OriginalPrice,
+			Currency:      p.Currency,
+			ValidityDays:  p.ValidityDays,
+			ValidityUnit:  p.ValidityUnit,
+			Features:      parseFeatures(p.Features),
+			SortOrder:     p.SortOrder,
+		})
+	}
+	return result
+}
+
+// GetPublicPlans returns for-sale subscription plans for the public homepage.
+// GET /api/v1/payment/public/plans
+func (h *PaymentHandler) GetPublicPlans(c *gin.Context) {
+	plans, err := h.configService.ListPlansForSale(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, publicCatalogPlans(plans))
+}
+
 // GetCheckoutInfo returns all data the payment page needs in a single call:
 // payment methods with limits, subscription plans, and configuration.
 // GET /api/v1/payment/checkout-info

@@ -29,6 +29,12 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => appStore,
 }))
 
+vi.mock('@/api/payment', () => ({
+  paymentAPI: {
+    getPublicPlans: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}))
+
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-i18n')>()
   return {
@@ -109,7 +115,7 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tocreate-landing"]').exists()).toBe(true)
   })
 
   it('links unauthenticated visitors to login', () => {

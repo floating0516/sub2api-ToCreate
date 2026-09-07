@@ -111,6 +111,19 @@ export interface PaymentOrder {
 
 // ==================== Plans & Channels ====================
 
+export interface PublicSubscriptionPlan {
+  id: number
+  name: string
+  description: string
+  price: number
+  original_price?: number | null
+  currency?: string
+  validity_days: number
+  validity_unit: string
+  features: string[]
+  sort_order: number
+}
+
 export interface SubscriptionPlan {
   id: number
   group_id: number

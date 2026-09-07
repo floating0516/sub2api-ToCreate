@@ -44,7 +44,24 @@ export default {
     },
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，调用多个模型',
-    heroDescription: '登录后即可使用 Claude、GPT、Gemini。',
+    heroDescription: '登录后购买套餐，即可用同一个密钥调用 Claude、GPT、Gemini。',
+    intro: {
+      nav: '介绍',
+      eyebrow: '怎么用',
+      title: '先看清楚再开始',
+      subtitle: '一个密钥对接常用客户端，按套餐购买额度，用多少买多少。'
+    },
+    pricing: {
+      nav: '价格',
+      eyebrow: '套餐',
+      title: '当前在售价格',
+      subtitle: '价格来自后台正在出售的套餐，登录后即可开通。',
+      recommended: '推荐',
+      validityDays: '{n} 天',
+      note: '价格按人民币结算。额度按周期计算，到期不结转。',
+      buy: '去购买',
+      loginToBuy: '登录后购买'
+    },
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',

@@ -44,7 +44,24 @@ export default {
     },
     // User-focused value proposition
     heroSubtitle: 'One key, multiple models',
-    heroDescription: 'Sign in to use Claude, GPT, and Gemini.',
+    heroDescription: 'Sign in, pick a plan, and use Claude, GPT, and Gemini with one key.',
+    intro: {
+      nav: 'About',
+      eyebrow: 'How it works',
+      title: 'A short look before you sign in',
+      subtitle: 'One key for the clients you already use. Buy a usage plan and start when you need it.'
+    },
+    pricing: {
+      nav: 'Pricing',
+      eyebrow: 'Plans',
+      title: 'Current prices',
+      subtitle: 'These are the plans currently for sale. Sign in to purchase.',
+      recommended: 'Recommended',
+      validityDays: '{n} days',
+      note: 'Prices are in CNY. Unused quota does not roll over.',
+      buy: 'Buy this plan',
+      loginToBuy: 'Sign in to buy'
+    },
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',

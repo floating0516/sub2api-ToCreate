@@ -57,6 +57,7 @@ func RegisterPaymentRoutes(
 	{
 		public.POST("/orders/verify", paymentHandler.VerifyOrderPublic)
 		public.POST("/orders/resolve", paymentHandler.ResolveOrderPublicByResumeToken)
+		public.GET("/plans", panelRateLimiter.PublicIP(), paymentHandler.GetPublicPlans)
 	}
 
 	// --- Webhook endpoints (no auth) ---

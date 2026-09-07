@@ -1547,6 +1547,14 @@ onMounted(async () => {
         }
       }
     }
+    if (route.query.plan_id) {
+      const planId = Number(route.query.plan_id)
+      const matchedPlan = checkout.value.plans.find((plan) => plan.id === planId)
+      if (matchedPlan) {
+        activeTab.value = 'subscription'
+        selectedPlan.value = matchedPlan
+      }
+    }
     if (route.query.tab === 'member') {
       activeTab.value = 'member'
     }
