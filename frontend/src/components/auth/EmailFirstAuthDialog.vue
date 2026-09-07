@@ -905,7 +905,15 @@ async function finishAuthentication(): Promise<void> {
     emit('update:open', false)
   }
   resetDialog()
-  await router.push(props.dashboardPath)
+  await router.push(resolvePostAuthPath())
+}
+
+function resolvePostAuthPath(): string {
+  const redirect = route.query.redirect
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return props.dashboardPath
 }
 
 function handleKeydown(event: KeyboardEvent): void {

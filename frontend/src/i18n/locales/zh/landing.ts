@@ -12,12 +12,13 @@ export default {
     switchToDark: '切换到深色模式',
     dashboard: '控制台',
     login: '登录',
-    getStarted: '立即开始',
+    getStarted: '登录',
     goToDashboard: '进入控制台',
     redesign: {
       liveGateway: '统一 AI 网关',
       fourProviders: '多模型接入',
-      gatewayPreview: '网关能力示意',
+      gatewayPreview: '模型示意',
+      diagramTitle: '一个密钥',
       connected: '已连接',
       routing: '路由中',
       secured: '安全连接',
@@ -37,13 +38,13 @@ export default {
       usageVisible: '用量与额度追踪已启用',
       readyForRequests: '已准备接收请求',
       backHome: '返回首页',
-      authEyebrow: '安全访问 ToCreate',
-      authHeadline: '一个账户，连接所有模型。',
-      authDescription: '一次登录，即可在同一工作区管理 API 密钥、订阅、路由、用量与账单。'
+      authEyebrow: '登录',
+      authHeadline: '使用邮箱登录',
+      authDescription: '没有账户时，可用同一邮箱注册。'
     },
     // 新增：面向用户的价值主张
-    heroSubtitle: '一个密钥，畅用多个 AI 模型',
-    heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    heroSubtitle: '一个密钥，调用多个模型',
+    heroDescription: '登录后即可使用 Claude、GPT、Gemini。',
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',

@@ -12,7 +12,7 @@ const captchaResetMock = vi.fn()
 const locationState = { href: 'http://localhost/login' }
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: { full: '1' } }),
   useRouter: () => ({
     currentRoute: { value: { query: {} } },
     push: vi.fn()

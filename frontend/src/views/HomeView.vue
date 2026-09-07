@@ -99,7 +99,6 @@
     :user-initial="userInitial"
     :is-dark="isDark"
     :current-year="currentYear"
-    :api-base-url="apiBaseUrl"
     :show-model-plaza-entry="showModelPlazaEntry"
     @toggle-theme="toggleTheme"
   />
@@ -134,10 +133,6 @@ const isHomeContentUrl = computed(() => {
 })
 
 const isDark = ref(document.documentElement.classList.contains('dark'))
-const apiBaseUrl = computed(() => {
-  const configured = appStore.cachedPublicSettings?.api_base_url || appStore.apiBaseUrl || ''
-  return typeof configured === 'string' ? configured : ''
-})
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const modelPlazaRequiresAuth = computed(

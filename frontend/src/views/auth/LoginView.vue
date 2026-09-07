@@ -1,6 +1,16 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <EmailFirstAuthDialog
+      v-if="!showFullLogin"
+      :open="true"
+      presentation="embedded"
+      :initial-email="initialLoginEmail"
+      :site-name="siteName"
+      :site-logo="siteLogo"
+      :dashboard-path="postLoginPath"
+    />
+
+    <div v-else class="space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -197,7 +207,7 @@
     </div>
 
     <!-- Footer -->
-    <template v-if="!backendModeEnabled" #footer>
+    <template v-if="showFullLogin && !backendModeEnabled" #footer>
       <p class="text-gray-500 dark:text-dark-400">
         {{ t('auth.dontHaveAccount') }}
         <router-link
@@ -226,6 +236,7 @@ import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
+import EmailFirstAuthDialog from '@/components/auth/EmailFirstAuthDialog.vue'
 import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
 import DingTalkOAuthSection from '@/components/auth/DingTalkOAuthSection.vue'
 import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
@@ -251,6 +262,7 @@ import type {
 } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { clearAllAffiliateReferralCodes } from '@/utils/oauthAffiliate'
+import { sanitizeUrl } from '@/utils/url'
 
 const { t } = useI18n()
 const LOGIN_AGREEMENT_STORAGE_KEY = 'sub2api_login_agreement_consent'
@@ -261,6 +273,24 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+
+const showFullLogin = computed(() => route.query.full === '1')
+const initialLoginEmail = computed(() => {
+  const value = route.query.email
+  return typeof value === 'string' ? value.trim() : ''
+})
+const siteName = computed(() => appStore.siteName || 'Sub2API')
+const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', {
+  allowRelative: true,
+  allowDataUrl: true
+}))
+const postLoginPath = computed(() => {
+  const redirect = route.query.redirect
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/dashboard'
+})
 
 // ==================== State ====================
 

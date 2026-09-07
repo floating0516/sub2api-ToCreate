@@ -19,30 +19,12 @@
         </div>
 
         <div class="tc-auth-preview" aria-hidden="true">
-          <div class="tc-auth-preview-head">
-            <span><i /><i /><i /></span>
-            <small><Icon name="shield" size="xs" /> {{ t('home.redesign.secured') }}</small>
-          </div>
-          <div class="tc-auth-preview-status">
-            <span><i /> {{ t('home.redesign.gatewayStatus') }}</span>
-            <strong>{{ t('home.redesign.operational') }}</strong>
-          </div>
-          <div class="tc-auth-route">
-            <span class="tc-auth-provider tc-auth-claude">C</span>
-            <i><b /></i>
-            <span class="tc-auth-core"><Icon name="swap" size="sm" /></span>
-            <i><b /></i>
-            <span class="tc-auth-provider tc-auth-gpt">G</span>
-          </div>
-          <div class="tc-auth-preview-foot">
-            <span><Icon name="check" size="xs" /> {{ t('home.tags.stickySession') }}</span>
-            <span>312 ms</span>
-          </div>
-        </div>
-
-        <div class="tc-auth-trust">
-          <span><Icon name="key" size="xs" /> {{ t('home.features.unifiedGateway') }}</span>
-          <span><Icon name="chart" size="xs" /> {{ t('home.features.balanceQuota') }}</span>
+          <p>{{ t('home.redesign.diagramTitle') }}</p>
+          <ul>
+            <li><span class="tc-auth-provider tc-auth-claude">C</span>Claude</li>
+            <li><span class="tc-auth-provider tc-auth-gpt">O</span>GPT</li>
+            <li><span class="tc-auth-provider tc-auth-gemini">G</span>Gemini</li>
+          </ul>
         </div>
       </section>
 
@@ -224,93 +206,38 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   margin-top: 34px;
+  padding: 18px 16px 10px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
 }
 
-.tc-auth-preview-head,
-.tc-auth-preview-status,
-.tc-auth-preview-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tc-auth-preview-head {
-  height: 34px;
-  padding: 0 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.tc-auth-preview-head > span {
-  display: flex;
-  gap: 5px;
-}
-
-.tc-auth-preview-head > span i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #676963;
-}
-
-.tc-auth-preview-head small,
-.tc-auth-preview-foot span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: #999c94;
-  font-size: 7px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.tc-auth-preview-head svg,
-.tc-auth-preview-foot svg {
-  color: #7fad91;
-}
-
-.tc-auth-preview-status {
-  padding: 18px 13px 10px;
-}
-
-.tc-auth-preview-status span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.tc-auth-preview > p {
+  margin: 0 0 10px;
   color: #a6a8a1;
-  font-size: 9px;
+  font-size: 12px;
 }
 
-.tc-auth-preview-status span i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #75a884;
-  box-shadow: 0 0 0 4px rgba(117, 168, 132, 0.11);
-  animation: tc-auth-pulse 2s ease-in-out infinite;
+.tc-auth-preview ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.tc-auth-preview-status strong {
-  color: #e9e6df;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.tc-auth-route {
-  display: grid;
-  grid-template-columns: 30px 1fr 32px 1fr 30px;
+.tc-auth-preview li {
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 12px 14px 17px;
+  gap: 10px;
+  min-height: 42px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #e9e6df;
+  font-size: 14px;
 }
 
-.tc-auth-provider,
-.tc-auth-core {
-  height: 30px;
+.tc-auth-provider {
+  width: 28px;
+  height: 28px;
   display: grid;
   border-radius: 7px;
   color: #fff;
@@ -322,59 +249,7 @@ onMounted(() => {
 
 .tc-auth-claude { background: #bd7247; }
 .tc-auth-gpt { background: #2f7c68; }
-
-.tc-auth-core {
-  color: #d6a078;
-  background: rgba(214, 160, 120, 0.12);
-}
-
-.tc-auth-route > i {
-  position: relative;
-  height: 1px;
-  overflow: hidden;
-  background: rgba(214, 160, 120, 0.22);
-}
-
-.tc-auth-route > i b {
-  position: absolute;
-  top: -1px;
-  width: 9px;
-  height: 3px;
-  border-radius: 99px;
-  background: #d2a27d;
-  animation: tc-auth-signal 2.4s linear infinite;
-}
-
-.tc-auth-route > i:nth-of-type(2) b {
-  animation-delay: -1.2s;
-}
-
-.tc-auth-preview-foot {
-  min-height: 33px;
-  padding: 0 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  color: #83b294;
-  font-family: ui-monospace, monospace;
-  font-size: 8px;
-}
-
-.tc-auth-trust {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: auto;
-  padding-top: 28px;
-  color: #999c94;
-  font-size: 8px;
-}
-
-.tc-auth-trust span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
+.tc-auth-gemini { background: #4578c8; }
 
 .tc-auth-content {
   min-width: 0;

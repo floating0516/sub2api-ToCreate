@@ -12,12 +12,13 @@ export default {
     switchToDark: 'Switch to Dark Mode',
     dashboard: 'Dashboard',
     login: 'Login',
-    getStarted: 'Get Started',
+    getStarted: 'Sign in',
     goToDashboard: 'Go to Dashboard',
     redesign: {
       liveGateway: 'Unified AI gateway',
       fourProviders: 'Multiple models',
-      gatewayPreview: 'Illustrated gateway preview',
+      gatewayPreview: 'Supported models',
+      diagramTitle: 'One API key',
       connected: 'Connected',
       routing: 'Routing',
       secured: 'Secured',
@@ -37,13 +38,13 @@ export default {
       usageVisible: 'Usage and quota tracking enabled',
       readyForRequests: 'Ready for requests',
       backHome: 'Back to home',
-      authEyebrow: 'Secure access to ToCreate',
-      authHeadline: 'One account. Every model.',
-      authDescription: 'Sign in once to manage API keys, subscriptions, routing, usage and billing from one focused workspace.'
+      authEyebrow: 'Sign in',
+      authHeadline: 'Sign in with email',
+      authDescription: 'Use the same email to create an account if you do not have one yet.'
     },
     // User-focused value proposition
-    heroSubtitle: 'One Key, All AI Models',
-    heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    heroSubtitle: 'One key, multiple models',
+    heroDescription: 'Sign in to use Claude, GPT, and Gemini.',
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',
