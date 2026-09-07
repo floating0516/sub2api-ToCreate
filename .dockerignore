@@ -52,6 +52,9 @@ backend/vendor/
 **/*.spec.ts
 **/*.spec.tsx
 **/__tests__/
+# Official 0.2.2 runs check:i18n inside the image build.
+!frontend/src/i18n/__tests__/
+!frontend/src/i18n/__tests__/localeKeyCompleteness.spec.ts
 coverage/
 .nyc_output/
 
