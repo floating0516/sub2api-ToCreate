@@ -375,6 +375,36 @@ func TestAuthService_Register_EmailExists(t *testing.T) {
 	require.ErrorIs(t, err, ErrEmailExists)
 }
 
+func TestAuthService_CheckRegistrationEmail_Available(t *testing.T) {
+	repo := &userRepoStub{}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	err := service.CheckRegistrationEmail(context.Background(), "fresh@test.com")
+	require.NoError(t, err)
+}
+
+func TestAuthService_CheckRegistrationEmail_Exists(t *testing.T) {
+	repo := &userRepoStub{exists: true}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	err := service.CheckRegistrationEmail(context.Background(), "user@test.com")
+	require.ErrorIs(t, err, ErrEmailExists)
+}
+
+func TestAuthService_CheckRegistrationEmail_Disabled(t *testing.T) {
+	repo := &userRepoStub{}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "false",
+	}, nil, nil)
+
+	err := service.CheckRegistrationEmail(context.Background(), "fresh@test.com")
+	require.ErrorIs(t, err, ErrRegDisabled)
+}
+
 func TestAuthService_Register_AliasDuplicateRejected(t *testing.T) {
 	repo := &userRepoStub{aliasExists: true}
 	service := newAuthService(repo, map[string]string{

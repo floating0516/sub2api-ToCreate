@@ -403,6 +403,27 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, loc
 	}, nil
 }
 
+// CheckRegistrationEmail reports whether a new account can be created for email.
+// Existing addresses return ErrEmailExists so the client can send the user back
+// to login without sending a verification email.
+func (s *AuthService) CheckRegistrationEmail(ctx context.Context, email string) error {
+	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
+		return ErrRegDisabled
+	}
+	if isReservedEmail(email) {
+		return ErrEmailReserved
+	}
+	existsEmail, err := s.existsByEmailOrAlias(ctx, email)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Database error checking registration email: %v", err)
+		return ErrServiceUnavailable
+	}
+	if existsEmail {
+		return ErrEmailExists
+	}
+	return nil
+}
+
 // VerifyCaptchaForRegister 在注册场景下验证当前启用的验证码。
 // 当邮箱验证开启且已提交验证码时，说明验证码发送阶段已完成验证码校验，
 // 此处跳过二次校验，避免一次性 token 在注册提交时重复使用导致误报失败。

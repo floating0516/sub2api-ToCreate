@@ -164,7 +164,7 @@
               type="button"
               :disabled="busy"
               data-testid="email-auth-start-register"
-              @click="startRegistration"
+              @click="continueToRegister"
             >
               {{ t('auth.createAccount') }}
             </button>
@@ -439,13 +439,14 @@ import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
 import { useAppStore, useAuthStore } from '@/stores'
 import {
   buildOAuthLoginStartURL,
+  checkRegistrationEmail,
   isTotp2FARequired,
   isWeChatWebOAuthEnabled,
   sendVerifyCode,
   type OAuthLoginStart
 } from '@/api/auth'
 import type { PublicSettings, TotpLoginResponse } from '@/types'
-import { extractI18nErrorMessage } from '@/utils/apiError'
+import { extractApiErrorCode, extractI18nErrorMessage } from '@/utils/apiError'
 import { clearAllAffiliateReferralCodes, resolveAffiliateReferralCode } from '@/utils/oauthAffiliate'
 import { isRegistrationEmailSuffixAllowed } from '@/utils/registrationEmailPolicy'
 import { storeFullRegistrationDraft } from '@/utils/registrationDraft'
@@ -673,14 +674,38 @@ async function acceptEmail(): Promise<boolean> {
 async function submitEmail(): Promise<void> {
   if (!await acceptEmail()) return
   if (props.intent === 'register') {
+    if (!await ensureEmailAvailableForRegistration()) return
     startRegistration()
     return
   }
   switchToLogin()
 }
 
+function handleExistingEmail(): void {
+  switchToLogin()
+  errorMessage.value = t('auth.errors.EMAIL_EXISTS')
+}
+
+async function ensureEmailAvailableForRegistration(): Promise<boolean> {
+  busy.value = true
+  try {
+    await checkRegistrationEmail(email.value)
+    return true
+  } catch (error: unknown) {
+    if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+      handleExistingEmail()
+      return false
+    }
+    errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', t('auth.registrationFailed'))
+    return false
+  } finally {
+    busy.value = false
+  }
+}
+
 async function continueToRegister(): Promise<void> {
   if (!await acceptEmail()) return
+  if (!await ensureEmailAvailableForRegistration()) return
   startRegistration()
 }
 
@@ -849,6 +874,10 @@ async function sendRegistrationCode(): Promise<void> {
     code.value = ''
     step.value = 'verification'
   } catch (error: unknown) {
+    if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+      handleExistingEmail()
+      return
+    }
     errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', t('auth.sendCodeFailed'))
   } finally {
     busy.value = false
@@ -903,6 +932,11 @@ async function createAccount(verifyCode?: string): Promise<void> {
     })
     await finishAuthentication()
   } catch (error: unknown) {
+    if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+      handleExistingEmail()
+      busy.value = false
+      return
+    }
     errorMessage.value = extractI18nErrorMessage(error, t, 'auth.errors', t('auth.registrationFailed'))
     busy.value = false
   }

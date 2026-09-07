@@ -234,6 +234,27 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	})
 }
 
+type checkRegistrationEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// CheckRegistrationEmail 检查邮箱是否还能用于注册
+// POST /api/v1/auth/check-registration-email
+func (h *AuthHandler) CheckRegistrationEmail(c *gin.Context) {
+	var req checkRegistrationEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.authService.CheckRegistrationEmail(c.Request.Context(), req.Email); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"available": true})
+}
+
 // Login handles user login
 // POST /api/v1/auth/login
 func (h *AuthHandler) Login(c *gin.Context) {

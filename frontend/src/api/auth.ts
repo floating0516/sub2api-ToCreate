@@ -477,6 +477,11 @@ export async function sendVerifyCode(
   return data
 }
 
+export async function checkRegistrationEmail(email: string): Promise<{ available: boolean }> {
+  const { data } = await apiClient.post<{ available: boolean }>('/auth/check-registration-email', { email })
+  return data
+}
+
 export async function sendPendingOAuthVerifyCode(
   request: SendVerifyCodeRequest
 ): Promise<PendingOAuthSendVerifyCodeResponse> {
@@ -695,6 +700,7 @@ export const authAPI = {
   clearAuthToken,
   getPublicSettings,
   sendVerifyCode,
+  checkRegistrationEmail,
   sendPendingOAuthVerifyCode,
   validatePromoCode,
   validateInvitationCode,

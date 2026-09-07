@@ -12,6 +12,7 @@ const {
   pushMock,
   routeState,
   sendVerifyCodeMock,
+  checkRegistrationEmailMock,
   clearAffiliateMock,
 } = vi.hoisted(() => ({
   appStore: {
@@ -27,6 +28,7 @@ const {
   pushMock: vi.fn(),
   routeState: { path: '/', query: {} as Record<string, string> },
   sendVerifyCodeMock: vi.fn(),
+  checkRegistrationEmailMock: vi.fn(),
   clearAffiliateMock: vi.fn(),
 }))
 
@@ -55,6 +57,7 @@ vi.mock('@/api/auth', async () => {
   return {
     ...actual,
     sendVerifyCode: (...args: unknown[]) => sendVerifyCodeMock(...args),
+    checkRegistrationEmail: (...args: unknown[]) => checkRegistrationEmailMock(...args),
   }
 })
 
@@ -121,11 +124,13 @@ describe('EmailFirstAuthDialog', () => {
     authStore.register.mockReset()
     pushMock.mockReset()
     sendVerifyCodeMock.mockReset()
+    checkRegistrationEmailMock.mockReset()
     clearAffiliateMock.mockReset()
     routeState.path = '/'
     routeState.query = {}
     sessionStorage.clear()
     sendVerifyCodeMock.mockResolvedValue({ message: 'sent', countdown: 60 })
+    checkRegistrationEmailMock.mockResolvedValue({ available: true })
     authStore.login.mockResolvedValue({ access_token: 'token', user: {} })
     authStore.loginWithPasskey.mockResolvedValue({})
     authStore.register.mockResolvedValue({})
@@ -149,6 +154,8 @@ describe('EmailFirstAuthDialog', () => {
   it('localizes invalid credential responses from the real login API', () => {
     expect(enCommon.auth.errors.INVALID_CREDENTIALS).toBe('Invalid email or password.')
     expect(zhCommon.auth.errors.INVALID_CREDENTIALS).toBe('邮箱或密码不正确')
+    expect(enCommon.auth.errors.EMAIL_EXISTS).toBe('This email is already registered. Please sign in instead.')
+    expect(zhCommon.auth.errors.EMAIL_EXISTS).toBe('该邮箱已经存在，请返回登录')
   })
 
   it('shows an inline error for an invalid email', async () => {
@@ -176,9 +183,23 @@ describe('EmailFirstAuthDialog', () => {
     await wrapper.get('[data-testid="email-auth-create-account"]').trigger('click')
     await flushPromises()
 
+    expect(checkRegistrationEmailMock).toHaveBeenCalledWith('user@example.com')
     expect(wrapper.get('[data-testid="email-auth-register-password"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="email-auth-password"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('user@example.com')
+  })
+
+  it('sends an existing email back to password login instead of creating an account', async () => {
+    checkRegistrationEmailMock.mockRejectedValue({ reason: 'EMAIL_EXISTS' })
+    const wrapper = mountDialog()
+
+    await wrapper.get('[data-testid="email-auth-email"]').setValue('user@example.com')
+    await wrapper.get('[data-testid="email-auth-create-account"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="email-auth-password"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="email-auth-register-password"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('auth.errors.EMAIL_EXISTS')
   })
 
   it('hides the alternative-method entry when no alternative provider is enabled', async () => {
