@@ -301,7 +301,7 @@ export default {
       verifyEyebrow: 'ONE QUICK CHECK',
       checkInbox: 'Check your inbox',
       codeSentTo: 'We sent a six-digit code to ',
-      codeHint: 'Enter the complete six-digit code.',
+      codeHint: 'Enter the six-digit code to continue.',
       verifyCode: 'Verify code',
       twoFactorEyebrow: 'TWO-FACTOR CHECK',
       twoFactorTitle: 'Verify your sign-in',

@@ -176,6 +176,9 @@ describe('EmailFirstAuthDialog', () => {
     expect(zhCommon.auth.errors.EMAIL_EXISTS).toBe('该邮箱已经存在，请返回登录')
     expect(enCommon.auth.errors.EMAIL_NOT_REGISTERED).toBe('This email is not registered yet.')
     expect(zhCommon.auth.errors.EMAIL_NOT_REGISTERED).toBe('该邮箱还没注册')
+    expect(enCommon.auth.emailFirst.verifyEyebrow).toBe('ONE QUICK CHECK')
+    expect(zhCommon.auth.emailFirst.verifyEyebrow).toBe('快速验证')
+    expect(zhCommon.auth.emailFirst.verifyCode).toBe('验证')
   })
 
   it('shows an inline error for an invalid email', async () => {
