@@ -8,3 +8,15 @@ export const activitySurface = '#fffefb'
 export const activitySurfaceDark = '#232620'
 export const activityEmpty = '#eeebe3'
 export const activityEmptyDark = '#1b1d19'
+
+/** Warm series for Token usage trend — stays in the cream/bronze family. */
+export const activityTrendPalette = [
+  '#aa7149',
+  '#6f4529',
+  '#d09a71',
+  '#8a562f',
+  '#c4a574',
+  '#3e413b',
+  '#e3b48f',
+  '#895634'
+]

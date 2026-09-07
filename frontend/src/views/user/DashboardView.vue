@@ -158,7 +158,7 @@ import type {
 } from '@/types'
 import type { UserPaymentSummary } from '@/types/payment'
 import { formatDateLocalInput } from '@/utils/format'
-import { activityAccent } from '@/components/user/dashboard/dashboardActivityTheme'
+import { activityAccent, activityTrendPalette } from '@/components/user/dashboard/dashboardActivityTheme'
 
 type Granularity = 'day' | 'hour'
 type GroupMode = 'model' | 'api_key'
@@ -177,20 +177,7 @@ interface MetricDetail {
   value: string
 }
 
-const MODEL_COLOR_PALETTE = [
-  activityAccent,
-  '#3b82f6',
-  '#8b5cf6',
-  '#d97738',
-  '#0891b2',
-  '#d14f7a',
-  '#b8870b',
-  '#4f6f8f',
-  '#dc5555',
-  '#0f9f8f',
-  '#6366f1',
-  '#729b24'
-]
+const MODEL_COLOR_PALETTE = activityTrendPalette
 const MAX_CHART_MODEL_SERIES = 8
 const API_KEY_COLOR = activityAccent
 const DAY_MS = 86_400_000

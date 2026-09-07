@@ -5,12 +5,12 @@
     width="wide"
     @close="emit('close')"
   >
-    <div v-if="loading" class="daily-report-loading">
+    <div v-if="loading" class="daily-report-theme daily-report-loading">
       <LoadingSpinner size="lg" />
       <p>{{ t('dashboard.dailyReport.loading') }}</p>
     </div>
 
-    <div v-else-if="errorMessage" class="daily-report-error" role="alert">
+    <div v-else-if="errorMessage" class="daily-report-theme daily-report-error" role="alert">
       <Icon name="exclamationCircle" size="lg" />
       <p>{{ errorMessage }}</p>
       <button type="button" class="btn btn-secondary" @click="loadReport">
@@ -19,7 +19,7 @@
       </button>
     </div>
 
-    <div v-else-if="report" class="daily-report-content">
+    <div v-else-if="report" class="daily-report-theme daily-report-content">
       <section class="daily-report-narrative">
         <div class="daily-report-narrative-icon" aria-hidden="true">
           <Icon name="sparkles" size="lg" />
@@ -225,6 +225,38 @@ watch(
 </script>
 
 <style scoped>
+.daily-report-theme {
+  --report-ink: #262823;
+  --report-copy: #3d2618;
+  --report-muted: #6f726c;
+  --report-subtle: #8a877e;
+  --report-line: rgba(42, 47, 40, 0.12);
+  --report-card: #f3efe7;
+  --report-track: #e4ddd0;
+  --report-peach: #f8f1ea;
+  --report-peach-line: #e8c9a3;
+  --report-chip: #f0e0d0;
+  --report-accent: #aa7149;
+  --report-accent-deep: #895634;
+  --report-on-accent: #fffefb;
+}
+
+:global(html.dark) .daily-report-theme {
+  --report-ink: #f1eee7;
+  --report-copy: #f1eee7;
+  --report-muted: #b6b7b0;
+  --report-subtle: #858981;
+  --report-line: rgba(240, 238, 230, 0.12);
+  --report-card: #141511;
+  --report-track: #2c2a24;
+  --report-peach: #3a2a1c;
+  --report-peach-line: #8a5a38;
+  --report-chip: #5c4030;
+  --report-accent: #d09a71;
+  --report-accent-deep: #e3b48f;
+  --report-on-accent: #fffefb;
+}
+
 .daily-report-loading,
 .daily-report-error {
   display: flex;
@@ -233,7 +265,7 @@ watch(
   align-items: center;
   justify-content: center;
   gap: 14px;
-  color: #6b7280;
+  color: var(--report-muted);
   text-align: center;
 }
 
@@ -255,9 +287,9 @@ watch(
 .daily-report-narrative {
   display: flex;
   gap: 16px;
-  border: 1px solid #e8c9a3;
+  border: 1px solid var(--report-peach-line);
   border-radius: 8px;
-  background: #f8f1ea;
+  background: var(--report-peach);
   padding: 20px;
 }
 
@@ -268,8 +300,8 @@ watch(
   flex: 0 0 42px;
   place-items: center;
   border-radius: 8px;
-  background: #aa7149;
-  color: #fffefb;
+  background: var(--report-accent);
+  color: var(--report-on-accent);
 }
 
 .daily-report-narrative-copy {
@@ -278,7 +310,7 @@ watch(
 
 .daily-report-narrative-copy > p {
   white-space: pre-line;
-  color: #3d2618;
+  color: var(--report-copy);
   font-size: 15px;
   line-height: 1.75;
 }
@@ -289,22 +321,22 @@ watch(
   align-items: center;
   gap: 8px 12px;
   margin-top: 12px;
-  color: #6f726c;
+  color: var(--report-muted);
   font-size: 12px;
 }
 
 .daily-report-comparison {
   border-radius: 999px;
-  background: #f0e0d0;
+  background: var(--report-chip);
   padding: 3px 8px;
-  color: #895634;
+  color: var(--report-accent-deep);
   font-weight: 600;
 }
 
 .daily-report-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-block: 1px solid #e5e7eb;
+  border-block: 1px solid var(--report-line);
 }
 
 .daily-report-metrics > div {
@@ -313,11 +345,11 @@ watch(
 }
 
 .daily-report-metrics > div + div {
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--report-line);
 }
 
 .daily-report-metrics dt {
-  color: #6b7280;
+  color: var(--report-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -325,7 +357,7 @@ watch(
 .daily-report-metrics dd {
   margin-top: 5px;
   overflow: hidden;
-  color: #895634;
+  color: var(--report-accent-deep);
   font-size: 24px;
   font-weight: 800;
   line-height: 1.2;
@@ -336,7 +368,7 @@ watch(
   display: block;
   margin-top: 6px;
   overflow-wrap: anywhere;
-  color: #7c838d;
+  color: var(--report-subtle);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -350,14 +382,14 @@ watch(
 }
 
 .daily-report-models h4 {
-  color: #111827;
+  color: var(--report-ink);
   font-size: 15px;
   font-weight: 700;
 }
 
 .daily-report-models header p,
 .daily-report-models header > span {
-  color: #7c838d;
+  color: var(--report-subtle);
   font-size: 12px;
 }
 
@@ -373,9 +405,9 @@ watch(
   grid-template-rows: auto 4px auto;
   gap: 8px;
   padding: 11px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--report-line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--report-card);
 }
 
 .daily-report-model-rank {
@@ -384,8 +416,8 @@ watch(
   height: 22px;
   place-items: center;
   border-radius: 5px;
-  background: #eef2f6;
-  color: #536273;
+  background: var(--report-track);
+  color: var(--report-muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -401,14 +433,14 @@ watch(
 .daily-report-model-heading strong {
   min-width: 0;
   overflow: hidden;
-  color: #26313d;
+  color: var(--report-ink);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .daily-report-model-share {
-  color: #895634;
+  color: var(--report-accent-deep);
   font-size: 11px;
   font-weight: 700;
 }
@@ -417,14 +449,14 @@ watch(
   height: 4px;
   overflow: hidden;
   border-radius: 2px;
-  background: #edf1f4;
+  background: var(--report-track);
 }
 
 .daily-report-model-track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #aa7149;
+  background: var(--report-accent);
 }
 
 .daily-report-model-stats {
@@ -437,12 +469,12 @@ watch(
 }
 
 .daily-report-model-stats > div + div {
-  border-left: 1px solid #edf0f2;
+  border-left: 1px solid var(--report-line);
   padding-left: 10px;
 }
 
 .daily-report-model-stats dt {
-  color: #7c838d;
+  color: var(--report-subtle);
   font-size: 10px;
   line-height: 1.2;
 }
@@ -450,7 +482,7 @@ watch(
 .daily-report-model-stats dd {
   margin-top: 2px;
   overflow: hidden;
-  color: #895634;
+  color: var(--report-accent-deep);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -463,56 +495,9 @@ watch(
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-block: 1px solid #e5e7eb;
-  color: #7c838d;
+  border-block: 1px solid var(--report-line);
+  color: var(--report-subtle);
   font-size: 13px;
-}
-
-:global(html.dark) .daily-report-narrative {
-  border-color: #8a5a38;
-  background: #3a2a1c;
-}
-
-:global(html.dark) .daily-report-narrative-copy > p {
-  color: #f1eee7;
-}
-
-:global(html.dark) .daily-report-meta {
-  color: #b6b7b0;
-}
-
-:global(html.dark) .daily-report-comparison {
-  background: #5c4030;
-  color: #e3b48f;
-}
-
-:global(html.dark) .daily-report-metrics,
-:global(html.dark) .daily-report-metrics > div + div,
-:global(html.dark) .daily-report-model-row,
-:global(html.dark) .daily-report-model-stats > div + div,
-:global(html.dark) .daily-report-empty {
-  border-color: rgba(240, 238, 230, 0.12);
-}
-
-:global(html.dark) .daily-report-model-row {
-  background: #232620;
-}
-
-:global(html.dark) .daily-report-models h4,
-:global(html.dark) .daily-report-model-heading strong {
-  color: #f1eee7;
-}
-
-:global(html.dark) .daily-report-metrics dd,
-:global(html.dark) .daily-report-model-share,
-:global(html.dark) .daily-report-model-stats dd {
-  color: #e3b48f;
-}
-
-:global(html.dark) .daily-report-model-rank,
-:global(html.dark) .daily-report-model-track {
-  background: #343730;
-  color: #b6b7b0;
 }
 
 @media (max-width: 720px) {
@@ -529,16 +514,11 @@ watch(
   }
 
   .daily-report-metrics > div:nth-child(even) {
-    border-left: 1px solid #e5e7eb;
+    border-left: 1px solid var(--report-line);
   }
 
   .daily-report-metrics > div:nth-child(n + 3) {
-    border-top: 1px solid #e5e7eb;
-  }
-
-  :global(html.dark) .daily-report-metrics > div:nth-child(even),
-  :global(html.dark) .daily-report-metrics > div:nth-child(n + 3) {
-    border-color: rgba(240, 238, 230, 0.12);
+    border-top: 1px solid var(--report-line);
   }
 }
 

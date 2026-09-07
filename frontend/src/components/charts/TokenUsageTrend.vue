@@ -1,6 +1,6 @@
 <template>
   <div class="card p-4">
-    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-dark-50">
       {{ t('admin.dashboard.tokenUsageTrend') }}
     </h3>
     <div v-if="loading" class="flex h-48 items-center justify-center">
@@ -19,8 +19,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  activityAccent,
+  activityAccentDeep
+} from '@/components/user/dashboard/dashboardActivityTheme'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -54,18 +58,17 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
-})
+const isDarkMode = ref(document.documentElement.classList.contains('dark'))
+let themeObserver: MutationObserver | null = null
 
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
-  input: '#3b82f6',
-  output: '#aa7149',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  text: isDarkMode.value ? '#b6b7b0' : '#6f726c',
+  grid: isDarkMode.value ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)',
+  input: activityAccentDeep,
+  output: activityAccent,
+  cacheCreation: '#d4a06a',
+  cacheRead: '#c08a60',
+  cacheHitRate: '#6f4529'
 }))
 
 const chartData = computed(() => {
@@ -225,4 +228,15 @@ const formatCost = (value: number): string => {
   }
   return value.toFixed(4)
 }
+
+onMounted(() => {
+  themeObserver = new MutationObserver(() => {
+    isDarkMode.value = document.documentElement.classList.contains('dark')
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+})
+
+onUnmounted(() => {
+  themeObserver?.disconnect()
+})
 </script>
