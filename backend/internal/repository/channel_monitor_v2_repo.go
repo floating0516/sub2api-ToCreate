@@ -156,17 +156,6 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 		count    int64
 	}
 	groupCounts := map[int64]groupValue{}
-	for _, platform := range channelMonitorV2EnabledPlatforms(cfg) {
-		platformCounts[platform] += 0
-		for _, p := range cfg.Platforms {
-			if p.Platform != platform || len(p.Models) == 0 {
-				continue
-			}
-			for _, model := range p.Models {
-				modelCounts[platform+"\x00"+model] = modelValue{platform: platform, count: 0}
-			}
-		}
-	}
 	groupInfo, err := r.loadChannelMonitorV2GroupInfo(ctx, configuredChannelMonitorV2GroupIDs(catalogFilter, cfg))
 	if err != nil {
 		return nil, err
@@ -203,12 +192,25 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 		Models:    []service.ChannelMonitorV2Dimension{},
 	}
 	for value, count := range platformCounts {
+		if count <= 0 {
+			continue
+		}
 		result.Platforms = append(result.Platforms, service.ChannelMonitorV2Dimension{Value: value, Label: value, RequestCount: count})
 	}
-	for value, meta := range modelCounts {
-		result.Models = append(result.Models, service.ChannelMonitorV2Dimension{Value: value, Label: channelMonitorV2ModelLabel(value), Platform: meta.platform, RequestCount: meta.count})
+	for key, meta := range modelCounts {
+		if meta.count <= 0 {
+			continue
+		}
+		model := key
+		if _, name, ok := strings.Cut(key, "\x00"); ok && name != "" {
+			model = name
+		}
+		result.Models = append(result.Models, service.ChannelMonitorV2Dimension{Value: model, Label: channelMonitorV2ModelLabel(model), Platform: meta.platform, RequestCount: meta.count})
 	}
 	for id, value := range groupCounts {
+		if value.count <= 0 {
+			continue
+		}
 		result.Groups = append(result.Groups, service.ChannelMonitorV2GroupDimension{ID: id, Name: value.name, Platform: value.platform, RequestCount: value.count})
 	}
 	sort.Slice(result.Platforms, func(i, j int) bool { return result.Platforms[i].RequestCount > result.Platforms[j].RequestCount })
@@ -302,21 +304,6 @@ func (r *channelMonitorV2Repository) GetModels(ctx context.Context, filter servi
 		return nil, err
 	}
 	accs := map[string]*metricAccumulator{}
-	for _, platform := range channelMonitorV2EnabledPlatforms(cfg) {
-		if len(filter.Platforms) > 0 && !containsString(filter.Platforms, platform) {
-			continue
-		}
-		models := configuredChannelMonitorV2Models(cfg, platform, filter)
-		for _, model := range models {
-			if model == "" {
-				continue
-			}
-			key := platform + "\x00" + model
-			if accs[key] == nil {
-				accs[key] = newMetricAccumulator()
-			}
-		}
-	}
 	for _, fact := range facts {
 		if !channelMonitorV2ModelSelected(filter, cfg, fact.Platform, fact.Model) {
 			continue
@@ -348,6 +335,9 @@ func (r *channelMonitorV2Repository) GetModels(ctx context.Context, filter servi
 		parts := strings.SplitN(key, "\x00", 2)
 		metrics := acc.metric(minutes, admin)
 		applyIgnoredErrors(&metrics, ignoredByPM[key])
+		if metrics.RequestCount <= 0 {
+			continue
+		}
 		items = append(items, service.ChannelMonitorV2ModelRow{Platform: parts[0], Model: parts[1], Metrics: metrics, Health: service.ChannelMonitorV2HealthForWithThresholds(metrics, cfg.HealthThresholds)})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Metrics.RequestCount > items[j].Metrics.RequestCount })
@@ -458,6 +448,9 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		}
 		metrics := acc.total.metric(minutes, admin)
 		applyIgnoredErrors(&metrics, ignoredByDim[key])
+		if metrics.RequestCount <= 0 {
+			continue
+		}
 		row := service.ChannelMonitorV2MatrixRow{Platform: key.platform, GroupName: acc.groupName, Model: key.model, Metrics: metrics, Health: service.ChannelMonitorV2HealthForWithThresholds(metrics, cfg.HealthThresholds), Buckets: []service.ChannelMonitorV2TrendPoint{}}
 		if key.groupID > 0 {
 			groupID := key.groupID

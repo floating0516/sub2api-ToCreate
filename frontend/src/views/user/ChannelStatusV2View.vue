@@ -301,7 +301,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="row in modelRows"
+                  v-for="row in visibleModelRows"
                   :key="`${row.platform}:${row.model}`"
                   class="cursor-pointer"
                   @click="drillModel(row)"
@@ -567,19 +567,22 @@ const hasDimensionFilter = computed(
 // Full platform catalog (never pruned). Groups/models cascade by selected platforms
 // so choosing a platform narrows the other pickers without collapsing platforms.
 const platformOptions = computed(() =>
-  (dimensions.value.platforms || []).map((item) => ({
-    value: item.value,
-    label: item.label,
-  }))
+  (dimensions.value.platforms || [])
+    .filter((item) => (item.request_count || 0) > 0)
+    .map((item) => ({
+      value: item.value,
+      label: item.label,
+    }))
 )
 const selectedPlatforms = computed(() => new Set(filter.value.platforms))
 const groupOptions = computed(() =>
   (dimensions.value.groups || [])
     .filter(
       (item) =>
-        selectedPlatforms.value.size === 0 ||
-        !item.platform ||
-        selectedPlatforms.value.has(item.platform),
+        (item.request_count || 0) > 0 &&
+        (selectedPlatforms.value.size === 0 ||
+          !item.platform ||
+          selectedPlatforms.value.has(item.platform)),
     )
     .map((item) => ({
       value: String(item.id),
@@ -590,9 +593,10 @@ const modelOptions = computed(() =>
   (dimensions.value.models || [])
     .filter(
       (item) =>
-        selectedPlatforms.value.size === 0 ||
-        !item.platform ||
-        selectedPlatforms.value.has(item.platform),
+        (item.request_count || 0) > 0 &&
+        (selectedPlatforms.value.size === 0 ||
+          !item.platform ||
+          selectedPlatforms.value.has(item.platform)),
     )
     .map((item) => ({
       value: item.value,
@@ -630,9 +634,12 @@ watch(
   },
   { flush: 'post' },
 )
+const visibleModelRows = computed(() =>
+  (modelRows.value || []).filter((row) => (row.metrics?.request_count || 0) > 0),
+)
 const activeRowsEmpty = computed(() =>
   activeTab.value === 'models'
-    ? modelRows.value.length === 0
+    ? visibleModelRows.value.length === 0
     : activeTab.value === 'errors'
       ? errorRows.value.length === 0
       : userRows.value.length === 0
@@ -645,7 +652,7 @@ const bootstrapPercent = computed(() => {
   return Math.min(100, Math.max(0, Math.round(raw)))
 })
 const matrixRows = computed(() => {
-  const items = matrix.value?.items || []
+  const items = (matrix.value?.items || []).filter((row) => (row.metrics?.request_count || 0) > 0)
   // platform_group views should only show real groups, never bare platform placeholders.
   if (matrixGroupBy.value === 'platform_group' || matrixGroupBy.value === 'platform_group_model') {
     return items.filter((row) => row.group_id != null && Number(row.group_id) > 0)
