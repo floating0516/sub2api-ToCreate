@@ -56,7 +56,7 @@ export default {
       durationValue: 'Duration {value}',
       cacheRateValue: 'Cache rate {value}',
     },
-    table: { platformModel: 'Platform / Model', rank: 'Rank', user: 'User' },
+    table: { platformModel: 'Platform / Model', rank: 'Rank', user: 'Email' },
     empty: { title: 'No data to display', description: 'Try changing the time range or filters' },
     bucket: { minutes: '{count}-minute buckets', hours: '{count}-hour buckets', days: '{count}-day buckets' },
     matrix: {

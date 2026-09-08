@@ -287,20 +287,48 @@ func TestErrorRateTTFTAndCacheScoreHelpers(t *testing.T) {
 	require.Equal(t, "healthy", cacheRateBand(0.50, 0.20, 0.05))
 }
 
+func TestChannelMonitorV2MaskedUserLabel(t *testing.T) {
+	require.Equal(t, "a***@g***.com", channelMonitorV2MaskedUserLabel("alice@gmail.com"))
+	require.Equal(t, "***", channelMonitorV2MaskedUserLabel(""))
+	require.Equal(t, "***", channelMonitorV2MaskedUserLabel("   "))
+}
+
 func TestChannelMonitorV2UsersRemovesOtherUserIdentity(t *testing.T) {
 	selfID, otherID := int64(7), int64(9)
 	repo := &channelMonitorV2RepoStub{config: ChannelMonitorV2Config{Enabled: true}, users: &ChannelMonitorV2List[ChannelMonitorV2UserRow]{Items: []ChannelMonitorV2UserRow{
-		{UserID: &otherID, Email: "other@example.com", Username: "other"},
-		{UserID: &selfID, Email: "self@example.com", Username: "self"},
+		{UserID: &otherID, Email: "other@example.com", Username: "备注名"},
+		{UserID: &selfID, Email: "self@example.com", Username: "自己的备注"},
 	}}}
 	result, err := NewChannelMonitorV2Service(repo).Users(context.Background(), ChannelMonitorV2Filter{}, selfID, false)
 	require.NoError(t, err)
 	require.Nil(t, result.Items[0].UserID)
 	require.Empty(t, result.Items[0].Email)
-	require.Equal(t, "Other user #1", result.Items[0].DisplayLabel)
+	require.Empty(t, result.Items[0].Username)
+	require.Equal(t, "o***@e***.com", result.Items[0].DisplayLabel)
 	require.Equal(t, selfID, *result.Items[1].UserID)
 	require.True(t, result.Items[1].IsSelf)
-	require.Equal(t, "Me", result.Items[1].DisplayLabel)
+	require.Empty(t, result.Items[1].Email)
+	require.Empty(t, result.Items[1].Username)
+	require.Equal(t, "s***@e***.com", result.Items[1].DisplayLabel)
+}
+
+func TestChannelMonitorV2UsersMasksIdentityForAdmin(t *testing.T) {
+	selfID, otherID := int64(7), int64(9)
+	repo := &channelMonitorV2RepoStub{config: ChannelMonitorV2Config{Enabled: true}, users: &ChannelMonitorV2List[ChannelMonitorV2UserRow]{Items: []ChannelMonitorV2UserRow{
+		{UserID: &otherID, Email: "other@example.com", Username: "备注名", DisplayLabel: "备注名"},
+		{UserID: &selfID, Email: "self@example.com", Username: "自己的备注", DisplayLabel: "自己的备注"},
+	}}}
+	result, err := NewChannelMonitorV2Service(repo).Users(context.Background(), ChannelMonitorV2Filter{}, selfID, true)
+	require.NoError(t, err)
+	require.Equal(t, otherID, *result.Items[0].UserID)
+	require.Empty(t, result.Items[0].Email)
+	require.Empty(t, result.Items[0].Username)
+	require.Equal(t, "o***@e***.com", result.Items[0].DisplayLabel)
+	require.Equal(t, selfID, *result.Items[1].UserID)
+	require.True(t, result.Items[1].IsSelf)
+	require.Empty(t, result.Items[1].Email)
+	require.Empty(t, result.Items[1].Username)
+	require.Equal(t, "s***@e***.com", result.Items[1].DisplayLabel)
 }
 
 func TestChannelMonitorV2UsersAppendsSelfWhenMissingFromRanking(t *testing.T) {
@@ -313,7 +341,9 @@ func TestChannelMonitorV2UsersAppendsSelfWhenMissingFromRanking(t *testing.T) {
 	require.Len(t, result.Items, 2)
 	self := result.Items[1]
 	require.True(t, self.IsSelf)
-	require.Equal(t, "Me", self.DisplayLabel)
+	require.Equal(t, "***", self.DisplayLabel)
+	require.Empty(t, self.Email)
+	require.Empty(t, self.Username)
 	require.Equal(t, selfID, *self.UserID)
 	require.Equal(t, 0, self.Rank) // unranked / no traffic in window
 }

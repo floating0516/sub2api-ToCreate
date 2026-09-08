@@ -858,22 +858,21 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 	effectiveFilter := channelMonitorV2CommonCoverageFilter(filter, *coverage)
 	filter = effectiveFilter
 	where, args, _ := channelMonitorV2WhereWithRollup(filter, cfg, "m")
-	query := `SELECT m.user_id,COALESCE(u.email,''),COALESCE(u.username,''),m.platform,m.model,
+	query := `SELECT m.user_id,COALESCE(u.email,''),m.platform,m.model,
 	SUM(m.success_requests),SUM(m.error_requests),SUM(m.input_tokens),SUM(m.output_tokens),SUM(m.cache_creation_tokens),SUM(m.cache_read_tokens),SUM(m.ttft_sum_ms),SUM(m.ttft_count),SUM(m.duration_sum_ms),SUM(m.duration_count)
-	FROM ` + channelMonitorV2UserMetricsTable(filter) + ` m LEFT JOIN users u ON u.id=m.user_id ` + where + ` GROUP BY m.user_id,u.email,u.username,m.platform,m.model`
+	FROM ` + channelMonitorV2UserMetricsTable(filter) + ` m LEFT JOIN users u ON u.id=m.user_id ` + where + ` GROUP BY m.user_id,u.email,m.platform,m.model`
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
-	type userMeta struct{ email, username string }
-	meta := map[int64]userMeta{}
+	meta := map[int64]string{}
 	accs := map[int64]*metricAccumulator{}
 	for rows.Next() {
 		var uid int64
-		var email, username string
+		var email string
 		var f channelMonitorV2Fact
-		if err := rows.Scan(&uid, &email, &username, &f.Platform, &f.Model, &f.Success, &f.Errors, &f.Input, &f.Output, &f.CacheCreation, &f.CacheRead, &f.TTFTSum, &f.TTFTCount, &f.DurationSum, &f.DurationCount); err != nil {
+		if err := rows.Scan(&uid, &email, &f.Platform, &f.Model, &f.Success, &f.Errors, &f.Input, &f.Output, &f.CacheCreation, &f.CacheRead, &f.TTFTSum, &f.TTFTCount, &f.DurationSum, &f.DurationCount); err != nil {
 			return nil, err
 		}
 		if !channelMonitorV2ModelSelected(filter, cfg, f.Platform, f.Model) {
@@ -883,7 +882,7 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 			accs[uid] = newMetricAccumulator()
 		}
 		accs[uid].addFact(f)
-		meta[uid] = userMeta{email, username}
+		meta[uid] = email
 	}
 	histograms, err := r.loadHistograms(ctx, filter, cfg, -1, false)
 	if err != nil {
@@ -920,11 +919,7 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 	minutes := channelMonitorV2CoveredMinutes(filter, *coverage)
 	for uid, acc := range accs {
 		id := uid
-		m := meta[uid]
-		label := m.username
-		if label == "" {
-			label = m.email
-		}
+		email := strings.TrimSpace(meta[uid])
 		metrics := acc.metric(minutes, false)
 		if ignoreRatio > 0 && metrics.ErrorRequests > 0 {
 			approxIgnored := int64(float64(metrics.ErrorRequests)*ignoreRatio + 0.5)
@@ -932,7 +927,8 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 		}
 		// Recompute health after rate adjustment.
 		// (metric() does not attach health; callers that need it recompute.)
-		items = append(items, service.ChannelMonitorV2UserRow{UserID: &id, Email: m.email, Username: m.username, DisplayLabel: label, CanDrilldown: admin, Metrics: metrics})
+		// Username is a local remark on this deployment; ranking labels use email only.
+		items = append(items, service.ChannelMonitorV2UserRow{UserID: &id, Email: email, DisplayLabel: email, CanDrilldown: admin, Metrics: metrics})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Metrics.RequestCount > items[j].Metrics.RequestCount })
 	return &service.ChannelMonitorV2List[service.ChannelMonitorV2UserRow]{Coverage: *coverage, Items: items}, rows.Err()

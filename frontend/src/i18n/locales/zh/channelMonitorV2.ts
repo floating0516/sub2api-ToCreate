@@ -56,7 +56,7 @@ export default {
       durationValue: '请求时长 {value}',
       cacheRateValue: '缓存率 {value}',
     },
-    table: { platformModel: '平台 / 模型', rank: '排名', user: '用户' },
+    table: { platformModel: '平台 / 模型', rank: '排名', user: '邮箱' },
     empty: { title: '没有可展示的数据', description: '尝试调整时间范围或筛选条件' },
     bucket: { minutes: '{count} 分钟粒度', hours: '{count} 小时粒度', days: '{count} 天粒度' },
     matrix: {
