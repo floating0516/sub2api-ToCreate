@@ -115,6 +115,51 @@ export function formatMonitorSuccessRateFromError(errorRate: number): string {
   return formatMonitorPercent(1 - (errorRate || 0))
 }
 
+function clampMonitorRate(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(1, Math.max(0, value))
+}
+
+/**
+ * Display success includes every failed request.
+ * Do not use 1-error_rate: backend error_rate excludes ignored categories
+ * (quota, content policy, cancelled, …) so it can be 0% while errors still exist.
+ */
+export function monitorDisplayedSuccessRate(metrics: {
+  success_rate?: number | null
+  success_requests?: number
+  request_count?: number
+  error_rate?: number
+}): number {
+  if (typeof metrics.success_rate === 'number' && Number.isFinite(metrics.success_rate)) {
+    return clampMonitorRate(metrics.success_rate)
+  }
+  const count = metrics.request_count || 0
+  if (count > 0 && typeof metrics.success_requests === 'number') {
+    return clampMonitorRate(metrics.success_requests / count)
+  }
+  return clampMonitorRate(1 - (metrics.error_rate || 0))
+}
+
+/** Complementary to monitorDisplayedSuccessRate so KPI and error lists agree. */
+export function monitorDisplayedErrorRate(metrics: {
+  success_rate?: number | null
+  success_requests?: number
+  request_count?: number
+  error_rate?: number
+}): number {
+  return clampMonitorRate(1 - monitorDisplayedSuccessRate(metrics))
+}
+
+export function formatMonitorDisplayedSuccessRate(metrics: {
+  success_rate?: number | null
+  success_requests?: number
+  request_count?: number
+  error_rate?: number
+}): string {
+  return formatMonitorPercent(monitorDisplayedSuccessRate(metrics))
+}
+
 /**
  * Map continuous 0–100 score to 11 fine bands for multi-stop green→yellow→red.
  * score10 = best (green), score0 = worst (red).

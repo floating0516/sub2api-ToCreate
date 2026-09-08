@@ -143,13 +143,6 @@
 
           <span class="mx-0.5 hidden h-5 w-px shrink-0 bg-gray-200 dark:bg-dark-700 md:block" aria-hidden="true"></span>
 
-          <Select
-            v-model="matrixGroupBy"
-            :options="matrixGroupOptions"
-            :placeholder="t('channelMonitorV2.groupBy.label')"
-            class="monitor-toolbar-select w-[7.5rem] shrink-0 sm:w-[8.5rem]"
-          />
-
           <div
             class="tabs inline-flex shrink-0"
             role="group"
@@ -202,8 +195,8 @@
       >
         <MetricCell
           :label="t('channelMonitorV2.metrics.successRate')"
-          :value="formatPercent(1 - snapshot.metrics.error_rate)"
-          :detail="t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(snapshot.metrics.error_rate) })"
+          :value="formatPercent(displayedSuccessRate(snapshot.metrics))"
+          :detail="t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(displayedErrorRate(snapshot.metrics)) })"
           :state="snapshot.health.error_rate"
         />
         <MetricCell
@@ -318,8 +311,8 @@
                     </div>
                   </td>
                   <td>
-                    <span class="block">{{ formatPercent(1 - row.metrics.error_rate) }}</span>
-                    <small class="text-xs text-gray-400">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(row.metrics.error_rate) }) }}</small>
+                    <span class="block">{{ formatPercent(displayedSuccessRate(row.metrics)) }}</span>
+                    <small class="text-xs text-gray-400">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(displayedErrorRate(row.metrics)) }) }}</small>
                   </td>
                   <td>
                     <span class="block">{{ formatMs(row.metrics.ttft.p50_ms) }}</span>
@@ -419,8 +412,8 @@
                     </strong>
                   </td>
                   <td>
-                    <span class="block">{{ formatPercent(1 - row.metrics.error_rate) }}</span>
-                    <small class="text-xs text-gray-400">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(row.metrics.error_rate) }) }}</small>
+                    <span class="block">{{ formatPercent(displayedSuccessRate(row.metrics)) }}</span>
+                    <small class="text-xs text-gray-400">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(displayedErrorRate(row.metrics)) }) }}</small>
                   </td>
                   <td>
                     <span class="block">{{ formatMs(row.metrics.ttft.p50_ms) }}</span>
@@ -464,7 +457,6 @@ import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import Select from '@/components/common/Select.vue'
 import FilterMultiSelect from '@/features/channel-monitor-v2/FilterMultiSelect.vue'
 import MetricCell from '@/features/channel-monitor-v2/MetricCell.vue'
 import MonitorRankBadge from '@/features/channel-monitor-v2/MonitorRankBadge.vue'
@@ -498,8 +490,16 @@ import {
   formatMonitorTokensPerSecond,
   tokensPerSecondFromTpm,
   healthScoreClass,
+  monitorDisplayedErrorRate,
+  monitorDisplayedSuccessRate,
   monitorErrorCategoryLabel,
 } from '@/features/channel-monitor-v2/monitorFormat'
+import {
+  MONITOR_DISPLAY_GROUPS,
+  collapseMonitorMatrixRows,
+  expandDisplayGroupIds,
+  parseDisplayGroupKeys,
+} from '@/features/channel-monitor-v2/displayGroups'
 
 type Tab = 'models' | 'errors' | 'users'
 type HealthMode = 'overall' | 'success' | 'ttft' | 'cache'
@@ -523,12 +523,6 @@ const tabs = computed(() => [
   { value: 'errors' as Tab, label: t('channelMonitorV2.tabs.errors') },
   { value: 'users' as Tab, label: t('channelMonitorV2.tabs.users') },
 ])
-const matrixGroupOptions = computed(() => [
-  { value: 'platform' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platform') },
-  { value: 'platform_group' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformGroup') },
-  { value: 'platform_model' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformModel') },
-  { value: 'platform_group_model' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformGroupModel') },
-])
 const healthModeOptions = computed(() => [
   { value: 'overall' as HealthMode, label: t('channelMonitorV2.healthMode.overall') },
   { value: 'success' as HealthMode, label: t('channelMonitorV2.healthMode.success') },
@@ -536,16 +530,16 @@ const healthModeOptions = computed(() => [
   { value: 'cache' as HealthMode, label: t('channelMonitorV2.healthMode.cache') },
 ])
 
-const filter = ref<MonitorFilter>({
+const filter = ref({
   range: parseRange(route.query.range),
   platforms: csv(route.query.platform),
-  groupIds: csv(route.query.group).map(Number).filter(Boolean),
+  displayGroupKeys: parseDisplayGroupKeys(csv(route.query.group)),
   models: csv(route.query.model),
 })
 const activeTab = ref<Tab>(
   (['models', 'errors', 'users'].includes(String(route.query.tab)) ? route.query.tab : 'models') as Tab
 )
-const matrixGroupBy = ref<MonitorMatrixGroupBy>(parseMatrixGroupBy(route.query.group_by))
+const matrixGroupBy = ref<MonitorMatrixGroupBy>('platform_group')
 const healthMode = ref<HealthMode>(parseHealthMode(route.query.health_mode))
 const trendView = ref<TrendView>(parseTrendView(route.query.trend_view))
 const dimensions = ref<MonitorDimensions>({ platforms: [], groups: [], models: [] })
@@ -563,8 +557,16 @@ let sequence = 0
 let autoRefreshTimer: number | null = null
 
 const hasDimensionFilter = computed(
-  () => filter.value.platforms.length + filter.value.groupIds.length + filter.value.models.length > 0
+  () => filter.value.platforms.length + filter.value.displayGroupKeys.length + filter.value.models.length > 0
 )
+function apiFilter(): MonitorFilter {
+  return {
+    range: filter.value.range,
+    platforms: filter.value.platforms,
+    groupIds: expandDisplayGroupIds(filter.value.displayGroupKeys),
+    models: filter.value.models,
+  }
+}
 // Full platform catalog (never pruned). Groups/models cascade by selected platforms
 // so choosing a platform narrows the other pickers without collapsing platforms.
 const platformOptions = computed(() =>
@@ -577,17 +579,15 @@ const platformOptions = computed(() =>
 )
 const selectedPlatforms = computed(() => new Set(filter.value.platforms))
 const groupOptions = computed(() =>
-  (dimensions.value.groups || [])
+  MONITOR_DISPLAY_GROUPS
     .filter(
-      (item) =>
-        (item.request_count || 0) > 0 &&
-        (selectedPlatforms.value.size === 0 ||
-          !item.platform ||
-          selectedPlatforms.value.has(item.platform)),
+      (group) =>
+        selectedPlatforms.value.size === 0 ||
+        group.platforms.some((platform) => selectedPlatforms.value.has(platform)),
     )
-    .map((item) => ({
-      value: String(item.id),
-      label: item.platform ? `${item.platform} / ${item.name || `#${item.id}`}` : item.name || `#${item.id}`,
+    .map((group) => ({
+      value: group.id,
+      label: t(group.labelKey),
     }))
 )
 const modelOptions = computed(() =>
@@ -608,9 +608,9 @@ const modelOptions = computed(() =>
     }))
 )
 const selectedGroupIds = computed({
-  get: () => filter.value.groupIds.map(String),
+  get: () => filter.value.displayGroupKeys,
   set: (value: string[]) => {
-    filter.value.groupIds = value.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    filter.value.displayGroupKeys = parseDisplayGroupKeys(value)
   },
 })
 // Soft-prune group/model selections that fall outside the platform cascade.
@@ -620,9 +620,9 @@ watch(
   () => {
     if (groupOptions.value.length > 0) {
       const allowed = new Set(groupOptions.value.map((item) => item.value))
-      const next = filter.value.groupIds.filter((id) => allowed.has(String(id)))
-      if (next.length !== filter.value.groupIds.length) {
-        filter.value.groupIds = next
+      const next = filter.value.displayGroupKeys.filter((key) => allowed.has(key))
+      if (next.length !== filter.value.displayGroupKeys.length) {
+        filter.value.displayGroupKeys = next
       }
     }
     if (modelOptions.value.length > 0) {
@@ -653,12 +653,15 @@ const bootstrapPercent = computed(() => {
   return Math.min(100, Math.max(0, Math.round(raw)))
 })
 const matrixRows = computed(() => {
-  const items = (matrix.value?.items || []).filter((row) => (row.metrics?.request_count || 0) > 0)
-  // platform_group views should only show real groups, never bare platform placeholders.
-  if (matrixGroupBy.value === 'platform_group' || matrixGroupBy.value === 'platform_group_model') {
-    return items.filter((row) => row.group_id != null && Number(row.group_id) > 0)
-  }
-  return items
+  const raw = matrix.value?.items || []
+  const withCounts = raw.filter((row) => (row.metrics?.request_count || 0) > 0)
+  // User payloads zero request_count; backend already dropped idle groups.
+  const items = withCounts.length > 0 ? withCounts : raw
+  const scoped =
+    matrixGroupBy.value === 'platform_group' || matrixGroupBy.value === 'platform_group_model'
+      ? items.filter((row) => row.group_id != null && Number(row.group_id) > 0)
+      : items
+  return collapseMonitorMatrixRows(scoped, matrixGroupBy.value, (group) => t(group.labelKey))
 })
 
 function csv(value: unknown) {
@@ -668,17 +671,6 @@ function parseRange(value: unknown): MonitorRange {
   if (value === '90m' || value === '24h') return value
   if (value === '7d' || value === '30d') return '24h'
   return '90m'
-}
-function parseMatrixGroupBy(value: unknown): MonitorMatrixGroupBy {
-  const allowed: MonitorMatrixGroupBy[] = [
-    'platform',
-    'platform_group',
-    'platform_model',
-    'platform_group_model',
-  ]
-  return allowed.includes(value as MonitorMatrixGroupBy)
-    ? (value as MonitorMatrixGroupBy)
-    : 'platform_group'
 }
 function parseHealthMode(value: unknown): HealthMode {
   const allowed: HealthMode[] = ['overall', 'success', 'ttft', 'cache']
@@ -692,7 +684,7 @@ function syncQuery() {
     query: {
       range: filter.value.range,
       platform: filter.value.platforms.join(',') || undefined,
-      group: filter.value.groupIds.join(',') || undefined,
+      group: filter.value.displayGroupKeys.join(',') || undefined,
       model: filter.value.models.join(',') || undefined,
       group_by: matrixGroupBy.value,
       health_mode: healthMode.value,
@@ -716,8 +708,8 @@ async function loadDimensions(signal?: AbortSignal, id = sequence) {
 
 async function loadMetrics(signal?: AbortSignal, id = sequence) {
   const [nextSnapshot, nextMatrix] = await Promise.all([
-    api.getSnapshot(filter.value, isAdmin.value, signal),
-    api.getMatrix(filter.value, matrixGroupBy.value, isAdmin.value, signal),
+    api.getSnapshot(apiFilter(), isAdmin.value, signal),
+    api.getMatrix(apiFilter(), matrixGroupBy.value, isAdmin.value, signal),
   ])
   if (id !== sequence) return
   snapshot.value = nextSnapshot
@@ -778,11 +770,11 @@ async function loadTab(signal?: AbortSignal, id = sequence) {
   tabLoading.value = true
   try {
     if (activeTab.value === 'models') {
-      modelRows.value = (await api.getModels(filter.value, isAdmin.value, signal)).items || []
+      modelRows.value = (await api.getModels(apiFilter(), isAdmin.value, signal)).items || []
     } else if (activeTab.value === 'errors') {
-      errorRows.value = (await api.getErrors(filter.value, isAdmin.value, signal)).items || []
+      errorRows.value = (await api.getErrors(apiFilter(), isAdmin.value, signal)).items || []
     } else {
-      userRows.value = (await api.getUsers(filter.value, isAdmin.value, signal)).items || []
+      userRows.value = (await api.getUsers(apiFilter(), isAdmin.value, signal)).items || []
     }
   } catch (error) {
     const e = error as { name?: string; code?: string }
@@ -800,7 +792,7 @@ function clearDimensions() {
   filter.value = {
     ...filter.value,
     platforms: [],
-    groupIds: [],
+    displayGroupKeys: [],
     models: [],
   }
 }
@@ -836,6 +828,12 @@ function exactTps(tpm: number | null | undefined) {
   return Intl.NumberFormat(locale.value || undefined, { maximumFractionDigits: 3 }).format(
     tokensPerSecondFromTpm(tpm),
   )
+}
+function displayedSuccessRate(metrics: Parameters<typeof monitorDisplayedSuccessRate>[0]) {
+  return monitorDisplayedSuccessRate(metrics)
+}
+function displayedErrorRate(metrics: Parameters<typeof monitorDisplayedErrorRate>[0]) {
+  return monitorDisplayedErrorRate(metrics)
 }
 function formatPercent(value: number) {
   return formatMonitorPercent(value)

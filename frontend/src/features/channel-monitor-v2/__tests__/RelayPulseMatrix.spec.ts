@@ -70,6 +70,7 @@ function metrics(requestCount: number): MonitorMetric {
     token_count: 100,
     rpm: 1.5,
     tpm: 10.2,
+    success_rate: requestCount ? (requestCount - 1) / requestCount : 0,
     error_rate: requestCount ? 1 / requestCount : 0,
     cache_rate: 0.5,
     cache_rate_numerator: 50,
@@ -113,6 +114,8 @@ describe('RelayPulseMatrix', () => {
 
     const cells = wrapper.findAll('.pulse-cell')
     expect(cells).toHaveLength(3)
+    expect(cells[0].attributes('title')).toBeUndefined()
+    expect(cells[0].attributes('aria-label')).toContain('成功率')
     // Hover tooltip content (privacy-safe: no absolute request/error counts)
     const tip = cells[0].text()
     expect(tip).toContain('成功率')
@@ -139,6 +142,42 @@ describe('RelayPulseMatrix', () => {
     // No click-to-open modal
     await cells[0].trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+})
+
+describe('RelayPulseMatrix success display', () => {
+  it('shows true success_rate when ignored errors zero error_rate', () => {
+    const ignored = metrics(1)
+    ignored.success_requests = 1
+    ignored.error_requests = 66
+    ignored.request_count = 67
+    ignored.success_rate = 1 / 67
+    ignored.error_rate = 0
+    const wrapper = mount(RelayPulseMatrix, {
+      props: {
+        rows: [{
+          platform: 'openai',
+          group_id: 30,
+          group_name: 'GPT Pro Standard v2',
+          metrics: ignored,
+          health,
+          buckets: [{ bucket_start: '2026-08-01T00:00:00Z', metrics: ignored, health }],
+        }],
+        coverage: {
+          requested_start: '2026-08-01T00:00:00Z',
+          requested_end: '2026-08-01T00:01:00Z',
+          coverage_start: '2026-08-01T00:00:00Z',
+          data_through: '2026-08-01T00:01:00Z',
+          computed_at: '2026-08-01T00:01:00Z',
+          aggregation_lag_seconds: 0,
+          coverage_complete: true,
+          bucket_seconds: 60,
+        },
+        healthMode: 'overall',
+      },
+    })
+    expect(wrapper.find('.summary-value').text()).toContain('1.5%')
+    expect(wrapper.find('.summary-value').text()).not.toContain('100')
   })
 })
 

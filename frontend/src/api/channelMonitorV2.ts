@@ -41,6 +41,8 @@ export interface MonitorMetric {
   rpm: number
   tpm: number
   error_rate: number
+  /** True success/request. Kept after user redaction; do not derive from error_rate. */
+  success_rate?: number
   cache_rate: number
   cache_rate_numerator: number
   cache_rate_denominator: number

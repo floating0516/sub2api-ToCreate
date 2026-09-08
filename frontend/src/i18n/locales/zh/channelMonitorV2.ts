@@ -20,6 +20,11 @@ export default {
     loadFailed: '渠道监控加载失败',
     detailLoadFailed: '渠道监控明细加载失败',
     otherModels: '其他模型',
+    displayGroups: {
+      pro: 'Pro 渠道',
+      claudeOpus: 'Claude Opus',
+      claude06: 'Claude 0.6',
+    },
     ignored: '忽略',
     currentUser: '当前用户',
     ranges: { '90m': '90m', '24h': '24h', '7d': '7d', '30d': '30d' },

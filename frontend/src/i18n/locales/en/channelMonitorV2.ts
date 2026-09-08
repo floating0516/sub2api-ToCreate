@@ -20,6 +20,11 @@ export default {
     loadFailed: 'Failed to load channel monitor',
     detailLoadFailed: 'Failed to load channel monitor details',
     otherModels: 'Other models',
+    displayGroups: {
+      pro: 'Pro',
+      claudeOpus: 'Claude Opus',
+      claude06: 'Claude 0.6',
+    },
     ignored: 'Ignored',
     currentUser: 'Current user',
     ranges: { '90m': '90m', '24h': '24h', '7d': '7d', '30d': '30d' },

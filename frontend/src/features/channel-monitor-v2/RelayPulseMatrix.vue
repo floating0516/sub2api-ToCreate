@@ -92,7 +92,6 @@
                 ]"
                 tabindex="0"
                 role="img"
-                :title="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
                 :aria-label="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
                 @mouseenter="showTooltip($event, slot)"
                 @mousemove="moveTooltip($event)"
@@ -108,7 +107,7 @@
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.ttftValue', { value: latencyPrivacy(slot.bucket.metrics.ttft) }) }}</span>
                     <span v-if="showThroughput" class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.tpsValue', { value: formatTps(slot.bucket.metrics.tpm) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.cacheRateValue', { value: formatPercent(slot.bucket.metrics.cache_rate) }) }}</span>
-                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(slot.bucket.metrics.error_rate) }) }}</span>
+                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(monitorDisplayedErrorRate(slot.bucket.metrics)) }) }}</span>
                     <span v-if="showThroughput" class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.rpmValue', { value: formatRate(slot.bucket.metrics.rpm) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.durationValue', { value: latencyPrivacy(slot.bucket.metrics.duration) }) }}</span>
                   </template>
@@ -183,9 +182,10 @@ import {
   formatMonitorDateTime,
   formatMonitorMs,
   parseMonitorDate,
+  formatMonitorDisplayedSuccessRate,
   formatMonitorPercent,
-  formatMonitorSuccessRateFromError,
   formatMonitorThroughput,
+  monitorDisplayedErrorRate,
   formatMonitorTokensPerSecond,
   tokensPerSecondFromTpm,
   healthModeScore,
@@ -351,7 +351,8 @@ function cellClass(health: MonitorHealth, requestCount: number): string {
 }
 
 function rowLabel(row: MonitorMatrixRow): string {
-  const parts = [row.platform]
+  const parts: string[] = []
+  if (row.platform) parts.push(row.platform)
   if (row.group_name || row.group_id) parts.push(row.group_name || `#${row.group_id}`)
   if (row.model) parts.push(row.model === '__other__' ? t('channelMonitorV2.otherModels') : row.model)
   return parts.join(' / ')
@@ -363,11 +364,11 @@ function rowKey(row: MonitorMatrixRow): string {
 
 function successRate(metrics: MonitorMetric): string {
   // Empty traffic: no request count and no throughput signal.
-  // When throughput is hidden for privacy, still show success from error_rate.
+  // When throughput is hidden for privacy, still show the true success_rate.
   const noCount = metrics.request_count <= 0
   const noTP = (metrics.rpm || 0) <= 0 && (metrics.tpm || 0) <= 0
   if (noCount && noTP && props.showThroughput) return '-'
-  return formatMonitorSuccessRateFromError(metrics.error_rate)
+  return formatMonitorDisplayedSuccessRate(metrics)
 }
 
 function formatScore(health: MonitorHealth): string {
@@ -393,7 +394,7 @@ function bucketTooltipLines(bucket: MonitorMatrixBucket): string[] {
   }
   lines.push(
     t('channelMonitorV2.metrics.cacheRateValue', { value: formatPercent(metrics.cache_rate) }),
-    t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(metrics.error_rate) }),
+    t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(monitorDisplayedErrorRate(metrics)) }),
   )
   if (props.showThroughput) {
     lines.push(t('channelMonitorV2.metrics.rpmValue', { value: formatRate(metrics.rpm) }))
@@ -555,9 +556,8 @@ function formatBucketRange(value: string) {
   z-index: 5;
 }
 
-/* CSS-only hover tooltip — no click modal, no absolute request counts.
-   Native title is also provided so dense/scrolling layouts can always show the
-   full content even when a browser clips transformed children. */
+/* In-cell tooltip markup stays for tests/a11y text. The visible card is the
+   body Teleport; do not also set a native title or two hover boxes appear. */
 .pulse-tooltip {
   pointer-events: none;
   position: absolute;

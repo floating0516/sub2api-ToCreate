@@ -515,6 +515,7 @@ func (s *ChannelMonitorV2Service) Matrix(ctx context.Context, filter ChannelMoni
 	if err != nil {
 		return nil, err
 	}
+	CollapseChannelMonitorV2DisplayGroups(matrix, groupBy)
 	if !admin && matrix != nil {
 		hideTP := s.hideThroughputForViewer(ctx, admin)
 		for i := range matrix.Items {

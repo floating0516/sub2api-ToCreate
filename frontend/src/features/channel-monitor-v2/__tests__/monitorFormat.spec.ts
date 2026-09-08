@@ -9,6 +9,8 @@ import {
   formatMonitorRate,
   formatMonitorSuccessRate,
   formatMonitorSuccessRateFromError,
+  monitorDisplayedErrorRate,
+  monitorDisplayedSuccessRate,
   formatMonitorThroughput,
   formatMonitorTokensPerSecond,
   healthScoreClass,
@@ -75,6 +77,12 @@ describe('monitorFormat accuracy', () => {
   it('derives success rate from error_rate without absolute counts', () => {
     expect(formatMonitorSuccessRateFromError(0.1)).toBe('90.0%')
     expect(formatMonitorSuccessRateFromError(0)).toBe('100.0%')
+  })
+
+  it('uses true success_rate when ignored errors zeroed error_rate', () => {
+    expect(monitorDisplayedSuccessRate({ success_rate: 0.015, error_rate: 0 })).toBeCloseTo(0.015)
+    expect(monitorDisplayedErrorRate({ success_rate: 0.015, error_rate: 0 })).toBeCloseTo(0.985)
+    expect(monitorDisplayedSuccessRate({ success_requests: 80, request_count: 100, error_rate: 0 })).toBeCloseTo(0.8)
   })
 
   it('maps continuous scores to multi-stop bands', () => {
