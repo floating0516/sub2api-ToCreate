@@ -8,6 +8,12 @@ export const activitySurface = '#fffefb'
 export const activitySurfaceDark = '#232620'
 export const activityEmpty = '#eeebe3'
 export const activityEmptyDark = '#1b1d19'
+export const activityAxisLight = '#3e413b'
+export const activityAxisDark = '#d8d5ce'
+
+export function activityAxisColor(dark: boolean): string {
+  return dark ? activityAxisDark : activityAxisLight
+}
 
 /** Warm series for usage charts — stays in the cream/bronze family. */
 export const activityTrendPalette = [

@@ -5,6 +5,7 @@
     </div>
     <VChart
       v-if="hasData"
+      :key="isDark ? 'dark' : 'light'"
       class="dashboard-echart"
       :option="chartOption"
       :update-options="updateOptions"
@@ -31,6 +32,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsOption } from 'echarts'
 import VChart from 'vue-echarts'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
 
 use([
   CanvasRenderer,
@@ -58,7 +60,7 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 const updateOptions = {
   notMerge: false,
   lazyUpdate: false,
-  replaceMerge: ['series', 'xAxis']
+  replaceMerge: ['series', 'xAxis', 'yAxis']
 }
 let themeObserver: MutationObserver | null = null
 
@@ -83,11 +85,11 @@ const hexToRgba = (color: string, opacity: number): string => {
 
 const chartOption = computed<EChartsOption>(() => {
   const dark = isDark.value
-  const axisColor = dark ? '#b6b7b0' : '#6f726c'
+  const axisColor = activityAxisColor(dark)
   const gridColor = dark ? 'rgba(240, 238, 230, 0.08)' : 'rgba(42, 47, 40, 0.08)'
   const tooltipBackground = dark ? '#232620' : '#fffefb'
   const tooltipBorder = dark ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.12)'
-  const tooltipText = dark ? '#b6b7b0' : '#6f726c'
+  const tooltipText = axisColor
   const tooltipTitle = dark ? '#f1eee7' : '#3e413b'
   const chartSurface = dark ? '#232620' : '#fffefb'
   const showSymbols = props.labels.length <= 31
@@ -100,6 +102,10 @@ const chartOption = computed<EChartsOption>(() => {
     animationDurationUpdate: 240,
     animationEasing: 'cubicOut',
     animationEasingUpdate: 'cubicOut',
+    textStyle: {
+      color: axisColor,
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    },
     aria: {
       enabled: true,
       decal: { show: false }

@@ -104,6 +104,7 @@
             <LoadingSpinner size="md" />
           </div>
           <VChart
+            :key="isDark ? 'dark' : 'light'"
             class="dashboard-calendar-chart"
             :option="chartOption"
             :update-options="updateOptions"
@@ -149,6 +150,7 @@ import {
 } from './dashboardCalendarLayout'
 import {
   activityAccent,
+  activityAxisColor,
   activityEmpty,
   activityEmptyDark,
   activityHeatmapDark,
@@ -192,7 +194,11 @@ const calendarStageRef = ref<HTMLElement | null>(null)
 const calendarCellSize = ref(14)
 const calendarWeekCount = ref(FULL_CALENDAR_WEEK_COUNT)
 const calendarPage = ref(0)
-const updateOptions = { notMerge: false, lazyUpdate: false }
+const updateOptions = {
+  notMerge: false,
+  lazyUpdate: false,
+  replaceMerge: ['calendar', 'series', 'visualMap']
+}
 const lightColors = activityHeatmapLight
 const darkColors = activityHeatmapDark
 const DAY_IN_MS = 24 * 60 * 60 * 1000
@@ -409,10 +415,14 @@ const chartOption = computed<EChartsOption>(() => {
   const maxValue = Math.max(1, scaleCeiling)
   const surface = dark ? activitySurfaceDark : activitySurface
   const empty = dark ? activityEmptyDark : activityEmpty
-  const text = dark ? '#b6b7b0' : '#6f726c'
+  const text = activityAxisColor(dark)
 
   return {
     backgroundColor: surface,
+    textStyle: {
+      color: text,
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    },
     animation: true,
     animationDuration: 260,
     animationDurationUpdate: 240,

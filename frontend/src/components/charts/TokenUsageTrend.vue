@@ -7,7 +7,7 @@
       <LoadingSpinner />
     </div>
     <div v-else-if="trendData.length > 0 && chartData" class="h-48">
-      <Line :data="chartData" :options="lineOptions" />
+      <Line :key="isDarkMode ? 'dark' : 'light'" :data="chartData" :options="lineOptions" />
     </div>
     <div
       v-else
@@ -23,7 +23,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   activityAccent,
-  activityAccentDeep
+  activityAccentDeep,
+  activityAxisColor
 } from '@/components/user/dashboard/dashboardActivityTheme'
 import {
   Chart as ChartJS,
@@ -62,13 +63,13 @@ const isDarkMode = ref(document.documentElement.classList.contains('dark'))
 let themeObserver: MutationObserver | null = null
 
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#b6b7b0' : '#6f726c',
+  text: activityAxisColor(isDarkMode.value),
   grid: isDarkMode.value ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)',
   input: activityAccentDeep,
   output: activityAccent,
   cacheCreation: '#d4a06a',
   cacheRead: '#c08a60',
-  cacheHitRate: '#6f4529'
+  cacheHitRate: isDarkMode.value ? '#e3b48f' : '#6f4529'
 }))
 
 const chartData = computed(() => {
@@ -129,6 +130,7 @@ const chartData = computed(() => {
 const lineOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  color: chartColors.value.text,
   interaction: {
     intersect: false,
     mode: 'index' as const

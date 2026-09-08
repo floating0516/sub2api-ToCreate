@@ -55,7 +55,7 @@ describe('DashboardTrendChart', () => {
     expect(wrapper.getComponent({ name: 'VChart' }).props('updateOptions')).toEqual({
       notMerge: false,
       lazyUpdate: false,
-      replaceMerge: ['series', 'xAxis']
+      replaceMerge: ['series', 'xAxis', 'yAxis']
     })
     expect(wrapper.getComponent({ name: 'VChart' }).props('option').tooltip.extraCssText).toContain(
       'overflow-wrap: anywhere'
