@@ -325,7 +325,12 @@
               <div v-if="userTrendLoading" class="flex h-full items-center justify-center">
                 <LoadingSpinner size="md" />
               </div>
-              <Line v-else-if="userTrendChartData" :data="userTrendChartData" :options="lineOptions" />
+              <Line
+                v-else-if="userTrendChartData"
+                :key="isDarkMode ? 'dark' : 'light'"
+                :data="userTrendChartData"
+                :options="lineOptions"
+              />
               <div
                 v-else
                 class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400"
@@ -363,6 +368,8 @@ import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
 
 import {
   Chart as ChartJS,
@@ -436,21 +443,18 @@ const granularityOptions = computed(() => [
   { value: 'hour', label: t('admin.dashboard.hour') }
 ])
 
-// Dark mode detection
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
-})
+const isDarkMode = useHtmlDarkMode()
 
-// Chart colors
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb'
+  text: activityAxisColor(isDarkMode.value),
+  grid: isDarkMode.value ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)'
 }))
 
 // Line chart options (for user trend chart)
 const lineOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  color: chartColors.value.text,
   interaction: {
     intersect: false,
     mode: 'index' as const
