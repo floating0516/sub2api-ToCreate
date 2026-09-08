@@ -369,7 +369,7 @@ import ModelDistributionChart from '@/components/charts/ModelDistributionChart.v
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
-import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 
 import {
   Chart as ChartJS,
@@ -447,7 +447,7 @@ const isDarkMode = useHtmlDarkMode()
 
 const chartColors = computed(() => ({
   text: activityAxisColor(isDarkMode.value),
-  grid: isDarkMode.value ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)'
+  grid: activityGridColor(isDarkMode.value)
 }))
 
 // Line chart options (for user trend chart)

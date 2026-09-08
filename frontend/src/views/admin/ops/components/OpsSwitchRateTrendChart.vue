@@ -18,6 +18,8 @@ import type { ChartState } from '../types'
 import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
@@ -31,12 +33,12 @@ interface Props {
 const props = defineProps<Props>()
 const { t } = useI18n()
 
-const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
+const isDarkMode = useHtmlDarkMode()
 const colors = computed(() => ({
   teal: '#14b8a6',
   tealAlpha: '#14b8a620',
-  grid: isDarkMode.value ? '#374151' : '#f3f4f6',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  grid: activityGridColor(isDarkMode.value),
+  text: activityAxisColor(isDarkMode.value)
 }))
 
 const totalRequests = computed(() => sumNumbers(props.points.map((p) => p.request_count)))
@@ -140,7 +142,12 @@ const options = computed(() => {
     </div>
 
     <div class="min-h-0 flex-1">
-      <Line v-if="state === 'ready' && chartData" :data="chartData" :options="options" />
+      <Line
+        v-if="state === 'ready' && chartData"
+        :key="isDarkMode ? 'dark' : 'light'"
+        :data="chartData"
+        :options="options"
+      />
       <div v-else class="flex h-full items-center justify-center">
         <div v-if="state === 'loading'" class="animate-pulse text-sm text-gray-400">{{ t('common.loading') }}</div>
         <EmptyState v-else :title="t('common.noData')" :description="t('admin.ops.charts.emptyRequest')" />

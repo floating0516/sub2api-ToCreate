@@ -45,7 +45,7 @@
         class="h-[280px] sm:h-[300px]"
         @wheel="onChartWheel"
       >
-        <Line :data="chartData" :options="chartOptions" />
+        <Line :key="isDark ? 'dark' : 'light'" :data="chartData" :options="chartOptions" />
       </div>
       <div v-else class="flex h-[280px] items-center justify-center sm:h-[300px]">
         <EmptyState
@@ -60,6 +60,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch } from 'vue'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -98,9 +100,7 @@ const chartRef = ref<HTMLElement | null>(null)
 const zoom = ref<ZoomState>(resetZoom())
 const zoomed = computed(() => isZoomed(zoom.value))
 
-const isDark = computed(() =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-)
+const isDark = useHtmlDarkMode()
 
 const bucketLabel = computed(() => {
   const seconds = props.coverage?.bucket_seconds || 60
@@ -205,8 +205,8 @@ function smoothTrend(values: Array<number | null>): Array<number | null> {
 }
 
 const chartOptions = computed(() => {
-  const text = isDark.value ? '#9ca3af' : '#6b7280'
-  const grid = isDark.value ? '#374151' : '#f3f4f6'
+  const text = activityAxisColor(isDark.value)
+  const grid = activityGridColor(isDark.value)
   const tooltipBg = isDark.value ? '#1f2937' : '#ffffff'
   const tooltipTitle = isDark.value ? '#f3f4f6' : '#111827'
   const tooltipBody = isDark.value ? '#d1d5db' : '#4b5563'

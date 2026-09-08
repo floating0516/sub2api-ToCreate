@@ -7,6 +7,8 @@ import type { OpsErrorDistributionResponse } from '@/api/admin/ops'
 import type { ChartState } from '../types'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -21,13 +23,13 @@ const emit = defineEmits<{
 }>()
 const { t } = useI18n()
 
-const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
+const isDarkMode = useHtmlDarkMode()
 const colors = computed(() => ({
   blue: '#3b82f6',
   red: '#ef4444',
   orange: '#f59e0b',
   gray: '#9ca3af',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  text: activityAxisColor(isDarkMode.value)
 }))
 
 const totalSlaErrors = computed(() =>
@@ -137,7 +139,11 @@ const options = computed(() => ({
     <div class="relative min-h-0 flex-1">
       <div v-if="state === 'ready' && chartData" class="flex h-full flex-col">
         <div class="flex-1">
-          <Doughnut :data="chartData" :options="{ ...options, cutout: '65%' }" />
+          <Doughnut
+            :key="isDarkMode ? 'dark' : 'light'"
+            :data="chartData"
+            :options="{ ...options, cutout: '65%' }"
+          />
         </div>
         <div class="mt-4 flex flex-col items-center gap-2">
           <div v-if="topReason" class="text-xs font-bold text-gray-900 dark:text-white">

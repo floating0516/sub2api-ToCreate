@@ -509,7 +509,7 @@ import ModelDistributionChart from '@/components/charts/ModelDistributionChart.v
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
-import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 import { adminAPI } from '@/api/admin'
 import type { Account, AccountUsageStatsResponse } from '@/types'
 
@@ -542,7 +542,7 @@ const isDarkMode = useHtmlDarkMode()
 
 const chartColors = computed(() => ({
   text: activityAxisColor(isDarkMode.value),
-  grid: isDarkMode.value ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)'
+  grid: activityGridColor(isDarkMode.value)
 }))
 
 // Line chart data

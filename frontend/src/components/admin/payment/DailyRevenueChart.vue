@@ -7,7 +7,12 @@
       <div v-if="loading" class="flex h-full items-center justify-center">
         <LoadingSpinner size="md" />
       </div>
-      <Line v-else-if="chartData" :data="chartData" :options="chartOptions" />
+      <Line
+        v-else-if="chartData"
+        :key="isDarkMode ? 'dark' : 'light'"
+        :data="chartData"
+        :options="chartOptions"
+      />
       <div
         v-else
         class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400"
@@ -20,6 +25,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -85,27 +92,42 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = {
+const isDarkMode = useHtmlDarkMode()
+const axisColor = computed(() => activityAxisColor(isDarkMode.value))
+const gridColor = computed(() => activityGridColor(isDarkMode.value))
+
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  color: axisColor.value,
   interaction: { mode: 'index' as const, intersect: false },
   scales: {
+    x: {
+      grid: { color: gridColor.value },
+      ticks: { color: axisColor.value, font: { size: 10 } },
+    },
     y: {
       type: 'linear' as const,
       display: true,
       position: 'left' as const,
-      title: { display: true, text: t('payment.admin.revenue') },
+      title: { display: true, text: t('payment.admin.revenue'), color: axisColor.value },
+      grid: { color: gridColor.value },
+      ticks: { color: axisColor.value, font: { size: 10 } },
     },
     y1: {
       type: 'linear' as const,
       display: true,
       position: 'right' as const,
-      title: { display: true, text: t('payment.admin.orderCount') },
+      title: { display: true, text: t('payment.admin.orderCount'), color: axisColor.value },
       grid: { drawOnChartArea: false },
+      ticks: { color: axisColor.value, font: { size: 10 } },
     }
   },
   plugins: {
-    legend: { position: 'top' as const },
+    legend: {
+      position: 'top' as const,
+      labels: { color: axisColor.value },
+    },
   }
-}
+}))
 </script>

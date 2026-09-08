@@ -15,6 +15,10 @@ export function activityAxisColor(dark: boolean): string {
   return dark ? activityAxisDark : activityAxisLight
 }
 
+export function activityGridColor(dark: boolean): string {
+  return dark ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)'
+}
+
 /** Warm series for usage charts — stays in the cream/bronze family. */
 export const activityTrendPalette = [
   '#aa7149',

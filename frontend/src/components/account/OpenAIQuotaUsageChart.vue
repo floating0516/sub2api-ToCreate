@@ -25,7 +25,12 @@
     </div>
 
     <div v-if="chartData" class="h-60 min-h-60 w-full">
-      <Line :data="chartData" :options="chartOptions" :plugins="chartPlugins" />
+      <Line
+        :key="isDarkMode ? 'dark' : 'light'"
+        :data="chartData"
+        :options="chartOptions"
+        :plugins="chartPlugins"
+      />
     </div>
     <div
       v-else
@@ -38,6 +43,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useHtmlDarkMode } from '@/composables/useHtmlDarkMode'
+import { activityAxisColor, activityGridColor } from '@/components/user/dashboard/dashboardActivityTheme'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -76,9 +83,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const isDarkMode = computed(() =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-)
+const isDarkMode = useHtmlDarkMode()
 
 const colors = computed(() => ({
   line: isDarkMode.value ? '#60a5fa' : '#2563eb',
@@ -86,8 +91,8 @@ const colors = computed(() => ({
   manualReset: isDarkMode.value ? '#4ade80' : '#16a34a',
   providerReset: isDarkMode.value ? '#f87171' : '#dc2626',
   unknownReset: isDarkMode.value ? '#9ca3af' : '#6b7280',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  grid: activityGridColor(isDarkMode.value),
+  text: activityAxisColor(isDarkMode.value)
 }))
 
 type QuotaChartPoint = {
