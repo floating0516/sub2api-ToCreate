@@ -1,5 +1,5 @@
 <template>
-  <section class="cs-kpi-grid" :aria-label="ariaLabel">
+  <section class="cs-kpi-grid" :aria-label="ariaLabelText">
     <article
       v-for="card in cards"
       :key="card.key"
@@ -37,7 +37,7 @@ export interface OverviewCard {
 
 defineProps<{
   cards: OverviewCard[]
-  ariaLabel: string
+  ariaLabelText: string
 }>()
 </script>
 
