@@ -491,6 +491,7 @@ import type {
 import {
   formatLatencyKpiSecondary,
   formatLatencyPrivacy,
+  formatMonitorDateTime,
   formatMonitorMs,
   formatMonitorPercent,
   formatMonitorThroughput,
@@ -859,12 +860,7 @@ function latencyKpiSecondary(metric: {
   return formatLatencyKpiSecondary(metric.avg_ms, metric.p90_ms, metric.p95_ms)
 }
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat(locale.value || undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return formatMonitorDateTime(value, locale.value)
 }
 function statusDot(health?: MonitorHealth | HealthState) {
   if (!health || typeof health === 'string') {

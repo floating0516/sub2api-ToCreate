@@ -179,7 +179,10 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import {
   formatLatencyPrivacy,
+  formatMonitorClock,
+  formatMonitorDateTime,
   formatMonitorMs,
+  parseMonitorDate,
   formatMonitorPercent,
   formatMonitorSuccessRateFromError,
   formatMonitorThroughput,
@@ -456,18 +459,13 @@ function formatMs(value: number | null) {
 }
 
 function formatAxisTime(value: string) {
-  return new Intl.DateTimeFormat(locale.value || undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return formatMonitorDateTime(value, locale.value)
 }
 
 function formatBucketRange(value: string) {
-  const start = new Date(value)
+  const start = parseMonitorDate(value)
   const end = new Date(start.getTime() + props.coverage.bucket_seconds * 1000)
-  return `${formatAxisTime(start.toISOString())} - ${new Intl.DateTimeFormat(locale.value || undefined, { hour: '2-digit', minute: '2-digit' }).format(end)}`
+  return `${formatMonitorDateTime(start, locale.value)} - ${formatMonitorClock(end, locale.value)}`
 }
 </script>
 

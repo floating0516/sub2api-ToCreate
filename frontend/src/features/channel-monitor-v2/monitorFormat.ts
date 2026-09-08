@@ -9,6 +9,44 @@
 import type { HealthScoreBand, MonitorHealth } from '@/api/channelMonitorV2'
 import { formatCompactNumber } from '@/utils/format'
 
+export const MONITOR_DISPLAY_TIME_ZONE = 'Asia/Shanghai'
+
+export function parseMonitorDate(value: string | Date): Date {
+  if (value instanceof Date) return value
+  const raw = String(value).trim()
+  if (!raw) return new Date(NaN)
+  // Aggregator timestamps are UTC. A payload without a zone must not be read as
+  // local time, or 13:58 UTC renders as 下午 1:58 instead of 21:58.
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(raw) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) {
+    return new Date(raw.replace(' ', 'T') + 'Z')
+  }
+  return new Date(raw)
+}
+
+export function formatMonitorDateTime(value: string | Date, locale = monitorIntlLocale()): string {
+  const date = parseMonitorDate(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: MONITOR_DISPLAY_TIME_ZONE,
+    hourCycle: 'h23',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+export function formatMonitorClock(value: string | Date, locale = monitorIntlLocale()): string {
+  const date = parseMonitorDate(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: MONITOR_DISPLAY_TIME_ZONE,
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
 export function monitorIntlLocale(): string {
   if (typeof document !== 'undefined') {
     const htmlLang = document.documentElement.getAttribute('lang')?.trim()

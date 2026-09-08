@@ -77,7 +77,7 @@ import { Line } from 'vue-chartjs'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { MonitorCoverage, MonitorMetric, MonitorHealth } from '@/api/channelMonitorV2'
-import { formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
+import { formatMonitorDateTime, formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
 import {
   applyWheelZoom,
   clientXRatio,
@@ -115,12 +115,7 @@ const chartData = computed(() => {
   const points = visibleTrend.value
   if (!points.length) return null
   const labels = points.map((p) =>
-    new Intl.DateTimeFormat(locale.value || undefined, {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(p.bucket_start))
+    formatMonitorDateTime(p.bucket_start, locale.value)
   )
   const errorRates = smoothTrend(points.map((p) => (p.metrics.error_rate || 0) * 100))
   const cacheRates = smoothTrend(points.map((p) => (p.metrics.cache_rate || 0) * 100))

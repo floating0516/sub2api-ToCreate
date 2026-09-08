@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatLatencyKpiSecondary,
   formatLatencyPrivacy,
+  formatMonitorDateTime,
   formatMonitorMs,
   formatMonitorNumber,
   formatMonitorPercent,
@@ -115,5 +116,10 @@ describe('monitorFormat accuracy', () => {
     expect(formatLatencyPrivacy(100, 250, 120, 300)).toBe('AVG 120ms · P50 100ms · P90 250ms')
     expect(formatLatencyPrivacy(100, null, null, 300)).toBe('P50 100ms · P95 300ms')
     expect(formatLatencyPrivacy(null, null)).toBe('-')
+  })
+
+  it('renders aggregator UTC timestamps as Asia/Shanghai 24h clock', () => {
+    expect(formatMonitorDateTime('2026-09-08T13:58:00Z', 'zh-CN')).toContain('21:58')
+    expect(formatMonitorDateTime('2026-09-08T13:58:00', 'zh-CN')).toContain('21:58')
   })
 })
