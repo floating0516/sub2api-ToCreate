@@ -1,14 +1,3 @@
-import {
-  platformAccentBarClass,
-  platformBadgeClass,
-  platformBadgeLightClass,
-  platformBorderClass,
-  platformButtonClass,
-  platformDiscountClass,
-  platformIconClass,
-  platformTextClass,
-} from '@/utils/platformColors'
-
 export type SubscriptionTier = 'light' | 'standard'
 
 export interface SubscriptionColorContext {
@@ -30,24 +19,24 @@ interface SubscriptionTierClasses {
 
 const TIER_CLASSES: Record<SubscriptionTier, SubscriptionTierClasses> = {
   light: {
-    accentBar: 'bg-gradient-to-r from-yellow-400 to-amber-500',
-    badge: 'border-yellow-500/30 bg-yellow-500/10 text-amber-700 dark:text-yellow-300',
-    badgeLight: 'bg-yellow-500/10 text-amber-700 dark:bg-yellow-500/10 dark:text-yellow-300',
-    border: 'border-yellow-500/30 dark:border-yellow-500/30',
-    button: 'bg-yellow-400 text-gray-950 hover:bg-yellow-500 active:bg-amber-500 dark:bg-yellow-400 dark:hover:bg-yellow-300',
-    discount: 'bg-yellow-100 text-amber-800 dark:bg-yellow-900/40 dark:text-yellow-300',
-    icon: 'text-amber-500 dark:text-yellow-400',
-    text: 'text-amber-600 dark:text-yellow-400',
+    accentBar: 'bg-gradient-to-r from-primary-200 to-primary-400',
+    badge: 'border-primary-300/50 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
+    badgeLight: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
+    border: 'border-primary-200 dark:border-primary-800',
+    button: 'bg-primary-400 text-white hover:bg-primary-500 active:bg-primary-600 dark:bg-primary-400 dark:hover:bg-primary-300',
+    discount: 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300',
+    icon: 'text-primary-500 dark:text-primary-400',
+    text: 'text-primary-600 dark:text-primary-400',
   },
   standard: {
-    accentBar: 'bg-gradient-to-r from-green-400 to-emerald-500',
-    badge: 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300',
-    badgeLight: 'bg-green-500/10 text-green-700 dark:bg-green-500/10 dark:text-green-300',
-    border: 'border-green-500/30 dark:border-green-500/30',
-    button: 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800 dark:bg-green-600 dark:hover:bg-green-500',
-    discount: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-    icon: 'text-green-500 dark:text-green-400',
-    text: 'text-green-600 dark:text-green-400',
+    accentBar: 'bg-gradient-to-r from-primary-600 to-primary-800',
+    badge: 'border-primary-500/40 bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200',
+    badgeLight: 'bg-primary-200/70 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200',
+    border: 'border-primary-400/50 dark:border-primary-700',
+    button: 'bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900 dark:bg-primary-600 dark:hover:bg-primary-500',
+    discount: 'bg-primary-200 text-primary-900 dark:bg-primary-900/50 dark:text-primary-200',
+    icon: 'text-primary-600 dark:text-primary-300',
+    text: 'text-primary-700 dark:text-primary-300',
   },
 }
 
@@ -60,47 +49,43 @@ export function detectSubscriptionTier(context: SubscriptionColorContext): Subsc
     .replace(/[_-]+/g, ' ')
 
   if (name.includes('轻量') || /\blight\b/.test(name)) return 'light'
-  if (name.includes('标准') || /\bstandard\b/.test(name)) return 'standard'
+  if (name.includes('标准') || name.includes('高额度') || /\bstandard\b/.test(name) || /\bhigh\b/.test(name)) return 'standard'
   return null
 }
 
-function tierClasses(context: SubscriptionColorContext): SubscriptionTierClasses | null {
+function tierClasses(context: SubscriptionColorContext): SubscriptionTierClasses {
   const tier = detectSubscriptionTier(context)
-  return tier ? TIER_CLASSES[tier] : null
-}
-
-function platform(context: SubscriptionColorContext): string {
-  return context.platform || ''
+  return TIER_CLASSES[tier ?? 'light']
 }
 
 export function subscriptionAccentBarClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.accentBar || platformAccentBarClass(platform(context))
+  return tierClasses(context).accentBar
 }
 
 export function subscriptionBadgeClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.badge || platformBadgeClass(platform(context))
+  return tierClasses(context).badge
 }
 
 export function subscriptionBadgeLightClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.badgeLight || platformBadgeLightClass(platform(context))
+  return tierClasses(context).badgeLight
 }
 
 export function subscriptionBorderClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.border || platformBorderClass(platform(context))
+  return tierClasses(context).border
 }
 
 export function subscriptionButtonClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.button || platformButtonClass(platform(context))
+  return tierClasses(context).button
 }
 
 export function subscriptionDiscountClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.discount || platformDiscountClass(platform(context))
+  return tierClasses(context).discount
 }
 
 export function subscriptionIconClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.icon || platformIconClass(platform(context))
+  return tierClasses(context).icon
 }
 
 export function subscriptionTextClass(context: SubscriptionColorContext): string {
-  return tierClasses(context)?.text || platformTextClass(platform(context))
+  return tierClasses(context).text
 }

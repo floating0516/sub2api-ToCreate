@@ -96,18 +96,18 @@
           </template>
           <!-- Subscribe Tab -->
           <template v-else-if="activeTab === 'subscription'">
-            <div class="rounded-xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/60 dark:bg-sky-950/30">
+            <div class="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-primary-800/60 dark:bg-primary-950/30">
               <div class="flex gap-3">
-                <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-sky-600 dark:text-sky-300" />
+                <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-primary-600 dark:text-primary-300" />
                 <div class="min-w-0">
-                  <p class="text-sm font-semibold text-sky-900 dark:text-sky-100">{{ t('payment.subscriptionHint.title') }}</p>
-                  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-sky-800 dark:text-sky-200">
+                  <p class="text-sm font-semibold text-primary-900 dark:text-primary-100">{{ t('payment.subscriptionHint.title') }}</p>
+                  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-primary-800 dark:text-primary-200">
                     <li class="flex gap-2">
-                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500 dark:bg-sky-300"></span>
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 dark:bg-primary-300"></span>
                       <span>{{ t('payment.subscriptionHint.samePlan') }}</span>
                     </li>
                     <li class="flex gap-2">
-                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500 dark:bg-sky-300"></span>
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 dark:bg-primary-300"></span>
                       <span>{{ t('payment.subscriptionHint.differentPlans') }}</span>
                     </li>
                   </ul>
@@ -259,22 +259,22 @@
           </template>
           <!-- Add-on Tab -->
           <template v-else-if="activeTab === 'addon'">
-            <div data-testid="addon-guidance" class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <div data-testid="addon-guidance" class="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-primary-800/60 dark:bg-primary-950/30">
               <div class="flex gap-3">
-                <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
+                <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-primary-600 dark:text-primary-300" />
                 <div class="min-w-0">
-                  <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">{{ t('payment.addon.guideTitle') }}</p>
-                  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+                  <p class="text-sm font-semibold text-primary-900 dark:text-primary-100">{{ t('payment.addon.guideTitle') }}</p>
+                  <ul class="mt-2 space-y-1.5 text-sm leading-relaxed text-primary-800 dark:text-primary-200">
                     <li class="flex gap-2">
-                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 dark:bg-primary-300"></span>
                       <span>{{ t('payment.addon.guideSubscription') }}</span>
                     </li>
                     <li class="flex gap-2">
-                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 dark:bg-primary-300"></span>
                       <span>{{ t('payment.addon.guideUsage') }}</span>
                     </li>
                     <li class="flex gap-2">
-                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"></span>
+                      <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 dark:bg-primary-300"></span>
                       <span>{{ t('payment.addon.guideExpiry') }}</span>
                     </li>
                   </ul>
