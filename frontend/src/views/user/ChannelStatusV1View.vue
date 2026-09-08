@@ -136,7 +136,7 @@
       <MonitorOverviewCards
         v-if="!loading || items.length > 0"
         :cards="overviewCards"
-        :aria-label-text="t('channelStatus.summaryAria')"
+        :summary-label="t('channelStatus.summaryAria')"
       />
       <section v-else class="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-hidden="true">
         <div v-for="i in 4" :key="i" class="h-[7.25rem] animate-pulse rounded-[1.25rem] bg-gray-100/80 dark:bg-dark-800" />
