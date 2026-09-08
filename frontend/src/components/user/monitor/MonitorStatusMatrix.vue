@@ -61,7 +61,7 @@
                 :key="`${row.id}:${index}`"
                 class="pulse-cell relative rounded-sm border-0 p-0 outline-offset-1"
                 :class="[cellClass(cell.status), cell.status === 'empty' ? 'is-empty' : 'has-data']"
-                :title="cell.title"
+                :aria-label="cell.title"
                 @mouseenter="showTooltip($event, cell)"
                 @mousemove="moveTooltip($event)"
                 @mouseleave="hideTooltip"

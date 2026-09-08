@@ -17,16 +17,9 @@ func (s channelMonitorRuntimeStub) GetChannelMonitorRuntime(context.Context) Cha
 	return s.rt
 }
 
-func TestRunCheck_ModeV2NeverProbes(t *testing.T) {
-	svc := NewChannelMonitorService(nil, nil)
-	svc.SetRuntimeReader(channelMonitorRuntimeStub{rt: ChannelMonitorRuntime{
-		Enabled: true,
-		Mode:    ChannelMonitorModeV2,
-	}})
-
-	results, err := svc.RunCheck(context.Background(), 1)
-	require.ErrorIs(t, err, ErrChannelMonitorActiveProbesRetired)
-	require.Nil(t, results)
+func TestRunCheck_ModeV2StillAllowsProbes(t *testing.T) {
+	rt := ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}
+	require.True(t, rt.ActiveProbesAllowed())
 }
 
 func TestRunCheck_DisabledReturnsDisabled(t *testing.T) {
@@ -44,7 +37,7 @@ func TestRunCheck_NilRuntimeReaderFailsClosedAsV2(t *testing.T) {
 	svc := NewChannelMonitorService(nil, nil)
 	// No SetRuntimeReader → probeRuntime defaults to mode=v2 (retired).
 	_, err := svc.RunCheck(context.Background(), 1)
-	require.ErrorIs(t, err, ErrChannelMonitorActiveProbesRetired)
+	require.ErrorIs(t, err, ErrChannelMonitorDisabled)
 }
 
 func TestNormalizeChannelMonitorMode(t *testing.T) {
@@ -58,6 +51,6 @@ func TestNormalizeChannelMonitorMode(t *testing.T) {
 func TestChannelMonitorRuntimeActiveProbesAllowed(t *testing.T) {
 	require.False(t, (ChannelMonitorRuntime{Enabled: false, Mode: ChannelMonitorModeV1}).ActiveProbesAllowed())
 	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV1}).ActiveProbesAllowed())
-	require.False(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}).ActiveProbesAllowed())
+	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}).ActiveProbesAllowed())
 	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}).PassiveAggregationAllowed())
 }

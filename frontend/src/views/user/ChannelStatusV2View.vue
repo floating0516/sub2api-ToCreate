@@ -141,48 +141,6 @@
             {{ t('channelMonitorV2.clearFilters') }}
           </button>
 
-          <span class="mx-0.5 hidden h-5 w-px shrink-0 bg-gray-200 dark:bg-dark-700 md:block" aria-hidden="true"></span>
-
-          <div
-            class="tabs inline-flex shrink-0"
-            role="group"
-            :aria-label="t('channelMonitorV2.trendView.label')"
-          >
-            <button
-              type="button"
-              class="tab !px-2.5 !py-1 text-xs"
-              :class="trendView === 'pulse' ? 'tab-active' : ''"
-              @click="trendView = 'pulse'"
-            >
-              {{ t('channelMonitorV2.trendView.pulse') }}
-            </button>
-            <button
-              type="button"
-              class="tab !px-2.5 !py-1 text-xs"
-              :class="trendView === 'line' ? 'tab-active' : ''"
-              @click="trendView = 'line'"
-            >
-              {{ t('channelMonitorV2.trendView.line') }}
-            </button>
-          </div>
-
-          <div
-            v-if="trendView === 'pulse'"
-            class="tabs inline-flex shrink-0"
-            role="group"
-            :aria-label="t('channelMonitorV2.healthMode.label')"
-          >
-            <button
-              v-for="option in healthModeOptions"
-              :key="option.value"
-              type="button"
-              class="tab !px-2.5 !py-1 text-xs"
-              :class="healthMode === option.value ? 'tab-active' : ''"
-              @click="healthMode = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
         </div>
       </section>
 
@@ -241,21 +199,12 @@
       </section>
 
       <div class="relative min-h-[320px]">
-        <MonitorTrendChart
-          v-if="trendView === 'line'"
-          :trend="snapshot?.trend || []"
-          :coverage="snapshot?.coverage || null"
-          :loading="loading && !snapshot"
-        />
-        <RelayPulseMatrix
-          v-else-if="matrix"
-          :rows="matrixRows"
-          :coverage="matrix.coverage"
-          :health-mode="healthMode"
-          :show-throughput="showThroughput"
+        <MonitorStatusMatrix
+          v-if="probeMatrixRows.length || !loading"
+          :rows="probeMatrixRows"
         />
         <div
-          v-else-if="loading"
+          v-else
           class="card flex min-h-[320px] items-center justify-center !rounded-3xl !border-0 text-sm text-gray-400 shadow-sm ring-1 ring-gray-900/5 dark:ring-dark-700"
         >
           <span class="animate-pulse">{{ t('common.loading') }}</span>
@@ -460,12 +409,12 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import FilterMultiSelect from '@/features/channel-monitor-v2/FilterMultiSelect.vue'
 import MetricCell from '@/features/channel-monitor-v2/MetricCell.vue'
 import MonitorRankBadge from '@/features/channel-monitor-v2/MonitorRankBadge.vue'
-import MonitorTrendChart from '@/features/channel-monitor-v2/MonitorTrendChart.vue'
-import RelayPulseMatrix from '@/features/channel-monitor-v2/RelayPulseMatrix.vue'
+import MonitorStatusMatrix from '@/components/user/monitor/MonitorStatusMatrix.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { isChannelMonitorThroughputHidden } from '@/utils/featureFlags'
+import { list as listChannelMonitorViews, type UserMonitorView } from '@/api/channelMonitor'
 import * as api from '@/api/channelMonitorV2'
 import type {
   HealthState,
@@ -474,12 +423,12 @@ import type {
   MonitorFilter,
   MonitorHealth,
   MonitorMatrixGroupBy,
-  MonitorMatrixResponse,
   MonitorModelRow,
   MonitorRange,
   MonitorSnapshot,
   MonitorUserRow,
 } from '@/api/channelMonitorV2'
+import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
 import {
   formatLatencyKpiSecondary,
   formatLatencyPrivacy,
@@ -496,20 +445,19 @@ import {
 } from '@/features/channel-monitor-v2/monitorFormat'
 import {
   MONITOR_DISPLAY_GROUPS,
-  collapseMonitorMatrixRows,
   expandDisplayGroupIds,
   parseDisplayGroupKeys,
 } from '@/features/channel-monitor-v2/displayGroups'
+import { buildProbeMatrixRows } from '@/features/channel-monitor-v2/probeTrend'
 
 type Tab = 'models' | 'errors' | 'users'
-type HealthMode = 'overall' | 'success' | 'ttft' | 'cache'
-type TrendView = 'pulse' | 'line'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const { t, te, locale } = useI18n()
+const { statusLabel } = useChannelMonitorFormat()
 const isAdmin = computed(() => authStore.isAdmin)
 /** Admins always see RPM/TPM; users honor the hide-throughput system setting. */
 const showThroughput = computed(() => isAdmin.value || !isChannelMonitorThroughputHidden())
@@ -523,13 +471,6 @@ const tabs = computed(() => [
   { value: 'errors' as Tab, label: t('channelMonitorV2.tabs.errors') },
   { value: 'users' as Tab, label: t('channelMonitorV2.tabs.users') },
 ])
-const healthModeOptions = computed(() => [
-  { value: 'overall' as HealthMode, label: t('channelMonitorV2.healthMode.overall') },
-  { value: 'success' as HealthMode, label: t('channelMonitorV2.healthMode.success') },
-  { value: 'ttft' as HealthMode, label: t('channelMonitorV2.healthMode.ttft') },
-  { value: 'cache' as HealthMode, label: t('channelMonitorV2.healthMode.cache') },
-])
-
 const filter = ref({
   range: parseRange(route.query.range),
   platforms: csv(route.query.platform),
@@ -540,11 +481,9 @@ const activeTab = ref<Tab>(
   (['models', 'errors', 'users'].includes(String(route.query.tab)) ? route.query.tab : 'models') as Tab
 )
 const matrixGroupBy = ref<MonitorMatrixGroupBy>('platform_group')
-const healthMode = ref<HealthMode>(parseHealthMode(route.query.health_mode))
-const trendView = ref<TrendView>(parseTrendView(route.query.trend_view))
 const dimensions = ref<MonitorDimensions>({ platforms: [], groups: [], models: [] })
 const snapshot = ref<MonitorSnapshot | null>(null)
-const matrix = ref<MonitorMatrixResponse | null>(null)
+const probeItems = ref<UserMonitorView[]>([])
 const modelRows = ref<MonitorModelRow[]>([])
 const errorRows = ref<MonitorErrorRow[]>([])
 const userRows = ref<MonitorUserRow[]>([])
@@ -652,17 +591,17 @@ const bootstrapPercent = computed(() => {
   if (typeof raw !== 'number' || Number.isNaN(raw)) return 0
   return Math.min(100, Math.max(0, Math.round(raw)))
 })
-const matrixRows = computed(() => {
-  const raw = matrix.value?.items || []
-  const withCounts = raw.filter((row) => (row.metrics?.request_count || 0) > 0)
-  // User payloads zero request_count; backend already dropped idle groups.
-  const items = withCounts.length > 0 ? withCounts : raw
-  const scoped =
-    matrixGroupBy.value === 'platform_group' || matrixGroupBy.value === 'platform_group_model'
-      ? items.filter((row) => row.group_id != null && Number(row.group_id) > 0)
-      : items
-  return collapseMonitorMatrixRows(scoped, matrixGroupBy.value, (group) => t(group.labelKey))
-})
+const probeMatrixRows = computed(() =>
+  buildProbeMatrixRows(
+    probeItems.value,
+    filter.value.range,
+    filter.value.displayGroupKeys,
+    filter.value.platforms,
+    (group) => t(group.labelKey),
+    probeStatusLabel,
+    t('channelStatus.matrix.noSample'),
+  ),
+)
 
 function csv(value: unknown) {
   return typeof value === 'string' ? value.split(',').filter(Boolean) : []
@@ -672,13 +611,6 @@ function parseRange(value: unknown): MonitorRange {
   if (value === '7d' || value === '30d') return '24h'
   return '90m'
 }
-function parseHealthMode(value: unknown): HealthMode {
-  const allowed: HealthMode[] = ['overall', 'success', 'ttft', 'cache']
-  return allowed.includes(value as HealthMode) ? (value as HealthMode) : 'overall'
-}
-function parseTrendView(value: unknown): TrendView {
-  return value === 'line' ? 'line' : 'pulse'
-}
 function syncQuery() {
   void router.replace({
     query: {
@@ -687,8 +619,6 @@ function syncQuery() {
       group: filter.value.displayGroupKeys.join(',') || undefined,
       model: filter.value.models.join(',') || undefined,
       group_by: matrixGroupBy.value,
-      health_mode: healthMode.value,
-      trend_view: trendView.value === 'line' ? 'line' : undefined,
       tab: activeTab.value,
     },
   })
@@ -707,13 +637,13 @@ async function loadDimensions(signal?: AbortSignal, id = sequence) {
 }
 
 async function loadMetrics(signal?: AbortSignal, id = sequence) {
-  const [nextSnapshot, nextMatrix] = await Promise.all([
+  const [nextSnapshot, nextProbes] = await Promise.all([
     api.getSnapshot(apiFilter(), isAdmin.value, signal),
-    api.getMatrix(apiFilter(), matrixGroupBy.value, isAdmin.value, signal),
+    listChannelMonitorViews({ signal }),
   ])
   if (id !== sequence) return
   snapshot.value = nextSnapshot
-  matrix.value = nextMatrix
+  probeItems.value = nextProbes.items || []
   scheduleAutoRefresh()
   await loadTab(signal, id)
 }
@@ -835,6 +765,12 @@ function displayedSuccessRate(metrics: Parameters<typeof monitorDisplayedSuccess
 function displayedErrorRate(metrics: Parameters<typeof monitorDisplayedErrorRate>[0]) {
   return monitorDisplayedErrorRate(metrics)
 }
+function probeStatusLabel(status: string) {
+  if (status === 'operational' || status === 'degraded' || status === 'failed' || status === 'error') {
+    return statusLabel(status)
+  }
+  return t('channelStatus.matrix.noSample')
+}
 function formatPercent(value: number) {
   return formatMonitorPercent(value)
 }
@@ -895,12 +831,6 @@ watch(
   },
   { deep: true }
 )
-watch(matrixGroupBy, () => {
-  syncQuery()
-  void reloadMetricsOnly(true)
-})
-watch(healthMode, syncQuery)
-watch(trendView, syncQuery)
 watch(activeTab, () => {
   syncQuery()
   void loadTab()

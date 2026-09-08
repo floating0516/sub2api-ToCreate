@@ -439,9 +439,11 @@ type ChannelMonitorRuntime struct {
 	ShowQuota bool
 }
 
-// ActiveProbesAllowed reports whether V1 active provider probes may run.
+// ActiveProbesAllowed reports whether admin probe checks may run.
+// This deployment keeps probes running in v2 so /monitor can show the
+// operator test trend while passive user aggregation stays on for the tables.
 func (r ChannelMonitorRuntime) ActiveProbesAllowed() bool {
-	return r.Enabled && r.Mode == ChannelMonitorModeV1
+	return r.Enabled
 }
 
 // PassiveAggregationAllowed reports whether V2 passive aggregation may run.
