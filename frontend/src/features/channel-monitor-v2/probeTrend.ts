@@ -3,6 +3,7 @@
  * not from user usage logs.
  */
 import type { MonitorTimelinePoint, UserMonitorView } from '@/api/channelMonitor'
+import type { MonitorRange } from '@/api/channelMonitorV2'
 import type { MatrixRow } from '@/components/user/monitor/MonitorStatusMatrix.vue'
 import {
   MONITOR_DISPLAY_GROUPS,
@@ -11,9 +12,11 @@ import {
 } from './displayGroups'
 import { formatMonitorDateTime, formatMonitorMs } from './monitorFormat'
 
-const RANGE_MS: Record<'90m' | '24h', number> = {
+const RANGE_MS: Record<MonitorRange, number> = {
   '90m': 90 * 60 * 1000,
   '24h': 24 * 60 * 60 * 1000,
+  '7d': 24 * 60 * 60 * 1000,
+  '30d': 24 * 60 * 60 * 1000,
 }
 
 const PROBE_BUCKET_MS = 30 * 60 * 1000
@@ -24,7 +27,7 @@ export function resolveProbeDisplayGroup(item: UserMonitorView): MonitorDisplayG
 
 export function buildProbeMatrixRows(
   items: UserMonitorView[],
-  range: '90m' | '24h',
+  range: MonitorRange,
   selectedGroupKeys: string[],
   selectedPlatforms: string[],
   labelFor: (group: MonitorDisplayGroup) => string,
