@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="group flex min-h-[280px] w-full flex-col rounded-[1.25rem] bg-[color-mix(in_srgb,var(--tc-surface,#fffefb)_92%,white)] p-5 text-left shadow-[0_1px_2px_rgb(17_24_39_/_4%),0_0_0_1px_rgb(17_24_39_/_5%)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgb(17_24_39_/_6%)] dark:bg-dark-800 dark:shadow-[0_1px_2px_rgb(0_0_0_/_20%),0_0_0_1px_rgb(255_255_255_/_6%)]"
+    class="group flex min-h-[280px] w-full flex-col rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-900/5 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md dark:bg-dark-800 dark:ring-dark-700"
     @click="emit('click')"
   >
     <!-- Header: icon + name/model + status chip -->

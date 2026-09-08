@@ -641,6 +641,17 @@ export default {
     updatedTo: '更新至 {time}',
     summaryAria: '筛选范围整体汇总',
     clearFilters: '重置',
+    tabs: {
+      aria: '明细维度',
+      channels: '渠道',
+    },
+    table: {
+      platformModel: '平台 / 模型',
+      availability: '可用性',
+      latency: '探测延迟',
+      ping: 'Ping',
+      status: '状态',
+    },
     filters: {
       platform: '平台',
       allPlatforms: '全部',
@@ -671,14 +682,20 @@ export default {
     },
     matrix: {
       title: '可用性趋势',
-      description: '每行是一个渠道，每个色块代表一次探测；悬停查看明细',
+      description: '每行是一种渠道组合，每个色块代表一次探测；悬停查看明细',
       dimension: '渠道',
+      latency: '延迟',
+      ping: 'Ping',
       emptyTitle: '当前筛选没有趋势数据',
+      legendAria: '健康图例',
+      bad: '差',
+      good: '好',
       healthyLegend: '健康',
       warningLegend: '需关注',
       criticalLegend: '异常',
       unknownLegend: '无探测',
       noSample: '该时刻无探测',
+      bucket: '探测点',
     },
     windowTab: {
       '7d': '7 天',
@@ -709,7 +726,8 @@ export default {
     },
     empty: {
       title: '暂无可显示的渠道',
-      description: '管理员尚未配置可监控的渠道。'
+      description: '管理员尚未配置可监控的渠道。',
+      filterDescription: '尝试调整时间范围或筛选条件',
     }
   },
 

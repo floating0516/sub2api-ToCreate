@@ -92,7 +92,7 @@
         <!-- Single compact toolbar row: range · filters · view controls -->
         <div class="monitor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 py-3 sm:gap-2 sm:px-5">
           <div
-            class="tabs inline-flex shrink-0 !rounded-full"
+            class="tabs inline-flex shrink-0"
             role="group"
             :aria-label="t('channelMonitorV2.timeRange')"
           >
@@ -100,7 +100,7 @@
               v-for="option in ranges"
               :key="option.value"
               type="button"
-              class="tab !rounded-full !px-2.5 !py-1 text-xs sm:!px-3"
+              class="tab !px-2.5 !py-1 text-xs sm:!px-3"
               :class="filter.range === option.value ? 'tab-active' : ''"
               @click="setRange(option.value)"
             >
@@ -151,13 +151,13 @@
           />
 
           <div
-            class="tabs inline-flex shrink-0 !rounded-full"
+            class="tabs inline-flex shrink-0"
             role="group"
             :aria-label="t('channelMonitorV2.trendView.label')"
           >
             <button
               type="button"
-              class="tab !rounded-full !px-2.5 !py-1 text-xs"
+              class="tab !px-2.5 !py-1 text-xs"
               :class="trendView === 'pulse' ? 'tab-active' : ''"
               @click="trendView = 'pulse'"
             >
@@ -165,7 +165,7 @@
             </button>
             <button
               type="button"
-              class="tab !rounded-full !px-2.5 !py-1 text-xs"
+              class="tab !px-2.5 !py-1 text-xs"
               :class="trendView === 'line' ? 'tab-active' : ''"
               @click="trendView = 'line'"
             >
@@ -175,7 +175,7 @@
 
           <div
             v-if="trendView === 'pulse'"
-            class="tabs inline-flex shrink-0 !rounded-full"
+            class="tabs inline-flex shrink-0"
             role="group"
             :aria-label="t('channelMonitorV2.healthMode.label')"
           >
@@ -183,7 +183,7 @@
               v-for="option in healthModeOptions"
               :key="option.value"
               type="button"
-              class="tab !rounded-full !px-2.5 !py-1 text-xs"
+              class="tab !px-2.5 !py-1 text-xs"
               :class="healthMode === option.value ? 'tab-active' : ''"
               @click="healthMode = option.value"
             >

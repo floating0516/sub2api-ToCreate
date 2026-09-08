@@ -1,18 +1,25 @@
 <template>
   <AppLayout>
-    <div class="channel-status-page space-y-6 pb-12">
-      <section class="cs-shell">
-        <header class="cs-shell-header">
+    <div class="monitor-ref-skin -mx-4 min-h-[calc(100vh-7rem)] space-y-6 bg-slate-50 px-4 pb-12 dark:bg-slate-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <section
+        class="card sticky top-0 z-20 !rounded-3xl !border-0 p-0 shadow-sm ring-1 ring-gray-900/5 backdrop-blur-sm dark:!bg-dark-800 dark:ring-dark-700 supports-[backdrop-filter]:bg-white/95 dark:supports-[backdrop-filter]:bg-dark-800/95"
+      >
+        <header class="page-header mb-0 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:px-6">
           <div class="min-w-0">
-            <h1 class="cs-title">
-              <span class="cs-title-icon" aria-hidden="true">
+            <h1 class="page-title flex items-center gap-2 !font-sans text-xl !font-black text-gray-900 dark:text-white">
+              <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-400">
                 <Icon name="chart" size="sm" />
               </span>
               {{ t('channelStatus.title') }}
             </h1>
-            <div class="cs-subtitle">
-              <span class="cs-live-dot" :class="loading ? 'is-empty' : overallDotClass"></span>
-              <span v-if="loading" class="inline-flex items-center gap-1">
+            <div class="page-description mt-1.5 flex flex-wrap items-center gap-2 !text-xs text-gray-500 dark:text-gray-400">
+              <span class="relative flex h-2 w-2 shrink-0">
+                <span
+                  class="relative inline-flex h-2 w-2 rounded-full"
+                  :class="loading ? 'bg-gray-400' : overallDotClass"
+                ></span>
+              </span>
+              <span v-if="loading" class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-300">
                 <LoadingSpinner size="sm" />
                 {{ t('channelStatus.updating') }}
               </span>
@@ -33,7 +40,7 @@
               @update:interval="autoRefresh.setInterval"
             />
             <button
-              class="cs-icon-btn"
+              class="btn btn-secondary btn-icon flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
               type="button"
               :title="t('common.refresh')"
               :disabled="loading"
@@ -44,21 +51,25 @@
           </div>
         </header>
 
-        <div class="cs-toolbar">
-          <div class="cs-pills" role="group" :aria-label="t('channelStatus.windowTab.7d')">
+        <div class="monitor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 py-3 sm:gap-2 sm:px-5">
+          <div
+            class="tabs inline-flex shrink-0"
+            role="group"
+            :aria-label="t('channelStatus.windowTab.7d')"
+          >
             <button
               v-for="option in windowOptions"
               :key="option.value"
               type="button"
-              class="cs-pill"
-              :class="currentWindow === option.value ? 'is-active' : ''"
+              class="tab !px-2.5 !py-1 text-xs sm:!px-3"
+              :class="currentWindow === option.value ? 'tab-active' : ''"
               @click="handleWindowChange(option.value)"
             >
               {{ option.label }}
             </button>
           </div>
 
-          <span class="cs-divider" aria-hidden="true"></span>
+          <span class="mx-0.5 hidden h-5 w-px shrink-0 bg-gray-200 dark:bg-dark-700 sm:block" aria-hidden="true"></span>
 
           <FilterMultiSelect
             v-model="selectedProviders"
@@ -91,40 +102,48 @@
             {{ t('channelStatus.clearFilters') }}
           </button>
 
-          <span class="cs-divider" aria-hidden="true"></span>
+          <span class="mx-0.5 hidden h-5 w-px shrink-0 bg-gray-200 dark:bg-dark-700 md:block" aria-hidden="true"></span>
 
-          <div class="cs-pills" role="group" :aria-label="t('channelStatus.trendView.label')">
+          <div
+            class="tabs inline-flex shrink-0"
+            role="group"
+            :aria-label="t('channelStatus.trendView.label')"
+          >
             <button
               type="button"
-              class="cs-pill"
-              :class="trendView === 'pulse' ? 'is-active' : ''"
+              class="tab !px-2.5 !py-1 text-xs"
+              :class="trendView === 'pulse' ? 'tab-active' : ''"
               @click="trendView = 'pulse'"
             >
               {{ t('channelStatus.trendView.pulse') }}
             </button>
             <button
               type="button"
-              class="cs-pill"
-              :class="trendView === 'cards' ? 'is-active' : ''"
+              class="tab !px-2.5 !py-1 text-xs"
+              :class="trendView === 'cards' ? 'tab-active' : ''"
               @click="trendView = 'cards'"
             >
               {{ t('channelStatus.trendView.cards') }}
             </button>
           </div>
 
-          <div class="cs-pills" role="group" :aria-label="t('channelStatus.healthFilter.label')">
+          <div
+            class="tabs inline-flex shrink-0"
+            role="group"
+            :aria-label="t('channelStatus.healthFilter.label')"
+          >
             <button
               type="button"
-              class="cs-pill"
-              :class="healthFilter === 'all' ? 'is-active' : ''"
+              class="tab !px-2.5 !py-1 text-xs"
+              :class="healthFilter === 'all' ? 'tab-active' : ''"
               @click="healthFilter = 'all'"
             >
               {{ t('channelStatus.healthFilter.all') }}
             </button>
             <button
               type="button"
-              class="cs-pill"
-              :class="healthFilter === 'issues' ? 'is-active' : ''"
+              class="tab !px-2.5 !py-1 text-xs"
+              :class="healthFilter === 'issues' ? 'tab-active' : ''"
               @click="healthFilter = 'issues'"
             >
               {{ t('channelStatus.healthFilter.issues') }}
@@ -133,13 +152,38 @@
         </div>
       </section>
 
-      <MonitorOverviewCards
+      <section
         v-if="!loading || items.length > 0"
-        :cards="overviewCards"
-        :summary-label="t('channelStatus.summaryAria')"
-      />
+        class="grid grid-cols-2 gap-3 xl:grid-cols-4"
+        :aria-label="t('channelStatus.summaryAria')"
+      >
+        <MetricCell
+          :label="t('channelStatus.metrics.availability')"
+          :value="kpis.availability.value"
+          :detail="kpis.availability.detail"
+          :state="kpis.availability.state"
+        />
+        <MetricCell
+          :label="t('channelStatus.metrics.latency')"
+          :value="kpis.latency.value"
+          :detail="kpis.latency.detail"
+          :state="kpis.latency.state"
+        />
+        <MetricCell
+          :label="t('channelStatus.metrics.ping')"
+          :value="kpis.ping.value"
+          :detail="kpis.ping.detail"
+          :state="kpis.ping.state"
+        />
+        <MetricCell
+          :label="t('channelStatus.metrics.healthRate')"
+          :value="kpis.health.value"
+          :detail="kpis.health.detail"
+          :state="kpis.health.state"
+        />
+      </section>
       <section v-else class="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-hidden="true">
-        <div v-for="i in 4" :key="i" class="h-[7.25rem] animate-pulse rounded-[1.25rem] bg-gray-100/80 dark:bg-dark-800" />
+        <div v-for="i in 4" :key="i" class="h-24 animate-pulse rounded-2xl bg-gray-50 dark:bg-dark-900/30" />
       </section>
 
       <MonitorStatusMatrix
@@ -148,19 +192,78 @@
         @row-click="openDetailById"
       />
 
-      <section v-if="trendView === 'cards' || visibleItems.length > 0">
-        <h2 v-if="trendView === 'pulse' && visibleItems.length" class="cs-detail-heading">
-          {{ t('channelStatus.detailSection') }}
-        </h2>
-        <MonitorCardGrid
-          :items="visibleItems"
-          :window="currentWindow"
-          :countdown-seconds="countdown"
-          :loading="loading"
-          :detail-cache="detailCache"
-          @card-click="openDetail"
-        />
+      <section
+        v-if="trendView === 'pulse'"
+        class="card flex min-h-0 flex-col overflow-hidden !rounded-3xl !border-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700"
+      >
+        <div class="border-b border-gray-100 px-5 pt-4 dark:border-dark-700 sm:px-6">
+          <nav class="tabs w-full max-w-md sm:w-auto" role="tablist" :aria-label="t('channelStatus.tabs.aria')">
+            <button type="button" role="tab" class="tab flex-1 tab-active sm:flex-none" aria-selected="true">
+              {{ t('channelStatus.tabs.channels') }}
+            </button>
+          </nav>
+        </div>
+        <div class="min-h-0 max-h-[min(52vh,520px)] overflow-auto p-4 sm:p-5">
+          <div v-if="visibleItems.length" class="table-container border-0">
+            <table class="table monitor-table min-w-[720px]">
+              <thead>
+                <tr>
+                  <th>{{ t('channelStatus.table.platformModel') }}</th>
+                  <th>{{ t('channelStatus.table.availability') }}</th>
+                  <th>{{ t('channelStatus.table.latency') }}</th>
+                  <th>{{ t('channelStatus.table.ping') }}</th>
+                  <th>{{ t('channelStatus.table.status') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in visibleItems"
+                  :key="row.id"
+                  class="cursor-pointer"
+                  @click="openDetail(row)"
+                >
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span class="inline-block h-2 w-2 shrink-0 rounded-full" :class="rowDotClass(row.primary_status)"></span>
+                      <div>
+                        <span class="block text-xs text-gray-500 dark:text-dark-400">
+                          {{ providerLabel(row.provider) }}<template v-if="row.group_name"> / {{ row.group_name }}</template>
+                        </span>
+                        <strong class="font-semibold text-gray-900 dark:text-white">
+                          {{ row.name || formatMonitorModel(row.primary_model) }}
+                        </strong>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="block">{{ formatPct(resolveAvailability(row)) }}</span>
+                    <small class="text-xs text-gray-400">{{ statusLabel(row.primary_status) }}</small>
+                  </td>
+                  <td>{{ formatMs(row.primary_latency_ms) }}</td>
+                  <td>{{ formatMs(row.primary_ping_latency_ms) }}</td>
+                  <td>{{ statusLabel(row.primary_status) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="empty-state py-10">
+            <p class="empty-state-title text-base">{{ t('channelStatus.empty.title') }}</p>
+            <p class="empty-state-description">
+              {{ items.length ? t('channelStatus.empty.filterDescription') : t('channelStatus.empty.description') }}
+            </p>
+          </div>
+        </div>
       </section>
+
+      <MonitorCardGrid
+        v-else
+        :items="visibleItems"
+        :window="currentWindow"
+        :countdown-seconds="countdown"
+        :loading="loading"
+        :detail-cache="detailCache"
+        @card-click="openDetail"
+      />
 
       <MonitorDetailDialog
         :show="showDetail"
@@ -183,15 +286,13 @@ import {
   type UserMonitorView,
   type UserMonitorDetail,
 } from '@/api/channelMonitor'
+import type { HealthState } from '@/api/channelMonitorV2'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AutoRefreshButton from '@/components/common/AutoRefreshButton.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import FilterMultiSelect from '@/features/channel-monitor-v2/FilterMultiSelect.vue'
-import MonitorOverviewCards, {
-  type OverviewCard,
-  type OverviewTone,
-} from '@/components/user/monitor/MonitorOverviewCards.vue'
+import MetricCell from '@/features/channel-monitor-v2/MetricCell.vue'
 import MonitorStatusMatrix, {
   type MatrixRow,
 } from '@/components/user/monitor/MonitorStatusMatrix.vue'
@@ -294,7 +395,7 @@ const overallStatus = computed<OverallStatus>(() => {
 
 const overallLabel = computed(() => t(`channelStatus.overall.${overallStatus.value}`))
 const overallDotClass = computed(() =>
-  overallStatus.value === 'operational' ? 'is-operational' : 'is-degraded'
+  overallStatus.value === 'operational' ? 'bg-green-500' : 'bg-amber-500'
 )
 const latestUpdateLabel = computed(() => {
   let latest = 0
@@ -308,7 +409,7 @@ const latestUpdateLabel = computed(() => {
 
 const detailTitle = computed(() => detailTarget.value?.name || t('channelStatus.detailTitle'))
 
-const overviewCards = computed<OverviewCard[]>(() => {
+const kpis = computed(() => {
   const rows = visibleItems.value
   const total = rows.length
   const failed = rows.filter((item) => item.primary_status === 'failed' || item.primary_status === 'error').length
@@ -324,48 +425,34 @@ const overviewCards = computed<OverviewCard[]>(() => {
   const pings = collectSamples(rows, 'ping_latency_ms')
   const healthRate = total ? (healthy / total) * 100 : null
 
-  return [
-    {
-      key: 'availability',
-      label: t('channelStatus.metrics.availability'),
+  return {
+    availability: {
       value: formatPct(avgAvailability),
-      details: [t('channelStatus.metrics.availabilityDetail', { failed, degraded })],
-      tone: toneFromAvailability(avgAvailability),
-      dot: true,
+      detail: t('channelStatus.metrics.availabilityDetail', { failed, degraded }),
+      state: toneFromAvailability(avgAvailability),
     },
-    {
-      key: 'latency',
-      label: t('channelStatus.metrics.latency'),
+    latency: {
       value: formatMs(percentile(latencies, 50)),
-      details: splitDetail(
-        t('channelStatus.metrics.latencyDetail', {
-          avg: formatMs(average(latencies)),
-          p90: formatMs(percentile(latencies, 90)),
-        }),
-      ),
-      tone: toneFromLatency(percentile(latencies, 50)),
+      detail: t('channelStatus.metrics.latencyDetail', {
+        avg: formatMs(average(latencies)),
+        p90: formatMs(percentile(latencies, 90)),
+      }),
+      state: toneFromLatency(percentile(latencies, 50)),
     },
-    {
-      key: 'ping',
-      label: t('channelStatus.metrics.ping'),
+    ping: {
       value: formatMs(percentile(pings, 50)),
-      details: splitDetail(
-        t('channelStatus.metrics.pingDetail', {
-          avg: formatMs(average(pings)),
-          p90: formatMs(percentile(pings, 90)),
-        }),
-      ),
-      tone: toneFromLatency(percentile(pings, 50)),
+      detail: t('channelStatus.metrics.pingDetail', {
+        avg: formatMs(average(pings)),
+        p90: formatMs(percentile(pings, 90)),
+      }),
+      state: toneFromLatency(percentile(pings, 50)),
     },
-    {
-      key: 'health',
-      label: t('channelStatus.metrics.healthRate'),
+    health: {
       value: formatPct(healthRate),
-      details: [t('channelStatus.metrics.healthDetail', { healthy, total })],
-      tone: toneFromHealth(failed, degraded, total),
-      dot: true,
+      detail: t('channelStatus.metrics.healthDetail', { healthy, total }),
+      state: toneFromHealth(failed, degraded, total),
     },
-  ]
+  }
 })
 
 const matrixRows = computed<MatrixRow[]>(() =>
@@ -374,6 +461,8 @@ const matrixRows = computed<MatrixRow[]>(() =>
     label: rowLabel(item),
     status: item.primary_status,
     availability: resolveAvailability(item),
+    latency: formatMs(item.primary_latency_ms),
+    ping: formatMs(item.primary_ping_latency_ms),
     cells: timelineCells(item),
   }))
 )
@@ -392,12 +481,20 @@ function timelineCells(item: UserMonitorView) {
   const cells = Array.from({ length: pad }, () => ({
     status: 'empty',
     title: t('channelStatus.matrix.noSample'),
+    lines: [t('channelStatus.matrix.noSample')],
   }))
   for (const point of real) {
     const latency = formatLatency(point.latency_ms)
+    const ping = formatLatency(point.ping_latency_ms)
     cells.push({
       status: point.status || 'empty',
       title: `${formatRelativeTime(point.checked_at)} · ${statusLabel(point.status)} · ${latency}ms`,
+      lines: [
+        formatRelativeTime(point.checked_at),
+        statusLabel(point.status),
+        `${t('channelStatus.matrix.latency')} ${latency}ms`,
+        `${t('channelStatus.matrix.ping')} ${ping}ms`,
+      ],
     })
   }
   return cells
@@ -450,29 +547,32 @@ function formatMs(value: number | null) {
   return `${formatted}ms`
 }
 
-function splitDetail(value: string) {
-  return value.split(/\s*[·|]\s*/).map((part) => part.trim()).filter(Boolean)
-}
-
-function toneFromAvailability(value: number | null): OverviewTone {
-  if (value == null) return 'neutral'
+function toneFromAvailability(value: number | null): HealthState {
+  if (value == null) return 'unknown'
   if (value >= 99) return 'healthy'
   if (value >= 95) return 'warning'
   return 'critical'
 }
 
-function toneFromLatency(value: number | null): OverviewTone {
-  if (value == null) return 'neutral'
+function toneFromLatency(value: number | null): HealthState {
+  if (value == null) return 'unknown'
   if (value <= 800) return 'healthy'
   if (value <= 2000) return 'warning'
   return 'critical'
 }
 
-function toneFromHealth(failed: number, degraded: number, total: number): OverviewTone {
-  if (!total) return 'neutral'
+function toneFromHealth(failed: number, degraded: number, total: number): HealthState {
+  if (!total) return 'unknown'
   if (failed > 0) return 'critical'
   if (degraded > 0) return 'warning'
   return 'healthy'
+}
+
+function rowDotClass(status: string) {
+  if (status === 'operational') return 'bg-emerald-500'
+  if (status === 'degraded') return 'bg-amber-500'
+  if (status === 'failed' || status === 'error') return 'bg-red-500'
+  return 'bg-gray-300'
 }
 
 function formatClock(value: number) {
@@ -595,186 +695,22 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.channel-status-page {
-  --cs-surface: color-mix(in srgb, var(--tc-surface, #fffefb) 92%, white);
+.monitor-ref-skin :deep(.card),
+.monitor-ref-skin :deep(.stat-card) {
+  background-color: #ffffff !important;
 }
-
-.cs-shell {
-  border-radius: 1.5rem;
-  background: var(--cs-surface);
-  box-shadow:
-    0 1px 2px rgb(17 24 39 / 4%),
-    0 0 0 1px rgb(17 24 39 / 5%);
+.monitor-ref-skin :deep(.tab-active) {
+  background-color: #ffffff !important;
 }
-
-.cs-shell-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid rgb(17 24 39 / 6%);
-  padding: 1rem 1.25rem;
+.monitor-ref-skin :deep(.select-trigger) {
+  background-color: #ffffff !important;
 }
-
-.cs-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #111827;
-  font-size: 1.25rem;
-  font-weight: 800;
+:global(.dark) .monitor-ref-skin :deep(.card),
+:global(.dark) .monitor-ref-skin :deep(.stat-card) {
+  background-color: rgb(30 41 59) !important;
 }
-
-.cs-title-icon {
-  display: inline-flex;
-  height: 2rem;
-  width: 2rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.75rem;
-  background: #ecfdf5;
-  color: #10b981;
-}
-
-.cs-subtitle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.cs-live-dot {
-  display: inline-block;
-  height: 0.5rem;
-  width: 0.5rem;
-  border-radius: 9999px;
-}
-
-.cs-live-dot.is-operational {
-  background: #10b981;
-}
-
-.cs-live-dot.is-degraded {
-  background: #f59e0b;
-}
-
-.cs-live-dot.is-empty {
-  background: #9ca3af;
-}
-
-.cs-icon-btn {
-  display: inline-flex;
-  height: 2rem;
-  width: 2rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.65rem;
-  background: rgb(243 244 246);
-  color: #6b7280;
-}
-
-.cs-icon-btn:hover {
-  background: rgb(229 231 235);
-}
-
-.cs-toolbar {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.8rem 1.1rem 1rem;
-}
-
-.cs-pills {
-  display: inline-flex;
-  flex: none;
-  gap: 0.2rem;
-  border-radius: 9999px;
-  background: rgb(243 244 246);
-  padding: 0.2rem;
-}
-
-.cs-pill {
-  border-radius: 9999px;
-  padding: 0.28rem 0.7rem;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.cs-pill.is-active {
-  background: white;
-  color: #111827;
-  box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
-}
-
-.cs-divider {
-  display: none;
-  height: 1.25rem;
-  width: 1px;
-  flex: none;
-  background: rgb(17 24 39 / 8%);
-}
-
-.cs-detail-heading {
-  margin-bottom: 0.85rem;
-  color: #111827;
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-@media (min-width: 640px) {
-  .cs-divider {
-    display: block;
-  }
-}
-
-:global(.dark) .cs-shell {
-  background: rgb(35 38 32);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 20%),
-    0 0 0 1px rgb(255 255 255 / 6%);
-}
-
-:global(.dark) .cs-shell-header {
-  border-bottom-color: rgb(255 255 255 / 8%);
-}
-
-:global(.dark) .cs-title,
-:global(.dark) .cs-detail-heading {
-  color: white;
-}
-
-:global(.dark) .cs-title-icon {
-  background: rgb(16 185 129 / 14%);
-  color: #34d399;
-}
-
-:global(.dark) .cs-subtitle {
-  color: #9ca3af;
-}
-
-:global(.dark) .cs-icon-btn {
-  background: rgb(55 65 81 / 50%);
-  color: #9ca3af;
-}
-
-:global(.dark) .cs-pills {
-  background: rgb(23 25 22);
-}
-
-:global(.dark) .cs-pill {
-  color: #9ca3af;
-}
-
-:global(.dark) .cs-pill.is-active {
-  background: rgb(55 65 81);
-  color: white;
+:global(.dark) .monitor-ref-skin :deep(.tab-active),
+:global(.dark) .monitor-ref-skin :deep(.select-trigger) {
+  background-color: rgb(51 65 85) !important;
 }
 </style>

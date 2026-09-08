@@ -636,6 +636,17 @@ export default {
     updatedTo: 'Updated to {time}',
     summaryAria: 'Filtered window summary',
     clearFilters: 'Reset',
+    tabs: {
+      aria: 'Detail tabs',
+      channels: 'Channels',
+    },
+    table: {
+      platformModel: 'Platform / model',
+      availability: 'Availability',
+      latency: 'Probe latency',
+      ping: 'Ping',
+      status: 'Status',
+    },
     filters: {
       platform: 'Platform',
       allPlatforms: 'All',
@@ -666,14 +677,20 @@ export default {
     },
     matrix: {
       title: 'Availability trend',
-      description: 'Each row is a channel. Each block is one probe. Hover for details.',
+      description: 'Each row is a channel combination. Each block is one probe. Hover for details.',
       dimension: 'Channel',
+      latency: 'Latency',
+      ping: 'Ping',
       emptyTitle: 'No trend data for the current filters',
+      legendAria: 'Health legend',
+      bad: 'Bad',
+      good: 'Good',
       healthyLegend: 'Healthy',
       warningLegend: 'Needs attention',
       criticalLegend: 'Incident',
       unknownLegend: 'No probe',
       noSample: 'No probe at this time',
+      bucket: 'Probe points',
     },
     windowTab: {
       '7d': '7 days',
@@ -704,7 +721,8 @@ export default {
     },
     empty: {
       title: 'No channels available',
-      description: 'No monitored channels have been configured yet.'
+      description: 'No monitored channels have been configured yet.',
+      filterDescription: 'Try another time range or filter.',
     }
   },
 
