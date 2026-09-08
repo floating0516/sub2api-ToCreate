@@ -8,7 +8,7 @@
         <header class="page-header mb-0 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:px-6">
           <div class="min-w-0">
             <h1 class="page-title flex items-center gap-2 text-xl font-black text-gray-900 dark:text-white">
-              <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400">
+              <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-400">
                 <Icon name="chart" size="sm" />
               </span>
               {{ t('channelMonitorV2.title') }}
@@ -92,7 +92,7 @@
         <!-- Single compact toolbar row: range · filters · view controls -->
         <div class="monitor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 py-3 sm:gap-2 sm:px-5">
           <div
-            class="tabs inline-flex shrink-0"
+            class="tabs inline-flex shrink-0 !rounded-full"
             role="group"
             :aria-label="t('channelMonitorV2.timeRange')"
           >
@@ -100,7 +100,7 @@
               v-for="option in ranges"
               :key="option.value"
               type="button"
-              class="tab !px-2 !py-1 text-xs sm:!px-2.5"
+              class="tab !rounded-full !px-2.5 !py-1 text-xs sm:!px-3"
               :class="filter.range === option.value ? 'tab-active' : ''"
               @click="setRange(option.value)"
             >
@@ -151,13 +151,13 @@
           />
 
           <div
-            class="tabs inline-flex shrink-0"
+            class="tabs inline-flex shrink-0 !rounded-full"
             role="group"
             :aria-label="t('channelMonitorV2.trendView.label')"
           >
             <button
               type="button"
-              class="tab !px-2 !py-1 text-xs"
+              class="tab !rounded-full !px-2.5 !py-1 text-xs"
               :class="trendView === 'pulse' ? 'tab-active' : ''"
               @click="trendView = 'pulse'"
             >
@@ -165,7 +165,7 @@
             </button>
             <button
               type="button"
-              class="tab !px-2 !py-1 text-xs"
+              class="tab !rounded-full !px-2.5 !py-1 text-xs"
               :class="trendView === 'line' ? 'tab-active' : ''"
               @click="trendView = 'line'"
             >
@@ -175,7 +175,7 @@
 
           <div
             v-if="trendView === 'pulse'"
-            class="tabs inline-flex shrink-0"
+            class="tabs inline-flex shrink-0 !rounded-full"
             role="group"
             :aria-label="t('channelMonitorV2.healthMode.label')"
           >
@@ -183,7 +183,7 @@
               v-for="option in healthModeOptions"
               :key="option.value"
               type="button"
-              class="tab !px-2 !py-1 text-xs"
+              class="tab !rounded-full !px-2.5 !py-1 text-xs"
               :class="healthMode === option.value ? 'tab-active' : ''"
               @click="healthMode = option.value"
             >

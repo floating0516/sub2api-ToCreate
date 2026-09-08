@@ -7,7 +7,7 @@
       <div
         v-for="i in 6"
         :key="i"
-        class="p-5 rounded-2xl min-h-[280px] bg-white/70 dark:bg-dark-800/60 border border-gray-200/80 dark:border-dark-700/70 animate-pulse"
+        class="min-h-[280px] animate-pulse rounded-[1.25rem] bg-[color-mix(in_srgb,var(--tc-surface,#fffefb)_92%,white)] p-5 shadow-[0_0_0_1px_rgb(17_24_39_/_5%)] dark:bg-dark-800"
       >
         <div class="flex items-start gap-3">
           <div class="w-9 h-9 rounded-xl bg-gray-200 dark:bg-dark-700"></div>

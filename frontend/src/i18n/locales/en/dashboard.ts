@@ -630,16 +630,60 @@ export default {
     loadError: 'Failed to load channel status',
     detailLoadError: 'Failed to load channel detail',
     detailTitle: 'Channel Detail',
+    detailSection: 'Channel details',
     closeDetail: 'Close',
+    updating: 'Updating data',
+    updatedTo: 'Updated to {time}',
+    summaryAria: 'Filtered window summary',
+    clearFilters: 'Reset',
+    filters: {
+      platform: 'Platform',
+      allPlatforms: 'All',
+      group: 'Group',
+      allGroups: 'All',
+      model: 'Model',
+      allModels: 'All',
+    },
+    trendView: {
+      label: 'Trend view',
+      pulse: 'Heatmap',
+      cards: 'Cards',
+    },
+    healthFilter: {
+      label: 'Health filter',
+      all: 'All',
+      issues: 'Issues only',
+    },
+    metrics: {
+      availability: 'Availability',
+      availabilityDetail: 'Failed {failed} · Watch {degraded}',
+      latency: 'Probe latency P50',
+      latencyDetail: 'AVG {avg} · P90 {p90}',
+      ping: 'Endpoint ping P50',
+      pingDetail: 'AVG {avg} · P90 {p90}',
+      healthRate: 'Healthy channels',
+      healthDetail: 'OK {healthy} / {total}',
+    },
+    matrix: {
+      title: 'Availability trend',
+      description: 'Each row is a channel. Each block is one probe. Hover for details.',
+      dimension: 'Channel',
+      emptyTitle: 'No trend data for the current filters',
+      healthyLegend: 'Healthy',
+      warningLegend: 'Needs attention',
+      criticalLegend: 'Incident',
+      unknownLegend: 'No probe',
+      noSample: 'No probe at this time',
+    },
     windowTab: {
       '7d': '7 days',
       '15d': '15 days',
       '30d': '30 days'
     },
     overall: {
-      operational: 'OPERATIONAL',
-      degraded: 'DEGRADED',
-      unavailable: 'UNAVAILABLE'
+      operational: 'Operational',
+      degraded: 'Needs attention',
+      unavailable: 'Unavailable'
     },
     columns: {
       name: 'Name',

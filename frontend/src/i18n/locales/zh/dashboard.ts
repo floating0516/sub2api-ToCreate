@@ -635,16 +635,60 @@ export default {
     loadError: '加载渠道状态失败',
     detailLoadError: '加载渠道详情失败',
     detailTitle: '渠道详情',
+    detailSection: '渠道明细',
     closeDetail: '关闭',
+    updating: '正在更新数据',
+    updatedTo: '更新至 {time}',
+    summaryAria: '筛选范围整体汇总',
+    clearFilters: '重置',
+    filters: {
+      platform: '平台',
+      allPlatforms: '全部',
+      group: '分组',
+      allGroups: '全部',
+      model: '模型',
+      allModels: '全部',
+    },
+    trendView: {
+      label: '趋势视图',
+      pulse: '色块矩阵',
+      cards: '渠道卡片',
+    },
+    healthFilter: {
+      label: '健康显示',
+      all: '全部',
+      issues: '仅异常',
+    },
+    metrics: {
+      availability: '可用性',
+      availabilityDetail: '异常 {failed} · 关注 {degraded}',
+      latency: '探测延迟 P50',
+      latencyDetail: 'AVG {avg} · P90 {p90}',
+      ping: '端点 Ping P50',
+      pingDetail: 'AVG {avg} · P90 {p90}',
+      healthRate: '健康渠道',
+      healthDetail: '正常 {healthy} / {total}',
+    },
+    matrix: {
+      title: '可用性趋势',
+      description: '每行是一个渠道，每个色块代表一次探测；悬停查看明细',
+      dimension: '渠道',
+      emptyTitle: '当前筛选没有趋势数据',
+      healthyLegend: '健康',
+      warningLegend: '需关注',
+      criticalLegend: '异常',
+      unknownLegend: '无探测',
+      noSample: '该时刻无探测',
+    },
     windowTab: {
       '7d': '7 天',
       '15d': '15 天',
       '30d': '30 天'
     },
     overall: {
-      operational: 'OPERATIONAL',
-      degraded: 'DEGRADED',
-      unavailable: 'UNAVAILABLE'
+      operational: '运行正常',
+      degraded: '需要关注',
+      unavailable: '不可用'
     },
     columns: {
       name: '名称',
