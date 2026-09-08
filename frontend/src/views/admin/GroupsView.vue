@@ -409,7 +409,7 @@
                 v-if="!authStore.isSimpleMode && row.platform === 'composite'"
                 data-testid="group-composite-routes"
                 @click="handleCompositeRoutes(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-cyan-600 dark:hover:bg-dark-700 dark:hover:text-cyan-400"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
                 <Icon name="swap" size="sm" />
                 <span class="text-xs">{{
@@ -824,7 +824,10 @@
               <div
                 v-for="(item, index) in createModelAllowlistState.items"
                 :key="item.id"
-                class="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 dark:border-dark-600 dark:bg-dark-800"
+                class="flex items-center gap-2 rounded border px-3 py-2"
+                :class="item.selected
+                  ? 'border-primary-200 bg-primary-50 dark:border-primary-800 dark:bg-primary-900/20'
+                  : 'border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800'"
               >
                 <input
                   v-model="item.selected"
@@ -2464,7 +2467,10 @@
               <div
                 v-for="(item, index) in editModelAllowlistState.items"
                 :key="item.id"
-                class="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 dark:border-dark-600 dark:bg-dark-800"
+                class="flex items-center gap-2 rounded border px-3 py-2"
+                :class="item.selected
+                  ? 'border-primary-200 bg-primary-50 dark:border-primary-800 dark:bg-primary-900/20'
+                  : 'border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800'"
               >
                 <input
                   v-model="item.selected"

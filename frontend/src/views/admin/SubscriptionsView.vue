@@ -380,10 +380,10 @@
                   !row.group?.weekly_limit_usd &&
                   !row.group?.monthly_limit_usd
                 "
-                class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 dark:from-emerald-900/20 dark:to-teal-900/20"
+                class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary-50 to-primary-100 px-3 py-2 dark:from-primary-900/20 dark:to-primary-800/20"
               >
-                <span class="text-lg text-emerald-600 dark:text-emerald-400">∞</span>
-                <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <span class="text-lg text-primary-600 dark:text-primary-400">∞</span>
+                <span class="text-xs font-medium text-primary-700 dark:text-primary-300">
                   {{ t('admin.subscriptions.unlimited') }}
                 </span>
               </div>
