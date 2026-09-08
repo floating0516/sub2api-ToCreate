@@ -619,7 +619,7 @@ watch(
   [groupOptions, modelOptions],
   () => {
     if (groupOptions.value.length > 0) {
-      const allowed = new Set(groupOptions.value.map((item) => item.value))
+      const allowed = new Set<string>(groupOptions.value.map((item) => item.value))
       const next = filter.value.displayGroupKeys.filter((key) => allowed.has(key))
       if (next.length !== filter.value.displayGroupKeys.length) {
         filter.value.displayGroupKeys = next
