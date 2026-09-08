@@ -180,7 +180,7 @@ export default {
     description: 'View your subscription plans and usage',
     noActiveSubscriptions: 'No Active Subscriptions',
     noActiveSubscriptionsDesc:
-      "You don't have any active subscriptions. Contact administrator to get one.",
+      "You don't have any active subscriptions yet. Buy a plan to get started.",
     failedToLoad: 'Failed to load subscriptions',
     status: {
       active: 'Active',

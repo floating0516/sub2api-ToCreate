@@ -175,7 +175,7 @@ export default {
     title: '我的订阅',
     description: '查看您的订阅计划和用量',
     noActiveSubscriptions: '暂无有效订阅',
-    noActiveSubscriptionsDesc: '您没有任何有效订阅。请联系管理员获取订阅。',
+    noActiveSubscriptionsDesc: '您还没有任何有效订阅，可以先去购买套餐。',
     failedToLoad: '加载订阅失败',
     status: {
       active: '有效',

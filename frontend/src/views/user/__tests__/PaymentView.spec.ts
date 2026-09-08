@@ -391,6 +391,36 @@ describe('PaymentView managed recharge entry', () => {
     expect(wrapper.get('[data-testid="payment-tab-member"]').classes()).toContain('bg-white')
     expect(wrapper.findComponent(LdxpShopEmbed).exists()).toBe(true)
   })
+
+  it('opens the add-on tab from the query string', async () => {
+    routeState.query = { tab: 'addon' }
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      addon_purchase_enabled: true,
+      addon_products: [{
+        id: 5,
+        sku: 'addon-usd-30',
+        name: '30 USD add-on',
+        quota_usd: 30,
+        price: 7.99,
+        for_sale: true,
+        sort_order: 20,
+      }],
+    }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="payment-tab-addon"]').classes()).toContain('bg-white')
+    expect(wrapper.get('[data-testid="addon-guidance"]').exists()).toBe(true)
+  })
 })
 
 describe('PaymentView recharge rate preview', () => {

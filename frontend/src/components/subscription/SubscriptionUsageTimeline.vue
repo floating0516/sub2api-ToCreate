@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-1.5 pt-1">
+  <div v-if="loading || hasUsage" class="space-y-1.5 pt-1">
     <div class="flex items-center justify-between gap-3 text-[11px] leading-4">
       <span class="font-medium text-gray-500 dark:text-dark-400">
         {{ t('userSubscriptions.usageTimeline') }}
@@ -30,6 +30,7 @@
         class="block h-3 min-w-0 rounded-sm transition-colors"
         :class="bucketClass(bucket)"
         @mouseenter="setActiveBucket(bucket)"
+        @click="toggleActiveBucket(bucket)"
       ></span>
       <div
         v-if="activeBucket && activeBucketTooltip"
@@ -136,13 +137,21 @@ function bucketClass(bucket: SubscriptionUsageTimelineBucket): string {
   }
 
   const ratio = bucketIntensityRatio(bucket)
-  if (ratio >= 1.5) return 'bg-emerald-700 dark:bg-emerald-500'
-  if (ratio >= 0.75) return 'bg-emerald-500 dark:bg-emerald-400'
-  return 'bg-emerald-100 dark:bg-emerald-900/70'
+  if (ratio >= 1.5) return 'bg-primary-700 dark:bg-primary-400'
+  if (ratio >= 0.75) return 'bg-primary-500 dark:bg-primary-300'
+  return 'bg-primary-100 dark:bg-primary-900/70'
 }
 
 function setActiveBucket(bucket: SubscriptionUsageTimelineBucket) {
   activeBucket.value = bucketTooltip(bucket) ? bucket : null
+}
+
+function toggleActiveBucket(bucket: SubscriptionUsageTimelineBucket) {
+  if (activeBucket.value?.index === bucket.index) {
+    activeBucket.value = null
+    return
+  }
+  setActiveBucket(bucket)
 }
 
 function bucketTooltip(bucket: SubscriptionUsageTimelineBucket): { range: string; relative: string | null } | null {

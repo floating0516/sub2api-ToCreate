@@ -229,12 +229,12 @@ function isUnlimited(sub: UserSubscription): boolean {
 function getProgressDotClass(sub: UserSubscription): string {
   // Unlimited subscriptions get a special color
   if (isUnlimited(sub)) {
-    return 'bg-emerald-500'
+    return 'bg-primary-500'
   }
   const maxPercentage = getMaxUsagePercentage(sub)
   if (maxPercentage >= 90) return 'bg-red-500'
   if (maxPercentage >= 70) return 'bg-orange-500'
-  return 'bg-green-500'
+  return 'bg-primary-500'
 }
 
 function getProgressBarClass(used: number | undefined, limit: number | null | undefined): string {
@@ -242,7 +242,7 @@ function getProgressBarClass(used: number | undefined, limit: number | null | un
   const percentage = ((used || 0) / limit) * 100
   if (percentage >= 90) return 'bg-red-500'
   if (percentage >= 70) return 'bg-orange-500'
-  return 'bg-green-500'
+  return 'bg-primary-500'
 }
 
 function getProgressWidth(used: number | undefined, limit: number | null | undefined): string {

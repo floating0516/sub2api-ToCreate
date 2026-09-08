@@ -543,9 +543,14 @@ const selectedAddonSubscription = computed(() =>
 )
 
 watch(activeSubscriptions, (subscriptions) => {
-  if (!subscriptions.some(sub => sub.id === selectedAddonSubscriptionId.value)) {
-    selectedAddonSubscriptionId.value = subscriptions[0]?.id ?? null
+  if (subscriptions.some(sub => sub.id === selectedAddonSubscriptionId.value)) {
+    return
   }
+  const groupId = Number(route.query.group)
+  const matched = Number.isFinite(groupId)
+    ? subscriptions.find(sub => sub.group_id === groupId)
+    : undefined
+  selectedAddonSubscriptionId.value = matched?.id ?? subscriptions[0]?.id ?? null
 }, { immediate: true })
 
 const paymentPhase = ref<'select' | 'paying'>('select')
@@ -1557,6 +1562,9 @@ onMounted(async () => {
     }
     if (route.query.tab === 'member') {
       activeTab.value = 'member'
+    }
+    if (route.query.tab === 'addon' && checkout.value.addon_purchase_enabled && checkout.value.addon_products.length > 0) {
+      activeTab.value = 'addon'
     }
   } catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
   finally { loading.value = false }
