@@ -12,11 +12,10 @@ import (
 
 const (
 	channelMonitorV2AggregatorLockKey = "channel-monitor-v2-aggregator"
-	// Retention walks back to the longest stored tier (1d rollup = 90d). Per-tier
-	// prune in the repository drops short-lived 1m/user/hist facts earlier.
-	channelMonitorV2RetentionMax = 90 * 24 * time.Hour
-	// First tick after upgrade prioritizes the default 90m view (with small padding).
-	channelMonitorV2BootstrapFirst = 2 * time.Hour
+	// Only keep a recent window. Do not walk 30d/90d of history on first enable.
+	channelMonitorV2RetentionMax = 24 * time.Hour
+	// First tick fills the whole recent window so the progress banner can hide.
+	channelMonitorV2BootstrapFirst = 24 * time.Hour
 	// Always refresh a small trailing window so late writes land without
 	// re-aggregating large history every tick.
 	channelMonitorV2RecentOverlap = 10 * time.Minute
@@ -25,7 +24,7 @@ const (
 	// Initial historical chunk after the 2h seed.
 	channelMonitorV2BackfillChunkInit = time.Hour
 	channelMonitorV2MinBackfillChunk  = 15 * time.Minute
-	// Depth-based ceilings (product phases 90m → 1d → 7d → 30d → 90d).
+	// Depth-based ceilings within the recent 24h window.
 	channelMonitorV2MaxChunkNear1d = 2 * time.Hour
 	channelMonitorV2MaxChunkNear7d = 4 * time.Hour
 	channelMonitorV2MaxChunkFar    = 6 * time.Hour
@@ -379,7 +378,7 @@ func (s *ChannelMonitorV2Aggregator) recordBackfillFailure(now, end time.Time) {
 }
 
 // ensureCursor restores durable backfill_cursor after process restart so progress
-// and historical walk continue instead of re-seeding only the last 2h.
+// and historical walk continue instead of re-seeding only the recent window.
 func (s *ChannelMonitorV2Aggregator) ensureCursor(ctx context.Context, now time.Time) error {
 	s.mu.Lock()
 	loaded := s.cursorLoaded
@@ -404,7 +403,7 @@ func (s *ChannelMonitorV2Aggregator) ensureCursor(ctx context.Context, now time.
 			s.hasAggregated = true
 			// Legacy rows may have data_through but null backfill_cursor (older workers).
 			// Infer cursor from data_through − initial window so we do not re-bootstrap
-			// only 2h and claim zero progress forever.
+			// only the recent seed and claim zero progress forever.
 			if s.backfillAt.IsZero() && !wm.DataThrough.IsZero() {
 				inferred := wm.DataThrough.UTC().Truncate(time.Minute).Add(-channelMonitorV2BootstrapFirst)
 				if inferred.After(now) {

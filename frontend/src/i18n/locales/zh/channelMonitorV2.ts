@@ -6,9 +6,9 @@ export default {
     updatedTo: '更新至 {time}',
     partialCoverage: '部分历史覆盖',
     bootstrap: {
-      title: '正在补齐历史监控数据',
+      title: '正在准备最近监控数据',
       description:
-        '首次启用被动监控时，系统会在后台静默聚合 90 分钟、24 小时、7 天与 30 天窗口；完成后可切换全部时间范围。',
+        '首次启用时只聚合最近 24 小时的真实请求，不会往回补 30 天。',
       progress: '进度 {percent}%',
       working: '后台聚合中…',
     },

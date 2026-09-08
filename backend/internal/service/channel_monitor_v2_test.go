@@ -94,23 +94,23 @@ func TestChannelMonitorV2BootstrapProgress(t *testing.T) {
 		require.Equal(t, now.Add(-ChannelMonitorV2BootstrapProductWindow), b.TargetStart)
 	})
 
-	t.Run("2h seed is small percent of 30d", func(t *testing.T) {
+	t.Run("partial 24h still shows bootstrap", func(t *testing.T) {
 		covered := now.Add(-2 * time.Hour)
 		b := ChannelMonitorV2BootstrapProgress(now, covered, true)
 		require.NotNil(t, b)
 		require.True(t, b.Active)
 		require.Greater(t, b.ProgressPercent, 0)
-		require.Less(t, b.ProgressPercent, 5)
+		require.Less(t, b.ProgressPercent, 20)
 	})
 
-	t.Run("30d covered hides bootstrap", func(t *testing.T) {
+	t.Run("24h covered hides bootstrap", func(t *testing.T) {
 		covered := now.Add(-ChannelMonitorV2BootstrapProductWindow)
 		b := ChannelMonitorV2BootstrapProgress(now, covered, true)
 		require.Nil(t, b)
 	})
 
-	t.Run("beyond 30d also hides", func(t *testing.T) {
-		covered := now.Add(-60 * 24 * time.Hour)
+	t.Run("beyond 24h also hides", func(t *testing.T) {
+		covered := now.Add(-7 * 24 * time.Hour)
 		b := ChannelMonitorV2BootstrapProgress(now, covered, true)
 		require.Nil(t, b)
 	})

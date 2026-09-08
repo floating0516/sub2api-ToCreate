@@ -326,9 +326,9 @@ func TestChannelMonitorV2TierRetentionPolicy(t *testing.T) {
 	require.Equal(t, 7*24*time.Hour, channelMonitorV2RetentionRollup5m)
 	require.Equal(t, 30*24*time.Hour, channelMonitorV2RetentionRollup1h)
 	require.Equal(t, 45*24*time.Hour, channelMonitorV2RetentionRollup12h)
-	require.Equal(t, 90*24*time.Hour, channelMonitorV2RetentionRollup1d)
-	require.Equal(t, channelMonitorV2RetentionRollup1d, channelMonitorV2MaxRetention())
-	require.Contains(t, channelMonitorV2WatermarkSQL, "INTERVAL '90 days'")
+	require.Equal(t, 24*time.Hour, channelMonitorV2RetentionRollup1d)
+	require.Equal(t, 24*time.Hour, channelMonitorV2MaxRetention())
+	require.Contains(t, channelMonitorV2WatermarkSQL, "INTERVAL '24 hours'")
 
 	// Every fixed rollup second must appear with a retention rule.
 	wantSeconds := map[int]time.Duration{

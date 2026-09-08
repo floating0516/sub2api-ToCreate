@@ -170,23 +170,21 @@ type ChannelMonitorV2Coverage struct {
 	// false once history is covered.
 	CoverageComplete bool `json:"coverage_complete"`
 	BucketSeconds    int  `json:"bucket_seconds"`
-	// Bootstrap is set while the first-upgrade historical backfill toward the
-	// product windows (90m / 24h / 7d / 30d) is still running. Omitted or
-	// inactive once the 30d UI range is fully covered; longer retention (90d)
-	// may continue silently without a progress banner.
+	// Bootstrap is set only while the recent 24h window is still being filled.
+	// Omitted once that window is covered; this deployment does not walk 30d/90d.
 	Bootstrap *ChannelMonitorV2Bootstrap `json:"bootstrap,omitempty"`
 }
 
 // ChannelMonitorV2Bootstrap reports first-upgrade aggregation progress for the UI.
-// Progress is measured against the longest product window (30d), not full 90d retention.
+// Progress is measured against the recent 24h window only.
 type ChannelMonitorV2Bootstrap struct {
-	// Active is true while historical backfill has not yet covered the 30d product window.
+	// Active is true while historical backfill has not yet covered the 24h window.
 	Active bool `json:"active"`
 	// ProgressPercent is 0–100 of history covered from now back toward TargetStart.
 	ProgressPercent int `json:"progress_percent"`
 	// CoveredFrom is the earliest minute already recomputed (backfill cursor).
 	CoveredFrom time.Time `json:"covered_from,omitempty"`
-	// TargetStart is now−30d (product bootstrap goal for 90m/24h/7d/30d).
+	// TargetStart is now−24h.
 	TargetStart time.Time `json:"target_start,omitempty"`
 }
 
@@ -312,9 +310,10 @@ type ChannelMonitorV2Repository interface {
 	RecomputeRange(ctx context.Context, start, end time.Time) error
 }
 
-// ChannelMonitorV2BootstrapProductWindow is the longest UI range that must be
-// filled on first upgrade before the bootstrap banner disappears (30d).
-const ChannelMonitorV2BootstrapProductWindow = 30 * 24 * time.Hour
+// ChannelMonitorV2BootstrapProductWindow is the recent window that must be
+// filled before the bootstrap banner disappears. Keep this short so first
+// enable does not walk weeks of history.
+const ChannelMonitorV2BootstrapProductWindow = 24 * time.Hour
 
 // ChannelMonitorV2BootstrapProgress builds the optional UI progress payload.
 // now and coveredFrom should be UTC minute-truncated when possible.
@@ -339,7 +338,7 @@ func ChannelMonitorV2BootstrapProgress(now, coveredFrom time.Time, hasData bool)
 	}
 	coveredFrom = coveredFrom.UTC().Truncate(time.Minute)
 	if !coveredFrom.After(targetStart) {
-		// 30d product windows fully covered; hide progress (90d retention may continue).
+		// Recent 24h window is covered; hide progress.
 		return nil
 	}
 	total := now.Sub(targetStart).Seconds()
@@ -353,8 +352,7 @@ func ChannelMonitorV2BootstrapProgress(now, coveredFrom time.Time, hasData bool)
 	if done > total {
 		done = total
 	}
-	// Round to nearest percent; any non-zero history shows at least 1% so the
-	// bar moves after the first 2h bootstrap tick (2h/30d ≈ 0.3%).
+	// Round to nearest percent; any non-zero history shows at least 1%.
 	pct := int((done/total)*100 + 0.5)
 	if done > 0 && pct < 1 {
 		pct = 1

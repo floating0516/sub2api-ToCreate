@@ -6,9 +6,9 @@ export default {
     updatedTo: 'Updated to {time}',
     partialCoverage: 'Partial historical coverage',
     bootstrap: {
-      title: 'Building historical monitor data',
+      title: 'Preparing recent monitor data',
       description:
-        'On first enable, passive aggregation silently fills the 90m, 24h, 7d, and 30d windows in the background. All ranges become complete once this finishes.',
+        'On first enable, only the last 24 hours of real traffic are aggregated. There is no 30-day backfill.',
       progress: '{percent}% complete',
       working: 'Aggregating in the background…',
     },

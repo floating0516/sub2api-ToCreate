@@ -94,7 +94,7 @@ export interface MonitorCoverage {
   aggregation_lag_seconds: number
   coverage_complete: boolean
   bucket_seconds: number
-  /** Present while initial aggregation has not covered the 30d product window. */
+  /** Present while initial aggregation has not covered the recent 24h window. */
   bootstrap?: MonitorBootstrap | null
 }
 

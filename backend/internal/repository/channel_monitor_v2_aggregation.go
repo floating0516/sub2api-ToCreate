@@ -26,8 +26,8 @@ const (
 	channelMonitorV2RetentionRollup5m    = 7 * 24 * time.Hour  // bucket_seconds=300
 	channelMonitorV2RetentionRollup1h    = 30 * 24 * time.Hour // 3600
 	channelMonitorV2RetentionRollup12h   = 45 * 24 * time.Hour // 43200
-	channelMonitorV2RetentionRollup1d    = 90 * 24 * time.Hour // 86400
-	channelMonitorV2RetentionMax         = channelMonitorV2RetentionRollup1d
+	channelMonitorV2RetentionRollup1d    = 24 * time.Hour // 86400
+	channelMonitorV2RetentionMax         = 24 * time.Hour
 )
 
 // channelMonitorV2MaxRetention is the longest stored window (1d rollup). Used to
@@ -320,8 +320,8 @@ SELECT bucket_start, platform, group_id, model, category, 1, COUNT(*) FROM class
 ON CONFLICT (bucket_start, platform, group_id, model, error_category, taxonomy_version)
 DO UPDATE SET error_requests = EXCLUDED.error_requests`
 
-// Floor matches channelMonitorV2RetentionMax (90d). Keep the INTERVAL literal in
-// sync when changing channelMonitorV2RetentionRollup1d.
+// Floor matches channelMonitorV2RetentionMax (24h). Keep the INTERVAL literal in
+// sync when changing the recent window.
 //
 // Coverage starts track how far back recompute has walked ($1 = chunk start), not
 // "min(source_log.created_at)". Using global min(ops_error_logs) pins
@@ -337,11 +337,11 @@ VALUES (
 )
 ON CONFLICT (id) DO UPDATE SET
   usage_coverage_start = GREATEST(
-    date_trunc('minute', NOW()) - INTERVAL '90 days',
+    date_trunc('minute', NOW()) - INTERVAL '24 hours',
     LEAST(COALESCE(channel_monitor_v2_watermarks.usage_coverage_start, EXCLUDED.usage_coverage_start), EXCLUDED.usage_coverage_start)
   ),
   error_coverage_start = GREATEST(
-    date_trunc('minute', NOW()) - INTERVAL '90 days',
+    date_trunc('minute', NOW()) - INTERVAL '24 hours',
     LEAST(COALESCE(channel_monitor_v2_watermarks.error_coverage_start, EXCLUDED.error_coverage_start), EXCLUDED.error_coverage_start)
   ),
   data_through = GREATEST(COALESCE(channel_monitor_v2_watermarks.data_through, EXCLUDED.data_through), EXCLUDED.data_through),

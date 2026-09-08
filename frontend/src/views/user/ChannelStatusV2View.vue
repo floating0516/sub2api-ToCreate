@@ -54,7 +54,7 @@
           </button>
         </header>
 
-        <!-- First-upgrade silent backfill: show until 30d product window is covered -->
+        <!-- First-upgrade: show only until the recent 24h window is covered -->
         <div
           v-if="bootstrapActive"
           class="border-b border-blue-100 bg-blue-50/90 px-5 py-3 dark:border-blue-900/40 dark:bg-blue-950/40 sm:px-6"
@@ -516,8 +516,6 @@ const showThroughput = computed(() => isAdmin.value || !isChannelMonitorThroughp
 const ranges = computed(() => [
   { value: '90m' as MonitorRange, label: t('channelMonitorV2.ranges.90m') },
   { value: '24h' as MonitorRange, label: t('channelMonitorV2.ranges.24h') },
-  { value: '7d' as MonitorRange, label: t('channelMonitorV2.ranges.7d') },
-  { value: '30d' as MonitorRange, label: t('channelMonitorV2.ranges.30d') },
 ])
 const tabs = computed(() => [
   { value: 'models' as Tab, label: t('channelMonitorV2.tabs.models') },
@@ -639,7 +637,7 @@ const activeRowsEmpty = computed(() =>
       ? errorRows.value.length === 0
       : userRows.value.length === 0
 )
-/** First-upgrade backfill toward 90m/24h/7d/30d; banner hides when backend omits bootstrap. */
+/** First-upgrade backfill toward the recent 24h window; banner hides when backend omits bootstrap. */
 const bootstrapActive = computed(() => Boolean(snapshot.value?.coverage?.bootstrap?.active))
 const bootstrapPercent = computed(() => {
   const raw = snapshot.value?.coverage?.bootstrap?.progress_percent
@@ -659,7 +657,9 @@ function csv(value: unknown) {
   return typeof value === 'string' ? value.split(',').filter(Boolean) : []
 }
 function parseRange(value: unknown): MonitorRange {
-  return ['90m', '24h', '7d', '30d'].includes(String(value)) ? (value as MonitorRange) : '90m'
+  if (value === '90m' || value === '24h') return value
+  if (value === '7d' || value === '30d') return '24h'
+  return '90m'
 }
 function parseMatrixGroupBy(value: unknown): MonitorMatrixGroupBy {
   const allowed: MonitorMatrixGroupBy[] = [
