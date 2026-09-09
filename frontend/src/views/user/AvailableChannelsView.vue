@@ -1,10 +1,19 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout content-variant="cards">
       <template #filters>
-        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-          <div class="flex flex-1 flex-wrap items-center gap-3">
-            <div class="relative w-full sm:w-80">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0 lg:hidden">
+            <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+              {{ t('availableChannels.title') }}
+            </h1>
+            <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
+              {{ t('availableChannels.description') }}
+            </p>
+          </div>
+
+          <div class="flex w-full flex-wrap items-center gap-3 lg:justify-end">
+            <div class="relative min-w-0 flex-1 sm:w-80 sm:flex-none">
               <Icon
                 name="search"
                 size="md"
@@ -17,9 +26,6 @@
                 class="input pl-10"
               />
             </div>
-          </div>
-
-          <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto">
             <button
               @click="loadChannels"
               :disabled="loading"

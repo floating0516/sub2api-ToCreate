@@ -761,8 +761,8 @@ export default {
   // Available Channels (user-facing)
   availableChannels: {
     title: 'Available Channels',
-    description: 'Channels you can access, along with their supported models and pricing',
-    searchPlaceholder: 'Search channels or models...',
+    description: 'See the groups and models you can use. Click a model name to copy it; hover for pricing.',
+    searchPlaceholder: 'Search channels, groups, or models...',
     empty: 'No available channels',
     noModels: 'No models configured',
     noPricing: 'Pricing not configured',
@@ -770,6 +770,12 @@ export default {
     public: 'Public',
     exclusiveTooltip: 'Exclusive groups granted to you by an admin',
     publicTooltip: 'Groups open to all users',
+    summary: '{groups} groups · {models} models',
+    showMoreGroups: '{count} more groups',
+    showLessGroups: 'Show fewer groups',
+    modelHint: 'Click to copy, hover for pricing',
+    copyModel: 'Click to copy model name',
+    copied: 'Model name copied',
     columns: {
       name: 'Channel',
       description: 'Description',

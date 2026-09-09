@@ -766,8 +766,8 @@ export default {
   // Available Channels (user-facing)
   availableChannels: {
     title: '可用渠道',
-    description: '查看您可访问的渠道与其支持的模型、定价',
-    searchPlaceholder: '搜索渠道或模型...',
+    description: '按渠道查看你能用的分组和模型。点模型名可复制，悬停查看定价。',
+    searchPlaceholder: '搜索渠道、分组或模型...',
     empty: '暂无可用渠道',
     noModels: '未配置模型',
     noPricing: '未配置定价',
@@ -775,6 +775,12 @@ export default {
     public: '公开',
     exclusiveTooltip: '管理员授权给你的专属分组',
     publicTooltip: '对所有用户公开的分组',
+    summary: '{groups} 个分组 · {models} 个模型',
+    showMoreGroups: '还有 {count} 个分组',
+    showLessGroups: '收起分组',
+    modelHint: '点名称复制，悬停看定价',
+    copyModel: '点击复制模型名',
+    copied: '已复制模型名',
     columns: {
       name: '渠道名',
       description: '描述',
