@@ -125,4 +125,47 @@ describe('probeTrend', () => {
     expect(rows[0].availability).toBe(100)
     expect(rows[0].status).toBe('operational')
   })
+
+  it('keeps three 90m cells even when now is not on a 30-minute boundary', () => {
+    const now = Date.parse('2026-09-08T14:19:00Z')
+    const rows = buildProbeMatrixRows(
+      [
+        monitor({
+          id: 4,
+          name: 'GPT-PRO',
+          provider: 'openai',
+          timeline: [
+            { status: 'operational', latency_ms: 180, ping_latency_ms: 30, checked_at: '2026-09-08T13:07:00Z' },
+            { status: 'operational', latency_ms: 190, ping_latency_ms: 32, checked_at: '2026-09-08T13:37:00Z' },
+            { status: 'failed', latency_ms: 800, ping_latency_ms: 40, checked_at: '2026-09-08T14:07:00Z' },
+          ],
+        }),
+      ],
+      '90m',
+      [],
+      [],
+      (group) => group.label,
+      (status) => status,
+      '无探测',
+      now,
+    )
+    expect(rows[0].cells).toHaveLength(3)
+    expect(rows[0].cells.filter((cell) => cell.status !== 'empty')).toHaveLength(3)
+    expect(rows[0].cells[2].status).toBe('failed')
+  })
+
+  it('keeps forty-eight 24h cells when now is not on a 30-minute boundary', () => {
+    const now = Date.parse('2026-09-08T14:19:00Z')
+    const rows = buildProbeMatrixRows(
+      [monitor({ id: 4, name: 'GPT-PRO', provider: 'openai' })],
+      '24h',
+      [],
+      [],
+      (group) => group.label,
+      (status) => status,
+      '无探测',
+      now,
+    )
+    expect(rows[0].cells).toHaveLength(48)
+  })
 })

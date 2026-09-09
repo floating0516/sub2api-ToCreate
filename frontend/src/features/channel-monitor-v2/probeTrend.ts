@@ -125,12 +125,17 @@ function buildAlignedCells(
   formatStatus: (status: string) => string,
   noSample: string,
 ) {
-  const alignedStart = Math.floor(start / PROBE_BUCKET_MS) * PROBE_BUCKET_MS
+  // Keep a fixed cell count for the selected window (90m → 3, 24h → 48).
+  // Clock-aligning the start used to add a leftover leading bucket.
+  const rangeMs = Math.max(0, now - start)
+  const bucketCount = Math.max(1, Math.round(rangeMs / PROBE_BUCKET_MS))
   const cells = []
-  for (let cursor = alignedStart; cursor < now; cursor += PROBE_BUCKET_MS) {
+  for (let index = 0; index < bucketCount; index += 1) {
+    const cursor = start + index * PROBE_BUCKET_MS
+    const next = index === bucketCount - 1 ? now : start + (index + 1) * PROBE_BUCKET_MS
     const inBucket = points.filter((point) => {
       const ts = Date.parse(point.checked_at)
-      return ts >= cursor && ts < cursor + PROBE_BUCKET_MS
+      return ts >= cursor && ts < next
     })
     if (!inBucket.length) {
       cells.push({
