@@ -1186,33 +1186,14 @@ func channelMonitorV2EnabledPlatforms(cfg service.ChannelMonitorV2Config) []stri
 	return out
 }
 
-// channelMonitorV2DisplayModel maps a raw model name for presentation.
-// Semantics (parallel to empty group_ids = all groups):
-//   - platform not in config / disabled → keep raw model (still collected)
-//   - models list empty → show the real model name (no collapsing)
-//   - models list non-empty → selected keep identity; everything else → __other__
-func channelMonitorV2DisplayModel(cfg service.ChannelMonitorV2Config, platform, model string) string {
+// channelMonitorV2DisplayModel returns the stored model name for presentation.
+// Every real model stays its own row. The old named + __other__ collapse is
+// disabled so traffic such as gpt-6-astra is not hidden behind "其他模型".
+func channelMonitorV2DisplayModel(_ service.ChannelMonitorV2Config, _ string, model string) string {
 	model = strings.TrimSpace(model)
 	if model == "" {
-		return service.ChannelMonitorV2OtherModel
+		return "unknown"
 	}
-	for _, p := range cfg.Platforms {
-		if p.Platform != platform {
-			continue
-		}
-		// Empty allow-list: surface every real model instead of dumping into __other__.
-		// Operators opt into the named + __other__ split only by listing models.
-		if len(p.Models) == 0 {
-			return model
-		}
-		for _, selected := range p.Models {
-			if selected == model {
-				return model
-			}
-		}
-		return service.ChannelMonitorV2OtherModel
-	}
-	// Platform not configured: still show the real model so traffic is visible.
 	return model
 }
 func channelMonitorV2ModelSelected(filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, platform, model string) bool {
