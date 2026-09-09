@@ -682,7 +682,7 @@ export default {
     },
     matrix: {
       title: '可用性趋势',
-      description: '每行是一个渠道，然后每个色块代表一个统计区间，悬停查看明细。',
+      description: '每行是一个渠道，每个色块代表一个统计区间，悬停查看明细。',
       dimension: '渠道',
       latency: '延迟',
       ping: 'Ping',
