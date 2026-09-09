@@ -144,11 +144,10 @@
         </div>
       </section>
 
-      <!-- Overview KPI: success · TTFT · tokens/s(optional) · cache · (+ RPM when throughput visible) -->
+      <!-- Overview KPI: success · TTFT · duration · cache -->
       <section
         v-if="snapshot"
-        class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        :class="showThroughput ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        class="grid grid-cols-2 gap-3 lg:grid-cols-4"
         :aria-label="t('channelMonitorV2.summaryAria')"
       >
         <MetricCell
@@ -165,11 +164,10 @@
           :state="snapshot.health.ttft"
         />
         <MetricCell
-          v-if="showThroughput"
-          :label="t('channelMonitorV2.metrics.tps')"
-          :value="formatTps(snapshot.metrics.tpm)"
-          :detail="t('channelMonitorV2.metrics.tpsDetail')"
-          :title="exactTps(snapshot.metrics.tpm)"
+          :label="t('channelMonitorV2.metrics.durationP50')"
+          :value="formatMs(snapshot.metrics.duration.p50_ms)"
+          :detail="latencyKpiSecondary(snapshot.metrics.duration)"
+          :title="latencyDetail(snapshot.metrics.duration)"
         />
         <MetricCell
           :label="t('channelMonitorV2.metrics.cacheRate')"
@@ -177,22 +175,14 @@
           :detail="t('channelMonitorV2.metrics.cacheDetail')"
           :state="snapshot.health.cache || snapshot.health.overall"
         />
-        <MetricCell
-          v-if="showThroughput"
-          :label="t('channelMonitorV2.metrics.rpm')"
-          :value="formatRate(snapshot.metrics.rpm)"
-          :detail="t('channelMonitorV2.metrics.rpmDetail')"
-          :title="exactRate(snapshot.metrics.rpm)"
-        />
       </section>
       <section
         v-else-if="loading"
-        class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        :class="showThroughput ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        class="grid grid-cols-2 gap-3 lg:grid-cols-4"
         aria-hidden="true"
       >
         <div
-          v-for="i in (showThroughput ? 5 : 4)"
+          v-for="i in 4"
           :key="i"
           class="h-24 animate-pulse rounded-2xl bg-gray-50 dark:bg-dark-900/30"
         />
@@ -236,9 +226,8 @@
                   <th>{{ t('channelMonitorV2.table.platformModel') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.successRate') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.ttftP50') }}</th>
-                  <th v-if="showThroughput">{{ t('channelMonitorV2.metrics.tps') }}</th>
+                  <th>{{ t('channelMonitorV2.metrics.durationP50') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.cacheRate') }}</th>
-                  <th v-if="showThroughput">{{ t('channelMonitorV2.metrics.rpm') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,9 +256,11 @@
                     <span class="block">{{ formatMs(row.metrics.ttft.p50_ms) }}</span>
                     <small class="text-xs text-gray-400">{{ latencyDetail(row.metrics.ttft) }}</small>
                   </td>
-                  <td v-if="showThroughput" :title="exactTps(row.metrics.tpm)">{{ formatTps(row.metrics.tpm) }}</td>
+                  <td>
+                    <span class="block">{{ formatMs(row.metrics.duration.p50_ms) }}</span>
+                    <small class="text-xs text-gray-400">{{ latencyDetail(row.metrics.duration) }}</small>
+                  </td>
                   <td>{{ formatPercent(row.metrics.cache_rate) }}</td>
-                  <td v-if="showThroughput">{{ formatRate(row.metrics.rpm) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -334,9 +325,8 @@
                   <th>{{ t('channelMonitorV2.table.user') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.successRate') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.ttftP50') }}</th>
-                  <th v-if="showThroughput">{{ t('channelMonitorV2.metrics.tps') }}</th>
+                  <th>{{ t('channelMonitorV2.metrics.durationP50') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.cacheRate') }}</th>
-                  <th v-if="showThroughput">{{ t('channelMonitorV2.metrics.rpm') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -368,9 +358,11 @@
                     <span class="block">{{ formatMs(row.metrics.ttft.p50_ms) }}</span>
                     <small class="text-xs text-gray-400">{{ latencyDetail(row.metrics.ttft) }}</small>
                   </td>
-                  <td v-if="showThroughput" :title="exactTps(row.metrics.tpm)">{{ formatTps(row.metrics.tpm) }}</td>
+                  <td>
+                    <span class="block">{{ formatMs(row.metrics.duration.p50_ms) }}</span>
+                    <small class="text-xs text-gray-400">{{ latencyDetail(row.metrics.duration) }}</small>
+                  </td>
                   <td>{{ formatPercent(row.metrics.cache_rate) }}</td>
-                  <td v-if="showThroughput">{{ formatRate(row.metrics.rpm) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -413,7 +405,6 @@ import MonitorStatusMatrix from '@/components/user/monitor/MonitorStatusMatrix.v
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { isChannelMonitorThroughputHidden } from '@/utils/featureFlags'
 import { list as listChannelMonitorViews, type UserMonitorView } from '@/api/channelMonitor'
 import * as api from '@/api/channelMonitorV2'
 import type {
@@ -435,9 +426,6 @@ import {
   formatMonitorDateTime,
   formatMonitorMs,
   formatMonitorPercent,
-  formatMonitorThroughput,
-  formatMonitorTokensPerSecond,
-  tokensPerSecondFromTpm,
   healthScoreClass,
   monitorDisplayedErrorRate,
   monitorDisplayedSuccessRate,
@@ -459,8 +447,6 @@ const appStore = useAppStore()
 const { t, te, locale } = useI18n()
 const { statusLabel } = useChannelMonitorFormat()
 const isAdmin = computed(() => authStore.isAdmin)
-/** Admins always see RPM/TPM; users honor the hide-throughput system setting. */
-const showThroughput = computed(() => isAdmin.value || !isChannelMonitorThroughputHidden())
 
 const ranges = computed(() => [
   { value: '90m' as MonitorRange, label: t('channelMonitorV2.ranges.90m') },
@@ -744,20 +730,6 @@ function scheduleAutoRefresh() {
 function drillModel(row: MonitorModelRow) {
   filter.value.platforms = [row.platform]
   filter.value.models = [row.model]
-}
-function formatRate(value: number) {
-  return formatMonitorThroughput(value)
-}
-function exactRate(value: number) {
-  return Intl.NumberFormat(locale.value || undefined, { maximumFractionDigits: 2 }).format(value || 0)
-}
-function formatTps(tpm: number | null | undefined) {
-  return formatMonitorTokensPerSecond(tpm)
-}
-function exactTps(tpm: number | null | undefined) {
-  return Intl.NumberFormat(locale.value || undefined, { maximumFractionDigits: 3 }).format(
-    tokensPerSecondFromTpm(tpm),
-  )
 }
 function displayedSuccessRate(metrics: Parameters<typeof monitorDisplayedSuccessRate>[0]) {
   return monitorDisplayedSuccessRate(metrics)
