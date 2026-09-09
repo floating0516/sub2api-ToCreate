@@ -1267,6 +1267,8 @@ type TestAccountRequest struct {
 	// ImageDataURL / AudioDataURL are data:<mime>;base64,... payloads.
 	ImageDataURL string `json:"image_data_url"`
 	AudioDataURL string `json:"audio_data_url"`
+	// ThinkingEffort is OpenAI reasoning.effort for GPT custom-text tests.
+	ThinkingEffort string `json:"thinking_effort"`
 }
 
 type SyncFromCRSRequest struct {
@@ -1297,8 +1299,9 @@ func (h *AccountHandler) Test(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 
 	opts := service.AccountTestOptions{
-		ImageDataURL: req.ImageDataURL,
-		AudioDataURL: req.AudioDataURL,
+		ImageDataURL:   req.ImageDataURL,
+		AudioDataURL:   req.AudioDataURL,
+		ThinkingEffort: req.ThinkingEffort,
 	}
 
 	// Use AccountTestService to test the account with SSE streaming

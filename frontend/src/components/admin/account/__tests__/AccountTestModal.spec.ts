@@ -220,4 +220,79 @@ describe('AccountTestModal', () => {
       mode: 'compact'
     })
   })
+
+  it('GPT 文字测试会先选模型再带思考深度和自定义文本', async () => {
+    getAvailableModels.mockResolvedValue([{ id: 'gpt-5.4', display_name: 'GPT-5.4' }])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_start","model":"gpt-5.4"}\n',
+        'data: {"type":"thinking","text":"ponder"}\n',
+        'data: {"type":"content","text":"ok"}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 42,
+      name: 'OpenAI OAuth',
+      platform: 'openai',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    ;(wrapper.vm as any).selectedModelId = 'gpt-5.4'
+    ;(wrapper.vm as any).testMode = 'custom_text'
+    ;(wrapper.vm as any).thinkingEffort = 'high'
+    ;(wrapper.vm as any).testPrompt = '一段测试文字'
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const [, request] = (global.fetch as any).mock.calls[0]
+    expect(JSON.parse(request.body)).toEqual({
+      model_id: 'gpt-5.4',
+      prompt: '一段测试文字',
+      mode: 'custom_text',
+      thinking_effort: 'high'
+    })
+  })
+
+  it('GPT 绘图测试会渲染可播放 SVG 而不是位图', async () => {
+    getAvailableModels.mockResolvedValue([{ id: 'gpt-5.4', display_name: 'GPT-5.4' }])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_start","model":"gpt-5.4"}\n',
+        'data: {"type":"svg","text":"<html><body><svg><text>pelican</text></svg></body></html>","mime_type":"text/html"}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 42,
+      name: 'OpenAI OAuth',
+      platform: 'openai',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    ;(wrapper.vm as any).selectedModelId = 'gpt-5.4'
+    ;(wrapper.vm as any).testMode = 'draw'
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    expect(JSON.parse(((global.fetch as any).mock.calls[0][1] as { body: string }).body)).toMatchObject({
+      model_id: 'gpt-5.4',
+      mode: 'draw'
+    })
+    const player = wrapper.find('[data-testid="account-test-svg-player"]')
+    expect(player.exists()).toBe(true)
+    const frame = player.find('iframe')
+    expect(frame.exists()).toBe(true)
+    expect(frame.attributes('srcdoc')).toContain('<svg>')
+    expect(wrapper.find('img[alt="test-image-1"]').exists()).toBe(false)
+  })
 })

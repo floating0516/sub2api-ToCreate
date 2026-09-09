@@ -2,7 +2,7 @@
   <BaseDialog
     :show="show"
     :title="t('admin.accounts.testAccountConnection')"
-    width="normal"
+    :width="isOpenAIAccount ? 'wide' : 'normal'"
     @close="handleClose"
   >
     <div class="space-y-4">
@@ -79,6 +79,26 @@
           :options="openAITestModeOptions"
           :disabled="status === 'connecting'"
         />
+        <p v-if="isOpenAICustomTextMode" class="text-xs text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.openai.customTextPromptHint') }}
+        </p>
+        <p v-else-if="isOpenAIDrawMode" class="text-xs text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.openai.drawTestHint') }}
+        </p>
+      </div>
+
+      <div v-if="isOpenAICustomTextMode && selectedModelId" class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{ t('admin.accounts.openai.thinkingDepth') }}
+        </label>
+        <Select
+          v-model="thinkingEffort"
+          :options="openAIThinkingOptions"
+          :disabled="status === 'connecting'"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.openai.thinkingDepthHint') }}
+        </p>
       </div>
 
       <div v-if="supportsPromptInput" class="space-y-1.5">
@@ -192,6 +212,9 @@
           </div>
 
           <!-- Streaming Content -->
+          <div v-if="streamingThinking" class="text-amber-300">
+            {{ streamingThinking }}<span class="animate-pulse">_</span>
+          </div>
           <div v-if="streamingContent" class="text-green-400">
             {{ streamingContent }}<span class="animate-pulse">_</span>
           </div>
@@ -222,6 +245,36 @@
         >
           <Icon name="link" size="sm" :stroke-width="2" />
         </button>
+      </div>
+
+      <div v-if="generatedSVGs.length > 0" class="space-y-2" data-testid="account-test-svg-player">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-medium text-gray-600 dark:text-gray-300">
+            {{ t('admin.accounts.svgPreview') }}
+          </div>
+          <button
+            type="button"
+            class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-300 dark:hover:bg-dark-500"
+            @click="replaySVG"
+          >
+            {{ t('admin.accounts.replaySvg') }}
+          </button>
+        </div>
+        <div
+          v-for="(svg, index) in generatedSVGs"
+          :key="`${svgReplayKey}-${index}`"
+          class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-dark-500 dark:bg-dark-700"
+        >
+          <iframe
+            :srcdoc="svg.html"
+            sandbox=""
+            class="h-[360px] w-full bg-[#d7efff]"
+            :title="t('admin.accounts.svgPreviewAlt', { index: index + 1 })"
+          />
+          <div class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:text-gray-300">
+            {{ svg.mimeType || 'image/svg+xml' }}
+          </div>
+        </div>
       </div>
 
       <div v-if="generatedImages.length > 0" class="space-y-2">
@@ -390,6 +443,11 @@ interface PreviewMedia {
   mimeType?: string
 }
 
+interface PreviewSVG {
+  html: string
+  mimeType?: string
+}
+
 const props = defineProps<{
   show: boolean
   account: Account | null
@@ -403,6 +461,7 @@ const terminalRef = ref<HTMLElement | null>(null)
 const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
+const streamingThinking = ref('')
 const errorMessage = ref('')
 const availableModels = ref<ClaudeModel[]>([])
 const selectedModelId = ref('')
@@ -412,8 +471,11 @@ let abortController: AbortController | null = null
 const generatedImages = ref<PreviewMedia[]>([])
 const generatedAudios = ref<PreviewMedia[]>([])
 const generatedVideos = ref<PreviewMedia[]>([])
+const generatedSVGs = ref<PreviewSVG[]>([])
+const svgReplayKey = ref(0)
 const previewImageUrl = ref('')
-const testMode = ref<'default' | 'compact'>('default')
+const testMode = ref<'default' | 'compact' | 'custom_text' | 'draw'>('default')
+const thinkingEffort = ref('medium')
 const grokTestMode = ref<'text' | 'image' | 'video' | 'search' | 'tts' | 'stt' | 'realtime'>('text')
 const uploadImageDataURL = ref('')
 const uploadImagePreview = ref('')
@@ -426,8 +488,22 @@ const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
-  { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
+  { value: 'compact', label: t('admin.accounts.openai.testModeCompact') },
+  { value: 'custom_text', label: t('admin.accounts.openai.testModeCustomText') },
+  { value: 'draw', label: t('admin.accounts.openai.testModeDraw') }
 ])
+const openAIThinkingOptions = computed(() => [
+  { value: 'none', label: t('admin.accounts.openai.thinkingNone') },
+  { value: 'minimal', label: t('admin.accounts.openai.thinkingMinimal') },
+  { value: 'low', label: t('admin.accounts.openai.thinkingLow') },
+  { value: 'medium', label: t('admin.accounts.openai.thinkingMedium') },
+  { value: 'high', label: t('admin.accounts.openai.thinkingHigh') },
+  { value: 'xhigh', label: t('admin.accounts.openai.thinkingXHigh') }
+])
+const isOpenAICustomTextMode = computed(
+  () => isOpenAIAccount.value && testMode.value === 'custom_text'
+)
+const isOpenAIDrawMode = computed(() => isOpenAIAccount.value && testMode.value === 'draw')
 const grokTestModeOptions = computed(() => [
   { value: 'text', label: t('admin.accounts.grok.testModeText') },
   { value: 'image', label: t('admin.accounts.grok.testModeImage') },
@@ -472,9 +548,10 @@ const supportsGrokVideoTest = computed(
   () => isGrokAccount.value && grokTestMode.value === 'video'
 )
 
-const supportsImageTest = computed(
-  () => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value
-)
+const supportsImageTest = computed(() => {
+  if (isOpenAICustomTextMode.value || isOpenAIDrawMode.value) return false
+  return supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value
+})
 
 // Model select only when the mode needs a model.
 const showModelSelect = computed(() => {
@@ -497,6 +574,7 @@ const modelOptionsForMode = computed(() => {
 })
 
 const supportsPromptInput = computed(() => {
+  if (isOpenAICustomTextMode.value) return true
   if (!isGrokAccount.value) {
     return supportsImageTest.value
   }
@@ -597,6 +675,9 @@ const clearMediaUploads = () => {
 }
 
 const promptInputLabel = computed(() => {
+  if (isOpenAICustomTextMode.value) {
+    return t('admin.accounts.openai.customTextPromptLabel')
+  }
   if (supportsGrokVideoTest.value || grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptLabel')
   }
@@ -613,6 +694,9 @@ const promptInputLabel = computed(() => {
 })
 
 const promptInputPlaceholder = computed(() => {
+  if (isOpenAICustomTextMode.value) {
+    return t('admin.accounts.openai.customTextPromptPlaceholder')
+  }
   if (grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptPlaceholder')
   }
@@ -629,6 +713,12 @@ const promptInputPlaceholder = computed(() => {
 })
 
 const promptInputHint = computed(() => {
+  if (isOpenAICustomTextMode.value) {
+    return t('admin.accounts.openai.customTextPromptHint')
+  }
+  if (isOpenAIDrawMode.value) {
+    return t('admin.accounts.openai.drawTestHint')
+  }
   if (grokTestMode.value === 'video') {
     return t('admin.accounts.videoTestHint')
   }
@@ -669,6 +759,8 @@ const testModeSummary = computed(() => {
         return t('admin.accounts.grok.textTestMode')
     }
   }
+  if (isOpenAICustomTextMode.value) return t('admin.accounts.openai.customTextTestMode')
+  if (isOpenAIDrawMode.value) return t('admin.accounts.openai.drawTestMode')
   if (supportsImageTest.value) return t('admin.accounts.imageTestMode')
   return t('admin.accounts.testPrompt')
 })
@@ -704,6 +796,10 @@ const sortTestModels = (models: ClaudeModel[]) => {
 const applyDefaultPromptForMode = () => {
   if (!supportsPromptInput.value) return
   if (testPrompt.value.trim()) return
+  if (isOpenAICustomTextMode.value) {
+    testPrompt.value = t('admin.accounts.openai.customTextPromptDefault')
+    return
+  }
   if (grokTestMode.value === 'video') {
     testPrompt.value = t('admin.accounts.videoPromptDefault')
   } else if (grokTestMode.value === 'image' || supportsImageTest.value) {
@@ -739,6 +835,7 @@ watch(
     if (newVal && props.account) {
       testPrompt.value = ''
       testMode.value = 'default'
+      thinkingEffort.value = 'medium'
       grokTestMode.value = 'text'
       resetState()
       await loadAvailableModels()
@@ -758,6 +855,13 @@ watch(grokTestMode, () => {
   clearMediaUploads()
   pickDefaultModelForMode()
   applyDefaultPromptForMode()
+})
+
+watch(testMode, () => {
+  if (!isOpenAIAccount.value) return
+  if (isOpenAICustomTextMode.value && !testPrompt.value.trim()) {
+    applyDefaultPromptForMode()
+  }
 })
 
 const loadAvailableModels = async () => {
@@ -794,10 +898,12 @@ const resetState = () => {
   status.value = 'idle'
   outputLines.value = []
   streamingContent.value = ''
+  streamingThinking.value = ''
   errorMessage.value = ''
   generatedImages.value = []
   generatedAudios.value = []
   generatedVideos.value = []
+  generatedSVGs.value = []
   previewImageUrl.value = ''
 }
 
@@ -850,12 +956,16 @@ const startTest = async () => {
       mode?: string
       image_data_url?: string
       audio_data_url?: string
+      thinking_effort?: string
     } = {
       model_id: showModelSelect.value ? selectedModelId.value : '',
       prompt: supportsPromptInput.value ? testPrompt.value.trim() : ''
     }
     if (isOpenAIAccount.value) {
       requestBody.mode = testMode.value
+      if (isOpenAICustomTextMode.value && thinkingEffort.value && thinkingEffort.value !== 'none') {
+        requestBody.thinking_effort = thinkingEffort.value
+      }
     }
     if (isGrokAccount.value) {
       // Always send explicit Grok mode. search/tts/stt/realtime are standalone
@@ -970,9 +1080,13 @@ const handleEvent = (event: {
                     : grokTestMode.value === 'realtime'
                       ? t('admin.accounts.grok.sendingRealtimeRequest')
                       : t('admin.accounts.sendingTestMessage')
-          : supportsImageTest.value
-            ? t('admin.accounts.sendingImageRequest')
-            : t('admin.accounts.sendingTestMessage'),
+          : isOpenAICustomTextMode.value
+            ? t('admin.accounts.openai.sendingCustomTextRequest')
+            : isOpenAIDrawMode.value
+              ? t('admin.accounts.openai.sendingDrawRequest')
+              : supportsImageTest.value
+                ? t('admin.accounts.sendingImageRequest')
+                : t('admin.accounts.sendingTestMessage'),
         'text-gray-400'
       )
       addLine('', 'text-gray-300')
@@ -983,6 +1097,23 @@ const handleEvent = (event: {
       if (event.text) {
         streamingContent.value += event.text
         scrollToBottom()
+      }
+      break
+
+    case 'thinking':
+      if (event.text) {
+        streamingThinking.value += event.text
+        scrollToBottom()
+      }
+      break
+
+    case 'svg':
+      if (event.text) {
+        generatedSVGs.value.push({
+          html: event.text,
+          mimeType: event.mime_type
+        })
+        addLine(t('admin.accounts.svgReceived', { count: generatedSVGs.value.length }), 'text-purple-300')
       }
       break
 
@@ -1024,6 +1155,10 @@ const handleEvent = (event: {
 
     case 'test_complete':
       // Move streaming content to output lines
+      if (streamingThinking.value) {
+        addLine(streamingThinking.value, 'text-amber-300')
+        streamingThinking.value = ''
+      }
       if (streamingContent.value) {
         addLine(streamingContent.value, 'text-green-300')
         streamingContent.value = ''
@@ -1039,12 +1174,20 @@ const handleEvent = (event: {
     case 'error':
       status.value = 'error'
       errorMessage.value = event.error || t('common.unknownError')
+      if (streamingThinking.value) {
+        addLine(streamingThinking.value, 'text-amber-300')
+        streamingThinking.value = ''
+      }
       if (streamingContent.value) {
         addLine(streamingContent.value, 'text-green-300')
         streamingContent.value = ''
       }
       break
   }
+}
+
+const replaySVG = () => {
+  svgReplayKey.value += 1
 }
 
 const copyOutput = () => {
