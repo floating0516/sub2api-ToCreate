@@ -87,7 +87,7 @@
         </p>
       </div>
 
-      <div v-if="isOpenAICustomTextMode && selectedModelId" class="space-y-1.5">
+      <div v-if="showOpenAIThinking && selectedModelId" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('admin.accounts.openai.thinkingDepth') }}
         </label>
@@ -504,6 +504,7 @@ const isOpenAICustomTextMode = computed(
   () => isOpenAIAccount.value && testMode.value === 'custom_text'
 )
 const isOpenAIDrawMode = computed(() => isOpenAIAccount.value && testMode.value === 'draw')
+const showOpenAIThinking = computed(() => isOpenAICustomTextMode.value || isOpenAIDrawMode.value)
 const grokTestModeOptions = computed(() => [
   { value: 'text', label: t('admin.accounts.grok.testModeText') },
   { value: 'image', label: t('admin.accounts.grok.testModeImage') },
@@ -574,7 +575,7 @@ const modelOptionsForMode = computed(() => {
 })
 
 const supportsPromptInput = computed(() => {
-  if (isOpenAICustomTextMode.value) return true
+  if (isOpenAICustomTextMode.value || isOpenAIDrawMode.value) return true
   if (!isGrokAccount.value) {
     return supportsImageTest.value
   }
@@ -678,6 +679,9 @@ const promptInputLabel = computed(() => {
   if (isOpenAICustomTextMode.value) {
     return t('admin.accounts.openai.customTextPromptLabel')
   }
+  if (isOpenAIDrawMode.value) {
+    return t('admin.accounts.openai.drawPromptLabel')
+  }
   if (supportsGrokVideoTest.value || grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptLabel')
   }
@@ -696,6 +700,9 @@ const promptInputLabel = computed(() => {
 const promptInputPlaceholder = computed(() => {
   if (isOpenAICustomTextMode.value) {
     return t('admin.accounts.openai.customTextPromptPlaceholder')
+  }
+  if (isOpenAIDrawMode.value) {
+    return t('admin.accounts.openai.drawPromptPlaceholder')
   }
   if (grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptPlaceholder')
@@ -800,6 +807,10 @@ const applyDefaultPromptForMode = () => {
     testPrompt.value = t('admin.accounts.openai.customTextPromptDefault')
     return
   }
+  if (isOpenAIDrawMode.value) {
+    testPrompt.value = t('admin.accounts.openai.drawPromptDefault')
+    return
+  }
   if (grokTestMode.value === 'video') {
     testPrompt.value = t('admin.accounts.videoPromptDefault')
   } else if (grokTestMode.value === 'image' || supportsImageTest.value) {
@@ -859,8 +870,15 @@ watch(grokTestMode, () => {
 
 watch(testMode, () => {
   if (!isOpenAIAccount.value) return
-  if (isOpenAICustomTextMode.value && !testPrompt.value.trim()) {
-    applyDefaultPromptForMode()
+  const current = testPrompt.value.trim()
+  const customDefault = t('admin.accounts.openai.customTextPromptDefault')
+  const drawDefault = t('admin.accounts.openai.drawPromptDefault')
+  if (isOpenAIDrawMode.value && (!current || current === customDefault)) {
+    testPrompt.value = drawDefault
+    return
+  }
+  if (isOpenAICustomTextMode.value && (!current || current === drawDefault)) {
+    testPrompt.value = customDefault
   }
 })
 
@@ -963,7 +981,7 @@ const startTest = async () => {
     }
     if (isOpenAIAccount.value) {
       requestBody.mode = testMode.value
-      if (isOpenAICustomTextMode.value && thinkingEffort.value && thinkingEffort.value !== 'none') {
+      if (showOpenAIThinking.value && thinkingEffort.value && thinkingEffort.value !== 'none') {
         requestBody.thinking_effort = thinkingEffort.value
       }
     }

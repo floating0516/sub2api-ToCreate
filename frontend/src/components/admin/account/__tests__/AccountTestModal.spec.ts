@@ -281,12 +281,16 @@ describe('AccountTestModal', () => {
 
     ;(wrapper.vm as any).selectedModelId = 'gpt-5.4'
     ;(wrapper.vm as any).testMode = 'draw'
+    ;(wrapper.vm as any).thinkingEffort = 'medium'
+    ;(wrapper.vm as any).testPrompt = '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画。'
     await (wrapper.vm as any).startTest()
     await flushPromises()
 
-    expect(JSON.parse(((global.fetch as any).mock.calls[0][1] as { body: string }).body)).toMatchObject({
+    expect(JSON.parse(((global.fetch as any).mock.calls[0][1] as { body: string }).body)).toEqual({
       model_id: 'gpt-5.4',
-      mode: 'draw'
+      prompt: '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画。',
+      mode: 'draw',
+      thinking_effort: 'medium'
     })
     const player = wrapper.find('[data-testid="account-test-svg-player"]')
     expect(player.exists()).toBe(true)

@@ -65,19 +65,41 @@ func TestResolveOpenAICustomTextPrompt(t *testing.T) {
 	require.Equal(t, "hello", resolveOpenAICustomTextPrompt(" hello "))
 }
 
-func TestEmitOpenAIDrawSVGPreview(t *testing.T) {
+func TestResolveOpenAIDrawPrompt(t *testing.T) {
 	t.Parallel()
-	gin.SetMode(gin.TestMode)
+	require.Equal(t, defaultOpenAIDrawPrompt, resolveOpenAIDrawPrompt("  "))
+	require.Equal(t, "创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画。", defaultOpenAIDrawPrompt)
+}
+
+func TestExtractPlayableSVGHTML(t *testing.T) {
+	t.Parallel()
+
+	html, ok := extractPlayableSVGHTML("```html\n<html><body><svg><circle r='4'/></svg></body></html>\n```")
+	require.True(t, ok)
+	require.Contains(t, html, "<svg>")
+	require.NotContains(t, html, "```")
+
+	wrapped, ok := extractPlayableSVGHTML("here you go\n<svg viewBox='0 0 10 10'></svg>\nthanks")
+	require.True(t, ok)
+	require.Contains(t, wrapped, "<!DOCTYPE html>")
+	require.Contains(t, wrapped, "<svg viewBox='0 0 10 10'></svg>")
+
+	_, ok = extractPlayableSVGHTML("just a paragraph")
+	require.False(t, ok)
+}
+
+func TestMaybeEmitCollectedDrawSVG(t *testing.T) {
+	t.Parallel()
 
 	ctx, recorder := newOpenAIExtendedTestContext()
 	svc := &AccountTestService{}
-	require.NoError(t, svc.emitOpenAIDrawSVGPreview(ctx, "gpt-5.4"))
+	svc.maybeEmitCollectedDrawSVG(ctx, "<svg id='p'></svg>")
+	require.NotContains(t, recorder.Body.String(), `"type":"svg"`)
 
-	body := recorder.Body.String()
-	require.Contains(t, body, `"type":"svg"`)
-	require.Contains(t, body, `"mime_type":"text/html"`)
-	require.Contains(t, body, "鹈鹕骑自行车")
-	require.Contains(t, body, "<svg")
-	require.NotContains(t, body, "image/png")
-	require.True(t, strings.Contains(body, `"type":"test_complete"`))
+	markAccountTestCollectDrawSVG(ctx)
+	svc.maybeEmitCollectedDrawSVG(ctx, "```svg\n<svg id='p'></svg>\n```")
+	require.Contains(t, recorder.Body.String(), `"type":"svg"`)
+	require.Contains(t, recorder.Body.String(), `"mime_type":"text/html"`)
+	require.Contains(t, recorder.Body.String(), "<svg id='p'></svg>")
+	require.NotContains(t, recorder.Body.String(), "image/png")
 }

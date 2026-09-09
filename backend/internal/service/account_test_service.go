@@ -704,19 +704,21 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	// /responses wire and does NOT apply the legacy compact-only mapping
 	// (post-#5641 semantics: compact_model_mapping is /responses/compact-only).
 	testModelID = account.GetMappedModel(testModelID)
-	if mode == AccountTestModeDraw {
-		return s.emitOpenAIDrawSVGPreview(c, testModelID)
-	}
 	if mode == AccountTestModeCompact {
 		return s.testOpenAICompactConnection(c, account, testModelID)
 	}
 	customText := mode == AccountTestModeCustomText
+	drawMode := mode == AccountTestModeDraw
 	if customText {
 		prompt = resolveOpenAICustomTextPrompt(prompt)
 	}
+	if drawMode {
+		prompt = resolveOpenAIDrawPrompt(prompt)
+		markAccountTestCollectDrawSVG(c)
+	}
 
 	// Route to image generation test if an image model is selected
-	if !customText && isOpenAIImageModel(testModelID) {
+	if !customText && !drawMode && isOpenAIImageModel(testModelID) {
 		imagePrompt := strings.TrimSpace(prompt)
 		if imagePrompt == "" {
 			imagePrompt = defaultOpenAIImageTestPrompt
@@ -770,7 +772,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		}
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
 			thinking := ""
-			if customText {
+			if customText || drawMode {
 				thinking = testOpts.ThinkingEffort
 			}
 			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken, thinking)
@@ -795,17 +797,23 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	}
 	payloadPrompt := ""
 	thinking := ""
-	if customText {
+	if customText || drawMode {
 		payloadPrompt = prompt
 		thinking = testOpts.ThinkingEffort
 	}
 	payload := createOpenAITestPayloadWithOptions(upstreamTestModelID, isOAuth, payloadPrompt, thinking)
+	if drawMode {
+		payload["max_output_tokens"] = openAIDrawMaxOutputTokens
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
 	// restart this probe after registering a replacement task.
 	if !agentIdentityTaskRecoveryWasTried(ctx) {
 		s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
+		if drawMode {
+			s.sendEvent(c, TestEvent{Type: "status", Text: "正在向 GPT 发送绘图提示词，结果将作为可播放 SVG 返回。"})
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(payloadBytes))
@@ -2047,11 +2055,17 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 		if effort := normalizeOpenAITestThinkingEffort(thinkingEffort); effort != "" {
 			payload["reasoning_effort"] = effort
 		}
+		if accountTestCollectDrawSVG(c) {
+			payload["max_tokens"] = openAIDrawMaxOutputTokens
+		}
 	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
 	s.sendEvent(c, TestEvent{Type: "status", Text: "正在通过 /v1/chat/completions 测试连接"})
+	if accountTestCollectDrawSVG(c) {
+		s.sendEvent(c, TestEvent{Type: "status", Text: "正在向 GPT 发送绘图提示词，结果将作为可播放 SVG 返回。"})
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payloadBytes))
 	if err != nil {
@@ -2789,12 +2803,14 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 	reader := bufio.NewReader(body)
 	seenJSON := false
 	seenFinish := false
+	var collected strings.Builder
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				if seenFinish {
+					s.maybeEmitCollectedDrawSVG(c, collected.String())
 					s.sendEvent(c, TestEvent{Type: "status", Text: "已通过 /v1/chat/completions 验证"})
 					s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 					return nil
@@ -2814,6 +2830,7 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
+			s.maybeEmitCollectedDrawSVG(c, collected.String())
 			s.sendEvent(c, TestEvent{Type: "status", Text: "已通过 /v1/chat/completions 验证"})
 			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 			return nil
@@ -2844,11 +2861,13 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 			}
 			if delta, ok := choice["delta"].(map[string]any); ok {
 				if text, ok := delta["content"].(string); ok && text != "" {
+					collected.WriteString(text)
 					s.sendEvent(c, TestEvent{Type: "content", Text: text})
 				}
 			}
 			if message, ok := choice["message"].(map[string]any); ok {
 				if text, ok := message["content"].(string); ok && text != "" {
+					collected.WriteString(text)
 					s.sendEvent(c, TestEvent{Type: "content", Text: text})
 				}
 			}
@@ -2863,12 +2882,14 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader) error {
 	reader := bufio.NewReader(body)
 	seenCompleted := false
+	var collected strings.Builder
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				if seenCompleted {
+					s.maybeEmitCollectedDrawSVG(c, collected.String())
 					s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 					return nil
 				}
@@ -2885,6 +2906,7 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
 			if seenCompleted {
+				s.maybeEmitCollectedDrawSVG(c, collected.String())
 				s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 				return nil
 			}
@@ -2902,13 +2924,21 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		case "response.output_text.delta":
 			// OpenAI Responses API uses "delta" field for text content
 			if delta, ok := data["delta"].(string); ok && delta != "" {
+				collected.WriteString(delta)
 				s.sendEvent(c, TestEvent{Type: "content", Text: delta})
+			}
+		case "response.output_text.done":
+			if collected.Len() == 0 {
+				if text, ok := data["text"].(string); ok && text != "" {
+					collected.WriteString(text)
+				}
 			}
 		case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
 			if delta, ok := data["delta"].(string); ok && delta != "" {
 				s.sendEvent(c, TestEvent{Type: "thinking", Text: delta})
 			}
 		case "response.completed", "response.done":
+			s.maybeEmitCollectedDrawSVG(c, collected.String())
 			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 			return nil
 		case "response.failed":
