@@ -496,9 +496,9 @@ function apiFilter(): MonitorFilter {
 // so choosing a platform narrows the other pickers without collapsing platforms.
 const platformOptions = computed(() =>
   (dimensions.value.platforms || []).map((item) => ({
-      value: item.value,
-      label: item.label,
-    }))
+    value: item.value,
+    label: item.label,
+  })),
 )
 const selectedPlatforms = computed(() => new Set(filter.value.platforms))
 const groupOptions = computed(() =>
