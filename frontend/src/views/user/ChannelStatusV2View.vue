@@ -323,6 +323,7 @@
                 <tr>
                   <th class="w-16">{{ t('channelMonitorV2.table.rank') }}</th>
                   <th>{{ t('channelMonitorV2.table.user') }}</th>
+                  <th>{{ t('channelMonitorV2.metrics.requestCount') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.successRate') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.ttftP50') }}</th>
                   <th>{{ t('channelMonitorV2.metrics.durationP50') }}</th>
@@ -349,6 +350,10 @@
                         class="badge badge-primary ml-2 !px-1.5 !py-0 text-[10px]"
                       >{{ t('channelMonitorV2.currentUser') }}</span>
                     </strong>
+                  </td>
+                  <td>
+                    <span class="block">{{ formatCount(row.metrics.request_count) }}</span>
+                    <small class="text-xs text-gray-400">{{ t('channelMonitorV2.metrics.tokenCountValue', { value: formatCount(row.metrics.token_count) }) }}</small>
                   </td>
                   <td>
                     <span class="block">{{ formatPercent(displayedSuccessRate(row.metrics)) }}</span>
@@ -425,6 +430,7 @@ import {
   formatLatencyPrivacy,
   formatMonitorDateTime,
   formatMonitorMs,
+  formatMonitorNumber,
   formatMonitorPercent,
   healthScoreClass,
   monitorDisplayedErrorRate,
@@ -737,6 +743,9 @@ function probeStatusLabel(status: string) {
     return statusLabel(status)
   }
   return t('channelStatus.matrix.noSample')
+}
+function formatCount(value: number | null | undefined) {
+  return formatMonitorNumber(value || 0)
 }
 function formatPercent(value: number) {
   return formatMonitorPercent(value)

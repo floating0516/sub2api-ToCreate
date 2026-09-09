@@ -923,7 +923,12 @@ func (r *channelMonitorV2Repository) GetUsers(ctx context.Context, filter servic
 		// Username is a local remark on this deployment; ranking labels use email only.
 		items = append(items, service.ChannelMonitorV2UserRow{UserID: &id, Email: email, DisplayLabel: email, CanDrilldown: admin, Metrics: metrics})
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].Metrics.RequestCount > items[j].Metrics.RequestCount })
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Metrics.RequestCount != items[j].Metrics.RequestCount {
+			return items[i].Metrics.RequestCount > items[j].Metrics.RequestCount
+		}
+		return items[i].Metrics.TokenCount > items[j].Metrics.TokenCount
+	})
 	return &service.ChannelMonitorV2List[service.ChannelMonitorV2UserRow]{Coverage: *coverage, Items: items}, rows.Err()
 }
 

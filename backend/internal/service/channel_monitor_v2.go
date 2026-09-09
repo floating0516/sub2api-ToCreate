@@ -702,7 +702,13 @@ func (s *ChannelMonitorV2Service) Users(ctx context.Context, filter ChannelMonit
 	for i := range result.Items {
 		row := &result.Items[i]
 		if !admin {
+			// Ranking is by request/token volume; keep those two fields so the
+			// user table can show why a row is ranked without exposing RPM/TPM.
+			requestCount := row.Metrics.RequestCount
+			tokenCount := row.Metrics.TokenCount
 			redactChannelMonitorV2Metric(&row.Metrics, hideTP)
+			row.Metrics.RequestCount = requestCount
+			row.Metrics.TokenCount = tokenCount
 		}
 		redactChannelMonitorV2UserIdentity(row)
 		if row.UserID != nil && *row.UserID == viewerID {

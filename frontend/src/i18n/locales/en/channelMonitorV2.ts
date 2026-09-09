@@ -60,6 +60,8 @@ export default {
       ttftValue: 'First token {value}',
       durationValue: 'Duration {value}',
       cacheRateValue: 'Cache rate {value}',
+      requestCount: 'Requests',
+      tokenCountValue: 'Tokens {value}',
     },
     table: { platformModel: 'Platform / Model', rank: 'Rank', user: 'Email' },
     empty: { title: 'No data to display', description: 'Try changing the time range or filters' },

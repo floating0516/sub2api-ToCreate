@@ -331,6 +331,20 @@ func TestChannelMonitorV2UsersMasksIdentityForAdmin(t *testing.T) {
 	require.Equal(t, "s***@e***.com", result.Items[1].DisplayLabel)
 }
 
+func TestChannelMonitorV2UsersKeepsRankVolumeForNonAdmin(t *testing.T) {
+	selfID, otherID := int64(7), int64(9)
+	repo := &channelMonitorV2RepoStub{config: ChannelMonitorV2Config{Enabled: true}, users: &ChannelMonitorV2List[ChannelMonitorV2UserRow]{Items: []ChannelMonitorV2UserRow{
+		{UserID: &otherID, Email: "other@example.com", Metrics: ChannelMonitorV2Metric{RequestCount: 42, TokenCount: 900, RPM: 3}},
+		{UserID: &selfID, Email: "self@example.com", Metrics: ChannelMonitorV2Metric{RequestCount: 7, TokenCount: 80, RPM: 1}},
+	}}}
+	result, err := NewChannelMonitorV2Service(repo).Users(context.Background(), ChannelMonitorV2Filter{}, selfID, false)
+	require.NoError(t, err)
+	require.Equal(t, int64(42), result.Items[0].Metrics.RequestCount)
+	require.Equal(t, int64(900), result.Items[0].Metrics.TokenCount)
+	require.Zero(t, result.Items[0].Metrics.RPM)
+	require.Equal(t, int64(7), result.Items[1].Metrics.RequestCount)
+}
+
 func TestChannelMonitorV2UsersAppendsSelfWhenMissingFromRanking(t *testing.T) {
 	selfID, otherID := int64(7), int64(9)
 	repo := &channelMonitorV2RepoStub{config: ChannelMonitorV2Config{Enabled: true}, users: &ChannelMonitorV2List[ChannelMonitorV2UserRow]{Items: []ChannelMonitorV2UserRow{

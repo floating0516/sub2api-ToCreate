@@ -60,6 +60,8 @@ export default {
       ttftValue: '首 Token {value}',
       durationValue: '请求时长 {value}',
       cacheRateValue: '缓存率 {value}',
+      requestCount: '请求量',
+      tokenCountValue: 'Token {value}',
     },
     table: { platformModel: '平台 / 模型', rank: '排名', user: '邮箱' },
     empty: { title: '没有可展示的数据', description: '尝试调整时间范围或筛选条件' },
