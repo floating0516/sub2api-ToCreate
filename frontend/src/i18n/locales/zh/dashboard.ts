@@ -681,8 +681,8 @@ export default {
       healthDetail: '正常 {healthy} / {total}',
     },
     matrix: {
-      title: '可用性趋势',
-      description: '每行是一个渠道，每个色块代表一个统计区间，悬停查看明细。',
+      title: '连通检测',
+      description: '每行是一条探活，色块来自检测历史，不是真实用户流量。',
       dimension: '渠道',
       latency: '延迟',
       ping: 'Ping',

@@ -509,7 +509,7 @@ export default {
     // Channel Monitor
     channelMonitor: {
       title: '渠道监控',
-      description: '监测各渠道的可用性、延迟和状态',
+      description: '同时管理连通检测和使用情况',
       searchPlaceholder: '搜索监控名称...',
       allProviders: '全部供应商',
       allStatus: '全部状态',

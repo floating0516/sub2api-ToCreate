@@ -2,6 +2,11 @@
 export default {
   channelMonitorV2: {
     title: 'Channel Monitor',
+    pageDescription: 'The color blocks above are connectivity probes. The tables below are real usage. They are separate datasets.',
+    usage: {
+      title: 'Usage',
+      description: 'Aggregated from real user requests: success rate and errors, not probe results.',
+    },
     updating: 'Updating data',
     updatedTo: 'Updated to {time}',
     partialCoverage: 'Partial historical coverage',
@@ -84,24 +89,22 @@ export default {
       unranked: 'Unranked',
     },
     settings: {
-      title: 'V2 data monitor config',
+      title: 'Usage',
       description:
-        'Configure passive usage aggregation dimensions (platform / model / group) and refresh cadence. Health colors and details on the user /monitor page show rates, RPM, and TPM — not absolute request volume.',
+        'Configure real-usage aggregation (platform / model / group) and refresh cadence. These numbers come only from user requests and are not blended with connectivity probes.',
       save: 'Save',
       loading: 'Loading…',
-      loadFailed: 'Failed to load V2 config',
-      saveSuccess: 'V2 monitor config saved',
-      saveFailed: 'Failed to save V2 config',
+      loadFailed: 'Failed to load usage config',
+      saveSuccess: 'Usage config saved',
+      saveFailed: 'Failed to save usage config',
       modeBanner:
-        'System mode is currently {mode}. V2 minute aggregation will not run; this config can be prepared now and takes effect after switching to {modeV2}. Change mode under System Settings → Feature switches.',
+        'Channel monitor is off, so usage aggregation will not run. You can still save this config; it applies as soon as the feature is enabled. Change this under System Settings → Feature switches.',
       modeClosed: 'Channel monitor disabled',
-      modeV1: 'V1 active probes',
-      modeV2: 'V2 passive monitoring',
-      enableTitle: 'Enable V2 aggregation',
+      enableTitle: 'Enable usage aggregation',
       enableHint:
-        'Applies when system mode is V2. Turning this off only stops this config’s aggregation; the system mode switch remains under Feature switches.',
+        'Turning this off only stops usage aggregation. Connectivity probes stay in the list above. The master switch is under Feature switches.',
       refreshTitle: 'Aggregation interval',
-      refreshHint: 'Affects matrix time granularity and refresh cadence',
+      refreshHint: 'Affects how often the usage tables refresh',
       refreshAria: 'Aggregation interval',
       platformsTitle: 'Platforms and models',
       platformsHint:
@@ -119,7 +122,7 @@ export default {
       ignoredSummary: 'Ignored {ignored} categories · counted in error rate {counted} categories',
       healthTitle: 'Health thresholds',
       healthHint:
-        'Controls user-facing color bands and overall score. Defaults are tolerant so small error rates or low cache do not immediately show as unhealthy.',
+        'Controls health colors in the usage tables. Defaults are tolerant so small error rates or low cache do not immediately show as unhealthy.',
       fields: {
         minimumSample: 'Minimum samples',
         warningError: 'Error rate watch %',
@@ -135,20 +138,17 @@ export default {
       userContractTitle: 'User-facing display contract',
       userContract: {
         health: 'Health color weights: error rate 60% + first-token P50 20% + cache rate 20% (thresholds configurable above)',
-        trend: 'Trend can switch between pulse matrix and line chart (error · cache · first token)',
+        trend: 'The color blocks on /monitor are connectivity probes; the tables below them are real usage',
         latency: 'Latency shows AVG · P50 · P90; absolute request / error counts are not shown',
         models: 'Empty model lists show real names and never dump everything into “Other”',
       },
     },
     admin: {
-      descriptionV1:
-        'System mode is V1 active probes: manage probe monitors and run checks now; V2 aggregation does not run.',
-      descriptionV2:
-        'System mode is V2 passive monitoring: configure aggregation dimensions; V1 active probes do not run.',
-      tabAria: 'Monitor management',
-      tabV2: 'V2 data monitor config',
-      tabV1Active: 'V1 active probes',
-      tabV1History: 'V1 history (probes not active in current mode)',
+      description:
+        'Connectivity probes drive the color blocks. Usage aggregation drives the request tables. Keep the two datasets separate — they are not merged into one score.',
+      probesTitle: 'Connectivity probes',
+      probesDescription:
+        'Scheduled upstream checks. Results appear as color blocks on the user page. Changing these changes the blocks, not the usage tables.',
     },
   },
 }

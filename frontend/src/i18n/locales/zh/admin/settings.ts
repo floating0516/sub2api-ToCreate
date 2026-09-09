@@ -16,18 +16,12 @@ export default {
       features: {
         channelMonitor: {
           title: '渠道监控',
-          description: '启用后在 V1 主动探测与 V2 被动用量监控中二选一。关闭后两种模式的后台任务均停止，用户端入口隐藏。',
-          configureLink: '前往 渠道管理 > 渠道监控 配置监控项',
+          description: '开启后同时运行连通检测（探活色块）和使用情况汇总（真实请求）。关闭后两类后台任务都停止，用户端入口隐藏。',
+          configureLink: '前往 渠道管理 > 渠道监控 配置探活和使用情况',
           enabled: '启用渠道监控',
-          enabledHint: '关闭后 V1 调度器与 V2 聚合均停止；已有配置与历史保留。',
-          mode: '监控模式',
-          modeHint: '默认 V1（主动探测）。仅在需要被动聚合时切换到 V2；同一时间只能启用一种实现。',
-          modeV2: 'V2 被动监控',
-          modeV1: 'V1 主动探测',
-          modeV2Hint: '需主动选择：基于真实网关流量聚合健康指标，不向上游发送探活请求；启用期间 V1 探测停止。',
-          modeV1Hint: '默认模式：按配置的渠道监控项定时发起上游健康检查（产生探测流量）。',
+          enabledHint: '关闭后探活调度和用量汇总都停止；已有配置与历史保留。',
           defaultInterval: '默认检测间隔（秒）',
-          defaultIntervalHint: '仅 V1 模式使用：新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
+          defaultIntervalHint: '新建连通检测时的默认间隔，可被单个监控项覆盖。范围 15 – 3600 秒。',
           hideThroughput: '对用户隐藏吞吐速率（RPM / TPM）',
           hideThroughputHint:
             '开启后，用户端渠道监控页面与用户 API 不返回 RPM/TPM，避免用「速率 × 时间窗」反推集群规模。管理员仍可见完整指标；错误率、延迟、缓存率照常展示。',

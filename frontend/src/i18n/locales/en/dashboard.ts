@@ -676,8 +676,8 @@ export default {
       healthDetail: 'OK {healthy} / {total}',
     },
     matrix: {
-      title: 'Availability trend',
-      description: 'Each row is a channel; each block is a time interval. Hover for details.',
+      title: 'Connectivity probes',
+      description: 'Each row is a probe. Color blocks come from check history, not real user traffic.',
       dimension: 'Channel',
       latency: 'Latency',
       ping: 'Ping',

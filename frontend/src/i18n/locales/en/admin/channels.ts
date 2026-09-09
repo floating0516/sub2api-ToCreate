@@ -509,7 +509,7 @@ export default {
     // Channel Monitor
     channelMonitor: {
       title: 'Channel Monitor',
-      description: 'Monitor channel availability, latency and status',
+      description: 'Manage connectivity probes and usage together',
       searchPlaceholder: 'Search monitor name...',
       allProviders: 'All Providers',
       allStatus: 'All Status',

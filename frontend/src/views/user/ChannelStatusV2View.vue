@@ -13,6 +13,9 @@
               </span>
               {{ t('channelMonitorV2.title') }}
             </h1>
+            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('channelMonitorV2.pageDescription') }}
+            </p>
             <div class="page-description mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <span class="relative flex h-2 w-2 shrink-0">
                 <span
@@ -203,6 +206,14 @@
 
       <section class="card flex min-h-0 flex-col overflow-hidden !rounded-3xl !border-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700">
         <div class="border-b border-gray-100 px-5 pt-4 dark:border-dark-700 sm:px-6">
+          <div class="mb-3">
+            <h2 class="text-sm font-bold text-gray-900 dark:text-white">
+              {{ t('channelMonitorV2.usage.title') }}
+            </h2>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+              {{ t('channelMonitorV2.usage.description') }}
+            </p>
+          </div>
           <nav class="tabs w-full max-w-md sm:w-auto" role="tablist" :aria-label="t('channelMonitorV2.tabs.aria')">
             <button
               v-for="item in tabs"

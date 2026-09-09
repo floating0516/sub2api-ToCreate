@@ -11,45 +11,20 @@
           {{ t('admin.channelMonitor.title') }}
         </h1>
         <p class="page-description mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-          {{
-            isV1Mode
-              ? t('channelMonitorV2.admin.descriptionV1')
-              : t('channelMonitorV2.admin.descriptionV2')
-          }}
+          {{ t('channelMonitorV2.admin.description') }}
         </p>
-        <div class="mt-4 border-t border-gray-100 pt-4 dark:border-dark-700">
-          <div
-            class="tabs inline-flex w-full max-w-xl flex-wrap sm:w-auto"
-            role="tablist"
-            :aria-label="t('channelMonitorV2.admin.tabAria')"
-          >
-            <button
-              type="button"
-              role="tab"
-              class="tab flex-1 sm:flex-none"
-              :class="adminMonitorTab === 'v2' ? 'tab-active' : ''"
-              :aria-selected="adminMonitorTab === 'v2'"
-              @click="adminMonitorTab = 'v2'"
-            >
-              {{ t('channelMonitorV2.admin.tabV2') }}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              class="tab flex-1 sm:flex-none"
-              :class="adminMonitorTab === 'legacy' ? 'tab-active' : ''"
-              :aria-selected="adminMonitorTab === 'legacy'"
-              @click="adminMonitorTab = 'legacy'"
-            >
-              {{ isV1Mode ? t('channelMonitorV2.admin.tabV1Active') : t('channelMonitorV2.admin.tabV1History') }}
-            </button>
-          </div>
-        </div>
       </header>
 
-      <MonitorSettingsPanel v-if="adminMonitorTab === 'v2'" />
-
-      <TablePageLayout v-else>
+      <section class="space-y-3">
+        <div class="px-1 sm:px-2">
+          <h2 class="text-sm font-bold text-gray-900 dark:text-white">
+            {{ t('channelMonitorV2.admin.probesTitle') }}
+          </h2>
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('channelMonitorV2.admin.probesDescription') }}
+          </p>
+        </div>
+      <TablePageLayout>
       <template #filters>
         <MonitorFiltersBar
           v-model:search="searchQuery"
@@ -134,6 +109,9 @@
         />
       </template>
       </TablePageLayout>
+      </section>
+
+      <MonitorSettingsPanel />
     </div>
 
     <MonitorFormDialog
@@ -169,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -199,12 +177,9 @@ import MonitorActionsCell from '@/components/admin/monitor/MonitorActionsCell.vu
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
 import MonitorSettingsPanel from '@/features/channel-monitor-v2/MonitorSettingsPanel.vue'
-import { isChannelMonitorV1Mode } from '@/utils/featureFlags'
 
 const { t } = useI18n()
 const appStore = useAppStore()
-const isV1Mode = computed(() => isChannelMonitorV1Mode())
-const adminMonitorTab = ref<'v2' | 'legacy'>(isChannelMonitorV1Mode() ? 'legacy' : 'v2')
 const {
   providerLabel,
   providerBadgeClass,
@@ -325,10 +300,6 @@ async function toggleEnabled(row: ChannelMonitor) {
 }
 
 async function handleRunNow(row: ChannelMonitor) {
-  if (!isV1Mode.value) {
-    appStore.showError(t('admin.channelMonitor.runFailed'))
-    return
-  }
   if (runningId.value != null) return
   runningId.value = row.id
   try {
@@ -382,11 +353,8 @@ async function confirmDelete() {
   }
 }
 
-watch(adminMonitorTab, (tab) => {
-  if (tab === 'legacy' && monitors.value.length === 0) void reload()
-})
 onMounted(() => {
-  if (adminMonitorTab.value === 'legacy') void reload()
+  void reload()
 })
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout)
