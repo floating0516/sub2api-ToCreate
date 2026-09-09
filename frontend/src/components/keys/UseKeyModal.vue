@@ -28,6 +28,28 @@
           {{ platformDescription }}
         </p>
 
+        <div v-if="showModels || (models && models.length)" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+          <div class="mb-1 flex items-center justify-between gap-3">
+            <p class="text-sm font-medium text-gray-900 dark:text-white">
+              {{ t('keys.useKeyModal.modelsTitle') }}
+            </p>
+            <RouterLink
+              to="/available-channels"
+              class="text-xs text-primary-600 hover:underline dark:text-primary-400"
+            >
+              {{ t('keys.useKeyModal.viewChannels') }}
+            </RouterLink>
+          </div>
+          <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('keys.useKeyModal.modelsHint') }}
+          </p>
+          <KeyModelChips
+            :models="models ?? []"
+            :max-visible="0"
+            :empty-label="t('keys.useKeyModal.modelsEmpty')"
+          />
+        </div>
+
         <!-- Client Tabs -->
         <div v-if="clientTabs.length" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
           <nav class="-mb-px flex min-w-max gap-4 sm:gap-6" aria-label="Client">
@@ -256,10 +278,12 @@
 
 <script setup lang="ts">
 import { ref, computed, h, watch, type Component } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import KeyModelChips from '@/components/keys/KeyModelChips.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
@@ -276,6 +300,8 @@ interface Props {
   baseUrl: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  models?: string[]
+  showModels?: boolean
 }
 
 interface Emits {

@@ -50,11 +50,9 @@
 
         <template #cell-message="{ row }">
           <span
-            v-if="row.message"
-            class="block max-w-[280px] truncate text-sm text-gray-600 dark:text-gray-400"
-            :title="row.message"
-          >{{ row.message }}</span>
-          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+            class="block max-w-[320px] truncate text-sm text-gray-700 dark:text-gray-300"
+            :title="row.message || undefined"
+          >{{ t(userErrorHintI18nKey(row)) }}</span>
         </template>
 
         <template #cell-group="{ row }">
@@ -137,6 +135,7 @@ import {
   requestTypeLabelKey,
   statusCodeBadgeClass,
 } from '@/utils/errorBadges'
+import { userErrorHintI18nKey } from '@/utils/userErrorHint'
 import type { UserErrorRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 

@@ -55,9 +55,14 @@
         </div>
       </div>
 
+      <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/30">
+        <span class="font-medium text-amber-800 dark:text-amber-200">{{ t('usage.errors.hint') }}</span>
+        <p class="mt-0.5 text-amber-900 dark:text-amber-100">{{ t(userErrorHintI18nKey(detail)) }}</p>
+      </div>
+
       <!-- Message -->
       <div v-if="detail.message">
-        <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.message') }}</span>
+        <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.originalMessage') }}</span>
         <p class="mt-0.5 text-gray-900 dark:text-dark-100 break-all">{{ detail.message }}</p>
       </div>
 
@@ -76,6 +81,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { getMyErrorDetail } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
+import { userErrorHintI18nKey } from '@/utils/userErrorHint'
 import type { UserErrorRequestDetail } from '@/types'
 
 const props = defineProps<{

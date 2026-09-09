@@ -174,6 +174,14 @@
             </div>
           </template>
 
+          <template v-if="availableChannelsEnabled" #cell-models="{ row }">
+            <KeyModelChips
+              :models="modelsForGroup(row.group_id)"
+              :max-visible="4"
+              show-view-all
+            />
+          </template>
+
           <template #cell-current_concurrency="{ value }">
             <span
               :class="[
@@ -1008,6 +1016,8 @@
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :models="modelsForGroup(selectedKey?.group_id)"
+      :show-models="availableChannelsEnabled"
       @close="closeUseKeyModal"
     />
 
@@ -1139,7 +1149,9 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { getLiheIntegration, type LiheIntegration } from '@/api/liheOAuth'
 
 const { t } = useI18n()
-import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import { keysAPI, authAPI, usageAPI, userGroupsAPI, userChannelsAPI } from '@/api'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
+import { modelsByGroupId } from '@/utils/keyAvailableModels'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import DataTable from '@/components/common/DataTable.vue'
@@ -1151,6 +1163,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+	import KeyModelChips from '@/components/keys/KeyModelChips.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1194,6 +1207,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'id', label: t('keys.id'), sortable: true },
   { key: 'key', label: t('keys.apiKey'), sortable: false },
   { key: 'group', label: t('keys.group'), sortable: false },
+  { key: 'models', label: t('keys.models'), sortable: false },
   { key: 'current_concurrency', label: t('keys.currentConcurrency'), sortable: true },
   { key: 'usage', label: t('keys.usage'), sortable: false },
   { key: 'rate_limit', label: t('keys.rateLimitColumn'), sortable: false },
@@ -1216,7 +1230,11 @@ const VERSION_NEW_HIDDEN_COLUMNS: Record<number, string[]> = {
 }
 
 const toggleableColumns = computed(() =>
-  allColumns.value.filter((col) => !ALWAYS_VISIBLE_COLUMNS.has(col.key))
+  allColumns.value.filter((col) => {
+    if (ALWAYS_VISIBLE_COLUMNS.has(col.key)) return false
+    if (col.key === 'models' && !availableChannelsEnabled.value) return false
+    return true
+  })
 )
 
 const hiddenColumns = reactive<Set<string>>(new Set())
@@ -1279,8 +1297,13 @@ const toggleColumn = (key: string) => {
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key)
 
+const availableChannelsEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.availableChannels))
+
 const columns = computed<Column[]>(() =>
-  allColumns.value.filter((col) => ALWAYS_VISIBLE_COLUMNS.has(col.key) || !hiddenColumns.has(col.key))
+  allColumns.value.filter((col) => {
+    if (col.key === 'models' && !availableChannelsEnabled.value) return false
+    return ALWAYS_VISIBLE_COLUMNS.has(col.key) || !hiddenColumns.has(col.key)
+  })
 )
 
 const apiKeys = ref<ApiKey[]>([])
@@ -1291,6 +1314,7 @@ const now = ref(new Date())
 let resetTimer: ReturnType<typeof setInterval> | null = null
 const usageStats = ref<Record<string, BatchApiKeyUsageStats>>({})
 const userGroupRates = ref<Record<number, number>>({})
+const groupModels = ref<Record<number, string[]>>({})
 
 const pagination = ref({
   page: 1,
@@ -1533,6 +1557,25 @@ const loadUserGroupRates = async () => {
     userGroupRates.value = await userGroupsAPI.getUserGroupRates()
   } catch (error) {
     console.error('Failed to load user group rates:', error)
+  }
+}
+
+const modelsForGroup = (groupId?: number | null): string[] => {
+  if (!groupId) return []
+  return groupModels.value[groupId] ?? []
+}
+
+const loadAvailableModels = async () => {
+  if (!availableChannelsEnabled.value) {
+    groupModels.value = {}
+    return
+  }
+  try {
+    const channels = await userChannelsAPI.getAvailable()
+    groupModels.value = modelsByGroupId(channels)
+  } catch (error) {
+    console.error('Failed to load available models:', error)
+    groupModels.value = {}
   }
 }
 
@@ -2006,6 +2049,7 @@ onMounted(() => {
   loadGroups()
   loadUserGroupRates()
   loadPublicSettings()
+  loadAvailableModels()
   document.addEventListener('click', closeGroupSelector)
   resetTimer = setInterval(() => { now.value = new Date() }, 60000)
 })
