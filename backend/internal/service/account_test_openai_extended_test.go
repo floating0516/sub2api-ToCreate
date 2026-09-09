@@ -57,6 +57,21 @@ func TestCreateOpenAITestPayloadWithOptions_CustomTextAndThinking(t *testing.T) 
 	require.Contains(t, string(raw), `"text":"一段测试文字"`)
 	require.Contains(t, string(raw), `"effort":"high"`)
 	require.NotContains(t, string(raw), `"text":"hi"`)
+	require.NotContains(t, string(raw), "max_output_tokens")
+	require.NotContains(t, string(raw), "max_tokens")
+}
+
+func TestCreateOpenAITestPayloadWithOptions_DrawMatchesWorkingProbes(t *testing.T) {
+	t.Parallel()
+
+	payload := createOpenAITestPayloadWithOptions("gpt-5.4", true, defaultOpenAIDrawPrompt, "medium")
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"text":"`+defaultOpenAIDrawPrompt+`"`)
+	require.Contains(t, string(raw), `"effort":"medium"`)
+	require.Contains(t, string(raw), `"store":false`)
+	require.NotContains(t, string(raw), "max_output_tokens")
+	require.NotContains(t, string(raw), "max_tokens")
 }
 
 func TestResolveOpenAICustomTextPrompt(t *testing.T) {

@@ -802,9 +802,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		thinking = testOpts.ThinkingEffort
 	}
 	payload := createOpenAITestPayloadWithOptions(upstreamTestModelID, isOAuth, payloadPrompt, thinking)
-	if drawMode {
-		payload["max_output_tokens"] = openAIDrawMaxOutputTokens
-	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -2054,9 +2051,6 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	if account.IsOpenAI() {
 		if effort := normalizeOpenAITestThinkingEffort(thinkingEffort); effort != "" {
 			payload["reasoning_effort"] = effort
-		}
-		if accountTestCollectDrawSVG(c) {
-			payload["max_tokens"] = openAIDrawMaxOutputTokens
 		}
 	}
 	payloadBytes, _ := json.Marshal(payload)

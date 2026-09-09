@@ -14,7 +14,6 @@ const (
 	AccountTestModeDraw = "draw"
 
 	accountTestCollectDrawSVGKey = "account_test_collect_draw_svg"
-	openAIDrawMaxOutputTokens    = 16384
 
 	defaultOpenAICustomTextPrompt = "请用一段不超过80字的生动文字，描写一只鹈鹕第一次骑自行车的情景，结尾带一个意外的小转折。"
 	// defaultOpenAIDrawPrompt is the user-provided drawing prompt.
