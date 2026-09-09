@@ -88,10 +88,16 @@ export function buildProbeMatrixRows(
     return {
       id: item.id,
       label: probeRowLabel(item, labelFor),
-      status: worstStatus([item.primary_status, ...points.map((point) => point.status)]),
-      availability: item.availability_7d != null && !Number.isNaN(item.availability_7d)
-        ? item.availability_7d
-        : probeAvailability(points),
+      status: worstStatus(
+        points.length
+          ? points.map((point) => point.status)
+          : [item.primary_status],
+      ),
+      availability: probeAvailability(points) ?? (
+        item.availability_7d != null && !Number.isNaN(item.availability_7d)
+          ? item.availability_7d
+          : null
+      ),
       latency: formatMonitorMs(item.primary_latency_ms ?? averageNullable(points.map((point) => point.latency_ms))),
       ping: formatMonitorMs(item.primary_ping_latency_ms ?? averageNullable(points.map((point) => point.ping_latency_ms))),
       cells: buildAlignedCells(points, start, now, formatStatus, noSample),

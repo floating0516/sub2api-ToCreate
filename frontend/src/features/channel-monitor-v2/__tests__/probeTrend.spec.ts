@@ -97,4 +97,32 @@ describe('probeTrend', () => {
     expect(grown.map((row) => row.label)).toEqual(['Pro 渠道', 'Claude Opus', 'Claude 0.6', 'Gemini Flash'])
     expect(grown[3].id).toBe(12)
   })
+
+  it('uses the selected window for availability instead of the 7-day field', () => {
+    const now = Date.parse('2026-09-08T14:00:00Z')
+    const rows = buildProbeMatrixRows(
+      [
+        monitor({
+          id: 12,
+          name: 'Gemini Flash',
+          provider: 'gemini',
+          availability_7d: 0,
+          primary_status: 'failed',
+          timeline: [
+            { status: 'operational', latency_ms: 200, ping_latency_ms: 20, checked_at: '2026-09-08T13:30:00Z' },
+            { status: 'operational', latency_ms: 180, ping_latency_ms: 18, checked_at: '2026-09-08T13:00:00Z' },
+          ],
+        }),
+      ],
+      '90m',
+      [],
+      [],
+      (group) => group.label,
+      (status) => status,
+      '无探测',
+      now,
+    )
+    expect(rows[0].availability).toBe(100)
+    expect(rows[0].status).toBe('operational')
+  })
 })

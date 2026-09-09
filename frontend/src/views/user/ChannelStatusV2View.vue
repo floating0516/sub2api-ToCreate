@@ -495,9 +495,7 @@ function apiFilter(): MonitorFilter {
 // Full platform catalog (never pruned). Groups/models cascade by selected platforms
 // so choosing a platform narrows the other pickers without collapsing platforms.
 const platformOptions = computed(() =>
-  (dimensions.value.platforms || [])
-    .filter((item) => (item.request_count || 0) > 0)
-    .map((item) => ({
+  (dimensions.value.platforms || []).map((item) => ({
       value: item.value,
       label: item.label,
     }))
@@ -519,10 +517,9 @@ const modelOptions = computed(() =>
   (dimensions.value.models || [])
     .filter(
       (item) =>
-        (item.request_count || 0) > 0 &&
-        (selectedPlatforms.value.size === 0 ||
-          !item.platform ||
-          selectedPlatforms.value.has(item.platform)),
+        selectedPlatforms.value.size === 0 ||
+        !item.platform ||
+        selectedPlatforms.value.has(item.platform),
     )
     .map((item) => ({
       value: item.value,
@@ -560,9 +557,7 @@ watch(
   },
   { flush: 'post' },
 )
-const visibleModelRows = computed(() =>
-  (modelRows.value || []).filter((row) => (row.metrics?.request_count || 0) > 0),
-)
+const visibleModelRows = computed(() => modelRows.value || [])
 const activeRowsEmpty = computed(() =>
   activeTab.value === 'models'
     ? visibleModelRows.value.length === 0
