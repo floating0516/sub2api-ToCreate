@@ -682,7 +682,7 @@ export default {
     },
     matrix: {
       title: '可用性趋势',
-      description: '每行是你配置的主动探测渠道，每个色块是一次探测结果，不是用户请求',
+      description: '每行是一条你配置的探测渠道，色块是探测结果',
       dimension: '渠道',
       latency: '延迟',
       ping: 'Ping',

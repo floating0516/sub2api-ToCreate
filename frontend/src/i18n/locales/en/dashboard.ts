@@ -677,7 +677,7 @@ export default {
     },
     matrix: {
       title: 'Availability trend',
-      description: 'Each row is an admin probe you configured. Each block is a probe result, not user traffic.',
+      description: 'Each row is a probe channel you configured; each block is a probe result.',
       dimension: 'Channel',
       latency: 'Latency',
       ping: 'Ping',

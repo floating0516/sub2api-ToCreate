@@ -1,6 +1,9 @@
 /**
  * Build the /monitor availability heatmap from admin probe histories,
  * not from user usage logs.
+ *
+ * One enabled probe = one row. Adding a monitor later grows the matrix
+ * without another frontend code change.
  */
 import type { MonitorTimelinePoint, UserMonitorView } from '@/api/channelMonitor'
 import type { MonitorRange } from '@/api/channelMonitorV2'
@@ -21,8 +24,31 @@ const RANGE_MS: Record<MonitorRange, number> = {
 
 const PROBE_BUCKET_MS = 30 * 60 * 1000
 
+/** Friendly labels for the current product probes; anything else uses the monitor name. */
+const PROBE_LABEL_ALIASES: Record<string, MonitorDisplayGroup['id']> = {
+  'gpt-pro': 'pro',
+  'claude x cursor': 'claude_opus',
+  'claude_0.6': 'claude_06',
+}
+
 export function resolveProbeDisplayGroup(item: UserMonitorView): MonitorDisplayGroup | null {
+  const aliasId = PROBE_LABEL_ALIASES[normalizeProbeName(item.name)]
+  if (aliasId) {
+    return MONITOR_DISPLAY_GROUPS.find((group) => group.id === aliasId) || null
+  }
   return resolveDisplayGroup(undefined, item.name || item.group_name, item.provider)
+}
+
+export function probeRowLabel(
+  item: UserMonitorView,
+  labelFor: (group: MonitorDisplayGroup) => string,
+): string {
+  const aliasId = PROBE_LABEL_ALIASES[normalizeProbeName(item.name)]
+  if (aliasId) {
+    const group = MONITOR_DISPLAY_GROUPS.find((entry) => entry.id === aliasId)
+    if (group) return labelFor(group)
+  }
+  return (item.name || item.group_name || '').trim() || `探测 ${item.id}`
 }
 
 export function buildProbeMatrixRows(
@@ -38,49 +64,52 @@ export function buildProbeMatrixRows(
   const start = now - RANGE_MS[range]
   const selected = new Set(selectedGroupKeys)
   const platforms = new Set(selectedPlatforms)
-  const buckets = new Map<string, UserMonitorView[]>()
 
-  for (const item of items) {
-    if (platforms.size && !platforms.has(item.provider)) continue
+  const visible = items.filter((item) => {
+    if (platforms.size && !platforms.has(item.provider)) return false
+    if (!selected.size) return true
     const group = resolveProbeDisplayGroup(item)
-    if (!group) continue
-    if (selected.size && !selected.has(group.id)) continue
-    const list = buckets.get(group.id)
-    if (list) list.push(item)
-    else buckets.set(group.id, [item])
-  }
+    return Boolean(group && selected.has(group.id))
+  })
 
-  return MONITOR_DISPLAY_GROUPS.filter((group) => buckets.has(group.id)).map((group) => {
-    const members = buckets.get(group.id) || []
-    const points = members
-      .flatMap((item) => item.timeline || [])
+  visible.sort((a, b) => {
+    const rankDiff = probeSortRank(a) - probeSortRank(b)
+    if (rankDiff !== 0) return rankDiff
+    return probeRowLabel(a, (group) => group.label).localeCompare(
+      probeRowLabel(b, (group) => group.label),
+      'zh',
+    )
+  })
+
+  return visible.map((item) => {
+    const points = (item.timeline || [])
       .filter((point) => Date.parse(point.checked_at) >= start)
       .sort((a, b) => Date.parse(a.checked_at) - Date.parse(b.checked_at))
-
-    const availabilities = members
-      .map((item) => item.availability_7d)
-      .filter((value): value is number => value != null && !Number.isNaN(value))
-    const latest = pickLatestMember(members)
     return {
-      id: latest?.id || group.groupIds[0] || 0,
-      label: labelFor(group),
-      status: worstStatus(members.map((item) => item.primary_status)),
-      availability: availabilities.length
-        ? availabilities.reduce((sum, value) => sum + value, 0) / availabilities.length
+      id: item.id,
+      label: probeRowLabel(item, labelFor),
+      status: worstStatus([item.primary_status, ...points.map((point) => point.status)]),
+      availability: item.availability_7d != null && !Number.isNaN(item.availability_7d)
+        ? item.availability_7d
         : probeAvailability(points),
-      latency: formatMonitorMs(latest?.primary_latency_ms ?? averageNullable(points.map((point) => point.latency_ms))),
-      ping: formatMonitorMs(latest?.primary_ping_latency_ms ?? averageNullable(points.map((point) => point.ping_latency_ms))),
+      latency: formatMonitorMs(item.primary_latency_ms ?? averageNullable(points.map((point) => point.latency_ms))),
+      ping: formatMonitorMs(item.primary_ping_latency_ms ?? averageNullable(points.map((point) => point.ping_latency_ms))),
       cells: buildAlignedCells(points, start, now, formatStatus, noSample),
     }
   })
 }
 
-function pickLatestMember(members: UserMonitorView[]): UserMonitorView | undefined {
-  return [...members].sort((a, b) => {
-    const aTime = Date.parse(a.timeline?.[0]?.checked_at || '') || 0
-    const bTime = Date.parse(b.timeline?.[0]?.checked_at || '') || 0
-    return bTime - aTime
-  })[0]
+function normalizeProbeName(name?: string): string {
+  return (name || '').trim().toLowerCase()
+}
+
+function probeSortRank(item: UserMonitorView): number {
+  const aliasId = PROBE_LABEL_ALIASES[normalizeProbeName(item.name)]
+  if (aliasId) {
+    const index = MONITOR_DISPLAY_GROUPS.findIndex((group) => group.id === aliasId)
+    if (index >= 0) return index
+  }
+  return MONITOR_DISPLAY_GROUPS.length + item.id
 }
 
 function buildAlignedCells(
