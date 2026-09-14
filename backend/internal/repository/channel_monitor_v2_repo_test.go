@@ -12,20 +12,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestChannelMonitorV2DisplayModelKeepsEveryRealName(t *testing.T) {
+func TestChannelMonitorV2DisplayModelKeepsEveryRealNameWhenNoCatalog(t *testing.T) {
 	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{
-		{Platform: "openai", Enabled: true, Models: []string{"shared", "gpt-5"}},
-		{Platform: "grok", Enabled: true, Models: []string{"grok-4"}},
 		{Platform: "anthropic", Enabled: true, Models: []string{}},
 	}}
-	require.Equal(t, "shared", channelMonitorV2DisplayModel(cfg, "openai", "shared"))
-	require.Equal(t, "shared", channelMonitorV2DisplayModel(cfg, "grok", "shared"))
-	require.Equal(t, "gpt-6-astra", channelMonitorV2DisplayModel(cfg, "openai", "gpt-6-astra"))
 	require.Equal(t, "claude-sonnet-4", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-4"))
-	require.Equal(t, "gemini-2.5-pro", channelMonitorV2DisplayModel(cfg, "gemini", "gemini-2.5-pro"))
+	require.Equal(t, "gpt-6-astra", channelMonitorV2DisplayModel(cfg, "openai", "gpt-6-astra"))
 	require.Equal(t, "unknown", channelMonitorV2DisplayModel(cfg, "openai", "  "))
-	require.True(t, channelMonitorV2ModelSelected(service.ChannelMonitorV2Filter{Models: []string{"shared"}}, cfg, "grok", "shared"))
-	require.False(t, channelMonitorV2ModelSelected(service.ChannelMonitorV2Filter{Models: []string{service.ChannelMonitorV2OtherModel}}, cfg, "grok", "shared"))
+}
+
+func TestChannelMonitorV2DisplayModelUsesProbeCatalogAsAllowList(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{
+		Platforms: []service.ChannelMonitorV2PlatformConfig{{Platform: "anthropic", Enabled: true, Models: []string{}}},
+		RuntimeCatalog: map[string][]string{
+			"anthropic": {"claude-sonnet-5"},
+		},
+	}
+	require.Equal(t, "claude-sonnet-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5"))
+	require.Equal(t, "claude-sonnet-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5-thinking"))
+	require.Equal(t, service.ChannelMonitorV2OtherModel, channelMonitorV2DisplayModel(cfg, "anthropic", "claude-fable-5-1"))
+	require.False(t, channelMonitorV2KeepDisplayedModel(cfg, "anthropic", service.ChannelMonitorV2OtherModel))
+	require.Equal(t, []string{"claude-sonnet-5"}, channelMonitorV2NamedModels(cfg, "anthropic"))
+}
+
+func TestChannelMonitorV2DisplayModelFoldsAllowListDatedAliases(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{
+		{Platform: "anthropic", Enabled: true, Models: []string{"claude-haiku-4-5"}},
+	}}
+	require.Equal(t, "claude-haiku-4-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-haiku-4-5-20251001"))
+	require.Equal(t, service.ChannelMonitorV2OtherModel, channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5"))
 }
 
 func TestChannelMonitorV2MatrixDimensionKey(t *testing.T) {
@@ -33,7 +48,7 @@ func TestChannelMonitorV2MatrixDimensionKey(t *testing.T) {
 	key := channelMonitorV2MatrixDimensionKey(service.ChannelMonitorV2GroupByPlatformGroupModel, cfg, "openai", 7, "gpt-5")
 	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai", groupID: 7, model: "gpt-5"}, key)
 	key = channelMonitorV2MatrixDimensionKey(service.ChannelMonitorV2GroupByPlatformModel, cfg, "openai", 7, "unlisted")
-	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai", model: "unlisted"}, key)
+	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai", model: service.ChannelMonitorV2OtherModel}, key)
 	key = channelMonitorV2MatrixDimensionKey(service.ChannelMonitorV2GroupByPlatform, cfg, "openai", 7, "gpt-5")
 	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai"}, key)
 }
