@@ -79,14 +79,14 @@ SELECT EXISTS (
             OR (
                 include_subdomains = TRUE
                 AND LENGTH($1) > LENGTH(domain)
-                AND RIGHT($1, LENGTH(domain) + 1) = '.' || domain
+				AND SUBSTR($1, LENGTH($1) - LENGTH(domain), LENGTH(domain) + 1) = '.' || domain
             )
        )
 )`, domain)
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {

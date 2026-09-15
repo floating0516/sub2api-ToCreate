@@ -29,7 +29,7 @@ func TestUserRepositoryIsEmailDomainBlacklisted(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = db.Close() })
 
-			mock.ExpectQuery(`(?s)SELECT EXISTS \(.*FROM email_domain_blacklist.*RIGHT`).
+			mock.ExpectQuery(`(?s)SELECT EXISTS \(.*FROM email_domain_blacklist.*SUBSTR`).
 				WithArgs("mail.12api.buzz").
 				WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(tt.row))
 

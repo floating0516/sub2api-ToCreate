@@ -117,6 +117,13 @@ CREATE TABLE IF NOT EXISTS user_provider_default_grants (
 	UNIQUE(user_id, provider_type, grant_reason)
 )`)
 	require.NoError(t, err)
+	_, err = db.Exec(`
+CREATE TABLE IF NOT EXISTS email_domain_blacklist (
+	domain TEXT PRIMARY KEY,
+	enabled BOOLEAN NOT NULL DEFAULT TRUE,
+	include_subdomains BOOLEAN NOT NULL DEFAULT TRUE
+)`)
+	require.NoError(t, err)
 
 	drv := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
