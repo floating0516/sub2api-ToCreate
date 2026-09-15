@@ -58,6 +58,52 @@ func (r *userRepository) CountUsersByEmailDomain(ctx context.Context, domain str
 	return countUsersByEmailDomainWithClient(ctx, clientFromContext(ctx, r.client), domain)
 }
 
+// IsEmailDomainBlacklisted checks the full email domain against enabled exact
+// entries and entries configured to include subdomains.
+func (r *userRepository) IsEmailDomainBlacklisted(ctx context.Context, domain string) (bool, error) {
+	domain = normalizeEmailDomainForBlacklist(domain)
+	if domain == "" {
+		return false, nil
+	}
+	if r.sql == nil {
+		return false, errors.New("email domain blacklist repository is not configured")
+	}
+
+	rows, err := r.sql.QueryContext(ctx, `
+SELECT EXISTS (
+    SELECT 1
+      FROM email_domain_blacklist
+     WHERE enabled = TRUE
+       AND (
+            domain = $1
+            OR (
+                include_subdomains = TRUE
+                AND LENGTH($1) > LENGTH(domain)
+                AND RIGHT($1, LENGTH(domain) + 1) = '.' || domain
+            )
+       )
+)`, domain)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return false, err
+		}
+		return false, sql.ErrNoRows
+	}
+	var blacklisted bool
+	if err := rows.Scan(&blacklisted); err != nil {
+		return false, err
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	return blacklisted, nil
+}
+
 // CreateWithEmailAliasGuardAndDomainLimit 串行化非白名单域名的注册请求，
 // 并在用户写入的同一事务内复查域名额度。
 func (r *userRepository) CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, userIn *service.User, domain string) error {
@@ -149,6 +195,9 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetRpmLimit(userIn.RPMLimit).
 		Save(txCtx)
 	if err != nil {
+		if isEmailDomainBlacklistViolation(err) {
+			return service.ErrEmailDomainBlacklisted
+		}
 		return translatePersistenceError(err, nil, service.ErrEmailExists)
 	}
 
@@ -1450,6 +1499,22 @@ func registrationEmailDomainLockKey(domain string) string {
 
 func normalizeEmailDomain(domain string) string {
 	return service.NormalizeRegistrationEmailDomain(domain)
+}
+
+func normalizeEmailDomainForBlacklist(domain string) string {
+	domain = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(domain, "@")))
+	return strings.TrimRight(domain, ".")
+}
+
+func isEmailDomainBlacklistViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr != nil && pqErr.Code == "23514" && strings.Contains(pqErr.Message, "EMAIL_DOMAIN_BLACKLISTED:") {
+		return true
+	}
+	return strings.Contains(err.Error(), "EMAIL_DOMAIN_BLACKLISTED:")
 }
 
 func countUsersByEmailDomainWithClient(ctx context.Context, client *dbent.Client, domain string) (int, error) {

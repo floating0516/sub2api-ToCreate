@@ -519,6 +519,54 @@ func TestAuthService_SendVerifyCodeAsync_NonWhitelistDomainRejectedWhenQuotaDisa
 	require.ErrorIs(t, err, ErrEmailSuffixNotAllowed)
 }
 
+func TestAuthService_SendVerifyCode_BlacklistedDomainRejectedBeforeSending(t *testing.T) {
+	repo := &userRepoStub{blacklistedDomains: map[string]bool{"mail.12api.buzz": true}}
+	svc := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	err := svc.SendVerifyCode(context.Background(), "user@MAIL.12API.BUZZ.")
+
+	require.ErrorIs(t, err, ErrEmailDomainBlacklisted)
+	appErr := infraerrors.FromError(err)
+	require.Equal(t, "EMAIL_DOMAIN_BLACKLISTED", appErr.Reason)
+	require.Equal(t, []string{"mail.12api.buzz"}, repo.blacklistChecks)
+}
+
+func TestAuthService_Register_BlacklistedDomainRejectedBeforeCreate(t *testing.T) {
+	repo := &userRepoStub{blacklistedDomains: map[string]bool{"12api.buzz": true}}
+	svc := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	_, _, err := svc.Register(context.Background(), "user@12api.buzz", "password")
+
+	require.ErrorIs(t, err, ErrEmailDomainBlacklisted)
+	require.Empty(t, repo.created)
+}
+
+func TestAuthService_SendVerifyCodeAsync_BlacklistedDomainRejectedBeforeEnqueue(t *testing.T) {
+	repo := &userRepoStub{blacklistedDomains: map[string]bool{"mail.12api.buzz": true}}
+	svc := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	_, err := svc.SendVerifyCodeAsync(context.Background(), "user@mail.12api.buzz")
+
+	require.ErrorIs(t, err, ErrEmailDomainBlacklisted)
+}
+
+func TestAuthService_SendVerifyCode_BlacklistLookupFailureIsUnavailable(t *testing.T) {
+	repo := &userRepoStub{blacklistErr: errors.New("db down")}
+	svc := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled: "true",
+	}, nil, nil)
+
+	err := svc.SendVerifyCode(context.Background(), "user@example.com")
+
+	require.ErrorIs(t, err, ErrServiceUnavailable)
+}
+
 func TestAuthService_Register_EmptyWhitelistAllowsAllDomains(t *testing.T) {
 	repo := &userRepoStub{nextID: 10}
 	svc := newAuthService(repo, map[string]string{

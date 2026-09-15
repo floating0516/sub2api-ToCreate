@@ -32,8 +32,19 @@ type userRepoStub struct {
 	getByEmailMisses     int
 	domainCounts         map[string]int
 	domainCountErr       error
+	blacklistedDomains   map[string]bool
+	blacklistErr         error
+	blacklistChecks      []string
 	domainLimitErr       error
 	domainLimitedCreates int
+}
+
+func (s *userRepoStub) IsEmailDomainBlacklisted(_ context.Context, domain string) (bool, error) {
+	s.blacklistChecks = append(s.blacklistChecks, domain)
+	if s.blacklistErr != nil {
+		return false, s.blacklistErr
+	}
+	return s.blacklistedDomains[domain], nil
 }
 
 func (s *userRepoStub) CountUsersByEmailDomain(_ context.Context, domain string) (int, error) {

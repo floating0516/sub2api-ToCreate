@@ -167,6 +167,8 @@ func (s *AuthService) RegisterOAuthEmailAccount(
 		switch {
 		case errors.Is(err, ErrEmailExists):
 			return nil, nil, ErrEmailExists
+		case errors.Is(err, ErrEmailDomainBlacklisted):
+			return nil, nil, ErrEmailDomainBlacklisted
 		case errors.Is(err, ErrEmailDomainRegistrationLimit):
 			return nil, nil, ErrEmailDomainRegistrationLimit
 		default:
@@ -254,6 +256,8 @@ func (s *AuthService) RegisterVerifiedOAuthEmailAccount(
 		switch {
 		case errors.Is(err, ErrEmailExists):
 			return nil, nil, ErrEmailExists
+		case errors.Is(err, ErrEmailDomainBlacklisted):
+			return nil, nil, ErrEmailDomainBlacklisted
 		case errors.Is(err, ErrEmailDomainRegistrationLimit):
 			return nil, nil, ErrEmailDomainRegistrationLimit
 		default:

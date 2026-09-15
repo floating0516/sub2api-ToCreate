@@ -194,6 +194,12 @@ type RegistrationEmailDomainRepository interface {
 	CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, user *User, domain string) error
 }
 
+// RegistrationEmailBlacklistRepository 是注册与验证码发送路径的邮箱域名黑名单查询能力。
+// 它保持为可选窄接口，避免扩大通用 UserRepository 的实现面。
+type RegistrationEmailBlacklistRepository interface {
+	IsEmailDomainBlacklisted(ctx context.Context, domain string) (bool, error)
+}
+
 // RedeemUserAdjustmentRepository provides the atomic, floor-at-zero updates
 // used by negative-value redeem codes. It is intentionally narrower than
 // UserRepository because normal usage billing is allowed to overdraw.

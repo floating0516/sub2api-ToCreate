@@ -103,6 +103,42 @@ func (s *UserRepoSuite) TestCreateWithEmailAliasGuardAndDomainLimitConcurrent() 
 	s.Require().Equal(1, count)
 }
 
+func (s *UserRepoSuite) TestIsEmailDomainBlacklisted() {
+	suffix := strings.ToLower(strings.ReplaceAll(time.Now().Format("150405.000000000"), ".", ""))
+	blockedDomain := "blocked-" + suffix + ".example"
+	exactOnlyDomain := "exact-" + suffix + ".example"
+	disabledDomain := "disabled-" + suffix + ".example"
+
+	_, err := integrationDB.ExecContext(s.ctx, `
+INSERT INTO email_domain_blacklist (domain, enabled, include_subdomains)
+VALUES ($1, TRUE, TRUE), ($2, TRUE, FALSE), ($3, FALSE, TRUE)
+`, blockedDomain, exactOnlyDomain, disabledDomain)
+	s.Require().NoError(err)
+	s.T().Cleanup(func() {
+		_, _ = integrationDB.ExecContext(context.Background(), `
+DELETE FROM email_domain_blacklist WHERE domain IN ($1, $2, $3)
+`, blockedDomain, exactOnlyDomain, disabledDomain)
+	})
+
+	tests := []struct {
+		domain string
+		want   bool
+	}{
+		{domain: blockedDomain, want: true},
+		{domain: "mail." + blockedDomain, want: true},
+		{domain: exactOnlyDomain, want: true},
+		{domain: "mail." + exactOnlyDomain, want: false},
+		{domain: disabledDomain, want: false},
+		{domain: "safe-" + suffix + ".example", want: false},
+	}
+
+	for _, tt := range tests {
+		got, err := s.repo.IsEmailDomainBlacklisted(s.ctx, tt.domain)
+		s.Require().NoError(err)
+		s.Require().Equal(tt.want, got, tt.domain)
+	}
+}
+
 func (s *UserRepoSuite) mustCreateGroup(name string) *service.Group {
 	s.T().Helper()
 

@@ -42,6 +42,10 @@ var (
 		"EMAIL_DOMAIN_REGISTRATION_LIMIT",
 		"this email domain cannot register another account; use a mainstream email or contact support to add the enterprise domain",
 	)
+	ErrEmailDomainBlacklisted = infraerrors.BadRequest(
+		"EMAIL_DOMAIN_BLACKLISTED",
+		"this email domain is not allowed; use a different email domain",
+	)
 	ErrRegDisabled             = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
 	ErrServiceUnavailable      = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
 	ErrInvitationCodeRequired  = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
@@ -252,6 +256,8 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		switch {
 		case errors.Is(err, ErrEmailExists):
 			return "", nil, ErrEmailExists
+		case errors.Is(err, ErrEmailDomainBlacklisted):
+			return "", nil, ErrEmailDomainBlacklisted
 		case errors.Is(err, ErrEmailDomainRegistrationLimit):
 			return "", nil, ErrEmailDomainRegistrationLimit
 		default:
@@ -1216,10 +1222,26 @@ func (s *AuthService) validateRegistrationEmailPolicy(ctx context.Context, email
 	return nil
 }
 
-// validateRegistrationEmailQuota 保留白名单为空时的全放行行为；配置白名单后，
+// validateRegistrationEmailQuota 先拦截邮箱域名黑名单，再处理白名单与域名额度。
+// 该方法在发送验证码前调用，数据库触发器仍作为用户写入时的最终防线。
+// 白名单为空时保留全放行行为；配置白名单后，
 // 非白名单域名默认直接拒绝（严格白名单模式）；仅当域名限量注册开关开启时，
 // 非白名单域名每个最多允许一个账户。
 func (s *AuthService) validateRegistrationEmailQuota(ctx context.Context, email string) error {
+	domain := strings.TrimPrefix(RegistrationEmailSuffix(email), "@")
+	if domain != "" {
+		if blacklistRepo, ok := s.userRepo.(RegistrationEmailBlacklistRepository); ok {
+			blacklisted, err := blacklistRepo.IsEmailDomainBlacklisted(ctx, domain)
+			if err != nil {
+				logger.LegacyPrintf("service.auth", "[Auth] Failed to check registration email domain blacklist for %s: %v", domain, err)
+				return ErrServiceUnavailable
+			}
+			if blacklisted {
+				return ErrEmailDomainBlacklisted
+			}
+		}
+	}
+
 	if s.settingService == nil {
 		return nil
 	}
@@ -1231,7 +1253,7 @@ func (s *AuthService) validateRegistrationEmailQuota(ctx context.Context, email 
 		return buildEmailSuffixNotAllowedError(whitelist)
 	}
 
-	domain := RegistrationEmailDomain(email)
+	domain = RegistrationEmailDomain(email)
 	if domain == "" {
 		return buildEmailSuffixNotAllowedError(whitelist)
 	}
