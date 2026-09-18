@@ -40,7 +40,10 @@ func (e *Enqueuer) Enqueue(ctx context.Context, req Request) error {
 		LogWarn(EventEnqueueDropped, mergeLogFields(baseFields, map[string]any{"status": "dropped", "error_code": "no_enabled_endpoint"}))
 		return nil
 	}
-	snapshot, err := ExtractPromptSnapshot(req)
+	// Keep asynchronous auditing aligned with the configured blocking scope.
+	// In latest-turn mode this excludes trusted system/developer instructions,
+	// which otherwise look like prompt injection to input-risk classifiers.
+	snapshot, err := ExtractBlockingPromptSnapshot(req, cfg.BlockingLatestTurnOnly)
 	if errors.Is(err, ErrNoPromptText) {
 		LogInfo(EventEnqueueSkipped, mergeLogFields(baseFields, map[string]any{"status": "skipped", "error_code": "no_user_text"}))
 		return nil
