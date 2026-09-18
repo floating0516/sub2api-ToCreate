@@ -1,0 +1,32 @@
+name: Prompt Audit Hotfix Check
+
+on:
+  push:
+    branches:
+      - fix/prompt-audit-latest-turn-20260918
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prompt-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Check changed Go files are formatted
+        working-directory: backend
+        run: |
+          test -z "$(gofmt -d \
+            internal/securityaudit/prompt_enqueue.go \
+            internal/securityaudit/prompt_snapshot.go \
+            internal/securityaudit/prompt_worker_test.go)"
+      - name: Run prompt audit tests
+        working-directory: backend
+        run: go test ./internal/securityaudit -count=1
