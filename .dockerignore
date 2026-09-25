@@ -96,6 +96,8 @@ tools/
 # Keep only the single test file required by `pnpm run check:i18n`.
 !frontend/src/i18n/__tests__/
 !frontend/src/i18n/__tests__/localeKeyCompleteness.spec.ts
+!frontend/src/__tests__/
+!frontend/src/__tests__/setup.ts
 
 # Claude files
 .claude/
