@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import AmountInput from '@/components/payment/AmountInput.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
-import type { CheckoutInfoResponse, MethodLimit, SubscriptionAddonProduct, SubscriptionPlan } from '@/types/payment'
-import type { UserSubscription } from '@/types'
+import en from '@/i18n/locales/en'
+import zh from '@/i18n/locales/zh'
+import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
 
 const routeState = vi.hoisted(() => ({
   path: '/purchase',
@@ -16,23 +18,18 @@ const routerReplace = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const routerResolve = vi.hoisted(() => vi.fn(() => ({ href: '/payment/stripe?mock=1' })))
 const createOrder = vi.hoisted(() => vi.fn())
-const purchaseAddonWithBalance = vi.hoisted(() => vi.fn())
 const refreshUser = vi.hoisted(() => vi.fn())
 const fetchActiveSubscriptions = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
-const showSuccess = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
-const subscriptionState = vi.hoisted(() => ({
-  activeSubscriptions: [] as UserSubscription[],
-}))
-const authState = vi.hoisted(() => ({
-  user: {
-    username: 'demo-user',
-    balance: 0,
-  },
+const translate = vi.hoisted(() => vi.fn((key: string) => key))
+// Public settings live in a reactive holder so tests can flip feature flags after mount
+// and exercise the watchers that react to them.
+const appStoreState = vi.hoisted(() => ({
+  setPublicSettings: (_value: Record<string, unknown> | undefined) => {},
 }))
 
 vi.mock('vue-router', async () => {
@@ -53,15 +50,16 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key,
+      t: translate,
     }),
   }
 })
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
-    get user() {
-      return authState.user
+    user: {
+      username: 'demo-user',
+      balance: 0,
     },
     refreshUser,
   }),
@@ -70,27 +68,33 @@ vi.mock('@/stores/auth', () => ({
 vi.mock('@/stores/payment', () => ({
   usePaymentStore: () => ({
     createOrder,
-    purchaseAddonWithBalance,
   }),
 }))
 
 vi.mock('@/stores/subscriptions', () => ({
   useSubscriptionStore: () => ({
-    get activeSubscriptions() {
-      return subscriptionState.activeSubscriptions
-    },
+    activeSubscriptions: [],
     fetchActiveSubscriptions,
   }),
 }))
 
-vi.mock('@/stores', () => ({
-  useAppStore: () => ({
-    showError,
-    showInfo,
-    showSuccess,
-    showWarning,
-  }),
-}))
+vi.mock('@/stores', async () => {
+  const { reactive } = await import('vue')
+  const state = reactive({ cachedPublicSettings: undefined as Record<string, unknown> | undefined })
+  appStoreState.setPublicSettings = (value) => {
+    state.cachedPublicSettings = value
+  }
+  return {
+    useAppStore: () => ({
+      showError,
+      showInfo,
+      showWarning,
+      get cachedPublicSettings() {
+        return state.cachedPublicSettings
+      },
+    }),
+  }
+})
 
 vi.mock('@/api/payment', () => ({
   paymentAPI: {
@@ -119,8 +123,6 @@ function checkoutInfoFixture(overrides: Partial<CheckoutInfoResponse> = {}) {
     global_min: 0,
     global_max: 0,
     plans: [],
-    addon_purchase_enabled: false,
-    addon_products: [],
     balance_disabled: false,
     balance_recharge_multiplier: 1,
     subscription_usd_to_cny_rate: 0,
@@ -235,7 +237,6 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
   showWarning.mockReset()
   getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoWithPlansFixture(options))
   bridgeInvoke.mockReset()
-  subscriptionState.activeSubscriptions = []
   window.localStorage.clear()
   ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
 
@@ -295,6 +296,69 @@ async function mountSubscriptionPlanList(planCount: number) {
   return wrapper
 }
 
+describe('PaymentView help text', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    routeState.path = '/purchase'
+    routeState.query = {}
+    createOrder.mockReset()
+    window.localStorage.clear()
+  })
+
+  async function mountHelp(help_text: string, help_image_url = '') {
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({ help_text, help_image_url }))
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+    return wrapper
+  }
+
+  it('renders headings, emphasis, links, and lists in payment help without starting checkout', async () => {
+    const wrapper = await mountHelp('## Recharge help\n\n**Read first**\n\n- [Contact support](https://example.com/help)')
+    const help = wrapper.get('.markdown-body')
+    expect(help.get('h2').text()).toBe('Recharge help')
+    expect(help.get('strong').text()).toBe('Read first')
+    expect(help.get('li a').attributes('href')).toBe('https://example.com/help')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('removes scripts, event handlers, and unsafe URLs from rendered help', async () => {
+    const wrapper = await mountHelp([
+      '<script>alert(1)</script>',
+      '<img src="https://example.com/help.png" onerror="alert(1)">',
+      '[Unsafe](javascript:alert%281%29)',
+      '[Support](https://example.com/help)',
+    ].join('\n\n'))
+    const help = wrapper.get('.markdown-body')
+    expect(help.find('script').exists()).toBe(false)
+    expect(help.get('img').attributes('onerror')).toBeUndefined()
+    expect(help.findAll('a').map(link => link.attributes('href'))).toEqual([undefined, 'https://example.com/help'])
+  })
+
+  it('keeps plain-text soft line breaks and the separate help image preview', async () => {
+    const wrapper = await mountHelp('First line\nSecond line', 'https://example.com/help.png')
+    const help = wrapper.get('.markdown-body')
+    expect(help.get('p').text()).toBe('First line\nSecond line')
+    expect(help.find('br').exists()).toBe(false)
+    await wrapper.get('img').trigger('click')
+    expect(wrapper.findAll('img')).toHaveLength(2)
+    expect(wrapper.findAll('img')[1].attributes('src')).toBe('https://example.com/help.png')
+  })
+
+  it('keeps image-only help without an empty Markdown container', async () => {
+    const wrapper = await mountHelp('', 'https://example.com/help.png')
+    expect(wrapper.find('.markdown-body').exists()).toBe(false)
+    expect(wrapper.get('img').attributes('src')).toBe('https://example.com/help.png')
+  })
+})
+
 describe('PaymentView subscription plan grid', () => {
   it.each([3, 4, 6])('keeps %i plans on the existing mobile/tablet/desktop grid', async (planCount) => {
     const wrapper = await mountSubscriptionPlanList(planCount)
@@ -310,15 +374,44 @@ describe('PaymentView subscription plan grid', () => {
   })
 })
 
-describe('PaymentView subscription confirmation amounts', () => {
-  it('shows subscription purchase behavior hint', async () => {
-    const wrapper = await mountSubscriptionConfirm()
+describe('PaymentView recharge rate preview', () => {
+  it('uses the selected payment method currency in both locale templates', async () => {
+    translate.mockClear()
+    routeState.path = '/purchase'
+    routeState.query = {}
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      balance_recharge_multiplier: 0.5,
+      methods: {
+        stripe: {
+          ...checkoutInfoFixture().data.methods.wxpay,
+          currency: 'USD',
+        },
+      },
+    }))
 
-    expect(wrapper.text()).toContain('payment.subscriptionHint.title')
-    expect(wrapper.text()).toContain('payment.subscriptionHint.samePlan')
-    expect(wrapper.text()).toContain('payment.subscriptionHint.differentPlans')
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+    wrapper.getComponent(AmountInput).vm.$emit('update:modelValue', 10)
+    await flushPromises()
+
+    expect(translate).toHaveBeenCalledWith('payment.rechargeRatePreview', {
+      currency: 'USD',
+      usd: '0.50',
+    })
+    expect(en.payment.rechargeRatePreview).toBe('Current rate: 1 {currency} = {usd} USD')
+    expect(zh.payment.rechargeRatePreview).toBe('当前倍率：1 {currency} = {usd} USD')
   })
+})
 
+describe('PaymentView subscription confirmation amounts', () => {
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {
@@ -408,194 +501,6 @@ describe('PaymentView subscription confirmation amounts', () => {
   })
 })
 
-describe('PaymentView add-on purchase', () => {
-  beforeEach(() => {
-    vi.useRealTimers()
-    routeState.path = '/purchase'
-    routeState.query = {}
-    routerReplace.mockReset().mockResolvedValue(undefined)
-    routerPush.mockReset().mockResolvedValue(undefined)
-    routerResolve.mockClear()
-    createOrder.mockReset()
-    purchaseAddonWithBalance.mockReset()
-    refreshUser.mockReset()
-    fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
-    showError.mockReset()
-    showInfo.mockReset()
-    showSuccess.mockReset()
-    showWarning.mockReset()
-    getCheckoutInfo.mockReset()
-    bridgeInvoke.mockReset()
-    window.localStorage.clear()
-    authState.user.balance = 20
-    ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
-    subscriptionState.activeSubscriptions = [{
-      id: 19,
-      user_id: 42,
-      group_id: 7,
-      status: 'active',
-      starts_at: '2098-12-01T00:00:00.000Z',
-      expires_at: '2099-01-01T00:00:00.000Z',
-      daily_usage_usd: 50,
-      weekly_usage_usd: 150,
-      monthly_usage_usd: 600,
-      daily_window_start: '2098-12-31T00:00:00.000Z',
-      weekly_window_start: '2098-12-25T00:00:00.000Z',
-      monthly_window_start: '2098-12-01T00:00:00.000Z',
-      created_at: '2098-12-01T00:00:00.000Z',
-      updated_at: '2098-12-01T00:00:00.000Z',
-    }]
-  })
-
-  it('hides the add-on tab while sales are disabled', async () => {
-    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
-      addon_purchase_enabled: false,
-      addon_products: [{
-        id: 5,
-        sku: 'addon-usd-30',
-        name: '30 USD add-on',
-        quota_usd: 30,
-        price: 7.99,
-        for_sale: true,
-        sort_order: 20,
-      }],
-    }))
-
-    const wrapper = shallowMount(PaymentView, {
-      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
-    })
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('payment.tabAddon')
-  })
-
-  it('submits the selected catalog product and subscription IDs', async () => {
-    const product: SubscriptionAddonProduct = {
-      id: 5,
-      sku: 'addon-usd-30',
-      name: '30 USD add-on',
-      quota_usd: 30,
-      price: 7.99,
-      for_sale: true,
-      sort_order: 20,
-    }
-    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
-      addon_purchase_enabled: true,
-      addon_products: [product],
-    }))
-    createOrder.mockResolvedValue({
-      order_id: 901,
-      amount: product.price,
-      pay_amount: product.price,
-      fee_rate: 0,
-      expires_at: '2099-01-01T00:10:00.000Z',
-      payment_type: 'wxpay',
-      qr_code: 'weixin://wxpay/bizpayurl?pr=addon',
-      out_trade_no: 'sub2_addon_901',
-    })
-
-    const wrapper = shallowMount(PaymentView, {
-      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
-    })
-    await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
-    await wrapper.find('[data-testid="addon-product-5"]').trigger('click')
-    await wrapper.find('[data-testid="addon-buy-button"]').trigger('click')
-    await flushPromises()
-
-    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({
-      amount: product.price,
-      payment_type: 'wxpay',
-      order_type: 'addon',
-      addon_product_id: product.id,
-      subscription_id: 19,
-    }))
-  })
-
-  it('shows add-on guidance before purchase', async () => {
-    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
-      addon_purchase_enabled: true,
-      addon_products: [{
-        id: 5,
-        sku: 'addon-usd-30',
-        name: '30 USD add-on',
-        quota_usd: 30,
-        price: 5.49,
-        for_sale: true,
-        sort_order: 20,
-      }],
-    }))
-
-    const wrapper = shallowMount(PaymentView, {
-      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
-    })
-    await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
-
-    const guidance = wrapper.find('[data-testid="addon-guidance"]')
-    expect(guidance.exists()).toBe(true)
-    expect(guidance.text()).toContain('payment.addon.guideTitle')
-    expect(guidance.text()).toContain('payment.addon.guideSubscription')
-    expect(guidance.text()).toContain('payment.addon.guideUsage')
-    expect(guidance.text()).toContain('payment.addon.guideExpiry')
-  })
-
-  it('purchases the selected add-on for the selected subscription with balance', async () => {
-    const product: SubscriptionAddonProduct = {
-      id: 5,
-      sku: 'addon-usd-30',
-      name: '30 USD add-on',
-      quota_usd: 30,
-      price: 5.49,
-      for_sale: true,
-      sort_order: 20,
-    }
-    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({
-      addon_purchase_enabled: true,
-      addon_products: [product],
-    }))
-    purchaseAddonWithBalance.mockResolvedValue({
-      order_id: 902,
-      amount: product.price,
-      status: 'COMPLETED',
-      payment_type: 'balance_wallet',
-      addon_id: 33,
-      addon_product_id: product.id,
-      subscription_id: 20,
-      quota_usd: product.quota_usd,
-      expires_at: '2099-01-01T00:00:00.000Z',
-      balance_before: 20,
-      balance_after: 14.51,
-    })
-    subscriptionState.activeSubscriptions = [
-      ...subscriptionState.activeSubscriptions,
-      {
-        ...subscriptionState.activeSubscriptions[0],
-        id: 20,
-        group_id: 8,
-      },
-    ]
-
-    const wrapper = shallowMount(PaymentView, {
-      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } },
-    })
-    await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'payment.tabAddon')?.trigger('click')
-    await wrapper.find('[data-testid="addon-subscription-20"]').trigger('click')
-    await wrapper.find('[data-testid="addon-product-5"]').trigger('click')
-    await wrapper.find('[data-testid="addon-balance-buy-button"]').trigger('click')
-    await flushPromises()
-
-    expect(purchaseAddonWithBalance).toHaveBeenCalledWith({
-      addon_product_id: product.id,
-      subscription_id: 20,
-    })
-    expect(refreshUser).toHaveBeenCalledTimes(1)
-    expect(fetchActiveSubscriptions).toHaveBeenCalledWith(true)
-    expect(showSuccess).toHaveBeenCalledWith('payment.addon.balanceSuccess')
-  })
-})
-
 describe('PaymentView payment recovery', () => {
   beforeEach(() => {
     vi.useRealTimers()
@@ -611,7 +516,6 @@ describe('PaymentView payment recovery', () => {
     showInfo.mockReset()
     showWarning.mockReset()
     bridgeInvoke.mockReset()
-    subscriptionState.activeSubscriptions = []
     window.localStorage.clear()
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
   })
@@ -697,7 +601,6 @@ describe('PaymentView WeChat JSAPI flow', () => {
     showWarning.mockReset()
     getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture())
     bridgeInvoke.mockReset()
-    subscriptionState.activeSubscriptions = []
     window.localStorage.clear()
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = {
       invoke: bridgeInvoke,
@@ -914,5 +817,73 @@ describe('PaymentView WeChat JSAPI flow', () => {
     expect(showWarning).toHaveBeenCalledWith('payment.errors.mobilePaymentFallbackToQr')
     expect(showError).not.toHaveBeenCalled()
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toContain('weixin://wxpay/bizpayurl?pr=fallback-native')
+  })
+})
+
+describe('PaymentView subscription feature flag', () => {
+  afterEach(() => {
+    appStoreState.setPublicSettings(undefined)
+  })
+
+  function tabLabels(wrapper: Awaited<ReturnType<typeof mountSubscriptionPlanList>>) {
+    return wrapper
+      .findAll('button')
+      .map((button) => button.text())
+      .filter((text) => text === 'payment.tabTopUp' || text === 'payment.tabSubscribe')
+  }
+
+  it('keeps the top-up / subscribe switcher when subscription_enabled is absent (opt-out default)', async () => {
+    const wrapper = await mountSubscriptionPlanList(2)
+
+    expect(tabLabels(wrapper)).toEqual(['payment.tabTopUp', 'payment.tabSubscribe'])
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(2)
+  })
+
+  it('drops the subscribe tab, hides the switcher and ignores ?tab=subscription when subscriptions are disabled', async () => {
+    appStoreState.setPublicSettings({ subscription_enabled: false })
+    const wrapper = await mountSubscriptionPlanList(2)
+
+    expect(tabLabels(wrapper)).toEqual([])
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    expect(wrapper.text()).toContain('payment.rechargeAccount')
+  })
+
+  it('shows an unavailable notice instead of a doomed top-up form when balance recharge is disabled too', async () => {
+    appStoreState.setPublicSettings({ subscription_enabled: false })
+    const wrapper = await mountSubscriptionConfirm({ checkout: { balance_disabled: true } })
+
+    expect(tabLabels(wrapper)).toEqual([])
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('payment.confirmSubscription')
+    expect(wrapper.text()).not.toContain('payment.rechargeAccount')
+    expect(wrapper.text()).toContain('payment.billingUnavailable')
+    wrapper.unmount()
+  })
+
+  it('falls back from the subscribe tab to top-up when the flag flips off after mount', async () => {
+    const wrapper = await mountSubscriptionPlanList(2)
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(2)
+
+    appStoreState.setPublicSettings({ subscription_enabled: false })
+    await flushPromises()
+
+    expect(tabLabels(wrapper)).toEqual([])
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    expect(wrapper.text()).toContain('payment.rechargeAccount')
+    wrapper.unmount()
+  })
+
+  it('enters the subscribe tab when a subscription-only site turns subscriptions back on', async () => {
+    appStoreState.setPublicSettings({ subscription_enabled: false })
+    const wrapper = await mountSubscriptionConfirm({ checkout: { balance_disabled: true } })
+    expect(wrapper.text()).toContain('payment.billingUnavailable')
+
+    appStoreState.setPublicSettings({ subscription_enabled: true })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('payment.billingUnavailable')
+    expect(wrapper.text()).not.toContain('payment.rechargeAccount')
+    expect(wrapper.findAllComponents(SubscriptionPlanCard).length).toBeGreaterThan(0)
+    wrapper.unmount()
   })
 })

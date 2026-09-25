@@ -42,6 +42,15 @@ describe('AppSidebar scroll position persistence', () => {
   })
 })
 
+describe('AppSidebar collapsible groups', () => {
+  it('lets the user collapse a group even while a child route is active', () => {
+    // The expand state must come from the user's override first, falling back
+    // to the active-route heuristic only when the user has not clicked yet.
+    expect(componentSource).toContain('const groupExpandOverrides = ref<Map<string, boolean>>(new Map())')
+    expect(componentSource).not.toContain('expandedGroups.value.has(item.path) || isGroupActive(item)')
+  })
+})
+
 describe('AppSidebar header styles', () => {
   it('does not clip the version badge dropdown', () => {
     const sidebarHeaderBlockMatch = styleSource.match(/\.sidebar-header\s*\{[\s\S]*?\n {2}\}/)
@@ -54,28 +63,20 @@ describe('AppSidebar header styles', () => {
   })
 })
 
-describe('AppSidebar Lihe Chat entry', () => {
-  it('keeps API keys as the only sidebar entry point for Lihe imports', () => {
-    expect(componentSource).not.toContain("{ path: '/integrations/lihe'")
-    expect(componentSource).not.toContain("t('nav.liheChat')")
+describe('AppSidebar subscription feature flag', () => {
+  it('gates the My Subscriptions entry behind the subscription public-settings flag', () => {
+    expect(componentSource).toContain('const flagSubscription = makeSidebarFlag(FeatureFlags.subscription)')
+    expect(componentSource).toMatch(/path: '\/subscriptions'[^\n]*featureFlag: flagSubscription/)
   })
-})
 
-describe('AppSidebar Quick Start access', () => {
-  it('recognizes the deployed menu id and applies the installer feature gate', () => {
-    expect(componentSource).toContain("id === 'codex-claude-import'")
-    expect(componentSource).toContain('canAccessQuickStartInstaller()')
-    expect(componentSource).toContain('FeatureFlags.quickStartInstaller')
+  it('also hides the admin Subscription Management entry on recharge-only sites', () => {
+    expect(componentSource).toMatch(/path: '\/admin\/subscriptions'[^\n]*featureFlag: flagSubscription/)
   })
-})
 
-describe('AppSidebar user-page switches', () => {
-  it('gates the redemption and order entries independently', () => {
-    expect(componentSource).toContain('FeatureFlags.userRedeem')
-    expect(componentSource).toContain('FeatureFlags.userOrders')
-    expect(componentSource).toContain("path: '/redeem'")
-    expect(componentSource).toContain('featureFlag: flagUserRedeem')
-    expect(componentSource).toContain("path: '/orders'")
-    expect(componentSource).toContain('featureFlag: flagUserOrders')
+  it('derives the purchase entry label from the site billing mode', () => {
+    expect(componentSource).toContain("import { resolveSiteBillingMode } from '@/utils/siteBillingMode'")
+    expect(componentSource).toMatch(/case 'recharge_only':\s*return t\('nav\.recharge'\)/)
+    expect(componentSource).toMatch(/case 'subscription_only':\s*return t\('nav\.subscribe'\)/)
+    expect(componentSource).toMatch(/path: '\/purchase'[^\n]*label: purchaseNavLabel\.value/)
   })
 })
