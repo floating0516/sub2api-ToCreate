@@ -497,7 +497,7 @@ export default {
       columns: {
         name: 'Name',
         provider: 'Provider',
-        primaryModel: 'Primary Model',
+        primaryModel: 'Probed Model',
         availability7d: '7d Availability',
         latency: 'Latency (ms)',
         enabled: 'Enabled',
@@ -522,7 +522,7 @@ export default {
         selectKeyTitle: 'Select my API Key',
         selectKeyHint: 'Only your active, non-expired keys are listed.',
         noActiveKey: 'No active API keys available',
-        primaryModel: 'Primary Model',
+        primaryModel: 'Probed Model',
         primaryModelPlaceholder: 'gpt-4o-mini',
         extraModels: 'Extra Models',
         extraModelsPlaceholder: 'Press Enter to add extra model',

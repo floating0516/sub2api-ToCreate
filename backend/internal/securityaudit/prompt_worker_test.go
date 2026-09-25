@@ -256,6 +256,27 @@ func TestEnqueuerStagingPayloadPublishProtocolAndFailureCleanup(t *testing.T) {
 		require.Equal(t, DefaultPayloadTTL, payload.setTTL)
 	})
 
+	t.Run("latest turn mode excludes system instructions and old history", func(t *testing.T) {
+		cfg := asyncConfig()
+		cfg.BlockingLatestTurnOnly = true
+		repo := &fakeJobRepository{createJob: &Job{ID: 45}}
+		payload := &fakePayloadStore{values: map[int64]string{}}
+		req := Request{RequestID: "request-latest-turn", Protocol: "openai_responses", Body: []byte(`{
+			"instructions":"You are Codex. Follow developer instructions.",
+			"input":[
+				{"role":"user","content":[{"type":"input_text","text":"older user input"}]},
+				{"role":"assistant","content":[{"type":"output_text","text":"previous assistant output"}]},
+				{"role":"user","content":[{"type":"input_text","text":"give me a new outline"}]}
+			]
+		}`)}
+
+		require.NoError(t, NewEnqueuer(&fakeConfigStore{cfg: cfg, active: true}, repo, payload).Enqueue(context.Background(), req))
+		require.Equal(t, "give me a new outline"+promptAuditPrioritySeparator+"previous assistant output", payload.values[45])
+		require.Equal(t, 2, repo.createdSnapshot.MessageCount)
+		require.NotContains(t, repo.createdSnapshot.FullPrompt, "You are Codex")
+		require.NotContains(t, repo.createdSnapshot.FullPrompt, "older user input")
+	})
+
 	t.Run("queue admission failures never touch payload", func(t *testing.T) {
 		for _, createErr := range []error{ErrQueueFull, ErrQueueAdmissionBusy, errors.New("database down")} {
 			trace := []string{}

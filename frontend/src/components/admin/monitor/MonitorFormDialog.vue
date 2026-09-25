@@ -6,9 +6,23 @@
     @close="$emit('close')"
   >
     <form id="channel-monitor-form" @submit.prevent="handleSubmit" class="space-y-5">
-      <div>
-        <label class="input-label">{{ t('admin.channelMonitor.form.name') }} <span class="text-red-500">*</span></label>
-        <input v-model="form.name" type="text" required class="input" :placeholder="t('admin.channelMonitor.form.namePlaceholder')" />
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="input-label">{{ t('admin.channelMonitor.form.name') }} <span class="text-red-500">*</span></label>
+          <input v-model="form.name" type="text" required class="input" :placeholder="t('admin.channelMonitor.form.namePlaceholder')" />
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.channelMonitor.form.primaryModel') }} <span class="text-red-500">*</span></label>
+          <input
+            v-model="form.primary_model"
+            data-testid="monitor-primary-model"
+            type="text"
+            required
+            class="input font-medium"
+            :class="getPlatformTextClass(form.provider)"
+            :placeholder="t('admin.channelMonitor.form.primaryModelPlaceholder')"
+          />
+        </div>
       </div>
 
       <div>
@@ -75,19 +89,6 @@
           </button>
         </div>
         <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
-      </div>
-
-      <div>
-        <label class="input-label">{{ t('admin.channelMonitor.form.primaryModel') }} <span class="text-red-500">*</span></label>
-        <input
-          v-model="form.primary_model"
-          data-testid="monitor-primary-model"
-          type="text"
-          required
-          class="input font-medium"
-          :class="getPlatformTextClass(form.provider)"
-          :placeholder="t('admin.channelMonitor.form.primaryModelPlaceholder')"
-        />
       </div>
 
       <div>

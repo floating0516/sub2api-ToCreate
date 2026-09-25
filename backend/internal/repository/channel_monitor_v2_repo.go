@@ -151,13 +151,8 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 	groupCounts := map[int64]groupValue{}
 	for _, platform := range channelMonitorV2EnabledPlatforms(cfg) {
 		platformCounts[platform] += 0
-		for _, p := range cfg.Platforms {
-			if p.Platform != platform || len(p.Models) == 0 {
-				continue
-			}
-			for _, model := range p.Models {
-				modelCounts[platform+"\x00"+model] = modelValue{platform: platform, count: 0}
-			}
+		for _, model := range channelMonitorV2NamedModels(cfg, platform) {
+			modelCounts[platform+"\x00"+model] = modelValue{platform: platform, count: 0}
 		}
 	}
 	groupInfo, err := r.loadChannelMonitorV2GroupInfo(ctx, configuredChannelMonitorV2GroupIDs(catalogFilter, cfg))
@@ -199,7 +194,13 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 		result.Platforms = append(result.Platforms, service.ChannelMonitorV2Dimension{Value: value, Label: value, RequestCount: count})
 	}
 	for value, meta := range modelCounts {
-		result.Models = append(result.Models, service.ChannelMonitorV2Dimension{Value: value, Label: channelMonitorV2ModelLabel(value), Platform: meta.platform, RequestCount: meta.count})
+		display := channelMonitorV2ModelLabel(value)
+		if strings.Contains(value, "\x00") {
+			if parts := strings.SplitN(value, "\x00", 2); len(parts) == 2 && !channelMonitorV2KeepDisplayedModel(cfg, parts[0], parts[1]) {
+				continue
+			}
+		}
+		result.Models = append(result.Models, service.ChannelMonitorV2Dimension{Value: value, Label: display, Platform: meta.platform, RequestCount: meta.count})
 	}
 	for id, value := range groupCounts {
 		result.Groups = append(result.Groups, service.ChannelMonitorV2GroupDimension{ID: id, Name: value.name, Platform: value.platform, RequestCount: value.count})
@@ -309,6 +310,9 @@ func (r *channelMonitorV2Repository) GetModels(ctx context.Context, filter servi
 			continue
 		}
 		model := channelMonitorV2DisplayModel(cfg, fact.Platform, fact.Model)
+		if !channelMonitorV2KeepDisplayedModel(cfg, fact.Platform, model) {
+			continue
+		}
 		key := fact.Platform + "\x00" + model
 		if accs[key] == nil {
 			accs[key] = newMetricAccumulator()
@@ -319,7 +323,11 @@ func (r *channelMonitorV2Repository) GetModels(ctx context.Context, filter servi
 		if !channelMonitorV2ModelSelected(filter, cfg, h.Platform, h.Model) {
 			continue
 		}
-		key := h.Platform + "\x00" + channelMonitorV2DisplayModel(cfg, h.Platform, h.Model)
+		display := channelMonitorV2DisplayModel(cfg, h.Platform, h.Model)
+		if !channelMonitorV2KeepDisplayedModel(cfg, h.Platform, display) {
+			continue
+		}
+		key := h.Platform + "\x00" + display
 		if accs[key] != nil {
 			accs[key].addHistogram(h)
 		}
@@ -333,6 +341,9 @@ func (r *channelMonitorV2Repository) GetModels(ctx context.Context, filter servi
 	minutes := channelMonitorV2CoveredMinutes(filter, *coverage)
 	for key, acc := range accs {
 		parts := strings.SplitN(key, "\x00", 2)
+		if len(parts) != 2 || !channelMonitorV2KeepDisplayedModel(cfg, parts[0], parts[1]) {
+			continue
+		}
 		metrics := acc.metric(minutes, admin)
 		applyIgnoredErrors(&metrics, ignoredByPM[key])
 		items = append(items, service.ChannelMonitorV2ModelRow{Platform: parts[0], Model: parts[1], Metrics: metrics, Health: service.ChannelMonitorV2HealthForWithThresholds(metrics, cfg.HealthThresholds)})
@@ -393,6 +404,9 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			continue
 		}
 		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, fact.Platform, fact.GroupID, fact.Model)
+		if key.model != "" && !channelMonitorV2KeepDisplayedModel(cfg, fact.Platform, key.model) {
+			continue
+		}
 		acc := accs[key]
 		if acc == nil {
 			acc = &channelMonitorV2MatrixAccumulator{total: newMetricAccumulator(), buckets: make(map[string]*metricAccumulator)}
@@ -418,6 +432,9 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			continue
 		}
 		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, histogram.Platform, histogram.GroupID, histogram.Model)
+		if key.model != "" && !channelMonitorV2KeepDisplayedModel(cfg, histogram.Platform, key.model) {
+			continue
+		}
 		acc := accs[key]
 		if acc == nil {
 			continue
@@ -438,6 +455,9 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		// platform_group views only emit rows with a real group_id.
 		if (groupBy == service.ChannelMonitorV2GroupByPlatformGroup || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel) &&
 			key.groupID <= 0 {
+			continue
+		}
+		if key.model != "" && !channelMonitorV2KeepDisplayedModel(cfg, key.platform, key.model) {
 			continue
 		}
 		metrics := acc.total.metric(minutes, admin)
@@ -551,14 +571,7 @@ func seedChannelMonitorV2MatrixAccumulators(filter service.ChannelMonitorV2Filte
 }
 
 func configuredChannelMonitorV2Models(cfg service.ChannelMonitorV2Config, platform string, filter service.ChannelMonitorV2Filter) []string {
-	models := []string{}
-	for _, p := range cfg.Platforms {
-		if p.Platform != platform {
-			continue
-		}
-		models = append(models, p.Models...)
-		break
-	}
+	models := append([]string{}, channelMonitorV2NamedModels(cfg, platform)...)
 	if len(filter.Models) > 0 {
 		if len(models) == 0 {
 			models = append(models, filter.Models...)
@@ -1165,35 +1178,76 @@ func channelMonitorV2EnabledPlatforms(cfg service.ChannelMonitorV2Config) []stri
 	return out
 }
 
+// channelMonitorV2NamedModels is the dimension seed list for a platform:
+// operator allow-list if present, otherwise the live runtime catalog.
+func channelMonitorV2NamedModels(cfg service.ChannelMonitorV2Config, platform string) []string {
+	listed, _ := channelMonitorV2ListedModels(cfg, platform)
+	return listed
+}
+
+func channelMonitorV2ListedModels(cfg service.ChannelMonitorV2Config, platform string) (listed []string, collapseOther bool) {
+	for _, p := range cfg.Platforms {
+		if p.Platform != platform {
+			continue
+		}
+		if len(p.Models) > 0 {
+			return p.Models, true
+		}
+		if len(cfg.RuntimeCatalog[platform]) > 0 {
+			return cfg.RuntimeCatalog[platform], true
+		}
+		return nil, false
+	}
+	if len(cfg.RuntimeCatalog[platform]) > 0 {
+		return cfg.RuntimeCatalog[platform], true
+	}
+	return nil, false
+}
+
+func channelMonitorV2HideOther(cfg service.ChannelMonitorV2Config, platform string) bool {
+	for _, p := range cfg.Platforms {
+		if p.Platform != platform {
+			continue
+		}
+		if len(p.Models) > 0 {
+			return false
+		}
+		return len(cfg.RuntimeCatalog[platform]) > 0
+	}
+	return len(cfg.RuntimeCatalog[platform]) > 0
+}
+
+func channelMonitorV2KeepDisplayedModel(cfg service.ChannelMonitorV2Config, platform, display string) bool {
+	if display != service.ChannelMonitorV2OtherModel {
+		return true
+	}
+	return !channelMonitorV2HideOther(cfg, platform)
+}
+
 // channelMonitorV2DisplayModel maps a raw model name for presentation.
-// Semantics (parallel to empty group_ids = all groups):
-//   - platform not in config / disabled → keep raw model (still collected)
-//   - models list empty → show the real model name (no collapsing)
-//   - models list non-empty → selected keep identity; everything else → __other__
+// Semantics:
+//   - operator models list non-empty → listed keep identity (including dated
+//     / thinking aliases); everything else → __other__
+//   - operator list empty + probe catalog → only probed models; other traffic omitted
+//   - both empty → show the real model name
 func channelMonitorV2DisplayModel(cfg service.ChannelMonitorV2Config, platform, model string) string {
 	model = strings.TrimSpace(model)
 	if model == "" {
 		return service.ChannelMonitorV2OtherModel
 	}
-	for _, p := range cfg.Platforms {
-		if p.Platform != platform {
-			continue
-		}
-		// Empty allow-list: surface every real model instead of dumping into __other__.
-		// Operators opt into the named + __other__ split only by listing models.
-		if len(p.Models) == 0 {
-			return model
-		}
-		for _, selected := range p.Models {
-			if selected == model {
-				return model
-			}
-		}
+	listed, collapseOther := channelMonitorV2ListedModels(cfg, platform)
+	if len(listed) == 0 {
+		return model
+	}
+	if canon, ok := service.ChannelMonitorV2CanonicalModel(listed, model); ok {
+		return canon
+	}
+	if collapseOther {
 		return service.ChannelMonitorV2OtherModel
 	}
-	// Platform not configured: still show the real model so traffic is visible.
 	return model
 }
+
 func channelMonitorV2ModelSelected(filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, platform, model string) bool {
 	if len(filter.Models) == 0 {
 		return true

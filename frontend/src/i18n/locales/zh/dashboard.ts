@@ -514,6 +514,8 @@ export default {
       gemini: 'Gemini',
       grok: 'Grok'
     },
+    channelName: '渠道',
+    probedModel: '探测模型',
     extraModelsHeader: '附加模型',
     extraModelsEmpty: '无附加模型',
     latencyEmpty: '-',
@@ -558,7 +560,7 @@ export default {
       name: '名称',
       provider: '供应商',
       groupName: '分组',
-      primaryModel: '主模型',
+      primaryModel: '探测模型',
       availability7d: '7 天可用率',
       latency: '延迟 (ms)'
     },

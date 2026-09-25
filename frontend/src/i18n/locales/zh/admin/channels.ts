@@ -497,7 +497,7 @@ export default {
       columns: {
         name: '名称',
         provider: '供应商',
-        primaryModel: '主模型',
+        primaryModel: '探测模型',
         availability7d: '7 天可用率',
         latency: '延迟 (ms)',
         enabled: '启用',
@@ -522,7 +522,7 @@ export default {
         selectKeyTitle: '选择我的 API Key',
         selectKeyHint: '仅显示当前账号下处于「启用」状态且未过期的 Key。',
         noActiveKey: '没有可用的启用状态 Key',
-        primaryModel: '主模型',
+        primaryModel: '探测模型',
         primaryModelPlaceholder: 'gpt-4o-mini',
         extraModels: '附加模型',
         extraModelsPlaceholder: '回车添加附加模型',

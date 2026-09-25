@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -49,6 +50,10 @@ type ChannelMonitorV2Config struct {
 	IgnoredErrorCategories []string  `json:"ignored_error_categories"`
 	UpdatedAt              time.Time `json:"updated_at"`
 	UpdatedBy              *int64    `json:"updated_by,omitempty"`
+	// RuntimeCatalog is the enabled V1 probe-model inventory. It is filled per
+	// request and never persisted. Empty Platforms[].Models uses this list as
+	// the only named Channel Status models; other traffic is omitted.
+	RuntimeCatalog map[string][]string `json:"-"`
 }
 
 // ChannelMonitorV2ErrorCategories is the ordered, versioned taxonomy used by the
@@ -373,7 +378,12 @@ func ChannelMonitorV2BootstrapProgress(now, coveredFrom time.Time, hasData bool)
 type ChannelMonitorV2Service struct {
 	repo     ChannelMonitorV2Repository
 	settings channelMonitorRuntimeReader
+	catalog  ChannelMonitorV2CatalogSource
 	now      func() time.Time
+
+	catalogMu    sync.Mutex
+	catalogCache map[string][]string
+	catalogAt    time.Time
 }
 
 func NewChannelMonitorV2Service(repo ChannelMonitorV2Repository) *ChannelMonitorV2Service {
@@ -386,6 +396,15 @@ func (s *ChannelMonitorV2Service) SetRuntimeReader(r channelMonitorRuntimeReader
 		return
 	}
 	s.settings = r
+}
+
+// SetCatalogSource wires the enabled V1 probe-model inventory used when
+// operators leave the V2 platform model lists empty.
+func (s *ChannelMonitorV2Service) SetCatalogSource(src ChannelMonitorV2CatalogSource) {
+	if s == nil {
+		return
+	}
+	s.catalog = src
 }
 
 func (s *ChannelMonitorV2Service) hideThroughputForViewer(ctx context.Context, admin bool) bool {
@@ -412,6 +431,7 @@ func (s *ChannelMonitorV2Service) getEnabledConfig(ctx context.Context) (*Channe
 	if cfg == nil || !cfg.Enabled {
 		return nil, ErrChannelMonitorDisabled
 	}
+	s.attachRuntimeCatalog(ctx, cfg)
 	return cfg, nil
 }
 

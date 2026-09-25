@@ -24,6 +24,28 @@ func TestChannelMonitorV2DisplayModelIsPlatformScoped(t *testing.T) {
 	require.True(t, channelMonitorV2ModelSelected(service.ChannelMonitorV2Filter{Models: []string{service.ChannelMonitorV2OtherModel}}, cfg, "grok", "shared"))
 }
 
+func TestChannelMonitorV2DisplayModelUsesProbeCatalogAsAllowList(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{
+		Platforms: []service.ChannelMonitorV2PlatformConfig{{Platform: "anthropic", Enabled: true, Models: []string{}}},
+		RuntimeCatalog: map[string][]string{
+			"anthropic": {"claude-sonnet-5"},
+		},
+	}
+	require.Equal(t, "claude-sonnet-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5"))
+	require.Equal(t, "claude-sonnet-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5-thinking"))
+	require.Equal(t, service.ChannelMonitorV2OtherModel, channelMonitorV2DisplayModel(cfg, "anthropic", "claude-fable-5-1"))
+	require.False(t, channelMonitorV2KeepDisplayedModel(cfg, "anthropic", service.ChannelMonitorV2OtherModel))
+	require.Equal(t, []string{"claude-sonnet-5"}, channelMonitorV2NamedModels(cfg, "anthropic"))
+}
+
+func TestChannelMonitorV2DisplayModelFoldsAllowListDatedAliases(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{
+		{Platform: "anthropic", Enabled: true, Models: []string{"claude-haiku-4-5"}},
+	}}
+	require.Equal(t, "claude-haiku-4-5", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-haiku-4-5-20251001"))
+	require.Equal(t, service.ChannelMonitorV2OtherModel, channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-5"))
+}
+
 func TestChannelMonitorV2MatrixDimensionKey(t *testing.T) {
 	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{{Platform: "openai", Enabled: true, Models: []string{"gpt-5"}}}}
 	key := channelMonitorV2MatrixDimensionKey(service.ChannelMonitorV2GroupByPlatformGroupModel, cfg, "openai", 7, "gpt-5")

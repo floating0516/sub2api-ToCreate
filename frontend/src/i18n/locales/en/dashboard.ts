@@ -509,6 +509,8 @@ export default {
       gemini: 'Gemini',
       grok: 'Grok'
     },
+    channelName: 'Channel',
+    probedModel: 'Probed Model',
     extraModelsHeader: 'Extra Models',
     extraModelsEmpty: 'No extra models',
     latencyEmpty: '-',
@@ -553,7 +555,7 @@ export default {
       name: 'Name',
       provider: 'Provider',
       groupName: 'Group',
-      primaryModel: 'Primary Model',
+      primaryModel: 'Probed Model',
       availability7d: '7d Availability',
       latency: 'Latency (ms)'
     },

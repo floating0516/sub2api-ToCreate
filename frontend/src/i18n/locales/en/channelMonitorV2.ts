@@ -98,8 +98,8 @@ export default {
       refreshAria: 'Aggregation interval',
       platformsTitle: 'Platforms and models',
       platformsHint:
-        'Leave empty = show all real model names; when filled, only listed models get their own rows and the rest roll into “Other”',
-      modelsPlaceholder: 'Empty = all real models; or list popular models (rest → Other)',
+        'Leave empty = show only enabled probe models from Channel Monitor; when filled, only listed models get their own rows and the rest roll into “Other”',
+      modelsPlaceholder: 'Empty = probed models only; or list popular models (rest → Other)',
       badgeAllModels: 'All models',
       badgeOther: '+ Other',
       groupsTitle: 'Monitored groups',
@@ -123,14 +123,14 @@ export default {
         warningCache: 'Cache rate watch %',
         criticalCache: 'Cache rate critical %',
       },
-      namedModelsEmpty: 'Platform model lists are empty: every real model name will be shown (not folded into “Other”).',
+      namedModelsEmpty: 'Platform model lists are empty: Channel Status shows only enabled probe models.',
       namedModelsCount: 'Showing {count} named model dimensions; unlisted models fold into per-platform “Other”.',
       userContractTitle: 'User-facing display contract',
       userContract: {
         health: 'Health color weights: error rate 60% + first-token P50 20% + cache rate 20% (thresholds configurable above)',
         trend: 'Trend can switch between pulse matrix and line chart (error · cache · first token)',
         latency: 'Latency shows AVG · P50 · P90; absolute request / error counts are not shown',
-        models: 'Empty model lists show real names and never dump everything into “Other”',
+        models: 'Empty model lists show only probed models and do not expand account mappings',
       },
     },
     admin: {

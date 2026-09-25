@@ -6,9 +6,9 @@ set -uo pipefail
 # directory; all Git, GitHub Actions, Docker, validation, and rollback work
 # remains outside the application container.
 
-SRC_DIR="${SRC_DIR:-/home/ubuntu/sub2api-src}"
+SRC_DIR="${SRC_DIR:-/home/ubuntu/sub2api-prod-merge-0201}"
 DEPLOY_DIR="${DEPLOY_DIR:-/home/ubuntu/sub2api-deploy}"
-BRANCH="${BRANCH:-custom/subscription-quota-window}"
+BRANCH="${BRANCH:-feature/production-baseline-0.2.1}"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 UPSTREAM_REF="${UPSTREAM_REF:-main}"
 CUSTOM_REPO="${CUSTOM_REPO:-floating0516/sub2api-ToCreate}"
@@ -434,7 +434,7 @@ bluegreen_state_matches_production() {
     && [ "$active_image" = "$image" ]
 }
 
-app_version_from_image() {
+image_tag_from_ref() {
   local image="$1"
   local tag=""
 
@@ -442,6 +442,15 @@ app_version_from_image() {
     "$IMAGE_REPO":*) tag="${image#"$IMAGE_REPO:"}" ;;
     *) return 1 ;;
   esac
+  tag="${tag%%@*}"
+  [ -n "$tag" ] || return 1
+  printf '%s\n' "$tag"
+}
+
+app_version_from_image() {
+  local tag=""
+
+  tag="$(image_tag_from_ref "$1")" || return 1
   if [[ "$tag" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-tc[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     printf '%s\n' "${BASH_REMATCH[1]}"
     return 0
@@ -452,7 +461,8 @@ app_version_from_image() {
 source_commit_from_release_tag() {
   local image="$1"
   local image_digest_value="$2"
-  local image_tag="${image#"$IMAGE_REPO:"}"
+  local image_tag=""
+  image_tag="$(image_tag_from_ref "$image")" || return 0
   local release_tag="tocreate-v$image_tag"
   local recorded_digest=""
   local source_commit=""
@@ -495,7 +505,13 @@ upstream_commit_for_release() {
 
 publish_current_github_release() {
   local deployed_at="$1"
-  local image_tag="${current_image#"$IMAGE_REPO:"}"
+  local image_tag=""
+  image_tag="$(image_tag_from_ref "$current_image")" || {
+    current_release_status="failed"
+    current_release_error="Could not parse the production image tag"
+    log "$current_release_error"
+    return 1
+  }
   local expected_tag="tocreate-v$image_tag"
   local expected_url="https://github.com/$CUSTOM_REPO/releases/tag/$expected_tag"
   local release_json=""
@@ -568,7 +584,7 @@ reconcile_completed_status_with_production() {
     [ "$(bluegreen_state_value ACTIVE_CONTAINER)" = "$PROD_CONTAINER_NAME" ] || return 1
     active_image="$(bluegreen_state_value ACTIVE_IMAGE)"
     [ -n "$active_image" ] || return 1
-    if [ "$verify_digest" != "1" ] && [ "$active_image" = "$status_image" ]; then
+    if [ "$active_image" = "$status_image" ]; then
       return 0
     fi
   fi
@@ -587,7 +603,7 @@ reconcile_completed_status_with_production() {
       return 0
     fi
     if [ "$(status_value '.release_status')" = "published" ] \
-      && [ "$(status_value '.release_tag')" = "tocreate-v${prod_image#"$IMAGE_REPO:"}" ] \
+      && [ "$(status_value '.release_tag')" = "tocreate-v$(image_tag_from_ref "$prod_image")" ] \
       && [ "$(status_value '.release_url')" = \
         "https://github.com/$CUSTOM_REPO/releases/tag/tocreate-v${prod_image#"$IMAGE_REPO:"}" ] \
       && [ -n "$(status_value '.release_published_at')" ]; then
@@ -720,7 +736,7 @@ continue_stage_after_merge() {
     WORKFLOW="$WORKFLOW" \
     IMAGE_REPO="$IMAGE_REPO" \
     CUSTOM_SUFFIX="$suffix" \
-    "$UPDATE_SCRIPT" "$current_app_version" "${current_image##*:}"; then
+    "$UPDATE_SCRIPT" "$current_app_version" "$(image_tag_from_ref "$current_image")"; then
     write_failure "GitHub Actions custom image build failed"
     return 1
   fi
@@ -1051,7 +1067,7 @@ main() {
     exit 1
   fi
 
-  [ -d "$SRC_DIR/.git" ] || {
+  [ -e "$SRC_DIR/.git" ] || {
     log "Source repository not found: $SRC_DIR"
     exit 1
   }
