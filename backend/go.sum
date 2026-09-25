@@ -218,6 +218,8 @@ github.com/go-webauthn/webauthn v0.17.4 h1:KFTSz3R2RYDiUn/0cDi3XTJgFenSG74eKTTHl
 github.com/go-webauthn/webauthn v0.17.4/go.mod h1:pZk63EE/BdztlmyS4Yc+9H5g4a8blNlbtGmdHQHbZX8=
 github.com/go-jose/go-jose/v3 v3.0.5 h1:BLLJWbC4nMZOfuPVxoZIxeYsn6Nl2r1fITaJ78UQlVQ=
 github.com/go-jose/go-jose/v3 v3.0.5/go.mod h1:5b+7YgP7ZICgJDBdfjZaIt+H/9L9T/YQrVfLAMboGkQ=
+github.com/go-sql-driver/mysql v1.7.0 h1:ueSltNNllEqE3qcWBTD0iQd3IpL/6U+mJxLkazJ7YPc=
+github.com/go-sql-driver/mysql v1.7.0/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/go-webauthn/x v0.2.6 h1:TEyDuQAIiEgYpx60nKiBJIX/5nSUC8LxNbH+uf5U9uk=
 github.com/go-webauthn/x v0.2.6/go.mod h1:45bA7YEqyQhRcQJ/TiBb46Ww8yqHBGvgEhQ3WWF0aDo=
 github.com/goccy/go-json v0.10.2 h1:CrxCmQqYDkv1z7lO7Wbh2HN93uovUHgrECaO5ZrCXAU=
