@@ -748,8 +748,6 @@ const purchaseNavLabel = computed(() => {
       return t('nav.buySubscription')
   }
 })
-const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
-const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
 const flagPluginManagement = makeSidebarFlag(FeatureFlags.pluginManagement)
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
 const flagAdminPayment = () => adminSettingsStore.paymentEnabled
