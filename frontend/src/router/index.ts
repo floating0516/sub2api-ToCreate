@@ -1047,6 +1047,11 @@ router.beforeEach(async (to, _from, next) => {
     to.meta.requiresUserOrders &&
     appStore.publicSettingsLoaded &&
     !isFeatureFlagEnabled(FeatureFlags.userOrders)
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
+  }
+
   // 订阅功能是 opt-out 开关：只有显式 false 才拦截「我的订阅」页直达。
   if (
     to.meta.requiresSubscription &&

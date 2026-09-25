@@ -118,6 +118,7 @@ export const FeatureFlags = {
     key: 'quick_start_installer_enabled',
     mode: 'opt-in',
     label: 'Quick Start Installer',
+  }),
   subscription: defineFlag({
     key: 'subscription_enabled',
     mode: 'opt-out',
