@@ -52,6 +52,7 @@ export default {
           redeemEnabledHint: 'When off, redemption links are hidden from the sidebar and dashboard, and direct access is blocked.',
           ordersEnabled: 'Show user orders page',
           ordersEnabledHint: 'When off, order links and the payment-result action are hidden, and direct access is blocked.',
+        },
         siteBillingMode: {
           title: 'Site Billing Mode',
           description: 'Controls which purchase options users see. Defaults to "Recharge & Subscription".',

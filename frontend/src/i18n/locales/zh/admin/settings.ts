@@ -52,6 +52,7 @@ export default {
           redeemEnabledHint: '关闭后隐藏侧边栏和仪表盘中的兑换入口，并阻止直接访问用户兑换页。',
           ordersEnabled: '显示用户订单界面',
           ordersEnabledHint: '关闭后隐藏订单入口和支付结果页的查看订单按钮，并阻止直接访问用户订单页。',
+        },
         siteBillingMode: {
           title: '站点类型',
           description: '决定用户端提供哪些购买方式。默认「充值 & 订阅」。',
