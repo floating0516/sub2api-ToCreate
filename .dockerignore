@@ -92,6 +92,11 @@ tools/
 # GitHub
 .github/
 
+# The frontend build runs this locale completeness check inside the image.
+# Keep only the single test file required by `pnpm run check:i18n`.
+!frontend/src/i18n/__tests__/
+!frontend/src/i18n/__tests__/localeKeyCompleteness.spec.ts
+
 # Claude files
 .claude/
 issues/
