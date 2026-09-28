@@ -2957,13 +2957,13 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 			}
 			if delta, ok := choice["delta"].(map[string]any); ok {
 				if text, ok := delta["content"].(string); ok && text != "" {
-					collected.WriteString(text)
+					_, _ = collected.WriteString(text)
 					s.sendEvent(c, TestEvent{Type: "content", Text: text})
 				}
 			}
 			if message, ok := choice["message"].(map[string]any); ok {
 				if text, ok := message["content"].(string); ok && text != "" {
-					collected.WriteString(text)
+					_, _ = collected.WriteString(text)
 					s.sendEvent(c, TestEvent{Type: "content", Text: text})
 				}
 			}
@@ -3020,13 +3020,13 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		case "response.output_text.delta":
 			// OpenAI Responses API uses "delta" field for text content
 			if delta, ok := data["delta"].(string); ok && delta != "" {
-				collected.WriteString(delta)
+				_, _ = collected.WriteString(delta)
 				s.sendEvent(c, TestEvent{Type: "content", Text: delta})
 			}
 		case "response.output_text.done":
 			if collected.Len() == 0 {
 				if text, ok := data["text"].(string); ok && text != "" {
-					collected.WriteString(text)
+					_, _ = collected.WriteString(text)
 				}
 			}
 		case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":

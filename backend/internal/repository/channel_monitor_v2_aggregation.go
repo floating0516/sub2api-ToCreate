@@ -26,7 +26,7 @@ const (
 	channelMonitorV2RetentionRollup5m    = 7 * 24 * time.Hour  // bucket_seconds=300
 	channelMonitorV2RetentionRollup1h    = 30 * 24 * time.Hour // 3600
 	channelMonitorV2RetentionRollup12h   = 45 * 24 * time.Hour // 43200
-	channelMonitorV2RetentionRollup1d    = 24 * time.Hour // 86400
+	channelMonitorV2RetentionRollup1d    = 24 * time.Hour      // 86400
 	channelMonitorV2RetentionMax         = 24 * time.Hour
 )
 

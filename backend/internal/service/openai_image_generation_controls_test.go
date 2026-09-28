@@ -168,14 +168,17 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 		name          string
 		allowImages   bool
 		bridgeEnabled bool
+		wantLite      bool
+		wantNamespace bool
 		path          string
 		body          []byte
 		configure     func(*Account)
 	}{
 		{
-			name:          "client image_gen namespace keeps lite",
+			name:          "client image_gen namespace uses non-lite compatibility",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantNamespace: true,
 			body: []byte(`{
 				"model":"gpt-5.5",
 				"input":"draw a cat",
@@ -187,12 +190,14 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			name:          "disabled bridge keeps lite",
 			allowImages:   true,
 			bridgeEnabled: false,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
 		},
 		{
 			name:          "api key account keeps lite",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
 			configure: func(account *Account) {
 				account.Type = AccountTypeAPIKey
@@ -203,12 +208,14 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			name:          "disabled group keeps lite",
 			allowImages:   false,
 			bridgeEnabled: true,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
 		},
 		{
 			name:          "passthrough account keeps lite",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
 			configure: func(account *Account) {
 				account.Extra = map[string]any{"openai_passthrough": true}
@@ -218,6 +225,7 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			name:          "strip policy keeps lite",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.4","input":"write code","stream":false}`),
 			configure: func(account *Account) {
 				account.Extra = map[string]any{featureKeyCodexImageGenerationExplicitToolPolicy: codexImageGenerationExplicitToolPolicyStrip}
@@ -227,6 +235,7 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			name:          "compact request keeps lite",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantLite:      true,
 			path:          "/openai/v1/responses/compact",
 			body:          []byte(`{"model":"gpt-5.4","input":"summarize the conversation","stream":false}`),
 		},
@@ -234,6 +243,7 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			name:          "spark model keeps lite",
 			allowImages:   true,
 			bridgeEnabled: true,
+			wantLite:      true,
 			body:          []byte(`{"model":"gpt-5.3-codex-spark","input":"write code","stream":false}`),
 		},
 	}
@@ -274,10 +284,10 @@ func TestOpenAIGatewayServiceForward_CodexResponsesLiteHostedImageBridgeFallback
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.NotNil(t, upstream.lastReq)
-			require.Equal(t, "true", upstream.lastReq.Header.Get(responsesLiteHeader))
+			require.Equal(t, tt.wantLite, isOpenAIResponsesLiteHeader(upstream.lastReq.Header.Get(responsesLiteHeader)))
 			require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
 			require.NotContains(t, gjson.GetBytes(upstream.lastBody, "instructions").String(), codexImageGenerationBridgeMarker)
-			if tt.name == "client image_gen namespace keeps lite" {
+			if tt.wantNamespace {
 				require.Equal(t, "image_gen", gjson.GetBytes(upstream.lastBody, `input.#(type=="additional_tools").tools.0.name`).String())
 			}
 		})

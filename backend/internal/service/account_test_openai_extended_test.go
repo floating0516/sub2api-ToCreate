@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -112,8 +113,11 @@ func TestMaybeEmitCollectedDrawSVG(t *testing.T) {
 
 	markAccountTestCollectDrawSVG(ctx)
 	svc.maybeEmitCollectedDrawSVG(ctx, "```svg\n<svg id='p'></svg>\n```")
-	require.Contains(t, recorder.Body.String(), `"type":"svg"`)
-	require.Contains(t, recorder.Body.String(), `"mime_type":"text/html"`)
-	require.Contains(t, recorder.Body.String(), "<svg id='p'></svg>")
-	require.NotContains(t, recorder.Body.String(), "image/png")
+	payload := strings.TrimSpace(strings.TrimPrefix(recorder.Body.String(), "data: "))
+	var event TestEvent
+	require.NoError(t, json.Unmarshal([]byte(payload), &event))
+	require.Equal(t, "svg", event.Type)
+	require.Equal(t, "text/html", event.MimeType)
+	require.Contains(t, event.Text, "<svg id='p'></svg>")
+	require.Empty(t, event.ImageURL)
 }
