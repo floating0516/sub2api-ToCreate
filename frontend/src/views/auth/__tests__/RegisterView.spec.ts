@@ -3,12 +3,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RegisterView from '@/views/auth/RegisterView.vue'
 import { consumeFullRegistrationDraft, storeFullRegistrationDraft } from '@/utils/registrationDraft'
 
-const { fetchPublicSettingsMock, registerMock, routeQuery, showErrorMock } = vi.hoisted(() => ({
-  fetchPublicSettingsMock: vi.fn(),
-  registerMock: vi.fn(),
-  routeQuery: { full: '1' } as Record<string, string>,
-  showErrorMock: vi.fn()
-}))
+const {
+  fetchPublicSettingsMock,
+  registerMock,
+  routeQuery,
+  showErrorMock,
+  pushMock,
+  verifyActionMock,
+  appStoreMock
+} = vi.hoisted(() => {
+  const fetchPublicSettingsMock = vi.fn()
+  const showErrorMock = vi.fn()
+  return {
+    fetchPublicSettingsMock,
+    registerMock: vi.fn(),
+    routeQuery: { full: '1' } as Record<string, string>,
+    showErrorMock,
+    pushMock: vi.fn(),
+    verifyActionMock: vi.fn(),
+    appStoreMock: {
+      siteLogo: '',
+      cachedPublicSettings: null as { promo_code_enabled?: boolean } | null,
+      fetchPublicSettings: (...args: unknown[]) => fetchPublicSettingsMock(...args),
+      showError: (...args: unknown[]) => showErrorMock(...args),
+      showSuccess: vi.fn(),
+      showWarning: vi.fn()
+    }
+  }
+})
+const getPublicSettingsMock = fetchPublicSettingsMock
 
 const publicSettings = {
   registration_enabled: true,
@@ -28,7 +51,7 @@ const publicSettings = {
 }
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
   useRoute: () => ({ path: '/register', query: routeQuery })
 }))
 
@@ -49,13 +72,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('@/stores', () => ({
   useAuthStore: () => ({ register: (...args: unknown[]) => registerMock(...args) }),
-  useAppStore: () => ({
-    siteLogo: '',
-    fetchPublicSettings: (...args: unknown[]) => fetchPublicSettingsMock(...args),
-    showError: (...args: unknown[]) => showErrorMock(...args),
-    showSuccess: vi.fn(),
-    showWarning: vi.fn()
-  })
+  useAppStore: () => appStoreMock
 }))
 
 function mountRegister() {
@@ -69,7 +86,10 @@ function mountRegister() {
           template: '<div data-testid="unified-registration" />'
         },
         Icon: true,
-        TurnstileWidget: { template: '<div data-testid="turnstile-widget" />' },
+        TurnstileWidget: {
+          template: '<div data-testid="turnstile-widget" />',
+          methods: { verifyAction: verifyActionMock, reset: vi.fn() }
+        },
         LoginAgreementPrompt: true,
         EmailOAuthButtons: true,
         LinuxDoOAuthSection: true,
@@ -82,11 +102,16 @@ function mountRegister() {
   })
 }
 
-describe('RegisterView invitation layout', () => {
+describe('RegisterView', () => {
   beforeEach(() => {
     fetchPublicSettingsMock.mockReset()
     registerMock.mockReset()
     showErrorMock.mockReset()
+    pushMock.mockReset()
+    verifyActionMock.mockReset()
+    appStoreMock.cachedPublicSettings = null
+    sessionStorage.removeItem('register_data')
+    verifyActionMock.mockResolvedValue({ token: 'ticket', randstr: 'randstr' })
     fetchPublicSettingsMock.mockResolvedValue(publicSettings)
     registerMock.mockResolvedValue({})
     routeQuery.full = '1'
@@ -117,6 +142,105 @@ describe('RegisterView invitation layout', () => {
     expect((wrapper.get('#email').element as HTMLInputElement).value).toBe('draft@example.com')
     expect((wrapper.get('#password').element as HTMLInputElement).value).toBe('secret-123')
     expect(consumeFullRegistrationDraft()).toBeNull()
+  })
+
+  it('does not flash the promo-code field before disabled settings finish loading', async () => {
+    let resolveSettings!: (settings: typeof publicSettings) => void
+    getPublicSettingsMock.mockReturnValueOnce(
+      new Promise<typeof publicSettings>((resolve) => {
+        resolveSettings = resolve
+      })
+    )
+
+    const wrapper = mountRegister()
+
+    expect(wrapper.find('#promo_code').exists()).toBe(false)
+
+    resolveSettings(publicSettings)
+    await flushPromises()
+
+    expect(wrapper.find('#promo_code').exists()).toBe(false)
+  })
+
+  it('uses injected public settings to show an enabled promo-code field on first render', () => {
+    appStoreMock.cachedPublicSettings = { promo_code_enabled: true }
+    getPublicSettingsMock.mockReturnValueOnce(new Promise(() => {}))
+
+    const wrapper = mountRegister()
+
+    expect(wrapper.find('#promo_code').exists()).toBe(true)
+  })
+
+  it.each([
+    ['', 'auth.confirmPasswordRequired'],
+    ['different-password', 'auth.passwordsDoNotMatch']
+  ])('blocks invalid confirmation %j before captcha and allows correction', async (confirmation, error) => {
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      tencent_captcha_enabled: true,
+      tencent_captcha_app_id: 'app-id'
+    })
+    const wrapper = mountRegister()
+    await flushPromises()
+    await wrapper.get('#email').setValue('user@example.com')
+    await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue(confirmation)
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(showErrorMock).toHaveBeenCalledWith(error)
+    expect(wrapper.get('#confirmPassword').classes()).toContain('input-error')
+    expect(registerMock).not.toHaveBeenCalled()
+    expect(verifyActionMock).not.toHaveBeenCalled()
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+
+    await wrapper.get('#confirmPassword').setValue('secret-123')
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.get('#confirmPassword').classes()).not.toContain('input-error')
+    expect(verifyActionMock).toHaveBeenCalledOnce()
+    expect(registerMock).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      password: 'secret-123',
+      turnstile_token: undefined,
+      tencent_captcha_ticket: 'ticket',
+      tencent_captcha_randstr: 'randstr',
+      promo_code: undefined,
+      invitation_code: undefined
+    })
+    expect(pushMock).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('requires matching confirmation before storing only the registration fields for email verification', async () => {
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      email_verify_enabled: true
+    })
+    const wrapper = mountRegister()
+    await flushPromises()
+    await wrapper.get('#email').setValue('user@example.com')
+    await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('different-password')
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+    expect(pushMock).not.toHaveBeenCalled()
+
+    await wrapper.get('#confirmPassword').setValue('secret-123')
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(JSON.parse(sessionStorage.getItem('register_data')!)).toEqual({
+      email: 'user@example.com',
+      password: 'secret-123'
+    })
+    expect(pushMock).toHaveBeenCalledWith('/email-verify')
+    expect(registerMock).not.toHaveBeenCalled()
   })
 
   it('keeps the optional affiliate invitation field before Turnstile', async () => {
@@ -159,6 +283,7 @@ describe('RegisterView invitation layout', () => {
     await flushPromises()
     await wrapper.get('#email').setValue('first@custom.example')
     await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 
@@ -184,6 +309,7 @@ describe('RegisterView invitation layout', () => {
     await flushPromises()
     await wrapper.get('#email').setValue('second@custom.example')
     await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 
@@ -204,6 +330,7 @@ describe('RegisterView invitation layout', () => {
     await flushPromises()
     await wrapper.get('#email').setValue('first@custom.example')
     await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 
@@ -224,6 +351,7 @@ describe('RegisterView invitation layout', () => {
     await flushPromises()
     await wrapper.get('#email').setValue('user@allowed.com')
     await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 

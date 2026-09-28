@@ -342,7 +342,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Subscriptions',
       titleKey: 'userSubscriptions.title',
-      descriptionKey: 'userSubscriptions.description'
+      descriptionKey: 'userSubscriptions.description',
+      requiresSubscription: true
     }
   },
   {
@@ -1024,7 +1025,8 @@ router.beforeEach(async (to, _from, next) => {
     (to.meta.requiresPayment ||
       to.meta.requiresRiskControl ||
       to.meta.requiresUserRedeem ||
-      to.meta.requiresUserOrders) &&
+      to.meta.requiresUserOrders ||
+      to.meta.requiresSubscription) &&
     !appStore.publicSettingsLoaded
   ) {
     try {
@@ -1067,6 +1069,16 @@ router.beforeEach(async (to, _from, next) => {
     to.meta.requiresUserOrders &&
     appStore.publicSettingsLoaded &&
     !isFeatureFlagEnabled(FeatureFlags.userOrders)
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
+  }
+
+  // 订阅功能是 opt-out 开关：只有显式 false 才拦截「我的订阅」页直达。
+  if (
+    to.meta.requiresSubscription &&
+    appStore.publicSettingsLoaded &&
+    appStore.cachedPublicSettings?.subscription_enabled === false
   ) {
     next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
     return

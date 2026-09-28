@@ -12,6 +12,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestChannelMonitorV2DateBinOriginIsUTC(t *testing.T) {
+	require.Equal(t, "TIMESTAMPTZ '1970-01-01 00:00:00+00'", channelMonitorV2DateBinOrigin)
+	require.Equal(t, "date_bin($1::interval,m.bucket_start,TIMESTAMPTZ '1970-01-01 00:00:00+00')", channelMonitorV2DateBinExpr("m.bucket_start"))
+
+	for _, query := range []string{
+		channelMonitorV2FixedRollupBoundsSQL,
+		channelMonitorV2MetricsRollupSQL,
+		channelMonitorV2UserMetricsRollupSQL,
+		channelMonitorV2HistogramRollupSQL,
+		channelMonitorV2ErrorRollupSQL,
+	} {
+		require.Contains(t, query, channelMonitorV2DateBinOrigin)
+		require.NotContains(t, query, "TIMESTAMPTZ '1970-01-01'")
+	}
+}
+
+func TestChannelMonitorV2DisplayModelIsPlatformScoped(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{
+		{Platform: "openai", Enabled: true, Models: []string{"shared", "gpt-5"}},
+		{Platform: "grok", Enabled: true, Models: []string{"grok-4"}},
+		// Empty models list must NOT collapse everything into __other__.
+		{Platform: "anthropic", Enabled: true, Models: []string{}},
+	}}
+	require.Equal(t, "shared", channelMonitorV2DisplayModel(cfg, "openai", "shared"))
+	require.Equal(t, service.ChannelMonitorV2OtherModel, channelMonitorV2DisplayModel(cfg, "grok", "shared"))
+	require.Equal(t, "claude-sonnet-4", channelMonitorV2DisplayModel(cfg, "anthropic", "claude-sonnet-4"))
+	// Unconfigured platform still surfaces the real model name.
+	require.Equal(t, "gemini-2.5-pro", channelMonitorV2DisplayModel(cfg, "gemini", "gemini-2.5-pro"))
+	require.True(t, channelMonitorV2ModelSelected(service.ChannelMonitorV2Filter{Models: []string{service.ChannelMonitorV2OtherModel}}, cfg, "grok", "shared"))
+}
+
 func TestChannelMonitorV2DisplayModelKeepsEveryRealNameWhenNoCatalog(t *testing.T) {
 	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{
 		{Platform: "anthropic", Enabled: true, Models: []string{}},
