@@ -89,11 +89,11 @@ const tooltipValue = (value: unknown): number => {
 }
 
 const escapeTooltipText = (value: unknown): string => String(value ?? '')
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#39;')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
 
 const formatTrendTooltip = (params: TooltipComponentFormatterCallbackParams): string => {
   const points = (Array.isArray(params) ? params : [params]) as DashboardTooltipParam[]
