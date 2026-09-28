@@ -47,6 +47,7 @@ export interface DashboardTrendSeries {
   label: string
   color: string
   values: number[]
+  total?: number
 }
 
 const props = defineProps<{

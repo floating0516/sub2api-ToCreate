@@ -128,4 +128,39 @@ describe('user DashboardView', () => {
     expect(labels[0]).toBe('00:00')
     expect(labels[23]).toBe('23:00')
   })
+
+  it('orders model series by total token usage instead of trusting response rank', async () => {
+    getDashboardModelTrends.mockResolvedValue({
+      trend: [
+        { date: '2026-08-01', model: 'model-low', rank: 1, requests: 1, total_tokens: 20 },
+        { date: '2026-08-01', model: 'model-high', rank: 3, requests: 1, total_tokens: 90 },
+        { date: '2026-08-02', model: 'model-low', rank: 1, requests: 1, total_tokens: 10 },
+        { date: '2026-08-02', model: 'model-high', rank: 3, requests: 1, total_tokens: 60 }
+      ]
+    })
+
+    const wrapper = shallowMount(DashboardView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Icon: true,
+          DashboardDateRangePicker: true,
+          DashboardUsageCalendar: true,
+          DashboardTrendChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const series = wrapper.getComponent({ name: 'DashboardTrendChart' }).props('series') as Array<{
+      label: string
+      color: string
+      total: number
+    }>
+    expect(series.map((item) => item.label)).toEqual(['model-high', 'model-low'])
+    expect(series.map((item) => item.total)).toEqual([150, 30])
+    expect(new Set(series.map((item) => item.color)).size).toBe(2)
+    expect(wrapper.findAll('.dashboard-legend-rank').map((item) => item.text())).toEqual(['1', '2'])
+  })
 })

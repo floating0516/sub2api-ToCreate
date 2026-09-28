@@ -61,12 +61,18 @@
               </span>
               <span class="dashboard-chart-scope">{{ chartScopeLabel }}</span>
             </div>
-            <div class="dashboard-legend" aria-label="Legend">
-              <span v-for="item in chartSeries" :key="item.label" :title="item.label">
+            <ol class="dashboard-legend" aria-label="Legend">
+              <li
+                v-for="(item, index) in chartSeries"
+                :key="item.label"
+                :title="`${item.label} · ${formatTokens(item.total || 0)}`"
+              >
+                <span class="dashboard-legend-rank">{{ index + 1 }}</span>
                 <i :style="{ backgroundColor: item.color }" />
                 <b>{{ item.label }}</b>
-              </span>
-            </div>
+                <small>{{ formatTokens(item.total || 0) }}</small>
+              </li>
+            </ol>
           </div>
 
           <div class="dashboard-chart-controls">
@@ -158,7 +164,10 @@ import type {
 } from '@/types'
 import type { UserPaymentSummary } from '@/types/payment'
 import { formatDateLocalInput } from '@/utils/format'
-import { activityAccent, activityTrendPalette } from '@/components/user/dashboard/dashboardActivityTheme'
+import {
+  activityAccent,
+  dashboardModelTrendPalette
+} from '@/components/user/dashboard/dashboardActivityTheme'
 
 type Granularity = 'day' | 'hour'
 type GroupMode = 'model' | 'api_key'
@@ -177,7 +186,7 @@ interface MetricDetail {
   value: string
 }
 
-const MODEL_COLOR_PALETTE = activityTrendPalette
+const MODEL_COLOR_PALETTE = dashboardModelTrendPalette
 const MAX_CHART_MODEL_SERIES = 8
 const API_KEY_COLOR = activityAccent
 const DAY_MS = 86_400_000
@@ -438,16 +447,19 @@ const loadModelTrendSeries = async (requestID: number, buckets: string[]) => {
   if (requestID !== chartRequestID) return
 
   const trend = response.trend || []
-  const rankedModels = [
-    ...new Map(trend.map((point) => [point.model, point.rank] as const)).entries()
-  ]
-    .sort((left, right) => left[1] - right[1])
+  const modelTotals = trend.reduce((totals, point) => {
+    totals.set(point.model, (totals.get(point.model) || 0) + point.total_tokens)
+    return totals
+  }, new Map<string, number>())
+  const rankedModels = [...modelTotals.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .map(([model]) => model)
   const colors = buildModelColors(rankedModels)
   chartSeries.value = rankedModels.map((model, index) => ({
     label: model,
     color: colors[model] || MODEL_COLOR_PALETTE[index],
-    values: normalizeModelTrend(trend, model, buckets)
+    values: normalizeModelTrend(trend, model, buckets),
+    total: modelTotals.get(model) || 0
   }))
 }
 
@@ -499,7 +511,8 @@ const loadApiKeyTrendSeries = async (requestID: number, buckets: string[]) => {
   chartSeries.value = [{
     label: selectedKey ? apiKeyLabel(selectedKey) : t('dashboard.overview.allApiKeys'),
     color: API_KEY_COLOR,
-    values: normalizeTrend(response.trend || [], buckets)
+    values: normalizeTrend(response.trend || [], buckets),
+    total: (response.trend || []).reduce((sum, point) => sum + point.total_tokens, 0)
   }]
 }
 
@@ -843,9 +856,11 @@ onMounted(refreshDashboard)
   min-width: 0;
   flex-wrap: nowrap;
   gap: 8px 18px;
-  margin-top: 12px;
+  margin: 12px 0 0;
+  padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  list-style: none;
   scrollbar-width: none;
 }
 
@@ -853,7 +868,7 @@ onMounted(refreshDashboard)
   display: none;
 }
 
-.dashboard-legend span {
+.dashboard-legend li {
   display: flex;
   flex: 0 0 auto;
   min-width: 0;
@@ -864,10 +879,24 @@ onMounted(refreshDashboard)
   font-size: 12px;
 }
 
+.dashboard-legend-rank {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--dashboard-divider);
+  border-radius: 50%;
+  color: var(--dashboard-subtle);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .dashboard-legend i {
   flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
@@ -877,6 +906,13 @@ onMounted(refreshDashboard)
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-legend small {
+  flex: 0 0 auto;
+  color: var(--dashboard-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-chart-controls {
@@ -1158,7 +1194,7 @@ onMounted(refreshDashboard)
     overflow: hidden;
   }
 
-  .dashboard-legend span {
+  .dashboard-legend li {
     width: 100%;
     max-width: none;
   }

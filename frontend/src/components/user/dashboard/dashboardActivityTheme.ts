@@ -19,7 +19,7 @@ export function activityGridColor(dark: boolean): string {
   return dark ? 'rgba(240, 238, 230, 0.12)' : 'rgba(42, 47, 40, 0.1)'
 }
 
-/** Warm series for usage charts — stays in the cream/bronze family. */
+/** Warm series for usage charts that intentionally follow the cream and bronze theme. */
 export const activityTrendPalette = [
   '#aa7149',
   '#6f4529',
@@ -33,4 +33,16 @@ export const activityTrendPalette = [
   '#d4a06a',
   '#54341f',
   '#e2c4a8'
+]
+
+/** Color-blind-friendly model colors for dense multi-series trend charts. */
+export const dashboardModelTrendPalette = [
+  '#3b82f6',
+  '#ef4444',
+  '#16a34a',
+  '#d97706',
+  '#8b5cf6',
+  '#0891b2',
+  '#db2777',
+  '#65a30d'
 ]
