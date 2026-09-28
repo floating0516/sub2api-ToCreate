@@ -403,7 +403,7 @@ func TestChannelMonitorV2TierRetentionPolicy(t *testing.T) {
 
 	now := time.Date(2026, 8, 7, 12, 0, 0, 0, time.UTC)
 	require.Equal(t, now.Add(-7*24*time.Hour), channelMonitorV2RetentionCutoff(now, channelMonitorV2RetentionMetrics1m))
-	require.Equal(t, now.Add(-90*24*time.Hour), channelMonitorV2RetentionCutoff(now, channelMonitorV2MaxRetention()))
+	require.Equal(t, now.Add(-channelMonitorV2MaxRetention()), channelMonitorV2RetentionCutoff(now, channelMonitorV2MaxRetention()))
 }
 
 func TestSameFixedRollupBucket(t *testing.T) {

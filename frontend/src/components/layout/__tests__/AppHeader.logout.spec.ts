@@ -56,10 +56,13 @@ vi.mock('@/stores/adminSettings', () => ({
   useAdminSettingsStore: () => ({ customMenuItems: [] }),
 }))
 
-vi.mock('@/utils/featureFlags', () => ({
-  FeatureFlags: { modelPlaza: 'model_plaza' },
-  isFeatureFlagEnabled: () => false,
-}))
+vi.mock('@/utils/featureFlags', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/featureFlags')>()
+  return {
+    ...actual,
+    isFeatureFlagEnabled: () => false,
+  }
+})
 
 function mountHeader() {
   return mount(AppHeader, {

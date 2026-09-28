@@ -352,7 +352,6 @@ describe('EmailFirstAuthDialog', () => {
     expect(wrapper.get('[data-testid="email-auth-code"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="email-auth-code"]').setValue('123456')
-    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(authStore.register).toHaveBeenCalledWith({

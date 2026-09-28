@@ -259,8 +259,7 @@ func (s *ChannelMonitorV2Aggregator) runOnce() {
 		return
 	}
 
-	// Phase 2: walk history backward at most one chunk per tick until retention max (90d).
-	// Product UI (30d) fills first; remaining 30–90d continues silently.
+	// Phase 2: walk history backward at most one chunk per tick until the configured retention limit.
 	retentionCutoff := now.Add(-channelMonitorV2RetentionMax)
 	if !cursor.After(retentionCutoff) {
 		return
