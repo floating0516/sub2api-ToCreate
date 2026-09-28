@@ -29,7 +29,7 @@ import {
 } from 'echarts/components'
 import { UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
-import type { EChartsOption } from 'echarts'
+import type { EChartsOption, TooltipComponentFormatterCallbackParams } from 'echarts'
 import VChart from 'vue-echarts'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { activityAxisColor } from '@/components/user/dashboard/dashboardActivityTheme'
@@ -73,6 +73,42 @@ const formatTokens = (value: number): string => {
   if (absolute >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
   if (absolute >= 1_000) return `${(value / 1_000).toFixed(0)}K`
   return Math.round(value).toLocaleString()
+}
+
+type DashboardTooltipParam = {
+  axisValue?: string | number
+  axisValueLabel?: string
+  marker?: string
+  seriesName?: string
+  value?: unknown
+}
+
+const tooltipValue = (value: unknown): number => {
+  if (Array.isArray(value)) return Number(value.at(-1) ?? 0)
+  return Number(value ?? 0)
+}
+
+const escapeTooltipText = (value: unknown): string => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
+const formatTrendTooltip = (params: TooltipComponentFormatterCallbackParams): string => {
+  const points = (Array.isArray(params) ? params : [params]) as DashboardTooltipParam[]
+  const sortedPoints = points
+    .map((point, index) => ({ point, index, value: tooltipValue(point.value) }))
+    .sort((left, right) => right.value - left.value || left.index - right.index)
+
+  const heading = sortedPoints[0]?.point.axisValueLabel ?? sortedPoints[0]?.point.axisValue ?? ''
+  const rows = sortedPoints.map(({ point, value }) => {
+    const marker = point.marker ?? ''
+    const label = escapeTooltipText(point.seriesName)
+    return `${marker}${label} <strong>${formatTokens(value)}</strong>`
+  })
+
+  return [escapeTooltipText(heading), ...rows].join('<br/>')
 }
 
 const hexToRgba = (color: string, opacity: number): string => {
@@ -120,6 +156,7 @@ const chartOption = computed<EChartsOption>(() => {
     },
     tooltip: {
       trigger: 'axis',
+      formatter: formatTrendTooltip,
       confine: true,
       backgroundColor: tooltipBackground,
       borderColor: tooltipBorder,

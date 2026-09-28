@@ -61,4 +61,33 @@ describe('DashboardTrendChart', () => {
       'overflow-wrap: anywhere'
     )
   })
+
+  it('sorts tooltip rows by the hovered bucket usage', () => {
+    const wrapper = mount(DashboardTrendChart, {
+      props: {
+        labels: ['00:00'],
+        series: [
+          { label: 'gpt-5.6-sol', color: '#22a06b', values: [10] },
+          { label: 'claude-sonnet', color: '#e06c45', values: [90] },
+          { label: 'gemini-2.5-pro', color: '#3978d4', values: [40] }
+        ],
+        loading: false
+      },
+      global: {
+        stubs: {
+          LoadingSpinner: true
+        }
+      }
+    })
+
+    const formatter = wrapper.getComponent({ name: 'VChart' }).props('option').tooltip.formatter
+    const output = formatter([
+      { axisValueLabel: '00:00', seriesName: 'gpt-5.6-sol', value: 10, marker: '' },
+      { axisValueLabel: '00:00', seriesName: 'claude-sonnet', value: 90, marker: '' },
+      { axisValueLabel: '00:00', seriesName: 'gemini-2.5-pro', value: 40, marker: '' }
+    ])
+
+    expect(output.indexOf('claude-sonnet')).toBeLessThan(output.indexOf('gemini-2.5-pro'))
+    expect(output.indexOf('gemini-2.5-pro')).toBeLessThan(output.indexOf('gpt-5.6-sol'))
+  })
 })
