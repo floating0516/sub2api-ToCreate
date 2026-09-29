@@ -193,8 +193,10 @@ func TestSupportHandler_MapsUpstreamUnauthorized(t *testing.T) {
 
 func TestSupportHandler_MapsTimeout(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"answer":"too late"}`))
 	}))
 	defer upstream.Close()
 
