@@ -387,6 +387,80 @@ func TestLocalizedPaymentSubjectAmount(t *testing.T) {
 	}
 }
 
+func TestPaymentProviderSubjectIncludesPaidAmountAndProduct(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		amount         string
+		currency       string
+		productSubject string
+		want           string
+	}{
+		{
+			name:           "subscription in CNY",
+			amount:         "19.90",
+			currency:       "CNY",
+			productSubject: "订阅 GPT Pro 高额度周卡",
+			want:           "实付 19.90 元 | 订阅 GPT Pro 高额度周卡",
+		},
+		{
+			name:           "add-on in CNY",
+			amount:         "9.90",
+			currency:       "CNY",
+			productSubject: "加油包 10 美元",
+			want:           "实付 9.90 元 | 加油包 10 美元",
+		},
+		{
+			name:           "balance with fee",
+			amount:         "10.30",
+			currency:       "CNY",
+			productSubject: "余额充值 10.00 元",
+			want:           "实付 10.30 元 | 余额充值 10.00 元",
+		},
+		{
+			name:           "subscription in USD",
+			amount:         "5.00",
+			currency:       "USD",
+			productSubject: "订阅 Claude Pro",
+			want:           "实付 5.00 美元 | 订阅 Claude Pro",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := paymentProviderSubjectWithPaidAmount(tt.amount, tt.currency, tt.productSubject)
+			if got != tt.want {
+				t.Fatalf("paymentProviderSubjectWithPaidAmount() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPaymentProviderSubjectKeepsPaidAmountBeforeLongProduct(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		ID:        269,
+		UserEmail: "henan7054@gmail.com",
+	}
+	productSubject := paymentProviderSubjectWithPaidAmount("19.90", "CNY", "订阅 "+strings.Repeat("高额度周卡", 40))
+
+	got := enrichPaymentProviderSubject(order, productSubject)
+	if len(got) > paymentProviderSubjectMaxBytes {
+		t.Fatalf("subject length = %d, want <= %d: %q", len(got), paymentProviderSubjectMaxBytes, got)
+	}
+	if !utf8.ValidString(got) {
+		t.Fatalf("subject is not valid UTF-8: %q", got)
+	}
+	if !strings.HasPrefix(got, "#269 | h***4@gmail.com | 实付 19.90 元 | 订阅 ") {
+		t.Fatalf("subject prefix = %q", got)
+	}
+}
+
 func TestAddonPaymentSubjectUsesChineseLabel(t *testing.T) {
 	t.Parallel()
 

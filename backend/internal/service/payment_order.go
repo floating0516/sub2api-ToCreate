@@ -477,7 +477,12 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		return nil, infraerrors.ServiceUnavailable("PAYMENT_PROVIDER_MISCONFIGURED", "provider_misconfigured").
 			WithMetadata(map[string]string{"provider": sel.ProviderKey, "instance_id": sel.InstanceID})
 	}
-	subject := enrichPaymentProviderSubject(order, s.buildPaymentSubject(plan, addon, managedRecharge, limitAmount, cfg, sel))
+	productSubject := s.buildPaymentSubject(plan, addon, managedRecharge, limitAmount, cfg, sel)
+	currency := payment.DefaultPaymentCurrency
+	if sel != nil {
+		currency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
+	}
+	subject := enrichPaymentProviderSubject(order, paymentProviderSubjectWithPaidAmount(payAmountStr, currency, productSubject))
 	outTradeNo := order.OutTradeNo
 	canonicalReturnURL, err := CanonicalizeReturnURL(req.ReturnURL, req.SrcHost, req.SrcURL)
 	if err != nil {
@@ -626,6 +631,17 @@ func localizedPaymentSubjectAmount(amount, currency string) string {
 	default:
 		return strings.TrimSpace(amount + " " + currency)
 	}
+}
+
+func paymentProviderSubjectWithPaidAmount(amount, currency, productSubject string) string {
+	parts := make([]string, 0, 2)
+	if amount = strings.TrimSpace(amount); amount != "" {
+		parts = append(parts, "实付 "+localizedPaymentSubjectAmount(amount, currency))
+	}
+	if productSubject = strings.TrimSpace(productSubject); productSubject != "" {
+		parts = append(parts, productSubject)
+	}
+	return strings.Join(parts, " | ")
 }
 
 func enrichPaymentProviderSubject(order *dbent.PaymentOrder, productName string) string {
