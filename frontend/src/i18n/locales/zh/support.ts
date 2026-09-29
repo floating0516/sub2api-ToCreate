@@ -1,0 +1,32 @@
+export default {
+  support: {
+    title: '技术支持',
+    subtitle: '描述你的问题，支持 Agent 会结合文档和证据回答。',
+    saved: '会话已保存',
+    emptyTitle: '先问一个问题',
+    emptyExample: '例如：Codex 怎么配？它 401 了怎么办？',
+    evidenceStatus: '证据状态：{status}',
+    evidence: {
+      sufficient: '充分',
+      insufficient: '不足，需要补充信息',
+      none: '未找到相关证据',
+    },
+    citations: '引用',
+    document: '文档',
+    ticketDraftTitle: '已整理为工单草稿',
+    product: '产品',
+    priority: '优先级',
+    confirmTicket: '确认提交',
+    cancelTicket: '取消',
+    ticketSubmitted: '工单已提交：{id}',
+    placeholder: '请不要发送 API Key、auth.json 或支付凭证。',
+    inputHint: '请提供可复现步骤和相关错误信息，不要粘贴密钥。',
+    processing: '处理中...',
+    send: '发送',
+    errors: {
+      loadThread: '加载支持会话失败',
+      unavailable: '支持服务暂时不可用，请稍后重试',
+      ticketAction: '工单操作失败，请稍后重试',
+    },
+  },
+}

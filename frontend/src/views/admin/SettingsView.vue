@@ -6765,6 +6765,21 @@
                 </div>
                 <Toggle v-model="form.quick_start_installer_enabled" />
               </div>
+
+              <!-- Support Agent -->
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <div class="pr-6">
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.site.supportAgentEnabled")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.site.supportAgentEnabledHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.support_agent_enabled" />
+              </div>
             </div>
           </div>
 
@@ -9798,6 +9813,7 @@ const form = reactive<SettingsForm>({
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
   quick_start_installer_enabled: false,
+  support_agent_enabled: false,
   payment_enabled: false,
   risk_control_enabled: false,
   cyber_policy_user_allowlist: "",
@@ -11499,6 +11515,7 @@ async function saveSettings() {
       backend_mode_enabled: form.backend_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
       quick_start_installer_enabled: form.quick_start_installer_enabled,
+      support_agent_enabled: form.support_agent_enabled,
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,

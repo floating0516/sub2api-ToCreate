@@ -163,6 +163,7 @@ type UpdateSettingsRequest struct {
 	CompactHomeEnabled          bool                  `json:"compact_home_enabled"`
 	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
 	QuickStartInstallerEnabled  bool                  `json:"quick_start_installer_enabled"`
+	SupportAgentEnabled         *bool                 `json:"support_agent_enabled"`
 	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
 	TableDefaultPageSize        int                   `json:"table_default_page_size"`
@@ -1978,6 +1979,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.AvailableChannelsEnabled
 		}(),
+		SupportAgentEnabled: func() bool {
+			if req.SupportAgentEnabled != nil {
+				return *req.SupportAgentEnabled
+			}
+			return previousSettings.SupportAgentEnabled
+		}(),
 		UserRedeemEnabled: func() bool {
 			if req.UserRedeemEnabled != nil {
 				return *req.UserRedeemEnabled
@@ -2323,6 +2330,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CompactHomeEnabled:                                     updatedSettings.CompactHomeEnabled,
 		HideCcsImportButton:                                    updatedSettings.HideCcsImportButton,
 		QuickStartInstallerEnabled:                             updatedSettings.QuickStartInstallerEnabled,
+		SupportAgentEnabled:                                    updatedSettings.SupportAgentEnabled,
 		PurchaseSubscriptionEnabled:                            updatedSettings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:                                updatedSettings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                                   updatedSettings.TableDefaultPageSize,

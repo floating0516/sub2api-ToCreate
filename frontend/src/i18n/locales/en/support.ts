@@ -1,0 +1,32 @@
+export default {
+  support: {
+    title: 'Technical Support',
+    subtitle: 'Describe the issue and the support Agent will answer from documented evidence.',
+    saved: 'Conversation saved',
+    emptyTitle: 'Ask a question to get started',
+    emptyExample: 'For example: How do I configure Codex? Why am I getting a 401?',
+    evidenceStatus: 'Evidence: {status}',
+    evidence: {
+      sufficient: 'Sufficient',
+      insufficient: 'More information needed',
+      none: 'No relevant evidence found',
+    },
+    citations: 'Sources',
+    document: 'Document',
+    ticketDraftTitle: 'Ticket draft ready',
+    product: 'Product',
+    priority: 'Priority',
+    confirmTicket: 'Submit ticket',
+    cancelTicket: 'Cancel',
+    ticketSubmitted: 'Ticket submitted: {id}',
+    placeholder: 'Do not send API keys, auth.json, or payment credentials.',
+    inputHint: 'Include reproduction steps and relevant errors, but do not paste secrets.',
+    processing: 'Working...',
+    send: 'Send',
+    errors: {
+      loadThread: 'Could not restore the support conversation',
+      unavailable: 'Support is temporarily unavailable. Please try again.',
+      ticketAction: 'The ticket action failed. Please try again.',
+    },
+  },
+}

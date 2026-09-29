@@ -61,6 +61,9 @@ declare module 'vue-router' {
     /** Whether the user-facing order-history page is enabled. */
     requiresUserOrders?: boolean
 
+    /** Whether the user-facing support Agent page is enabled. */
+    requiresSupportAgent?: boolean
+
     /**
      * 是否要求订阅功能开关（subscription_enabled，opt-out）未被显式关闭
      * @default false

@@ -70,6 +70,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeySiteName:                                  "Sub2API",
 		SettingKeySiteLogo:                                  "",
 		SettingKeyQuickStartInstallerEnabled:                "false",
+		SettingKeySupportAgentEnabled:                       "false",
 		SettingKeyPurchaseSubscriptionEnabled:               "false",
 		SettingKeyPurchaseSubscriptionURL:                   "",
 		SettingKeyTableDefaultPageSize:                      "20",
@@ -374,6 +375,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		CompactHomeEnabled:                     settings[SettingKeyCompactHomeEnabled] == "true",
 		HideCcsImportButton:                    settings[SettingKeyHideCcsImportButton] == "true",
 		QuickStartInstallerEnabled:             settings[SettingKeyQuickStartInstallerEnabled] == "true",
+		SupportAgentEnabled:                    settings[SettingKeySupportAgentEnabled] == "true",
 		PurchaseSubscriptionEnabled:            settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:                strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		CustomMenuItems:                        settings[SettingKeyCustomMenuItems],
@@ -832,6 +834,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Available channels feature (default: disabled; strict true)
 	result.AvailableChannelsEnabled = settings[SettingKeyAvailableChannelsEnabled] == "true"
+	result.SupportAgentEnabled = settings[SettingKeySupportAgentEnabled] == "true"
 	result.UserRedeemEnabled = !isFalseSettingValue(settings[SettingKeyUserRedeemEnabled])
 	result.UserOrdersEnabled = !isFalseSettingValue(settings[SettingKeyUserOrdersEnabled])
 
