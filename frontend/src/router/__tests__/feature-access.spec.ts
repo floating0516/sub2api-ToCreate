@@ -27,6 +27,7 @@ const appStore = vi.hoisted(() => ({
     risk_control_enabled?: boolean
     user_redeem_enabled?: boolean
     user_orders_enabled?: boolean
+    support_agent_enabled?: boolean
     custom_menu_items?: []
   },
   fetchPublicSettings: vi.fn(),
@@ -146,6 +147,7 @@ describe('feature route guard', () => {
     ['risk control', { requiresRiskControl: true }, '/admin/risk-control'],
     ['user redeem', { requiresUserRedeem: true }, '/redeem'],
     ['user orders', { requiresUserOrders: true }, '/orders'],
+    ['support Agent', { requiresSupportAgent: true }, '/support'],
   ])('does not treat a failed %s settings load as explicitly disabled', async (_name, meta, path) => {
     authStore.isAdmin = meta.requiresRiskControl === true
     appStore.fetchPublicSettings.mockResolvedValue(null)
@@ -176,6 +178,12 @@ describe('feature route guard', () => {
       'user orders',
       { requiresUserOrders: true },
       { user_orders_enabled: false },
+      '/dashboard',
+    ],
+    [
+      'support Agent',
+      { requiresSupportAgent: true },
+      { support_agent_enabled: false },
       '/dashboard',
     ],
   ])('redirects when loaded settings explicitly disable %s', async (_name, meta, settings, target) => {

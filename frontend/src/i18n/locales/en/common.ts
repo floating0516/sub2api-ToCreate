@@ -176,6 +176,7 @@ export default {
     channels: 'Channels',
     availableChannels: 'Available Channels',
     modelPlaza: 'Model Plaza',
+    support: 'Technical Support',
     subscriptions: 'Subscriptions',
     benefitGrants: 'Benefit Grants',
     accounts: 'Accounts',

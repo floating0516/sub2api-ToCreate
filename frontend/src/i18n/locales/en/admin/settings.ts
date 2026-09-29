@@ -648,7 +648,9 @@ export default {
         hideCcsImportButton: 'Hide CCS Import Button',
         hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page',
         quickStartInstallerEnabled: 'Publish Quick Start Installer',
-        quickStartInstallerEnabledHint: 'Allow ordinary users to open Quick Start and issue one-line install commands. When disabled, only administrators can access it.'
+        quickStartInstallerEnabledHint: 'Allow ordinary users to open Quick Start and issue one-line install commands. When disabled, only administrators can access it.',
+        supportAgentEnabled: 'Enable Technical Support',
+        supportAgentEnabledHint: 'Show the same-origin support page and route requests through the private support Agent.'
       },
       purchase: {
         title: 'Recharge / Subscription Page',

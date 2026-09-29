@@ -176,6 +176,7 @@ export default {
     channels: '渠道管理',
     availableChannels: '可用渠道',
     modelPlaza: '模型广场',
+    support: '技术支持',
     subscriptions: '订阅管理',
     benefitGrants: '权益发放中心',
     accounts: '账号管理',

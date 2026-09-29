@@ -61,6 +61,9 @@ declare module 'vue-router' {
     /** Whether the user-facing order-history page is enabled. */
     requiresUserOrders?: boolean
 
+    /** Whether the user-facing support Agent page is enabled. */
+    requiresSupportAgent?: boolean
+
     /**
      * i18n key for the page title
      */

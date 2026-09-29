@@ -6,6 +6,7 @@ import batchImage from './batchImage'
 import admin from './admin'
 import misc from './misc'
 import quickstart from './quickstart'
+import support from './support'
 
 export default {
   ...landing,
@@ -14,6 +15,7 @@ export default {
   ...channelMonitorV2,
   ...batchImage,
   ...quickstart,
+  ...support,
   admin,
   ...misc,
 }

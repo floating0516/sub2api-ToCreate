@@ -346,6 +346,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyCompactHomeEnabled] = strconv.FormatBool(settings.CompactHomeEnabled)
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
 	updates[SettingKeyQuickStartInstallerEnabled] = strconv.FormatBool(settings.QuickStartInstallerEnabled)
+	updates[SettingKeySupportAgentEnabled] = strconv.FormatBool(settings.SupportAgentEnabled)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
 	tableDefaultPageSize, tablePageSizeOptions := normalizeTablePreferences(

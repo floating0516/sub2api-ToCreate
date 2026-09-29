@@ -119,6 +119,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Quick Start Installer',
   }),
+  supportAgent: defineFlag({
+    key: 'support_agent_enabled',
+    mode: 'opt-in',
+    label: 'Support Agent',
+  }),
   modelPlaza: defineFlag({
     key: 'model_plaza_enabled',
     mode: 'opt-in',

@@ -190,6 +190,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyCompactHomeEnabled,
 		SettingKeyHideCcsImportButton,
 		SettingKeyQuickStartInstallerEnabled,
+		SettingKeySupportAgentEnabled,
 		SettingKeyPurchaseSubscriptionEnabled,
 		SettingKeyPurchaseSubscriptionURL,
 		SettingKeyTableDefaultPageSize,
@@ -332,6 +333,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		CompactHomeEnabled:                  settings[SettingKeyCompactHomeEnabled] == "true",
 		HideCcsImportButton:                 settings[SettingKeyHideCcsImportButton] == "true",
 		QuickStartInstallerEnabled:          settings[SettingKeyQuickStartInstallerEnabled] == "true",
+		SupportAgentEnabled:                 settings[SettingKeySupportAgentEnabled] == "true",
 		PurchaseSubscriptionEnabled:         settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:             strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		TableDefaultPageSize:                tableDefaultPageSize,
@@ -578,6 +580,7 @@ type PublicSettingsInjectionPayload struct {
 	CompactHomeEnabled                  bool                     `json:"compact_home_enabled"`
 	HideCcsImportButton                 bool                     `json:"hide_ccs_import_button"`
 	QuickStartInstallerEnabled          bool                     `json:"quick_start_installer_enabled"`
+	SupportAgentEnabled                 bool                     `json:"support_agent_enabled"`
 	PurchaseSubscriptionEnabled         bool                     `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL             string                   `json:"purchase_subscription_url"`
 	TableDefaultPageSize                int                      `json:"table_default_page_size"`
@@ -667,6 +670,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		CompactHomeEnabled:                  settings.CompactHomeEnabled,
 		HideCcsImportButton:                 settings.HideCcsImportButton,
 		QuickStartInstallerEnabled:          settings.QuickStartInstallerEnabled,
+		SupportAgentEnabled:                 settings.SupportAgentEnabled,
 		PurchaseSubscriptionEnabled:         settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:             settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                settings.TableDefaultPageSize,
