@@ -319,6 +319,18 @@ const BatchImageIcon = {
     )
 }
 
+const SupportIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M4.5 12a7.5 7.5 0 0115 0v5.25a2.25 2.25 0 01-2.25 2.25H15v-3h2.25V12a5.25 5.25 0 00-10.5 0v4.5H9v3H6.75A2.25 2.25 0 014.5 17.25V12z' }),
+        h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 19.5h2.25' })
+      ]
+    )
+}
+
 const ChartIcon = {
   render: () =>
     h(
@@ -725,6 +737,7 @@ const ChevronDownIcon = {
 const flagChannelMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
 const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
+const flagSupportAgent = makeSidebarFlag(FeatureFlags.supportAgent)
 const flagUserRedeem = makeSidebarFlag(FeatureFlags.userRedeem)
 const flagUserOrders = () =>
   isFeatureFlagEnabled(FeatureFlags.payment) && isFeatureFlagEnabled(FeatureFlags.userOrders)
@@ -787,6 +800,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(...quickStartMenuItems.map(customMenuItemToNavItem))
   items.push(
+    { path: '/support', label: t('nav.support'), icon: SupportIcon, featureFlag: flagSupportAgent },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },

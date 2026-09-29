@@ -114,16 +114,21 @@ export const FeatureFlags = {
     mode: 'opt-out',
     label: 'User Orders Page',
   }),
-  quickStartInstaller: defineFlag({
-    key: 'quick_start_installer_enabled',
-    mode: 'opt-in',
-    label: 'Quick Start Installer',
-  }),
-  subscription: defineFlag({
-    key: 'subscription_enabled',
-    mode: 'opt-out',
-    label: 'Subscription',
-  }),
+	quickStartInstaller: defineFlag({
+	  key: 'quick_start_installer_enabled',
+	  mode: 'opt-in',
+	  label: 'Quick Start Installer',
+	}),
+	subscription: defineFlag({
+	  key: 'subscription_enabled',
+	  mode: 'opt-out',
+	  label: 'Subscription',
+	}),
+	supportAgent: defineFlag({
+	  key: 'support_agent_enabled',
+	  mode: 'opt-in',
+	  label: 'Support Agent',
+	}),
   modelPlaza: defineFlag({
     key: 'model_plaza_enabled',
     mode: 'opt-in',

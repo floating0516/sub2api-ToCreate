@@ -108,6 +108,7 @@ type Config struct {
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
 	Plugins                 PluginConfig                  `mapstructure:"plugins"`
+	SupportAgent            SupportAgentConfig            `mapstructure:"support_agent"`
 
 	// Enforce only API-key spending windows in simple mode.
 	SimpleModeKeyRateLimitEnabled bool `mapstructure:"simple_mode_key_rate_limit_enabled" yaml:"simple_mode_key_rate_limit_enabled"`
@@ -127,6 +128,18 @@ type PluginConfig struct {
 	MaxUploadBytes       int64             `mapstructure:"max_upload_bytes"`
 	MaxUncompressedBytes int64             `mapstructure:"max_uncompressed_bytes"`
 	StartTimeoutSeconds  int               `mapstructure:"start_timeout_seconds"`
+}
+
+// SupportAgentConfig configures the private console-to-support-agent bridge.
+// Its secret is intentionally separate from JWT.Secret.
+type SupportAgentConfig struct {
+	BaseURL          string `mapstructure:"base_url"`
+	JWTSecret        string `mapstructure:"jwt_secret"`
+	Issuer           string `mapstructure:"issuer"`
+	Audience         string `mapstructure:"audience"`
+	TokenTTLSeconds  int    `mapstructure:"token_ttl_seconds"`
+	TimeoutSeconds   int    `mapstructure:"timeout_seconds"`
+	MaxResponseBytes int64  `mapstructure:"max_response_bytes"`
 }
 
 type LogConfig struct {
@@ -2044,6 +2057,13 @@ func setDefaults() {
 	viper.SetDefault("run_mode", RunModeStandard)
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)
+	viper.SetDefault("support_agent.base_url", "")
+	viper.SetDefault("support_agent.jwt_secret", "")
+	viper.SetDefault("support_agent.issuer", "support-agent")
+	viper.SetDefault("support_agent.audience", "support-agent")
+	viper.SetDefault("support_agent.token_ttl_seconds", 300)
+	viper.SetDefault("support_agent.timeout_seconds", 60)
+	viper.SetDefault("support_agent.max_response_bytes", int64(1024*1024))
 
 	// Server
 	viper.SetDefault("server.host", "0.0.0.0")

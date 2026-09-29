@@ -686,7 +686,10 @@ export default {
         hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮',
         quickStartInstallerEnabled: '公开快速开始安装向导',
         quickStartInstallerEnabledHint:
-          '开启后普通用户可访问快速开始并签发一行安装命令；关闭时仅管理员可访问。'
+          '开启后普通用户可访问快速开始并签发一行安装命令；关闭时仅管理员可访问。',
+        supportAgentEnabled: '启用技术支持',
+        supportAgentEnabledHint:
+          '显示控制台内的技术支持页面，并通过同源 BFF 访问独立支持 Agent。'
       },
       purchase: {
         title: '充值/订阅页面',

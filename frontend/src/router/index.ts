@@ -226,6 +226,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/support',
+    name: 'Support',
+    component: () => import('@/views/user/SupportView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      requiresSupportAgent: true,
+      title: 'Technical Support',
+      titleKey: 'nav.support'
+    }
+  },
+  {
     path: '/keys',
     name: 'Keys',
     component: () => import('@/views/user/KeysView.vue'),
@@ -1023,10 +1035,11 @@ router.beforeEach(async (to, _from, next) => {
   // “未启用”而错误拦截，故这里先确保设置加载完成。
   if (
     (to.meta.requiresPayment ||
-      to.meta.requiresRiskControl ||
-      to.meta.requiresUserRedeem ||
-      to.meta.requiresUserOrders ||
-      to.meta.requiresSubscription) &&
+	  to.meta.requiresRiskControl ||
+	  to.meta.requiresUserRedeem ||
+	  to.meta.requiresUserOrders ||
+	  to.meta.requiresSubscription ||
+	  to.meta.requiresSupportAgent) &&
     !appStore.publicSettingsLoaded
   ) {
     try {
@@ -1079,6 +1092,15 @@ router.beforeEach(async (to, _from, next) => {
     to.meta.requiresSubscription &&
     appStore.publicSettingsLoaded &&
     appStore.cachedPublicSettings?.subscription_enabled === false
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
+  }
+
+  if (
+    to.meta.requiresSupportAgent &&
+    appStore.publicSettingsLoaded &&
+    !isFeatureFlagEnabled(FeatureFlags.supportAgent)
   ) {
     next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
     return
