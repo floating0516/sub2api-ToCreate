@@ -20,6 +20,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const paymentProviderSubjectMaxBytes = 120
+
 // --- Order Creation ---
 
 func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
@@ -475,7 +477,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		return nil, infraerrors.ServiceUnavailable("PAYMENT_PROVIDER_MISCONFIGURED", "provider_misconfigured").
 			WithMetadata(map[string]string{"provider": sel.ProviderKey, "instance_id": sel.InstanceID})
 	}
-	subject := s.buildPaymentSubject(plan, addon, managedRecharge, limitAmount, cfg, sel)
+	subject := enrichPaymentProviderSubject(order, s.buildPaymentSubject(plan, addon, managedRecharge, limitAmount, cfg, sel))
 	outTradeNo := order.OutTradeNo
 	canonicalReturnURL, err := CanonicalizeReturnURL(req.ReturnURL, req.SrcHost, req.SrcURL)
 	if err != nil {
@@ -615,7 +617,27 @@ func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, addon
 	if hasPaymentProductNameAffix(cfg) {
 		return applyPaymentProductNameAffix(amountStr, cfg)
 	}
-	return "Sub2API " + amountStr + " " + currency
+	return "Sub2API Balance recharge " + amountStr + " " + currency
+}
+
+func enrichPaymentProviderSubject(order *dbent.PaymentOrder, productName string) string {
+	productName = strings.TrimSpace(productName)
+	if order == nil {
+		return truncateString(productName, paymentProviderSubjectMaxBytes)
+	}
+
+	parts := make([]string, 0, 3)
+	if order.ID > 0 {
+		parts = append(parts, "#"+strconv.FormatInt(order.ID, 10))
+	}
+	if email := strings.TrimSpace(order.UserEmail); email != "" {
+		parts = append(parts, truncateString(MaskEmail(email), 48))
+	}
+	if productName != "" {
+		parts = append(parts, productName)
+	}
+
+	return truncateString(strings.Join(parts, " | "), paymentProviderSubjectMaxBytes)
 }
 
 func hasPaymentProductNameAffix(cfg *PaymentConfig) bool {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -363,6 +364,42 @@ func TestBuildPaymentSubjectAppliesAffixToSubscriptionPlanDefaultName(t *testing
 	got := svc.buildPaymentSubject(plan, nil, nil, 0, cfg, nil)
 	if got != "PRE Sub2API Subscription Team Monthly SUF" {
 		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE Sub2API Subscription Team Monthly SUF")
+	}
+}
+
+func TestEnrichPaymentProviderSubjectAddsOrderAndMaskedEmail(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		ID:        272,
+		UserEmail: "waylliam@live.com",
+	}
+
+	got := enrichPaymentProviderSubject(order, "Sub2API Balance recharge 10.00 USD")
+	want := "#272 | w***m@live.com | Sub2API Balance recharge 10.00 USD"
+	if got != want {
+		t.Fatalf("enrichPaymentProviderSubject() = %q, want %q", got, want)
+	}
+}
+
+func TestEnrichPaymentProviderSubjectStaysWithinProviderLimit(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		ID:        269,
+		UserEmail: "henan7054@gmail.com",
+	}
+	productName := strings.Repeat("高额度周卡", 40)
+
+	got := enrichPaymentProviderSubject(order, productName)
+	if len(got) > paymentProviderSubjectMaxBytes {
+		t.Fatalf("subject length = %d, want <= %d: %q", len(got), paymentProviderSubjectMaxBytes, got)
+	}
+	if !utf8.ValidString(got) {
+		t.Fatalf("subject is not valid UTF-8: %q", got)
+	}
+	if !strings.HasPrefix(got, "#269 | h***4@gmail.com | ") {
+		t.Fatalf("subject prefix = %q", got)
 	}
 }
 
