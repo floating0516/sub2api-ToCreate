@@ -304,5 +304,5 @@ func addonPaymentSubject(addon *addonOrderSelection) string {
 	if addon == nil || addon.product == nil {
 		return ""
 	}
-	return fmt.Sprintf("Sub2API Add-on $%s", strconv.FormatFloat(addon.product.QuotaUSD, 'f', -1, 64))
+	return fmt.Sprintf("加油包 %s 美元", strconv.FormatFloat(addon.product.QuotaUSD, 'f', -1, 64))
 }

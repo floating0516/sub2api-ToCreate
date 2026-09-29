@@ -597,27 +597,35 @@ func selectedInstanceSupportedTypes(sel *payment.InstanceSelection) string {
 
 func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, addon *addonOrderSelection, managedRecharge *ManagedRechargePaymentSelection, limitAmount float64, cfg *PaymentConfig, sel *payment.InstanceSelection) string {
 	if plan != nil {
-		productName := plan.ProductName
+		productName := strings.TrimSpace(plan.ProductName)
 		if productName == "" {
-			productName = "Sub2API Subscription " + plan.Name
+			productName = strings.TrimSpace(plan.Name)
 		}
-		return applyPaymentProductNameAffix(productName, cfg)
+		return applyPaymentProductNameAffix("订阅 "+productName, cfg)
 	}
 	if subject := addonPaymentSubject(addon); subject != "" {
 		return applyPaymentProductNameAffix(subject, cfg)
 	}
 	if managedRecharge != nil {
-		return applyPaymentProductNameAffix("GPT member subscription "+managedRecharge.ProductName, cfg)
+		return applyPaymentProductNameAffix("GPT 会员订阅 "+managedRecharge.ProductName, cfg)
 	}
 	currency := payment.DefaultPaymentCurrency
 	if sel != nil {
 		currency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 	}
 	amountStr := payment.FormatAmountForCurrency(limitAmount, currency)
-	if hasPaymentProductNameAffix(cfg) {
-		return applyPaymentProductNameAffix(amountStr, cfg)
+	return applyPaymentProductNameAffix("余额充值 "+localizedPaymentSubjectAmount(amountStr, currency), cfg)
+}
+
+func localizedPaymentSubjectAmount(amount, currency string) string {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "CNY":
+		return amount + " 元"
+	case "USD":
+		return amount + " 美元"
+	default:
+		return strings.TrimSpace(amount + " " + currency)
 	}
-	return "Sub2API Balance recharge " + amountStr + " " + currency
 }
 
 func enrichPaymentProviderSubject(order *dbent.PaymentOrder, productName string) string {

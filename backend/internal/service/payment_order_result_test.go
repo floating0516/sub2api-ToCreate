@@ -346,8 +346,8 @@ func TestBuildPaymentSubjectAppliesAffixToSubscriptionPlanProductName(t *testing
 	}
 
 	got := svc.buildPaymentSubject(plan, nil, nil, 0, cfg, nil)
-	if got != "PRE Claude Pro SUF" {
-		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE Claude Pro SUF")
+	if got != "PRE 订阅 Claude Pro SUF" {
+		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE 订阅 Claude Pro SUF")
 	}
 }
 
@@ -362,8 +362,39 @@ func TestBuildPaymentSubjectAppliesAffixToSubscriptionPlanDefaultName(t *testing
 	plan := &dbent.SubscriptionPlan{Name: "Team Monthly"}
 
 	got := svc.buildPaymentSubject(plan, nil, nil, 0, cfg, nil)
-	if got != "PRE Sub2API Subscription Team Monthly SUF" {
-		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE Sub2API Subscription Team Monthly SUF")
+	if got != "PRE 订阅 Team Monthly SUF" {
+		t.Fatalf("buildPaymentSubject() = %q, want %q", got, "PRE 订阅 Team Monthly SUF")
+	}
+}
+
+func TestLocalizedPaymentSubjectAmount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		amount   string
+		currency string
+		want     string
+	}{
+		{amount: "10.00", currency: "CNY", want: "10.00 元"},
+		{amount: "5.00", currency: "USD", want: "5.00 美元"},
+		{amount: "8.50", currency: "NZD", want: "8.50 NZD"},
+	}
+
+	for _, tt := range tests {
+		if got := localizedPaymentSubjectAmount(tt.amount, tt.currency); got != tt.want {
+			t.Fatalf("localizedPaymentSubjectAmount(%q, %q) = %q, want %q", tt.amount, tt.currency, got, tt.want)
+		}
+	}
+}
+
+func TestAddonPaymentSubjectUsesChineseLabel(t *testing.T) {
+	t.Parallel()
+
+	addon := &addonOrderSelection{
+		product: &SubscriptionAddonProduct{QuotaUSD: 10},
+	}
+	if got := addonPaymentSubject(addon); got != "加油包 10 美元" {
+		t.Fatalf("addonPaymentSubject() = %q, want %q", got, "加油包 10 美元")
 	}
 }
 
@@ -375,8 +406,8 @@ func TestEnrichPaymentProviderSubjectAddsOrderAndMaskedEmail(t *testing.T) {
 		UserEmail: "waylliam@live.com",
 	}
 
-	got := enrichPaymentProviderSubject(order, "Sub2API Balance recharge 10.00 USD")
-	want := "#272 | w***m@live.com | Sub2API Balance recharge 10.00 USD"
+	got := enrichPaymentProviderSubject(order, "余额充值 10.00 元")
+	want := "#272 | w***m@live.com | 余额充值 10.00 元"
 	if got != want {
 		t.Fatalf("enrichPaymentProviderSubject() = %q, want %q", got, want)
 	}
