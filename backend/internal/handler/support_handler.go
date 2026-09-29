@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	supportMaxRequestBytes int64 = 64 * 1024
-	defaultSupportTimeout        = 60 * time.Second
-	defaultSupportMaxResponse   = 1 << 20
+	supportMaxRequestBytes    int64 = 64 * 1024
+	defaultSupportTimeout           = 60 * time.Second
+	defaultSupportMaxResponse       = 1 << 20
 )
 
 type SupportHandler struct {
@@ -133,7 +133,9 @@ func (h *SupportHandler) proxyJSON(c *gin.Context, method, path string, hasBody 
 		response.Error(c, http.StatusServiceUnavailable, "support service is unavailable")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	maxBytes := int64(defaultSupportMaxResponse)
 	if h.cfg.SupportAgent.MaxResponseBytes > 0 {
 		maxBytes = h.cfg.SupportAgent.MaxResponseBytes
@@ -201,16 +203,17 @@ func readSupportRequest(c *gin.Context) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("invalid JSON body")
 	}
-	if strings.Contains(c.Request.URL.Path, "/chat") {
-		req := payload.(*supportChatRequest)
+	switch req := payload.(type) {
+	case *supportChatRequest:
 		if strings.TrimSpace(req.Message) == "" || len(req.Message) > 8000 || req.ClientMessageID == uuid.Nil {
 			return nil, errors.New("message and client_message_id are required")
 		}
-	} else {
-		req := payload.(*supportConfirmRequest)
+	case *supportConfirmRequest:
 		if req.ThreadID == uuid.Nil || req.Confirm == nil {
 			return nil, errors.New("thread_id and confirm are required")
 		}
+	default:
+		return nil, errors.New("unsupported support request")
 	}
 	return raw, nil
 }
