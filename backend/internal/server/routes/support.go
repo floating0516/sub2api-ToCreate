@@ -49,7 +49,9 @@ func RegisterSupportRoutes(
 	admin.Use(gin.HandlerFunc(jwtAuth), middleware.AdminOnly(), panelRateLimiter.Global())
 	admin.Use(func(c *gin.Context) {
 		if settingService == nil || !settingService.IsSupportAgentEnabled(c.Request.Context()) {
-			response.NotFound(c, "support is not enabled"); c.Abort(); return
+			response.NotFound(c, "support is not enabled")
+			c.Abort()
+			return
 		}
 		c.Next()
 	})

@@ -67,7 +67,9 @@ func (h *SupportHandler) ConfirmTicket(c *gin.Context) {
 	h.proxyJSON(c, http.MethodPost, "/tickets/confirm", true)
 }
 func (h *SupportHandler) GetThread(c *gin.Context) {
-	if !h.supportReady(c, "/threads") { return }
+	if !h.supportReady(c, "/threads") {
+		return
+	}
 	if _, err := uuid.Parse(c.Param("id")); err != nil {
 		response.BadRequest(c, "invalid thread id")
 		return
@@ -75,7 +77,9 @@ func (h *SupportHandler) GetThread(c *gin.Context) {
 	h.proxyJSON(c, http.MethodGet, "/threads/"+c.Param("id"), false)
 }
 func (h *SupportHandler) GetTicket(c *gin.Context) {
-	if !h.supportReady(c, "/tickets") { return }
+	if !h.supportReady(c, "/tickets") {
+		return
+	}
 	if _, err := uuid.Parse(c.Param("id")); err != nil {
 		response.BadRequest(c, "invalid ticket id")
 		return
@@ -84,17 +88,23 @@ func (h *SupportHandler) GetTicket(c *gin.Context) {
 }
 
 func (h *SupportHandler) proxyJSON(c *gin.Context, method, path string, hasBody bool) {
-	if !h.supportReady(c, path) { return }
+	if !h.supportReady(c, path) {
+		return
+	}
 	var body []byte
 	if hasBody {
 		var err error
 		body, err = h.readPortalRequest(c, path)
 		if err != nil {
-			if !errors.Is(err, errSupportResponseWritten) { response.BadRequest(c, err.Error()) }
+			if !errors.Is(err, errSupportResponseWritten) {
+				response.BadRequest(c, err.Error())
+			}
 			return
 		}
 	}
-	if payload, ok := h.requestJSON(c, method, path, body); ok { response.Success(c, payload) }
+	if payload, ok := h.requestJSON(c, method, path, body); ok {
+		response.Success(c, payload)
+	}
 }
 
 func (h *SupportHandler) supportReady(c *gin.Context, path string) bool {
@@ -123,7 +133,9 @@ func (h *SupportHandler) supportReady(c *gin.Context, path string) bool {
 
 // requestJSON is called only by explicit handlers with fixed upstream paths.
 func (h *SupportHandler) requestJSON(c *gin.Context, method, path string, body []byte) (any, bool) {
-	if !h.supportReady(c, path) { return nil, false }
+	if !h.supportReady(c, path) {
+		return nil, false
+	}
 	subject, _ := servermiddleware.GetAuthSubjectFromContext(c)
 	if !h.acquire(subject.UserID) {
 		response.Error(c, http.StatusTooManyRequests, "support request already in progress")
@@ -132,7 +144,9 @@ func (h *SupportHandler) requestJSON(c *gin.Context, method, path string, body [
 	defer h.release(subject.UserID)
 
 	role := "user"
-	if strings.HasPrefix(path, "/admin/") { role = "agent" }
+	if strings.HasPrefix(path, "/admin/") {
+		role = "agent"
+	}
 	token, err := h.issueSupportToken(subject.UserID, role)
 	if err != nil {
 		response.Error(c, http.StatusServiceUnavailable, "support service is not configured")
@@ -175,8 +189,12 @@ func (h *SupportHandler) requestJSON(c *gin.Context, method, path string, body [
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		message := "support service request failed"
-		var failure struct { Detail string `json:"detail"` }
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 && json.Unmarshal(raw, &failure) == nil && failure.Detail != "" && len(failure.Detail) <= 1000 { message = failure.Detail }
+		var failure struct {
+			Detail string `json:"detail"`
+		}
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && json.Unmarshal(raw, &failure) == nil && failure.Detail != "" && len(failure.Detail) <= 1000 {
+			message = failure.Detail
+		}
 		response.Error(c, mapSupportStatus(resp.StatusCode), message)
 		return nil, false
 	}
@@ -187,7 +205,29 @@ func (h *SupportHandler) requestJSON(c *gin.Context, method, path string, body [
 		response.Error(c, http.StatusBadGateway, "invalid support service response")
 		return nil, false
 	}
+	if strings.HasPrefix(path, "/admin/") {
+		rewriteAdminSupportAttachmentURLs(payload)
+	}
 	return payload, true
+}
+
+func rewriteAdminSupportAttachmentURLs(payload any) {
+	switch value := payload.(type) {
+	case map[string]any:
+		for key, child := range value {
+			if key == "url" {
+				if path, ok := child.(string); ok && strings.HasPrefix(path, "/api/v1/support/uploads/") {
+					value[key] = strings.Replace(path, "/api/v1/support/", "/api/v1/admin/support/", 1)
+				}
+			} else {
+				rewriteAdminSupportAttachmentURLs(child)
+			}
+		}
+	case []any:
+		for _, child := range value {
+			rewriteAdminSupportAttachmentURLs(child)
+		}
+	}
 }
 
 func (h *SupportHandler) acquire(userID int64) bool {
@@ -261,7 +301,9 @@ func (h *SupportHandler) issueSupportToken(userID int64, roles ...string) (strin
 	}
 	now := time.Now()
 	role := "user"
-	if len(roles) > 0 && roles[0] == "agent" { role = "agent" }
+	if len(roles) > 0 && roles[0] == "agent" {
+		role = "agent"
+	}
 	claims := supportClaims{Role: role, RegisteredClaims: jwt.RegisteredClaims{
 		Subject:   strconv.FormatInt(userID, 10),
 		Issuer:    "support-agent",
