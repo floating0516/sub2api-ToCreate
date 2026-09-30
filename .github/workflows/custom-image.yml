@@ -58,10 +58,9 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Format support backend and export patch
+      - name: Check support backend formatting
         run: |
-          gofmt -w backend/internal/handler/support*.go backend/internal/service/support_order*.go backend/internal/server/routes/support*.go backend/internal/server/router.go
-          git diff --binary > support-gofmt.patch
+          gofmt -d backend/internal/handler/support*.go backend/internal/service/support_order*.go backend/internal/server/routes/support*.go backend/internal/server/router.go > support-gofmt.patch
 
       - name: Upload support formatting patch
         uses: actions/upload-artifact@v4
@@ -72,7 +71,9 @@ jobs:
 
       - name: Test support portal backend
         working-directory: backend
-        run: go test -tags=unit ./internal/handler ./internal/service ./internal/server/routes -run 'TestSupport|TestMapSupport|TestRegisterSupport' -count=1
+        run: |
+          test ! -s ../support-gofmt.patch
+          go test -tags=unit ./internal/handler ./internal/service ./internal/server/routes -run 'TestSupport|TestMapSupport|TestRegisterSupport' -count=1
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
