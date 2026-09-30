@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { supportAPI, type SupportChatResult, type SupportCitation, type SupportThread, type SupportTicketDraft } from '@/api/support'
 import { useAuthStore } from './auth'
 
@@ -32,11 +32,23 @@ export const useSupportStore = defineStore('support', () => {
   const error = ref('')
   const pendingMessage = ref<PendingSupportMessage | null>(null)
   const hasDraft = computed(() => !!draft.value && !ticketId.value && status.value === 'ticket_drafted')
+  let accountVersion = 0
+
+  watch(() => authStore.user?.id, () => {
+    accountVersion++
+    threadId.value = null
+    turns.value = []
+    draft.value = null
+    ticketId.value = null
+    status.value = ''
+    pendingMessage.value = null
+    error.value = ''
+    loading.value = false
+  }, { flush: 'sync' })
 
   function restoreLocalThread() {
     const userId = authStore.user?.id
-    if (!userId) return
-    threadId.value = localStorage.getItem(threadKey(userId))
+    threadId.value = userId ? localStorage.getItem(threadKey(userId)) : null
   }
 
   function persistThread(id: string) {
@@ -49,6 +61,10 @@ export const useSupportStore = defineStore('support', () => {
     const userId = authStore.user?.id
     if (userId) localStorage.removeItem(threadKey(userId))
     threadId.value = null
+    turns.value = []
+    draft.value = null
+    ticketId.value = null
+    status.value = ''
   }
 
   function applyThread(result: SupportThread) {
@@ -76,26 +92,31 @@ export const useSupportStore = defineStore('support', () => {
     return statusCode === 0 || statusCode === 504
   }
 
-  async function recoverMessage(id: string, clientMessageId: string) {
+  async function recoverMessage(id: string, clientMessageId: string, version: number) {
     try {
       const result = await supportAPI.getThread(id)
+      if (version !== accountVersion) return false
       applyThread(result)
       return result.turns.some((turn) =>
         turn.client_message_id === clientMessageId || turn.reply_to === clientMessageId
       )
     } catch (err) {
-      if ((err as { status?: number }).status === 404) clearStoredThread()
+      if (version === accountVersion && (err as { status?: number }).status === 404) clearStoredThread()
       return false
     }
   }
 
   async function refresh() {
+    const version = accountVersion
+    error.value = ''
     restoreLocalThread()
     if (!threadId.value) return
     try {
       const result = await supportAPI.getThread(threadId.value)
+      if (version !== accountVersion) return
       applyThread(result)
     } catch (err) {
+      if (version !== accountVersion) return
       const statusCode = (err as { status?: number }).status
       if (statusCode === 404) {
         clearStoredThread()
@@ -107,7 +128,8 @@ export const useSupportStore = defineStore('support', () => {
 
   async function send(message: string) {
     const text = message.trim()
-    if (!text || loading.value) return false
+    if (!text || loading.value || !authStore.user?.id) return false
+    const version = accountVersion
     const retry = pendingMessage.value?.message === text ? pendingMessage.value : null
     const requestThreadId = retry?.threadId || threadId.value || crypto.randomUUID()
     const clientMessageId = retry?.clientMessageId || crypto.randomUUID()
@@ -128,6 +150,7 @@ export const useSupportStore = defineStore('support', () => {
         client_message_id: clientMessageId,
         thread_id: requestThreadId,
       })
+      if (version !== accountVersion) return false
       persistThread(result.thread_id)
       turns.value.push({
         role: 'assistant',
@@ -142,9 +165,11 @@ export const useSupportStore = defineStore('support', () => {
       pendingMessage.value = null
       completed = true
     } catch (err) {
+      if (version !== accountVersion) return false
       const recovered = isRecoverableRequestError(err)
-        ? await recoverMessage(requestThreadId, clientMessageId)
+        ? await recoverMessage(requestThreadId, clientMessageId, version)
         : false
+      if (version !== accountVersion) return false
       if (recovered) {
         pendingMessage.value = null
         completed = true
@@ -153,24 +178,33 @@ export const useSupportStore = defineStore('support', () => {
         error.value = 'support.errors.unavailable'
       }
     } finally {
-      loading.value = false
+      if (version === accountVersion) loading.value = false
     }
     return completed
   }
 
   async function confirmTicket(confirm: boolean) {
-    if (!threadId.value || loading.value) return
+    if (!threadId.value || loading.value || !authStore.user?.id) return false
+    const version = accountVersion
     loading.value = true
     error.value = ''
     try {
       const result = await supportAPI.confirmTicket({ thread_id: threadId.value, confirm })
+      if (version !== accountVersion) return false
+      const expectedStatus = confirm ? 'ticket_submitted' : 'ticket_cancelled'
+      if (result.status !== expectedStatus || (confirm && !result.ticket_id)) {
+        error.value = 'support.errors.ticketAction'
+        return false
+      }
       status.value = result.status
       ticketId.value = result.ticket_id || null
       draft.value = null
+      return true
     } catch {
-      error.value = 'support.errors.ticketAction'
+      if (version === accountVersion) error.value = 'support.errors.ticketAction'
+      return false
     } finally {
-      loading.value = false
+      if (version === accountVersion) loading.value = false
     }
   }
 
