@@ -47,6 +47,23 @@
 
 ### 检查与交付
 
+- 前端分支：`feature/support-portal-frontend-20260930`。
+- 用户端接线代码：`31995b752ac16a45023a72f71af451634265ae8c`。
+- 最终代码及 AI 加载隔离修正：`9d85692af0ff9acfc2d88f98ceb90b5e542da565`。
+- 最终代码 CI：[36686447758](https://github.com/floating0516/sub2api-ToCreate/actions/runs/36686447758)。
+  `frontend` job 的 lint、typecheck 成功，41 个测试文件、452 项测试通过。
+- 最终代码安全扫描：[36686447864](https://github.com/floating0516/sub2api-ToCreate/actions/runs/36686447864)，成功。
+- `9d85692` 之后只补充此交接文档，不改变上述已验证代码。
+
+本轮新增/改造的文件组：
+
+- `frontend/src/views/user/SupportView.vue`：页面编排及已有订单选择接入。
+- `frontend/src/components/support/SupportTicket{CreateDialog,Discussion,List,Row}.vue`：表单、消息、列表和工单行。
+- `frontend/src/components/support/SupportAttachment{Picker,s}.vue`：私有上传与授权下载。
+- `frontend/src/components/support/ticketPresentation.ts`：类型、状态、角色与日期展示。
+- `frontend/src/composables/useTicketPortal.ts`：真实查询、权限操作、失效响应和账号隔离。
+- `frontend/src/api/support.ts`、中文/英文 support locale、相应测试及 `Makefile`。
+
 本机只做 `git diff --check` 和源码/配置阅读，不安装依赖、运行构建或测试。
 新增 API、composable、表单/详情/列表、附件测试已加入
 `FRONTEND_CRITICAL_VITEST`，随 GitHub Actions 的 `make test-frontend`
@@ -60,7 +77,7 @@
 生产仍未改动。部署详情以 `sub2api-deploy/custom/CUSTOM_BUILD_DETAILS.md`
 为准。下文保留最初布局交接范围，其中“尚未验证”描述只针对当时快照。
 
-## 本轮范围
+## 最初布局范围（历史）
 
 基于 `feature/support-console-v1-0.2.10`，基线提交为
 `b0de60e02b3fb4912045c3c81ad3696af5995d0c`。工单后端缺口仍待另一个窗口接入。
