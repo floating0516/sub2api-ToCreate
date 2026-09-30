@@ -50,6 +50,17 @@ export interface SupportThreadTurn {
   reply_to?: string
 }
 
+export interface SupportTicketRecord {
+  id: string
+  title: string
+  description: string
+  priority: string
+  status: string
+  product: string
+  created_at: string
+  updated_at: string
+}
+
 export const supportAPI = {
   chat(payload: { message: string; client_message_id: string; thread_id?: string }) {
     return apiClient.post<SupportChatResult>('/support/chat', payload, { timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)
@@ -59,5 +70,8 @@ export const supportAPI = {
   },
   getThread(threadId: string) {
     return apiClient.get<SupportThread>(`/support/threads/${encodeURIComponent(threadId)}`, { timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)
+  },
+  getTicket(ticketId: string) {
+    return apiClient.get<SupportTicketRecord>(`/support/tickets/${encodeURIComponent(ticketId)}`, { timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)
   },
 }

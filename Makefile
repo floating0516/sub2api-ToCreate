@@ -4,6 +4,9 @@ FRONTEND_CRITICAL_VITEST := \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
 	src/api/__tests__/client.spec.ts \
 	src/api/__tests__/tokenRefresh.spec.ts \
+	src/stores/__tests__/support.spec.ts \
+	src/components/support/__tests__/SupportConversation.spec.ts \
+	src/views/user/__tests__/SupportView.spec.ts \
 	src/api/__tests__/keys.bulkUpdate.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.transport.spec.ts \
