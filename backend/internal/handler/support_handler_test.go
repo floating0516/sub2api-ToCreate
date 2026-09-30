@@ -64,7 +64,7 @@ func newSupportHandlerForTest(baseURL string, enabled bool) *SupportHandler {
 		SupportAgent: config.SupportAgentConfig{
 			BaseURL:         baseURL,
 			JWTSecret:       "support-handler-test-secret-32bytes",
-			Issuer:          "sub2api-console",
+			Issuer:          "support-agent",
 			Audience:        "support-agent",
 			TokenTTLSeconds: 120,
 		},
@@ -123,7 +123,7 @@ func TestSupportHandler_ReplacesBrowserCredentialsAndIssuesScopedToken(t *testin
 			return []byte("support-handler-test-secret-32bytes"), nil
 		},
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithIssuer("sub2api-console"),
+		jwt.WithIssuer("support-agent"),
 		jwt.WithAudience("support-agent"),
 	)
 	require.NoError(t, err)
