@@ -61,6 +61,7 @@ export interface SupportTicketRecord {
   updated_at: string
   type?: string
   order_id?: string | null
+  requester_id?: string
   last_reply_at?: string | null
   attachments?: SupportAttachment[]
   replies?: SupportTicketReply[]

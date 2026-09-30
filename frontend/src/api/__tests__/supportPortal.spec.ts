@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { supportAPI } from '../support'
+import { adminSupportAPI } from '../admin/support'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 vi.mock('../client', () => ({ apiClient: client }))
@@ -36,5 +37,14 @@ describe('Support portal API contract', () => {
     expect(options.headers['Content-Type']).toBeUndefined()
     await supportAPI.downloadAttachment('file-1')
     expect(client.get).toHaveBeenLastCalledWith('/support/uploads/file-1', { responseType: 'blob' })
+  })
+
+  it('keeps administrator ticket traffic on the admin same-origin namespace', async () => {
+    await adminSupportAPI.listTickets({ page: 1, page_size: 20 })
+    expect(client.get).toHaveBeenLastCalledWith('/admin/support/tickets', { params: { page: 1, page_size: 20 } })
+    await adminSupportAPI.ticketStats()
+    expect(client.get).toHaveBeenLastCalledWith('/admin/support/tickets/stats')
+    await adminSupportAPI.replyTicket('ticket-1', { content: 'Reply', attachment_ids: [], client_message_id: 'admin-message' })
+    expect(client.post).toHaveBeenLastCalledWith('/admin/support/tickets/ticket-1/replies', { content: 'Reply', attachment_ids: [], client_message_id: 'admin-message' }, expect.objectContaining({ timeout: 70000 }))
   })
 })

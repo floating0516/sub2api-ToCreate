@@ -1,5 +1,15 @@
 export default {
   support: {
+    admin: {
+      title: 'Ticket management',
+      requester: 'User',
+      requesterId: 'Requester ID',
+      pendingUser: 'Waiting for user',
+      allStatuses: 'All statuses',
+      reply: 'Support reply',
+      unavailable: 'Ticket management is not connected',
+      discardReply: 'Discard the unsent reply and attachments?',
+    },
     centerEyebrow: 'Dedicated support center',
     centerTitle: 'My tickets',
     centerDescription: 'Ask questions before purchase or keep working with support after purchase in one place.',

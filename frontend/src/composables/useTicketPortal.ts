@@ -3,7 +3,9 @@ import { supportAPI, type SupportTicketRecord, type SupportTicketStats } from '@
 import { useAuthStore } from '@/stores/auth'
 import type { TicketFormValues } from '@/components/support/ticketPresentation'
 
-export function useTicketPortal() {
+type TicketPortalAPI = Pick<typeof supportAPI, 'listTickets' | 'ticketStats' | 'getTicket' | 'replyTicket' | 'transitionTicket'> & Partial<Pick<typeof supportAPI, 'createTicket'>>
+
+export function useTicketPortal(api: TicketPortalAPI = supportAPI, admin = false) {
   const auth = useAuthStore()
   const items = ref<SupportTicketRecord[]>([])
   const total = ref(0)
@@ -29,15 +31,16 @@ export function useTicketPortal() {
   let disposed = false
   let searchTimer: ReturnType<typeof setTimeout> | undefined
 
-  const current = (version: number) => !disposed && version === accountVersion && !!auth.user?.id
+  const authorized = () => !!auth.user?.id && (!admin || auth.isAdmin)
+  const current = (version: number) => !disposed && version === accountVersion && authorized()
   async function loadList() {
     const account = accountVersion
     const version = ++listVersion
     items.value = []
     listState.value = 'loading'
-    if (!auth.user?.id) return
+    if (!authorized()) return
     try {
-      const result = await supportAPI.listTickets({
+      const result = await api.listTickets({
         q: search.value.trim() || undefined,
         type: type.value === 'all' ? undefined : type.value,
         status: status.value === 'all' ? undefined : status.value,
@@ -65,9 +68,9 @@ export function useTicketPortal() {
     const version = ++statsVersion
     stats.value = null
     statsError.value = false
-    if (!auth.user?.id) return
+    if (!authorized()) return
     try {
-      const result = await supportAPI.ticketStats()
+      const result = await api.ticketStats()
       if (!current(account) || version !== statsVersion) return
       if (!['all', 'pending_agent', 'pending_user', 'resolved', 'closed'].every((key) => Number.isSafeInteger(result[key as keyof SupportTicketStats]) && result[key as keyof SupportTicketStats] >= 0)) throw new Error('Invalid ticket statistics')
       stats.value = result
@@ -86,9 +89,9 @@ export function useTicketPortal() {
     detail.value = null
     detailState.value = 'loading'
     actionError.value = false
-    if (!auth.user?.id) { detailState.value = 'error'; return }
+    if (!authorized()) { detailState.value = 'error'; return }
     try {
-      const result = await supportAPI.getTicket(id)
+      const result = await api.getTicket(id)
       if (!current(account) || version !== detailVersion) return
       if (result.id !== id) throw new Error('Invalid ticket detail')
       detail.value = result
@@ -98,9 +101,9 @@ export function useTicketPortal() {
     }
   }
   async function create(values: TicketFormValues, requestId: string) {
-    if (!available.value || !auth.user?.id) return false
+    if (!available.value || !authorized() || !api.createTicket) return false
     const account = accountVersion
-    const result = await supportAPI.createTicket({
+    const result = await api.createTicket({
       type: values.type, title: values.title, description: values.description,
       product: values.product, priority: values.priority,
       order_id: values.orderId || undefined, attachment_ids: values.attachmentIds,
@@ -111,12 +114,12 @@ export function useTicketPortal() {
   }
   async function reply(text: string, attachmentIds: string[], messageId: string) {
     const record = detail.value
-    if (!record?.allowed_actions?.includes('reply') || ['closed', 'resolved'].includes(record.status) || replyBusy.value || actionBusy.value) return false
+    if (!authorized() || !record?.allowed_actions?.includes('reply') || ['closed', 'resolved'].includes(record.status) || replyBusy.value || actionBusy.value) return false
     const account = accountVersion
     const version = detailVersion
     replyBusy.value = true
     try {
-      const result = await supportAPI.replyTicket(record.id, { content: text, attachment_ids: attachmentIds, client_message_id: messageId })
+      const result = await api.replyTicket(record.id, { content: text, attachment_ids: attachmentIds, client_message_id: messageId })
       if (!current(account) || !result.id) return false
       void refresh()
       if (version !== detailVersion) return false
@@ -129,13 +132,13 @@ export function useTicketPortal() {
   }
   async function transition(action: 'resolve' | 'close' | 'reopen') {
     const record = detail.value
-    if (!record?.allowed_actions?.includes(action) || actionBusy.value || replyBusy.value) return false
+    if (!authorized() || !record?.allowed_actions?.includes(action) || actionBusy.value || replyBusy.value) return false
     const account = accountVersion
     const version = detailVersion
     actionBusy.value = true
     actionError.value = false
     try {
-      const result = await supportAPI.transitionTicket(record.id, action)
+      const result = await api.transitionTicket(record.id, action)
       if (!current(account) || version !== detailVersion || result.id !== record.id) return false
       detail.value = result
       void refresh()
@@ -174,7 +177,7 @@ export function useTicketPortal() {
     if (searchTimer) clearTimeout(searchTimer)
     searchTimer = setTimeout(applyFilters, 300)
   })
-  watch(() => auth.user?.id, () => {
+  watch([() => auth.user?.id, () => admin && auth.isAdmin], () => {
     accountVersion++
     listVersion++
     statsVersion++

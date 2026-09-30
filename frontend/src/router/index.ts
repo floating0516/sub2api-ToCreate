@@ -477,6 +477,18 @@ const routes: RouteRecordRaw[] = [
 
   // ==================== Admin Routes ====================
   {
+    path: '/admin/support',
+    name: 'AdminSupport',
+    component: () => import('@/views/admin/SupportView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      requiresSupportAgent: true,
+      title: 'Ticket Management',
+      titleKey: 'support.admin.title'
+    }
+  },
+  {
     path: '/admin',
     redirect: '/admin/dashboard'
   },

@@ -64,11 +64,12 @@ const props = withDefaults(defineProps<{
   closed?: boolean
   resolved?: boolean
   canReply?: boolean
+  admin?: boolean
   attachmentCount?: number
   uploadFile?: (file: File) => Promise<SupportAttachment>
   downloadFile?: (id: string) => Promise<Blob>
   sendReply?: (text: string, attachmentIds: string[], messageId: string) => Promise<boolean>
-}>(), { messages: () => [], timelineState: 'unavailable', closed: false, resolved: false, canReply: false, attachmentCount: 0 })
+}>(), { messages: () => [], timelineState: 'unavailable', closed: false, resolved: false, canReply: false, admin: false, attachmentCount: 0 })
 const emit = defineEmits<{ retry: []; replied: [] }>()
 const { t, locale } = useI18n()
 const text = ref('')
@@ -86,6 +87,7 @@ let pendingRequest: { payload: string; id: string } | null = null
 let disposed = false
 
 function roleKey(role: string) {
+  if (props.admin && role === 'user') return 'support.admin.requester'
   const roles: Record<string, string> = { user: 'user', staff: 'staff', system: 'system' }
   return `support.messageRoles.${Object.prototype.hasOwnProperty.call(roles, role) ? roles[role] : 'unknown'}`
 }

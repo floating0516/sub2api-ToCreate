@@ -1,5 +1,15 @@
 export default {
   support: {
+    admin: {
+      title: '工单管理',
+      requester: '用户',
+      requesterId: '提单用户 ID',
+      pendingUser: '待用户回复',
+      allStatuses: '全部状态',
+      reply: '客服回复',
+      unavailable: '工单管理服务未接通',
+      discardReply: '回复内容或附件尚未发送，确认丢弃？',
+    },
     centerEyebrow: '专属支持中心',
     centerTitle: '我的工单',
     centerDescription: '购买前有疑问，或购买后需要帮助，都可以在这里和客服持续沟通。',
