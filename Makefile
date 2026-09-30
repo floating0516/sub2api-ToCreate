@@ -7,6 +7,10 @@ FRONTEND_CRITICAL_VITEST := \
 	src/stores/__tests__/support.spec.ts \
 	src/components/support/__tests__/SupportConversation.spec.ts \
 	src/views/user/__tests__/SupportView.spec.ts \
+	src/api/__tests__/supportPortal.spec.ts \
+	src/composables/__tests__/useTicketPortal.spec.ts \
+	src/components/support/__tests__/SupportTicketComponents.spec.ts \
+	src/components/support/__tests__/SupportAttachments.spec.ts \
 	src/api/__tests__/keys.bulkUpdate.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.transport.spec.ts \
