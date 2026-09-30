@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
 import SupportView from '../SupportView.vue'
+import SupportConversation from '@/components/support/SupportConversation.vue'
 import type { SupportTicketRecord } from '@/api/support'
 
 const api = vi.hoisted(() => ({ getTicket: vi.fn(), listTickets: vi.fn(), ticketStats: vi.fn(), createTicket: vi.fn(), replyTicket: vi.fn(), transitionTicket: vi.fn(), uploadAttachment: vi.fn(), downloadAttachment: vi.fn() }))
@@ -197,5 +198,51 @@ describe('SupportView API boundaries', () => {
     expect(dialog.get('[data-testid="send-reply"]').attributes('disabled')).toBeDefined()
     expect(dialog.text()).toContain('support.actions.reopen')
     expect(dialog.text()).not.toContain('support.actions.resolve')
+  })
+
+  it('keeps AI consultation usable while a portal read is slow', async () => {
+    let finish!: (value: unknown) => void
+    api.listTickets.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.getComponent(SupportConversation).props('restoring')).toBe(false)
+    expect(wrapper.get('#support-panel-tickets [aria-busy]').attributes('aria-busy')).toBe('true')
+    finish({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
+    await flushPromises()
+  })
+
+  it('submits a real form and refreshes the history only after creation succeeds', async () => {
+    api.listTickets.mockResolvedValueOnce({ items: [], total: 0, page: 1, page_size: 20, pages: 0 }).mockResolvedValue({ items: [record], total: 1, page: 1, page_size: 20, pages: 1 })
+    api.ticketStats.mockResolvedValue({ all: 1, pending_agent: 1, pending_user: 0, resolved: 0, closed: 0 })
+    api.createTicket.mockResolvedValue(record)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="create-ticket"]').trigger('click')
+    await flushPromises()
+    expect(orders.listManagedRechargeOrders).toHaveBeenCalledWith(100)
+    await wrapper.get('#support-create-title').setValue('Test issue')
+    await wrapper.get('#support-create-description').setValue('Detailed reproduction steps')
+    await wrapper.get('#support-create-form').trigger('submit')
+    await flushPromises()
+    expect(api.createTicket).toHaveBeenCalledWith({ type: 'pre-sale', title: 'Test issue', description: 'Detailed reproduction steps', priority: 'normal', product: 'tocreate', order_id: undefined, attachment_ids: [], client_request_id: expect.any(String) })
+    expect(app.showSuccess).toHaveBeenCalledWith('support.created')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('#support-panel-tickets').text()).toContain(record.title)
+  })
+
+  it('does not announce success or close the form on an incomplete creation response', async () => {
+    api.listTickets.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
+    api.ticketStats.mockResolvedValue({ all: 0, pending_agent: 0, pending_user: 0, resolved: 0, closed: 0 })
+    api.createTicket.mockResolvedValue({})
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="create-ticket"]').trigger('click')
+    await wrapper.get('#support-create-title').setValue('Test issue')
+    await wrapper.get('#support-create-description').setValue('Detailed reproduction steps')
+    await wrapper.get('#support-create-form').trigger('submit')
+    await flushPromises()
+    expect(app.showSuccess).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('support.errors.createTicket')
+    expect((wrapper.get('#support-create-title').element as HTMLInputElement).value).toBe('Test issue')
   })
 })

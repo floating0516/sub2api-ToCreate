@@ -224,9 +224,11 @@ const ticket = ref<SupportTicketRecord | null>(null)
 const ticketError = ref('')
 const loadingTicket = ref(true)
 const restoring = ref(false)
+const refreshingSupport = ref(false)
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
 let requestVersion = 0
+let restoreVersion = 0
 let disposed = false
 
 const tabs = computed(() => [
@@ -336,18 +338,25 @@ async function loadTicket() {
   }
 }
 async function refreshSupport() {
-  if (restoring.value || store.loading) return
+  if (refreshingSupport.value || store.loading) return
+  const version = ++restoreVersion
   const userId = auth.user?.id
+  refreshingSupport.value = true
   restoring.value = true
   loadingTicket.value = true
   try {
     await store.refresh()
-    if (!disposed && userId === auth.user?.id) {
+    if (!disposed && version === restoreVersion && userId === auth.user?.id) {
+      // Portal reads must not keep the restored AI conversation disabled.
+      restoring.value = false
       await loadTicket()
-      if (!disposed && userId === auth.user?.id) await portal.refresh()
+      if (!disposed && version === restoreVersion && userId === auth.user?.id) await portal.refresh()
     }
   } finally {
-    if (userId === auth.user?.id) restoring.value = false
+    if (version === restoreVersion && userId === auth.user?.id) {
+      restoring.value = false
+      refreshingSupport.value = false
+    }
   }
 }
 function formatDate(value: string) {
@@ -362,10 +371,12 @@ watch(() => store.ticketId, () => {
 })
 watch(() => auth.user?.id, () => {
   requestVersion++
+  restoreVersion++
   ticket.value = null
   ticketError.value = ''
   loadingTicket.value = false
   restoring.value = false
+  refreshingSupport.value = false
   showCreateDialog.value = false
   showDetailDialog.value = false
   pendingAction.value = null
@@ -383,5 +394,6 @@ onMounted(refreshSupport)
 onUnmounted(() => {
   disposed = true
   requestVersion++
+  restoreVersion++
 })
 </script>

@@ -74,7 +74,9 @@ async function selectFiles(event: Event) {
     if (disposed || version !== requestVersion) return
     if (entries.value.length >= props.maxFiles) { selectionError.value = 'support.validation.attachmentCount'; break }
     if (!file.size || file.size > 10 * 1024 * 1024) { selectionError.value = 'support.validation.attachmentSize'; continue }
-    if (!/\.(png|jpe?g|webp|pdf|txt)$/i.test(file.name) || file.type && !['image/png', 'image/jpeg', 'image/webp', 'application/pdf', 'text/plain'].includes(file.type)) { selectionError.value = 'support.validation.attachmentType'; continue }
+    const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase()
+    const types: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf', txt: 'text/plain' }
+    if (!Object.prototype.hasOwnProperty.call(types, extension) || file.type && file.type !== types[extension]) { selectionError.value = 'support.validation.attachmentType'; continue }
     entries.value.push({ key: ++nextKey, file, state: 'uploading' })
     await upload(entries.value[entries.value.length - 1]!)
   }

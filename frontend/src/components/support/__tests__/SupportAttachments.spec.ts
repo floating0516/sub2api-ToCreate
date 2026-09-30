@@ -30,6 +30,8 @@ describe('Ticket attachments', () => {
     await selectFiles(wrapper, [new File(['secret'], 'auth.json', { type: 'application/json' })])
     expect(uploadFile).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('support.validation.attachmentType')
+    await selectFiles(wrapper, [new File(['content'], 'mismatched.png', { type: 'application/pdf' })])
+    expect(uploadFile).not.toHaveBeenCalled()
     const large = new File(['a'], 'large.txt', { type: 'text/plain' })
     Object.defineProperty(large, 'size', { value: 10 * 1024 * 1024 + 1 })
     await selectFiles(wrapper, [large])
