@@ -314,13 +314,6 @@ func (h *SupportHandler) issueSupportToken(userID int64, roles ...string) (strin
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
 }
 
-func firstSupportString(value, fallback string) string {
-	if value = strings.TrimSpace(value); value != "" {
-		return value
-	}
-	return fallback
-}
-
 func mapSupportStatus(status int) int {
 	switch status {
 	case http.StatusBadRequest,

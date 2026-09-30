@@ -71,7 +71,8 @@ func (h *SupportHandler) upload(c *gin.Context, path string) {
 		response.BadRequest(c, "only png/jpeg/webp/pdf/txt files are allowed")
 		return
 	}
-	metadata := map[string]any{"id": uuid.NewString(), "filename": filename, "size": len(data), "content_type": contentType}
+	attachmentID := uuid.NewString()
+	metadata := map[string]any{"id": attachmentID, "filename": filename, "size": len(data), "content_type": contentType}
 	if ticketID := c.PostForm("ticket_id"); ticketID != "" {
 		if _, err := uuid.Parse(ticketID); err != nil {
 			response.BadRequest(c, "invalid ticket_id")
@@ -83,7 +84,7 @@ func (h *SupportHandler) upload(c *gin.Context, path string) {
 		response.Error(c, http.StatusServiceUnavailable, "support upload storage unavailable")
 		return
 	}
-	storedPath := filepath.Join(h.uploadsDir, metadata["id"].(string))
+	storedPath := filepath.Join(h.uploadsDir, attachmentID)
 	stored, err := os.OpenFile(storedPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		response.Error(c, http.StatusServiceUnavailable, "support upload storage unavailable")
