@@ -12,7 +12,8 @@ const support = vi.hoisted(() => ({
 }))
 vi.mock('@/api/support', () => ({ supportAPI: api }))
 vi.mock('@/stores/support', () => ({ useSupportStore: () => reactive(support) }))
-vi.mock('vue-i18n', () => ({
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...await importOriginal<typeof import('vue-i18n')>(),
   useI18n: () => ({ t: (key: string) => key, locale: ref('zh-CN') }),
 }))
 enableAutoUnmount(afterEach)

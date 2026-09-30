@@ -14,7 +14,10 @@ const auth = vi.hoisted(() => ({ user: { id: 42 } }))
 vi.mock('@/stores/support', () => ({ useSupportStore: () => reactive(support) }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => app }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => reactive(auth) }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, te: () => false }) }))
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...await importOriginal<typeof import('vue-i18n')>(),
+  useI18n: () => ({ t: (key: string) => key, te: () => false }),
+}))
 enableAutoUnmount(afterEach)
 const mountConversation = (restoring = false) => mount(SupportConversation, {
   props: { restoring }, global: { stubs: { Icon: true } },
