@@ -21,8 +21,8 @@ import (
 func TestResumeQuotaConcurrency(t *testing.T) {
  // Each goroutine receives its own real SQL transaction through the production services.
  // No outer test transaction, shared connection, or mutex-backed fake repository.
- ctx:=context.Background();client:=testEntClient(t)
- for _,kind:=range []string{"bill_same","bill_distinct","addon_bill_same","addon_bill_distinct","renew_same","renew_distinct","addon_order_same","addon_order_distinct","reset_renew_consume"} {
+ ctx:=context.Background();client:=testEntClient(t);usageLogs:=NewUsageLogRepository(client,integrationDB)
+ for _,kind:=range []string{"bill_same","bill_distinct","addon_bill_same","addon_bill_distinct","renew_same","renew_distinct","addon_order_same","addon_order_distinct","reset_renew_consume_daily","reset_renew_consume_weekly","reset_renew_consume_monthly"} {
   for _,c:=range []int{1,10,50}{for round:=1;round<=20;round++{
    t.Run(fmt.Sprintf("%s/c%d/r%d",kind,c,round),func(t *testing.T){
     suffix:=fmt.Sprintf("resume-%s-%d-%d-%d",kind,c,round,time.Now().UnixNano())
@@ -35,6 +35,12 @@ func TestResumeQuotaConcurrency(t *testing.T) {
     subSvc:=service.ProvideSubscriptionService(groupRepo,subRepo,nil,client,nil,addonRepo);defer subSvc.Stop()
     paySvc:=service.NewPaymentService(client,nil,nil,nil,subSvc,nil,nil,groupRepo,nil)
     billRepo:=NewUsageBillingRepository(client,integrationDB)
+    account:=mustCreateAccount(t,client,&service.Account{Name:suffix,Type:service.AccountTypeAPIKey})
+    logUsage:=func(id string,cost float64,at time.Time)error{
+     _,e:=usageLogs.Create(ctx,&service.UsageLog{UserID:user.ID,APIKeyID:key.ID,AccountID:account.ID,RequestID:id,Model:"synthetic-fixed-cost",GroupID:&group.ID,SubscriptionID:&entity.ID,ActualCost:cost,TotalCost:cost,CreatedAt:at});return e
+    }
+    resetUsage:=subRepo.ResetDailyUsage
+    if strings.HasSuffix(kind,"_weekly"){resetUsage=subRepo.ResetWeeklyUsage};if strings.HasSuffix(kind,"_monthly"){resetUsage=subRepo.ResetMonthlyUsage}
     unique:=c;if strings.HasSuffix(kind,"_same"){unique=1}
     orders:=make([]*dbent.PaymentOrder,unique)
     if strings.HasPrefix(kind,"renew_")||strings.HasPrefix(kind,"addon_order_"){
@@ -50,9 +56,10 @@ func TestResumeQuotaConcurrency(t *testing.T) {
     if strings.HasPrefix(kind,"addon_bill_"){
      pack=&service.SubscriptionAddonPack{SubscriptionID:entity.ID,UserID:user.ID,GroupID:group.ID,QuotaUSD:1000,StartsAt:start,ExpiresAt:expiry,Status:service.SubscriptionAddonStatusActive};require.NoError(t,addonRepo.Create(ctx,pack))
     }
-    if kind=="reset_renew_consume"{
+    if strings.HasPrefix(kind,"reset_renew_consume"){
      _,err=billRepo.Apply(ctx,&service.UsageBillingCommand{RequestID:suffix+"-old",APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:7});require.NoError(t,err)
-     require.NoError(t,subRepo.ResetDailyUsage(ctx,entity.ID,&start,now))
+     require.NoError(t,logUsage(suffix+"-old",7,start))
+     require.NoError(t,resetUsage(ctx,entity.ID,&start,now))
     }
     type outcome struct{applied int;err error};outs:=make(chan outcome,c);ready:=sync.WaitGroup{};ready.Add(c);gate:=make(chan struct{})
     for i:=0;i<c;i++{go func(i int){
@@ -65,8 +72,8 @@ func TestResumeQuotaConcurrency(t *testing.T) {
       default:
        cmd:=&service.UsageBillingCommand{RequestID:fmt.Sprintf("%s-event-%d",suffix,idx),APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:0.125}
        if pack!=nil{cmd.SubscriptionCost=0;cmd.AddonPackID=&pack.ID;cmd.AddonCost=0.125}
-       if kind=="reset_renew_consume"{e=subRepo.ResetDailyUsage(ctx,entity.ID,&start,now);if e==nil&&repeat==0{_,e=subSvc.ExtendSubscription(ctx,entity.ID,1)}}
-       if e==nil{var result *service.UsageBillingApplyResult;result,e=billRepo.Apply(ctx,cmd);if result!=nil&&result.Applied{o.applied++}}
+       if strings.HasPrefix(kind,"reset_renew_consume"){e=resetUsage(ctx,entity.ID,&start,now);if e==nil&&repeat==0{_,e=subSvc.ExtendSubscription(ctx,entity.ID,1)}}
+       if e==nil{var result *service.UsageBillingApplyResult;result,e=billRepo.Apply(ctx,cmd);if result!=nil&&result.Applied{o.applied++};if e==nil{e=logUsage(cmd.RequestID,0.125,now)}}
       }
       if e!=nil{o.err=e;break}
      }
@@ -75,7 +82,7 @@ func TestResumeQuotaConcurrency(t *testing.T) {
     ready.Wait();close(gate);applied:=0;errorsCount:=0
     for i:=0;i<c;i++{o:=<-outs;applied+=o.applied;if o.err!=nil{errorsCount++;t.Errorf("operation: %v",o.err)}}
     actual,err:=subRepo.GetByID(ctx,entity.ID);require.NoError(t,err)
-    expectedUsage:=float64(unique)*0.125;delta:=0.0;duplicate:=0;missing:=0;expiryDelta:=0.0;ledgerDelta:=0.0
+    expectedUsage:=float64(unique)*0.125;delta:=0.0;duplicate:=0;missing:=0;expiryDelta:=0.0;ledgerDelta:=0.0;usageLogDelta:=0.0
     switch {
     case strings.HasPrefix(kind,"renew_"):
      expiryDelta=actual.ExpiresAt.Sub(expiry.Add(time.Duration(unique)*24*time.Hour)).Seconds();require.Equal(t,start,actual.StartsAt);require.Equal(t,start,*actual.MonthlyWindowStart)
@@ -90,16 +97,25 @@ func TestResumeQuotaConcurrency(t *testing.T) {
       got,e:=addonRepo.GetByID(ctx,pack.ID);require.NoError(t,e);delta=got.UsedUSD-expectedUsage
       var total float64;var n int;require.NoError(t,integrationDB.QueryRowContext(ctx,"SELECT coalesce(sum(cost_usd),0),count(*) FROM subscription_addon_usage WHERE addon_pack_id=$1",pack.ID).Scan(&total,&n));ledgerDelta=total-expectedUsage;require.Equal(t,unique,n)
      }else{
-      delta=actual.DailyUsageUSD-expectedUsage
-      expectedLong:=expectedUsage;if kind=="reset_renew_consume"{expectedLong+=7;expiryDelta=actual.ExpiresAt.Sub(expiry.Add(time.Duration(c)*24*time.Hour)).Seconds()}
-      require.InDelta(t,expectedLong,actual.WeeklyUsageUSD,0.000001);require.InDelta(t,expectedLong,actual.MonthlyUsageUSD,0.000001)
+      expectedDaily,expectedWeekly,expectedMonthly:=expectedUsage,expectedUsage,expectedUsage
+      if strings.HasPrefix(kind,"reset_renew_consume"){
+       if !strings.HasSuffix(kind,"_daily"){expectedDaily+=7};if !strings.HasSuffix(kind,"_weekly"){expectedWeekly+=7};if !strings.HasSuffix(kind,"_monthly"){expectedMonthly+=7}
+       expiryDelta=actual.ExpiresAt.Sub(expiry.Add(time.Duration(c)*24*time.Hour)).Seconds()
+      }
+      delta=math.Max(math.Abs(actual.DailyUsageUSD-expectedDaily),math.Max(math.Abs(actual.WeeklyUsageUSD-expectedWeekly),math.Abs(actual.MonthlyUsageUSD-expectedMonthly)))
      }
-     var n int;require.NoError(t,integrationDB.QueryRowContext(ctx,"SELECT count(*) FROM usage_billing_dedup WHERE api_key_id=$1",key.ID).Scan(&n));expectedN:=unique;if kind=="reset_renew_consume"{expectedN++};require.Equal(t,expectedN,n)
+     var n int;require.NoError(t,integrationDB.QueryRowContext(ctx,"SELECT count(*) FROM usage_billing_dedup WHERE api_key_id=$1",key.ID).Scan(&n));expectedN:=unique;if strings.HasPrefix(kind,"reset_renew_consume"){expectedN++};require.Equal(t,expectedN,n)
+    }
+    if !strings.HasPrefix(kind,"renew_")&&!strings.HasPrefix(kind,"addon_order_"){
+     var total,current float64;var logCount int
+     require.NoError(t,integrationDB.QueryRowContext(ctx,"SELECT count(*),coalesce(sum(actual_cost),0),coalesce(sum(actual_cost) FILTER (WHERE created_at >= $2),0) FROM usage_logs WHERE api_key_id=$1",key.ID,now).Scan(&logCount,&total,&current))
+     expectedTotal:=expectedUsage;expectedCount:=unique;if strings.HasPrefix(kind,"reset_renew_consume"){expectedTotal+=7;expectedCount++}
+     usageLogDelta=total-expectedTotal;require.Equal(t,expectedCount,logCount);require.InDelta(t,expectedUsage,current,0.000001)
     }
     if len(orders)>0&&(strings.HasPrefix(kind,"renew_")||strings.HasPrefix(kind,"addon_order_")){for _,o:=range orders{got,e:=client.PaymentOrder.Get(ctx,o.ID);require.NoError(t,e);require.Equal(t,service.OrderStatusCompleted,got.Status)}}
-    row:=map[string]interface{}{"scenario":kind,"concurrency":c,"round":round,"duplicate_effects":duplicate,"missing_effects":missing,"quota_delta_usd":delta,"ledger_delta_usd":ledgerDelta,"expiry_delta_seconds":expiryDelta,"operation_errors":errorsCount}
+    row:=map[string]interface{}{"scenario":kind,"concurrency":c,"round":round,"duplicate_effects":duplicate,"missing_effects":missing,"quota_delta_usd":delta,"ledger_delta_usd":ledgerDelta,"usage_log_delta_usd":usageLogDelta,"expiry_delta_seconds":expiryDelta,"operation_errors":errorsCount}
     raw,_:=json.Marshal(row);t.Log("EXPERIMENT_ROW "+string(raw))
-    require.Zero(t,duplicate);require.Zero(t,missing);require.LessOrEqual(t,math.Abs(delta),0.000001);require.LessOrEqual(t,math.Abs(ledgerDelta),0.000001);require.Zero(t,expiryDelta)
+    require.Zero(t,duplicate);require.Zero(t,missing);require.LessOrEqual(t,math.Abs(delta),0.000001);require.LessOrEqual(t,math.Abs(ledgerDelta),0.000001);require.LessOrEqual(t,math.Abs(usageLogDelta),0.000001);require.Zero(t,expiryDelta)
    })
   }}
  }
