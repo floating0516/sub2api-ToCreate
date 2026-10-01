@@ -137,6 +137,8 @@ async def main():
     async with aiohttp.ClientSession() as session:
         launch_gateway('off',18090,0);await wait_ready(session,18090)
         login=await api(session,18090,'/auth/login',{'email':'experiment@example.invalid','password':PASSWORD});token=login['access_token']
+        # Synthetic preconfigured admin fixture in the disposable database only.
+        sql("INSERT INTO settings (key,value,updated_at) SELECT 'admin_compliance_acknowledgement:' || id, '{\"version\":\"v2026.06.10\",\"synthetic_fixture\":true}', now() FROM users WHERE email='experiment@example.invalid' ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value")
         group=await api(session,18090,'/admin/groups',{'name':'resume-experiment','platform':'openai','subscription_type':'standard','rate_multiplier':1,'is_exclusive':False},token)
         account=await api(session,18090,'/admin/accounts',{'name':'synthetic-upstream','platform':'openai','type':'apikey','credentials':{'api_key':'synthetic-not-a-real-key','base_url':'http://127.0.0.1:19090/v1'},'group_ids':[group['id']],'concurrency':100,'priority':1,'rate_multiplier':1},token)
         sql("UPDATE users SET balance=10000, concurrency=100 WHERE email='experiment@example.invalid'")

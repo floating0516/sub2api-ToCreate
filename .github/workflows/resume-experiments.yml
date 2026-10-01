@@ -8,6 +8,7 @@ permissions:
   packages: read
 jobs:
   quota:
+    if: "!contains(github.event.head_commit.message, '[sse-only]')"
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -50,6 +51,7 @@ jobs:
           path: results/
           retention-days: 30
   sse:
+    if: "!contains(github.event.head_commit.message, '[quota-only]')"
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
