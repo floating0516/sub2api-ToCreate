@@ -39,7 +39,7 @@ func TestResumeQuotaConcurrency(t *testing.T) {
     orders:=make([]*dbent.PaymentOrder,unique)
     if strings.HasPrefix(kind,"renew_")||strings.HasPrefix(kind,"addon_order_"){
      for i:=range orders{
-      b:=client.PaymentOrder.Create().SetUserID(user.ID).SetUserEmail(user.Email).SetUserName("experiment").SetAmount(1.99).SetPayAmount(1.99).SetRechargeCode(fmt.Sprintf("%s-%d",suffix,i)).SetOutTradeNo(fmt.Sprintf("%s-%d",suffix,i)).SetPaymentType("alipay").SetStatus(service.OrderStatusPaid).SetExpiresAt(expiry).SetClientIP("127.0.0.1").SetSrcHost("experiment.invalid")
+      b:=client.PaymentOrder.Create().SetUserID(user.ID).SetUserEmail(user.Email).SetUserName("experiment").SetAmount(1.99).SetPayAmount(1.99).SetRechargeCode(fmt.Sprintf("%s-%d",suffix,i)).SetOutTradeNo(fmt.Sprintf("%s-%d",suffix,i)).SetPaymentType("alipay").SetPaymentTradeNo(fmt.Sprintf("synthetic-%s-%d",suffix,i)).SetStatus(service.OrderStatusPaid).SetExpiresAt(expiry).SetClientIP("127.0.0.1").SetSrcHost("experiment.invalid")
       if strings.HasPrefix(kind,"renew_"){b.SetOrderType("subscription").SetSubscriptionGroupID(group.ID).SetSubscriptionDays(1)}else{
        b.SetOrderType("addon").SetProviderSnapshot(map[string]interface{}{"addon_purchase":map[string]interface{}{"product_id":"1","product_sku":"experiment-10","product_name":"Synthetic","subscription_id":strconv.FormatInt(entity.ID,10),"group_id":strconv.FormatInt(group.ID,10),"quota_usd":"10","price":"1.99","expires_at":expiry.Format(time.RFC3339Nano)}})
       }

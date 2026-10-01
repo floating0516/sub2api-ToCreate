@@ -27,6 +27,7 @@ jobs:
           git rev-parse HEAD > results/test-commit.txt
           go version > results/go-version.txt
           gofmt -w backend/internal/service/resume_quota_rules_test.go backend/internal/repository/resume_quota_experiment_test.go
+          cp backend/internal/service/resume_quota_rules_test.go backend/internal/repository/resume_quota_experiment_test.go results/
       - name: Clock-driven rules
         working-directory: backend
         run: |

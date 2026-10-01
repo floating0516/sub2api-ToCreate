@@ -11,6 +11,11 @@ import (
  "github.com/stretchr/testify/require"
 )
 
+type resumeRulesRepo struct { *subscriptionUserSubRepoStub }
+func (r *resumeRulesRepo) ExtendExpiry(ctx context.Context, id int64, expiry time.Time) error {
+ sub,err:=r.GetByID(ctx,id);if err!=nil{return err};sub.ExpiresAt=expiry;return r.Update(ctx,sub)
+}
+
 func TestResumeQuotaRules(t *testing.T) {
  require.NoError(t, timezone.Init("Asia/Shanghai"))
  defer func(){ _ = timezone.Init("UTC") }()
@@ -57,7 +62,7 @@ func TestResumeQuotaRules(t *testing.T) {
  for _,offset:=range []time.Duration{-time.Microsecond,0,time.Microsecond}{
   t.Run(fmt.Sprintf("renewal/%d",offset),func(t *testing.T){
    expiry:=time.Date(2026,3,2,12,0,0,0,loc);now:=expiry.Add(offset);anchor:=start
-   repo:=newSubscriptionUserSubRepoStub();repo.seed(&UserSubscription{ID:99,UserID:7,GroupID:1,Status:SubscriptionStatusActive,StartsAt:start,ExpiresAt:expiry,DailyWindowStart:&anchor,WeeklyWindowStart:&anchor,MonthlyWindowStart:&anchor,DailyUsageUSD:3,WeeklyUsageUSD:4,MonthlyUsageUSD:5})
+   repo:=&resumeRulesRepo{newSubscriptionUserSubRepoStub()};repo.seed(&UserSubscription{ID:99,UserID:7,GroupID:1,Status:SubscriptionStatusActive,StartsAt:start,ExpiresAt:expiry,DailyWindowStart:&anchor,WeeklyWindowStart:&anchor,MonthlyWindowStart:&anchor,DailyUsageUSD:3,WeeklyUsageUSD:4,MonthlyUsageUSD:5})
    svc:=NewSubscriptionService(&subscriptionGroupRepoStub{group:&Group{ID:1,SubscriptionType:SubscriptionTypeSubscription}},repo,nil,nil,nil);svc.now=func()time.Time{return now}
    got,_,err:=svc.AssignOrExtendSubscription(context.Background(),&AssignSubscriptionInput{UserID:7,GroupID:1,ValidityDays:7});require.NoError(t,err)
    if offset<0 {require.Equal(t,start,got.StartsAt);require.Equal(t,expiry.Add(7*24*time.Hour),got.ExpiresAt);require.Equal(t,5.0,got.MonthlyUsageUSD);require.Equal(t,start,*got.MonthlyWindowStart)}else{require.Equal(t,now,got.StartsAt);require.Equal(t,now.Add(7*24*time.Hour),got.ExpiresAt);require.Zero(t,got.MonthlyUsageUSD);require.Equal(t,now,*got.MonthlyWindowStart)}
