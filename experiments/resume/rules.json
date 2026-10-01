@@ -1,0 +1,32 @@
+{
+  "baseline_commit": "3054379774497a4ec264cefc276193a5b519fb32",
+  "status": "Expected contract frozen before execution; derived from the business agreement discussed in this conversation, not observed test outputs",
+  "timezone": "Asia/Shanghai",
+  "quota": {
+    "daily": "Local calendar midnight; term duration <= one calendar day receives one allocation only",
+    "weekly": "7*24 hours from subscription activation anchor",
+    "monthly": "30*24 hours from subscription activation anchor, independent of calendar month length",
+    "boundary": "New period includes exact reset instant; subscription and add-on invalid at exact expiry",
+    "active_renewal": "Extend previous expiry; preserve start, windows and usage",
+    "expired_renewal": "New term starts at renewal instant; usage zero; periodic anchor renewal instant",
+    "addon": "Use after base quota exhaustion; purchase snapshot expiry does not extend on renewal",
+    "idempotency": "Same order/request ID applies once; distinct IDs apply independently even with same amount",
+    "accounting": "Known fixed amounts, decimal reference amounts; absolute tolerance 0.000001 USD",
+    "cross_boundary_accounting": "For controlled ordering, bills committed before reset belong to old window; bills admitted after completed reset belong to new window. Unordered race is checked for an admissible serial ordering; no assertion of request-start attribution.",
+    "concurrency": [1, 10, 50],
+    "rounds_per_combination": 20
+  },
+  "sse": {
+    "simulation": true,
+    "route": "/v1/messages with OpenAI compatible account",
+    "nginx_proxy_read_timeout_s": 15,
+    "keepalive_interval_s": [0, 5],
+    "upstream_delay_s": [10, 17, 30],
+    "phases": ["headers", "body"],
+    "requests_per_combination": 50,
+    "client_concurrency": 10,
+    "complete": "Expected text plus Anthropic message_stop; HTTP 200 or ping alone insufficient",
+    "first_content": "First text_delta only, excluding ping and protocol metadata",
+    "error_cases": ["error_before_first_heartbeat", "error_after_heartbeat", "cancel_before_headers", "cancel_after_headers"]
+  }
+}

@@ -1,0 +1,76 @@
+name: Resume quota and SSE experiments
+on:
+  push:
+    branches: ['experiment/resume-quota-sse-20261001']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+jobs:
+  quota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SUB2API_TEST_POSTGRES_IMAGE: postgres:15-alpine
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Rules and test identity
+        run: |
+          mkdir -p results
+          cp experiments/resume/rules.json results/
+          git rev-parse HEAD > results/test-commit.txt
+          go version > results/go-version.txt
+          gofmt -w backend/internal/service/resume_quota_rules_test.go backend/internal/repository/resume_quota_experiment_test.go
+      - name: Clock-driven rules
+        working-directory: backend
+        run: |
+          set -o pipefail
+          go test -tags unit ./internal/service -run '^TestResumeQuotaRules$' -count=1 -json -timeout 8m | tee ../results/quota-rules.jsonl
+      - name: Real PostgreSQL concurrency
+        if: '!cancelled()'
+        working-directory: backend
+        run: |
+          set -o pipefail
+          go test -tags integration ./internal/repository -run '^TestResumeQuotaConcurrency$' -count=1 -json -timeout 15m | tee ../results/quota-concurrency.jsonl
+      - name: Relevant existing regressions
+        if: '!cancelled()'
+        working-directory: backend
+        run: |
+          set -o pipefail
+          go test -tags unit ./internal/service -run 'Test(OpenAIMessagesSSEKeepalive|OpenAIMessagesKeepaliveAdjusted|PassthroughKeepalive|CheckAndResetWindows|ValidateAndCheckLimits|AutomaticWindow|DelayedFirstUse|ThirtyDaySubscription|AssignOrExtendSubscription|ResolveUsageAccess|GrantAddon)' -count=1 -json -timeout 8m | tee ../results/existing-regressions.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resume-quota-results
+          path: results/
+          retention-days: 30
+  sse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install experiment client
+        run: python -m pip install aiohttp
+      - name: Authenticate image pull
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+      - name: Prepare isolated data services
+        run: |
+          docker run -d --name resume-pg --network host -e POSTGRES_PASSWORD='Synthetic-Experiment-Only-20261001!' -e POSTGRES_DB=resume postgres:15-alpine -p 15439
+          docker run -d --name resume-redis --network host redis:7-alpine redis-server --port 16389
+          docker pull ghcr.io/floating0516/sub2api-tocreate@sha256:1929e4a9744a540fb3e2cba45acba2dc3c193af4d1b978cf632e92f958be0f3c
+          docker pull nginx:1.28-alpine
+      - name: Execute actual gateway experiment
+        run: python -u experiments/resume/sse_experiment.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resume-sse-results
+          path: results/
+          retention-days: 30
