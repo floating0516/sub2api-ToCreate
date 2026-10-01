@@ -10,9 +10,12 @@ PASSWORD='Synthetic-Experiment-Only-20261001!'
 STATES={}; ROWS=[]; ACCOUNTS=[]; TOKEN=None
 
 def cmd(*args):
-    return subprocess.check_output(args,text=True,stderr=subprocess.STDOUT).strip()
+    try:return subprocess.check_output(args,text=True,stderr=subprocess.STDOUT).strip()
+    except subprocess.CalledProcessError as exc:
+        print(exc.output,flush=True)
+        raise
 def sql(query):
-    return cmd('docker','exec','resume-pg','psql','-U','postgres','-d','resume','-At','-c',query)
+    return cmd('docker','exec','resume-pg','psql','-p','15439','-U','postgres','-d','resume','-At','-c',query)
 def docker_start(name,image,*options):
     return cmd('docker','run','-d','--name',name,'--network','host',*options,image)
 def event(kind,**data):
