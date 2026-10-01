@@ -58,8 +58,8 @@ func TestResumeQuotaConcurrency(t *testing.T) {
      pack=&service.SubscriptionAddonPack{SubscriptionID:entity.ID,UserID:user.ID,GroupID:group.ID,QuotaUSD:1000,StartsAt:start,ExpiresAt:expiry,Status:service.SubscriptionAddonStatusActive};require.NoError(t,addonRepo.Create(ctx,pack))
     }
     if strings.HasPrefix(kind,"reset_renew_consume"){
-     _,err=billRepo.Apply(ctx,&service.UsageBillingCommand{RequestID:suffix+"-old",APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:7});require.NoError(t,err)
-     require.NoError(t,logUsage(suffix+"-old",7,start))
+     _,err=billRepo.Apply(ctx,&service.UsageBillingCommand{RequestID:fmt.Sprintf("resume-%d-old",entity.ID),APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:7});require.NoError(t,err)
+     require.NoError(t,logUsage(fmt.Sprintf("resume-%d-old",entity.ID),7,start))
      require.NoError(t,resetUsage(ctx,entity.ID,&start,now))
     }
     type outcome struct{applied int;conflicts int;err error};outs:=make(chan outcome,c);ready:=sync.WaitGroup{};ready.Add(c);gate:=make(chan struct{})
@@ -71,7 +71,7 @@ func TestResumeQuotaConcurrency(t *testing.T) {
       case strings.HasPrefix(kind,"renew_"): e=paySvc.ExecuteSubscriptionFulfillment(ctx,orders[idx].ID)
       case strings.HasPrefix(kind,"addon_order_"): e=paySvc.ExecuteAddonFulfillment(ctx,orders[idx].ID)
       default:
-       cmd:=&service.UsageBillingCommand{RequestID:fmt.Sprintf("%s-event-%d",suffix,idx),APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:0.125}
+       cmd:=&service.UsageBillingCommand{RequestID:fmt.Sprintf("resume-%d-event-%d",entity.ID,idx),APIKeyID:key.ID,UserID:user.ID,SubscriptionID:&entity.ID,SubscriptionCost:0.125}
        if pack!=nil{cmd.SubscriptionCost=0;cmd.AddonPackID=&pack.ID;cmd.AddonCost=0.125}
        if strings.HasPrefix(kind,"reset_renew_consume"){e=resetUsage(ctx,entity.ID,&start,now);if e==nil&&repeat==0{_,e=subSvc.ExtendSubscription(ctx,entity.ID,1)}}
        if e==nil{var result *service.UsageBillingApplyResult;result,e=billRepo.Apply(ctx,cmd);if result!=nil&&result.Applied{o.applied++};if e==nil{e=logUsage(cmd.RequestID,0.125,now)}}

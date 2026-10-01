@@ -1,6 +1,6 @@
 {
   "baseline_commit": "3054379774497a4ec264cefc276193a5b519fb32",
-  "status": "Expected contract frozen before execution; derived from the business agreement discussed in this conversation, not observed test outputs",
+  "status": "Quota invariants fixed before execution. In-flight same-order 409 response handling clarified after the initial run; conflicts are explicitly counted and post-completion retries are checked. All preliminary attempts are retained.",
   "timezone": "Asia/Shanghai",
   "quota": {
     "daily": "Local calendar midnight; term duration <= one calendar day receives one allocation only",
