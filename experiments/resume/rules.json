@@ -13,20 +13,40 @@
     "idempotency": "Same order/request ID applies once; distinct IDs apply independently even with same amount",
     "accounting": "Known fixed amounts, decimal reference amounts; absolute tolerance 0.000001 USD",
     "cross_boundary_accounting": "For controlled ordering, bills committed before reset belong to old window; bills admitted after completed reset belong to new window. Unordered race is checked for an admissible serial ordering; no assertion of request-start attribution.",
-    "concurrency": [1, 10, 50],
-    "rounds_per_combination": 20
+    "concurrency": [
+      1,
+      10,
+      50
+    ],
+    "rounds_per_combination": 20,
+    "concurrent_replay_response": "Business invariant is exactly one effect. An in-flight same-order replay may report 409 processing; count it separately, require the owner to have completed, then require a post-completion replay to succeed without another effect. Never classify different-order conflicts or other errors as success."
   },
   "sse": {
     "simulation": true,
     "route": "/v1/messages with OpenAI compatible account",
     "nginx_proxy_read_timeout_s": 15,
-    "keepalive_interval_s": [0, 5],
-    "upstream_delay_s": [10, 17, 30],
-    "phases": ["headers", "body"],
+    "keepalive_interval_s": [
+      0,
+      5
+    ],
+    "upstream_delay_s": [
+      10,
+      17,
+      30
+    ],
+    "phases": [
+      "headers",
+      "body"
+    ],
     "requests_per_combination": 50,
     "client_concurrency": 10,
     "complete": "Expected text plus Anthropic message_stop; HTTP 200 or ping alone insufficient",
     "first_content": "First text_delta only, excluding ping and protocol metadata",
-    "error_cases": ["error_before_first_heartbeat", "error_after_heartbeat", "cancel_before_headers", "cancel_after_headers"]
+    "error_cases": [
+      "error_before_first_heartbeat",
+      "error_after_heartbeat",
+      "cancel_before_headers",
+      "cancel_after_headers"
+    ]
   }
 }

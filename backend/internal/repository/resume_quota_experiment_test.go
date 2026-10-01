@@ -15,6 +15,7 @@ import (
 
  dbent "github.com/Wei-Shaw/sub2api/ent"
  "github.com/Wei-Shaw/sub2api/internal/service"
+ infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
  "github.com/stretchr/testify/require"
 )
 
@@ -61,7 +62,7 @@ func TestResumeQuotaConcurrency(t *testing.T) {
      require.NoError(t,logUsage(suffix+"-old",7,start))
      require.NoError(t,resetUsage(ctx,entity.ID,&start,now))
     }
-    type outcome struct{applied int;err error};outs:=make(chan outcome,c);ready:=sync.WaitGroup{};ready.Add(c);gate:=make(chan struct{})
+    type outcome struct{applied int;conflicts int;err error};outs:=make(chan outcome,c);ready:=sync.WaitGroup{};ready.Add(c);gate:=make(chan struct{})
     for i:=0;i<c;i++{go func(i int){
      ready.Done();<-gate;idx:=i;if unique==1{idx=0};o:=outcome{}
      for repeat:=0;repeat<2;repeat++{
@@ -75,12 +76,23 @@ func TestResumeQuotaConcurrency(t *testing.T) {
        if strings.HasPrefix(kind,"reset_renew_consume"){e=resetUsage(ctx,entity.ID,&start,now);if e==nil&&repeat==0{_,e=subSvc.ExtendSubscription(ctx,entity.ID,1)}}
        if e==nil{var result *service.UsageBillingApplyResult;result,e=billRepo.Apply(ctx,cmd);if result!=nil&&result.Applied{o.applied++};if e==nil{e=logUsage(cmd.RequestID,0.125,now)}}
       }
-      if e!=nil{o.err=e;break}
+      if e!=nil{
+       if (kind=="renew_same"||kind=="addon_order_same")&&infraerrors.Code(e)==409&&infraerrors.Message(e)=="order is being processed"{o.conflicts++;break}
+       o.err=e;break
+      }
      }
      outs<-o
     }(i)}
-    ready.Wait();close(gate);applied:=0;errorsCount:=0
-    for i:=0;i<c;i++{o:=<-outs;applied+=o.applied;if o.err!=nil{errorsCount++;t.Errorf("operation: %v",o.err)}}
+    ready.Wait();close(gate);applied:=0;errorsCount:=0;conflicts:=0
+    for i:=0;i<c;i++{o:=<-outs;applied+=o.applied;conflicts+=o.conflicts;if o.err!=nil{errorsCount++;t.Errorf("operation: %v",o.err)}}
+    // A processing conflict is only acceptable if the owner already committed,
+    // and a later retry succeeds without a second business effect.
+    if strings.HasPrefix(kind,"renew_")||strings.HasPrefix(kind,"addon_order_"){
+     for _,o:=range orders{
+      before,e:=client.PaymentOrder.Get(ctx,o.ID);require.NoError(t,e);require.Equal(t,service.OrderStatusCompleted,before.Status)
+      if strings.HasPrefix(kind,"renew_"){require.NoError(t,paySvc.ExecuteSubscriptionFulfillment(ctx,o.ID))}else{require.NoError(t,paySvc.ExecuteAddonFulfillment(ctx,o.ID))}
+     }
+    }
     actual,err:=subRepo.GetByID(ctx,entity.ID);require.NoError(t,err)
     expectedUsage:=float64(unique)*0.125;delta:=0.0;duplicate:=0;missing:=0;expiryDelta:=0.0;ledgerDelta:=0.0;usageLogDelta:=0.0
     switch {
@@ -113,7 +125,7 @@ func TestResumeQuotaConcurrency(t *testing.T) {
      usageLogDelta=total-expectedTotal;require.Equal(t,expectedCount,logCount);require.InDelta(t,expectedUsage,current,0.000001)
     }
     if len(orders)>0&&(strings.HasPrefix(kind,"renew_")||strings.HasPrefix(kind,"addon_order_")){for _,o:=range orders{got,e:=client.PaymentOrder.Get(ctx,o.ID);require.NoError(t,e);require.Equal(t,service.OrderStatusCompleted,got.Status)}}
-    row:=map[string]interface{}{"scenario":kind,"concurrency":c,"round":round,"duplicate_effects":duplicate,"missing_effects":missing,"quota_delta_usd":delta,"ledger_delta_usd":ledgerDelta,"usage_log_delta_usd":usageLogDelta,"expiry_delta_seconds":expiryDelta,"operation_errors":errorsCount}
+    row:=map[string]interface{}{"scenario":kind,"concurrency":c,"round":round,"duplicate_effects":duplicate,"missing_effects":missing,"quota_delta_usd":delta,"ledger_delta_usd":ledgerDelta,"usage_log_delta_usd":usageLogDelta,"expiry_delta_seconds":expiryDelta,"operation_errors":errorsCount,"inflight_conflict_responses":conflicts}
     raw,_:=json.Marshal(row);t.Log("EXPERIMENT_ROW "+string(raw))
     require.Zero(t,duplicate);require.Zero(t,missing);require.LessOrEqual(t,math.Abs(delta),0.000001);require.LessOrEqual(t,math.Abs(ledgerDelta),0.000001);require.LessOrEqual(t,math.Abs(usageLogDelta),0.000001);require.Zero(t,expiryDelta)
    })
