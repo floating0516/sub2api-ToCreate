@@ -24,6 +24,9 @@
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
                 <span class="font-medium text-gray-900 dark:text-white">
                   {{ props.orderType === 'managed_recharge' ? formatGatewayAmount(paidOrder.amount, paidOrder.currency) : creditedAmountSymbol + paidOrder.amount.toFixed(2) }}
+                  <span v-if="props.orderType !== 'managed_recharge' && (paidOrder.bonus_amount ?? 0) > 0" class="ml-1 text-xs font-normal text-amber-600 dark:text-amber-400">
+                    ({{ t('payment.orders.bonusIncluded', { amount: creditedAmountSymbol + (paidOrder.bonus_amount ?? 0).toFixed(2) }) }})
+                  </span>
                 </span>
               </div>
               <div class="flex justify-between">
