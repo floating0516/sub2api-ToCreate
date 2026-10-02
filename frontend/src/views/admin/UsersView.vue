@@ -1819,6 +1819,7 @@ const loadUsersSecondaryData = async (
 }
 
 const refreshCurrentPageSecondaryData = () => {
+  if (loading.value) return
   const userIds = users.value.map((u) => u.id)
   if (userIds.length === 0) return
   const seq = ++secondaryDataSeq
