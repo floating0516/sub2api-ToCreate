@@ -12,6 +12,7 @@ vi.mock('@/api/client', () => ({
 
 import {
   batchUpdateLimits,
+  getUsageInsights,
   bindUserAuthIdentity,
   type AdminBindAuthIdentityRequest,
   type AdminBoundAuthIdentity,
@@ -146,5 +147,16 @@ describe('admin users api auth identity binding', () => {
     expect(result).toEqual({ affected: 2 })
     expect(batchRequestContractExact).toBe(true)
     expect(batchResponseContractExact).toBe(true)
+  })
+})
+
+
+describe('user usage insights API', () => {
+  it('posts the batch with a cancellation signal', async () => {
+    const signal = new AbortController().signal
+    const data = { insights: { 1: { usage_summary: { total_requests: 9 }, model_preferences: [] } } }
+    post.mockResolvedValueOnce({ data })
+    expect(await getUsageInsights([1], signal)).toEqual(data)
+    expect(post).toHaveBeenLastCalledWith('/admin/users/usage-insights', { user_ids: [1] }, { signal })
   })
 })

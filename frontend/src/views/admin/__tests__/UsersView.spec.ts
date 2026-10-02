@@ -6,6 +6,7 @@ import UsersView from '../UsersView.vue'
 
 const {
   listUsers,
+  getUsageInsights,
   getUserById,
   toggleStatus,
   deleteUser,
@@ -17,6 +18,7 @@ const {
   getBatchUserAttributes
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
+  getUsageInsights: vi.fn(),
   getUserById: vi.fn(),
   toggleStatus: vi.fn(),
   deleteUser: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     users: {
       list: listUsers,
+      getUsageInsights,
       getById: getUserById,
       toggleStatus,
       delete: deleteUser
@@ -89,10 +92,11 @@ const createAdminUser = (overrides: Partial<AdminUser> = {}): AdminUser => ({
 })
 
 const DataTableStub = {
-  props: ['columns', 'data', 'selectedKeys'],
+  props: ['columns', 'data', 'selectedKeys', 'loading'],
   emits: ['sort', 'update:selectedKeys'],
   template: `
     <div>
+      <div data-test="list-loading">{{ loading }}</div>
       <div data-test="columns">{{ columns.map(col => col.key).join(',') }}</div>
       <div data-test="row-order">{{ data.map(row => row.email).join(',') }}</div>
       <div data-test="row-state">{{ data.map(row => [row.id, row.status, row.current_concurrency].join(':')).join(',') }}</div>
@@ -110,6 +114,8 @@ const DataTableStub = {
         <slot :name="'header-' + col.key" :column="col" />
       </template>
       <div v-for="row in data" :key="row.id">
+        <div :data-test="'insights-' + row.id"><slot name="cell-usage_overview" :row="row" /></div>
+        <div :data-test="'models-' + row.id"><slot name="cell-model_preferences" :row="row" /></div>
         <slot name="cell-last_used_at" :value="row.last_used_at" :row="row" />
         <div :data-test="'actions-' + row.id"><slot name="cell-actions" :row="row" /></div>
       </div>
@@ -186,6 +192,8 @@ describe('admin UsersView', () => {
     localStorage.clear()
 
     listUsers.mockReset()
+    getUsageInsights.mockReset()
+    getUsageInsights.mockResolvedValue({ insights: {} })
     getUserById.mockReset()
     toggleStatus.mockReset()
     deleteUser.mockReset()
@@ -212,6 +220,61 @@ describe('admin UsersView', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('renders users before insights finish, then fills the statistics', async () => {
+    vi.useFakeTimers()
+    let finish!: (value: unknown) => void
+    getUsageInsights.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(wrapper.get('[data-test="row-order"]').text()).toContain('scoped@example.com')
+    expect(wrapper.get('[data-test="list-loading"]').text()).toBe('false')
+    expect(listUsers.mock.calls[0][2].include_usage_insights).toBe(false)
+    expect(wrapper.get('[data-test="insights-42"]').text()).toBe('common.loading')
+    await vi.advanceTimersByTimeAsync(50)
+    expect(getUsageInsights).toHaveBeenCalledWith([42], expect.any(AbortSignal))
+    finish({ insights: { 42: { usage_summary: { today_requests: 123, requests_7d: 123, requests_30d: 123, tokens_30d: 0, actual_cost_30d: 0 }, model_preferences: [] } } })
+    await flushPromises()
+    expect(wrapper.get('[data-test="insights-42"]').text()).toContain('123')
+    expect(wrapper.get('[data-test="insights-42"]').text()).not.toContain('common.loading')
+    wrapper.unmount()
+  })
+
+  it('ignores old insights after a new page request begins', async () => {
+    vi.useFakeTimers()
+    let finishOld!: (value: unknown) => void
+    getUsageInsights.mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+    listUsers.mockResolvedValueOnce({ items: [createAdminUser()], total: 2, pages: 2 })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(50)
+    let finishPage!: (value: unknown) => void
+    listUsers.mockReturnValueOnce(new Promise(resolve => { finishPage = resolve }))
+    await wrapper.get('[data-test="next-page"]').trigger('click')
+    expect(getUsageInsights.mock.calls[0][1].aborted).toBe(true)
+    finishOld({ insights: { 42: { usage_summary: { today_requests: 999 }, model_preferences: [] } } })
+    await flushPromises()
+    expect(wrapper.get('[data-test="insights-42"]').text()).not.toContain('999')
+    finishPage({ items: [createAdminUser({ id: 43 })], total: 2, pages: 2 })
+    await flushPromises()
+    expect(wrapper.find('[data-test="insights-42"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps user data on insight failure and supports retry', async () => {
+    vi.useFakeTimers()
+    getUsageInsights.mockRejectedValueOnce(new Error('unavailable'))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(50)
+    expect(wrapper.get('[data-test="row-order"]').text()).toContain('scoped@example.com')
+    expect(wrapper.get('[data-test="insights-42"]').text()).toBe('common.tryAgain')
+    getUsageInsights.mockResolvedValueOnce({ insights: { 42: { usage_summary: { today_requests: 7 }, model_preferences: [] } } })
+    await wrapper.get('[data-test="insights-42"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="insights-42"]').text()).toContain('7')
+    wrapper.unmount()
   })
 
   it('cancels bulk deletion without deleting or clearing selected users', async () => {
