@@ -550,7 +550,11 @@
           </template>
 
           <template #cell-usage_overview="{ row }">
-            <div class="min-w-[190px] space-y-1.5">
+            <button v-if="insightsState === 'error'" type="button" class="text-xs text-primary-600" :title="t('admin.users.failedToLoad')" @click="refreshCurrentPageSecondaryData">
+              {{ t('common.tryAgain') }}
+            </button>
+            <span v-else-if="insightsState === 'loading'" class="text-xs text-gray-400" role="status">{{ t('common.loading') }}</span>
+            <div v-else class="min-w-[190px] space-y-1.5">
               <div class="flex items-center gap-2 text-xs">
                 <span class="rounded-md bg-primary-50 px-2 py-0.5 font-medium text-primary-700 dark:bg-primary-900/25 dark:text-primary-300">
                   {{ t('admin.users.today') }} {{ formatRequestCount(getUsageSummary(row).today_requests) }}
@@ -571,8 +575,12 @@
           </template>
 
           <template #cell-model_preferences="{ row }">
+            <button v-if="insightsState === 'error'" type="button" class="text-xs text-primary-600" :title="t('admin.users.failedToLoad')" @click="refreshCurrentPageSecondaryData">
+              {{ t('common.tryAgain') }}
+            </button>
+            <span v-else-if="insightsState === 'loading'" class="text-xs text-gray-400" role="status">{{ t('common.loading') }}</span>
             <div
-              v-if="getModelPreferences(row).length > 0"
+              v-else-if="getModelPreferences(row).length > 0"
               class="flex max-w-[280px] flex-wrap gap-1.5"
             >
               <span
@@ -1223,7 +1231,7 @@ const toggleColumn = (key: string) => {
     hiddenColumns.add(key)
   }
   saveColumnsToStorage()
-  if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_') || key === 'balance_platform_quota')) {
+  if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_') || key === 'balance_platform_quota' || key === 'model_preferences')) {
     refreshCurrentPageSecondaryData()
   }
   if (key === 'subscriptions') {
@@ -1267,6 +1275,7 @@ const columns = computed<Column[]>(() =>
 
 const users = ref<AdminUser[]>([])
 const loading = ref(false)
+const insightsState = ref<'loading' | 'ready' | 'error'>('loading')
 const searchQuery = ref('')
 const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
@@ -1711,6 +1720,36 @@ const loadUsersSecondaryData = async (
 
   const tasks: Promise<void>[] = []
 
+  if (isColumnVisible('usage_overview') || isColumnVisible('model_preferences')) {
+    insightsState.value = 'loading'
+    const isCurrent = () => !signal?.aborted && expectedSeq === secondaryDataSeq
+    tasks.push((async () => {
+      try {
+        const insights: Record<number, Pick<AdminUser, 'usage_summary' | 'model_preferences'>> = {}
+        for (let start = 0; start < userIds.length; start += 100) {
+          if (!isCurrent()) return
+          const response = await adminAPI.users.getUsageInsights(userIds.slice(start, start + 100), signal)
+          if (!isCurrent()) return
+          Object.assign(insights, response.insights)
+        }
+        if (userIds.some(id => !insights[id]?.usage_summary)) {
+          throw new Error('Incomplete user usage insights')
+        }
+        // Merge only statistics; edits to balance/status while this request was
+        // in flight must not be overwritten by an earlier user snapshot.
+        users.value = users.value.map(user => {
+          const insight = insights[user.id]
+          return insight ? { ...user, usage_summary: insight.usage_summary, model_preferences: insight.model_preferences } : user
+        })
+        insightsState.value = 'ready'
+      } catch (error) {
+        if (!isCurrent()) return
+        insightsState.value = 'error'
+        console.error('Failed to load user usage insights:', error)
+      }
+    })())
+  }
+
   if (hasVisibleUsageColumn.value) {
     tasks.push(
       (async () => {
@@ -1783,7 +1822,7 @@ const refreshCurrentPageSecondaryData = () => {
   const userIds = users.value.map((u) => u.id)
   if (userIds.length === 0) return
   const seq = ++secondaryDataSeq
-  void loadUsersSecondaryData(userIds, undefined, seq)
+  void loadUsersSecondaryData(userIds, abortController?.signal, seq)
 }
 
 // Action Menu State
@@ -1921,6 +1960,7 @@ const handleAttributesModalClose = async () => {
 
 const loadUsers = async () => {
   abortController?.abort()
+  const seq = ++secondaryDataSeq
   const currentAbortController = new AbortController()
   abortController = currentAbortController
   const { signal } = currentAbortController
@@ -1946,6 +1986,7 @@ const loadUsers = async () => {
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
         // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
         include_subscriptions: true,
+        include_usage_insights: false,
         sort_by: sortState.sort_by,
         sort_order: sortState.sort_order
       },
@@ -1955,6 +1996,7 @@ const loadUsers = async () => {
       return
     }
     users.value = response.items
+    insightsState.value = 'loading'
     pagination.total = response.total
     pagination.pages = response.pages
     usageStats.value = {}
@@ -1964,7 +2006,6 @@ const loadUsers = async () => {
     // Defer heavy secondary data so table can render first.
     if (response.items.length > 0) {
       const userIds = response.items.map((u) => u.id)
-      const seq = ++secondaryDataSeq
       window.setTimeout(() => {
         if (signal.aborted || seq !== secondaryDataSeq) return
         void loadUsersSecondaryData(userIds, signal, seq)

@@ -150,6 +150,10 @@ func (h *UserHandler) List(c *gin.Context) {
 		includeSubscriptions := parseBoolQueryWithDefault(raw, true)
 		filters.IncludeSubscriptions = &includeSubscriptions
 	}
+	if raw, ok := c.GetQuery("include_usage_insights"); ok {
+		include := parseBoolQueryWithDefault(raw, true)
+		filters.IncludeUsageInsights = &include
+	}
 
 	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters, sortBy, sortOrder)
 	if err != nil {

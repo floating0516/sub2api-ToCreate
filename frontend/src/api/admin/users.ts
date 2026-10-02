@@ -74,6 +74,7 @@ export async function list(
     api_key_group_id?: number   // filter users by the group their API keys are bound to
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
+    include_usage_insights?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },
@@ -91,6 +92,7 @@ export async function list(
     group_name: filters?.group_name,
     api_key_group_id: filters?.api_key_group_id,
     include_subscriptions: filters?.include_subscriptions,
+    include_usage_insights: filters?.include_usage_insights,
     sort_by: filters?.sort_by,
     sort_order: filters?.sort_order
   }
@@ -404,8 +406,23 @@ export async function resetPlatformQuotaWindow(
   return data
 }
 
+export interface UserUsageInsight {
+  usage_summary: NonNullable<AdminUser['usage_summary']>
+  model_preferences: AdminUser['model_preferences']
+}
+
+export async function getUsageInsights(userIds: number[], signal?: AbortSignal) {
+  const { data } = await apiClient.post<{ insights: Record<number, UserUsageInsight> }>(
+    '/admin/users/usage-insights',
+    { user_ids: userIds },
+    { signal }
+  )
+  return data
+}
+
 export const usersAPI = {
   list,
+  getUsageInsights,
   getById,
   create,
   update,

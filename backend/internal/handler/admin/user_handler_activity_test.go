@@ -41,7 +41,7 @@ func TestUserHandlerListIncludesActivityFieldsAndSortParams(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(
 		http.MethodGet,
-		"/api/v1/admin/users?sort_by=last_used_at&sort_order=asc&search=activity",
+		"/api/v1/admin/users?sort_by=last_used_at&sort_order=asc&search=activity&include_usage_insights=false",
 		nil,
 	)
 
@@ -51,6 +51,8 @@ func TestUserHandlerListIncludesActivityFieldsAndSortParams(t *testing.T) {
 	require.Equal(t, "last_used_at", adminSvc.lastListUsers.sortBy)
 	require.Equal(t, "asc", adminSvc.lastListUsers.sortOrder)
 	require.Equal(t, "activity", adminSvc.lastListUsers.filters.Search)
+	require.NotNil(t, adminSvc.lastListUsers.filters.IncludeUsageInsights)
+	require.False(t, *adminSvc.lastListUsers.filters.IncludeUsageInsights)
 
 	var resp struct {
 		Code int `json:"code"`
