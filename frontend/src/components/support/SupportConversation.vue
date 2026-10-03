@@ -24,14 +24,29 @@
           <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{{ t(turn.role === 'user' ? 'support.you' : 'support.agent') }}</p>
           <div :class="['rounded-xl px-4 py-3 text-sm leading-6 text-gray-800 dark:text-gray-100', turn.role === 'user' ? 'bg-primary-50 dark:bg-primary-950/40' : 'bg-gray-50 dark:bg-dark-800']">
             <p class="whitespace-pre-wrap break-words">{{ turn.content }}</p>
-            <p v-if="turn.evidence_status" class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ t('support.evidenceStatus', { status: evidenceLabel(turn.evidence_status) }) }}</p>
+            <div v-if="turn.evidence_action" class="mt-3 text-xs text-gray-600 dark:text-gray-300" data-testid="evidence-decision">
+              <p class="font-medium">{{ t(`support.decisions.${turn.evidence_action}`) }}</p>
+              <p v-if="turn.evidence_reason_code" class="mt-1">{{ reasonLabel(turn.evidence_reason_code) }}</p>
+              <template v-if="turn.missing_information?.length">
+                <p class="mt-2 font-medium">{{ t('support.missingInformation') }}</p>
+                <ul class="mt-1 list-disc space-y-1 pl-5">
+                  <li v-for="item in turn.missing_information" :key="item" class="break-words">{{ item }}</li>
+                </ul>
+              </template>
+            </div>
+            <p v-else-if="turn.evidence_status" class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ t('support.evidenceStatus', { status: evidenceLabel(turn.evidence_status) }) }}</p>
             <div v-if="turn.citations?.length" class="mt-3 border-t border-gray-200 pt-3 text-xs dark:border-dark-600">
               <p class="mb-2 flex items-center gap-2 font-medium">
-                <Icon name="book" size="sm" />{{ t('support.citations') }}
+                <Icon name="book" size="sm" />{{ t('support.retrievedSources') }}
               </p>
-              <p v-for="(citation, citationIndex) in turn.citations" :key="citationIndex" class="break-words text-gray-500 dark:text-gray-400">
+              <div v-for="(citation, citationIndex) in turn.citations" :key="citation.chunk_id || citationIndex" class="mb-2 break-words text-gray-500 dark:text-gray-400">
                 {{ citation.source || citation.document_id || t('support.document') }}<span v-if="citation.section"> / {{ citation.section }}</span><span v-if="citation.version"> / {{ citation.version }}</span>
-              </p>
+                <span v-if="citation.chunk_id && turn.supported_source_ids?.includes(citation.chunk_id)" class="ml-2 text-emerald-700 dark:text-emerald-400">{{ t('support.supportedSource') }}</span>
+                <details v-if="citation.excerpt" class="mt-1">
+                  <summary class="cursor-pointer text-primary-600 dark:text-primary-400">{{ t('support.viewExcerpt') }}</summary>
+                  <blockquote class="mt-2 whitespace-pre-wrap border-l-2 border-gray-300 pl-3 text-gray-600 dark:border-dark-500 dark:text-gray-300">{{ citation.excerpt }}</blockquote>
+                </details>
+              </div>
             </div>
           </div>
         </article>
@@ -124,6 +139,10 @@ watch(() => authStore.user?.id, () => { message.value = '' }, { flush: 'sync' })
 function evidenceLabel(status: string) {
   const key = `support.evidence.${status}`
   return te(key) ? t(key) : status
+}
+function reasonLabel(reason: string) {
+  const key = `support.reasons.${reason}`
+  return te(key) ? t(key) : t('support.reasons.unknown')
 }
 async function submit() {
   if (busy.value) return

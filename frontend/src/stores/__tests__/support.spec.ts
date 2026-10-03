@@ -54,6 +54,41 @@ describe('useSupportStore', () => {
     expect(store.hasDraft).toBe(true)
   })
 
+  it.each(['answer', 'clarify', 'refuse'] as const)('preserves %s decisions and excerpts on send and refresh', async (action) => {
+    const evidence = {
+      evidence_action: action,
+      evidence_reason_code: action === 'answer' ? 'supported' : 'specific_cause_not_established',
+      supported_source_ids: action === 'answer' ? ['guide:1'] : [],
+      missing_information: action === 'clarify' ? ['Client version', 'API endpoint'] : [],
+      citations: [{ source: 'guide.md', chunk_id: 'guide:1', excerpt: 'Original document text' }],
+    }
+    supportMocks.chat.mockResolvedValueOnce({ thread_id: 'evidence-thread', answer: 'Response', ...evidence })
+    const store = useSupportStore()
+    expect(await store.send('Question')).toBe(true)
+    expect(store.turns[1]).toMatchObject(evidence)
+    supportMocks.getThread.mockResolvedValueOnce({
+      thread_id: 'evidence-thread',
+      turns: [{ role: 'assistant', content: 'Response', ...evidence }],
+    })
+    await store.refresh()
+    expect(store.turns[0]).toMatchObject(evidence)
+  })
+
+  it('recovers diagnostic fields after a timeout', async () => {
+    supportMocks.chat.mockImplementation(async (payload: { thread_id: string; client_message_id: string }) => {
+      supportMocks.getThread.mockResolvedValueOnce({ thread_id: payload.thread_id, turns: [
+        { role: 'assistant', content: 'Need details', reply_to: payload.client_message_id,
+          evidence_action: 'clarify', evidence_reason_code: 'specific_cause_not_established',
+          missing_information: ['Client version'], supported_source_ids: [] },
+      ] })
+      throw { status: 504 }
+    })
+    const store = useSupportStore()
+    expect(await store.send('Question')).toBe(true)
+    expect(store.turns[0]).toMatchObject({ evidence_action: 'clarify', missing_information: ['Client version'] })
+    expect(store.pendingMessage).toBeNull()
+  })
+
   it('removes a stale stored thread after a confirmed 404', async () => {
     localStorage.setItem('support.thread.42', '7d5584bd-22d4-45af-9971-d1019f36a45d')
     supportMocks.getThread.mockRejectedValue({ status: 404 })

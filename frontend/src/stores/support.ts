@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { supportAPI, type SupportChatResult, type SupportCitation, type SupportThread, type SupportTicketDraft } from '@/api/support'
+import { supportAPI, type SupportChatResult, type SupportCitation, type SupportEvidenceDecision, type SupportThread, type SupportTicketDraft } from '@/api/support'
 import { useAuthStore } from './auth'
 
-export interface SupportTurn {
+export interface SupportTurn extends SupportEvidenceDecision {
   role: 'user' | 'assistant'
   content: string
   citations?: SupportCitation[]
@@ -20,6 +20,15 @@ interface PendingSupportMessage {
 }
 
 const threadKey = (userId: number | string) => `support.thread.${userId}`
+
+function evidenceDecision(result: SupportEvidenceDecision): SupportEvidenceDecision {
+  return {
+    evidence_action: result.evidence_action,
+    evidence_reason_code: result.evidence_reason_code,
+    supported_source_ids: Array.isArray(result.supported_source_ids) ? result.supported_source_ids : [],
+    missing_information: Array.isArray(result.missing_information) ? result.missing_information : [],
+  }
+}
 
 export const useSupportStore = defineStore('support', () => {
   const authStore = useAuthStore()
@@ -74,6 +83,7 @@ export const useSupportStore = defineStore('support', () => {
       content: String(turn.content || ''),
       citations: Array.isArray(turn.citations) ? turn.citations : [],
       evidence_status: typeof turn.evidence_status === 'string' ? turn.evidence_status : undefined,
+      ...evidenceDecision(turn),
       created_at: typeof turn.created_at === 'string' ? turn.created_at : undefined,
       client_message_id: typeof turn.client_message_id === 'string' ? turn.client_message_id : undefined,
       reply_to: typeof turn.reply_to === 'string' ? turn.reply_to : undefined,
@@ -157,6 +167,7 @@ export const useSupportStore = defineStore('support', () => {
         content: result.answer || '',
         citations: result.citations || [],
         evidence_status: result.evidence_status,
+        ...evidenceDecision(result),
         reply_to: clientMessageId,
       })
       draft.value = result.ticket_draft || null

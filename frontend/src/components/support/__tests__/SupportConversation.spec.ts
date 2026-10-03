@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { reactive } from 'vue'
+import type { SupportTurn } from '@/stores/support'
 import SupportConversation from '../SupportConversation.vue'
 
 const support = vi.hoisted(() => ({
-  turns: [] as Array<{ role: string; content: string; citations?: Array<{ source: string }> }>,
+  turns: [] as SupportTurn[],
   draft: { title: 'Draft title', description: 'Draft description', product: 'Codex', priority: 'normal' },
   ticketId: null as string | null, error: '', loading: false, hasDraft: true,
   send: vi.fn(), confirmTicket: vi.fn(),
@@ -16,7 +17,7 @@ vi.mock('@/stores/app', () => ({ useAppStore: () => app }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => reactive(auth) }))
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...await importOriginal<typeof import('vue-i18n')>(),
-  useI18n: () => ({ t: (key: string) => key, te: () => false }),
+  useI18n: () => ({ t: (key: string) => key, te: (key: string) => key === 'support.reasons.specific_cause_not_established' }),
 }))
 enableAutoUnmount(afterEach)
 const mountConversation = (restoring = false) => mount(SupportConversation, {
@@ -69,6 +70,29 @@ describe('SupportConversation', () => {
     const wrapper = mountConversation()
     expect(wrapper.text()).toContain('Configuration guide')
     expect(wrapper.text()).toContain('support.aiConversationHint')
+  })
+
+  it('shows a readable decision, missing fields and escaped source excerpt', () => {
+    support.turns = [{ role: 'assistant', content: 'Need diagnostics', evidence_action: 'clarify',
+      evidence_reason_code: 'specific_cause_not_established', missing_information: ['Client version', 'Actual endpoint'],
+      supported_source_ids: [], citations: [{ source: 'guide.md', chunk_id: 'guide:1', excerpt: '<script>alert(1)</script>' }] }]
+    const wrapper = mountConversation()
+    expect(wrapper.get('[data-testid="evidence-decision"]').text()).toContain('support.decisions.clarify')
+    expect(wrapper.text()).toContain('support.reasons.specific_cause_not_established')
+    expect(wrapper.findAll('li').map((item) => item.text())).toEqual(['Client version', 'Actual endpoint'])
+    expect(wrapper.get('summary').text()).toBe('support.viewExcerpt')
+    expect(wrapper.get('blockquote').text()).toBe('<script>alert(1)</script>')
+    expect(wrapper.find('script').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('support.supportedSource')
+  })
+
+  it('marks only supported citations and hides unknown reason codes', () => {
+    support.turns = [{ role: 'assistant', content: 'Response', evidence_action: 'answer', evidence_reason_code: 'future_internal_code',
+      supported_source_ids: ['guide:1'], citations: [{ source: 'guide.md', chunk_id: 'guide:1' }, { source: 'other.md', chunk_id: 'other:1' }] }]
+    const wrapper = mountConversation()
+    expect(wrapper.text().split('support.supportedSource')).toHaveLength(2)
+    expect(wrapper.text()).toContain('support.reasons.unknown')
+    expect(wrapper.text()).not.toContain('future_internal_code')
   })
 
   it('disables sending and confirmation during restoration', async () => {

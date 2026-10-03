@@ -9,6 +9,14 @@ export interface SupportCitation {
   document_id?: string
   chunk_id?: string
   score?: number
+  excerpt?: string
+}
+
+export interface SupportEvidenceDecision {
+  evidence_action?: 'answer' | 'clarify' | 'refuse' | null
+  evidence_reason_code?: string
+  supported_source_ids?: string[]
+  missing_information?: string[]
 }
 
 export interface SupportTicketDraft {
@@ -18,7 +26,7 @@ export interface SupportTicketDraft {
   product: string
 }
 
-export interface SupportChatResult {
+export interface SupportChatResult extends SupportEvidenceDecision {
   thread_id: string
   answer: string
   citations: SupportCitation[]
@@ -40,7 +48,7 @@ export interface SupportThread {
   updated_at?: string
 }
 
-export interface SupportThreadTurn {
+export interface SupportThreadTurn extends SupportEvidenceDecision {
   role?: string
   content?: string
   citations?: SupportCitation[]
