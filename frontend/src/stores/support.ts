@@ -23,6 +23,7 @@ const threadKey = (userId: number | string) => `support.thread.${userId}`
 
 function evidenceDecision(result: SupportEvidenceDecision): SupportEvidenceDecision {
   return {
+    generation: result.generation,
     evidence_action: result.evidence_action,
     evidence_reason_code: result.evidence_reason_code,
     supported_source_ids: Array.isArray(result.supported_source_ids) ? result.supported_source_ids : [],

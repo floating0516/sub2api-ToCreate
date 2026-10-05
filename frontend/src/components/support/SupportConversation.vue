@@ -24,6 +24,7 @@
           <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{{ t(turn.role === 'user' ? 'support.you' : 'support.agent') }}</p>
           <div :class="['rounded-xl px-4 py-3 text-sm leading-6 text-gray-800 dark:text-gray-100', turn.role === 'user' ? 'bg-primary-50 dark:bg-primary-950/40' : 'bg-gray-50 dark:bg-dark-800']">
             <p class="whitespace-pre-wrap break-words">{{ turn.content }}</p>
+            <p v-if="turn.generation" class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-testid="answer-generation">{{ t(turn.generation.mode === 'model' ? 'support.modelAnswer' : 'support.localReference') }}</p>
             <div v-if="turn.evidence_action" class="mt-3 text-xs text-gray-600 dark:text-gray-300" data-testid="evidence-decision">
               <p class="font-medium">{{ t(`support.decisions.${turn.evidence_action}`) }}</p>
               <p v-if="turn.evidence_reason_code" class="mt-1">{{ reasonLabel(turn.evidence_reason_code) }}</p>
@@ -42,6 +43,11 @@
               <div v-for="(citation, citationIndex) in turn.citations" :key="citation.chunk_id || citationIndex" class="mb-2 break-words text-gray-500 dark:text-gray-400">
                 {{ citation.source || citation.document_id || t('support.document') }}<span v-if="citation.section"> / {{ citation.section }}</span><span v-if="citation.version"> / {{ citation.version }}</span>
                 <span v-if="citation.chunk_id && turn.supported_source_ids?.includes(citation.chunk_id)" class="ml-2 text-emerald-700 dark:text-emerald-400">{{ t('support.supportedSource') }}</span>
+                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                  <a v-if="safeDocumentUrl(citation.url)" :href="safeDocumentUrl(citation.url)" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline dark:text-primary-400" data-testid="source-link">{{ t('support.originalDocument') }}</a>
+                  <span v-if="citation.fetched_at">{{ t('support.sourceSnapshot') }}: {{ citation.fetched_at.slice(0, 10) }}</span>
+                  <span v-if="citation.scope === 'official'">{{ t('support.officialScope') }}</span>
+                </div>
                 <details v-if="citation.excerpt" class="mt-1">
                   <summary class="cursor-pointer text-primary-600 dark:text-primary-400">{{ t('support.viewExcerpt') }}</summary>
                   <blockquote class="mt-2 whitespace-pre-wrap border-l-2 border-gray-300 pl-3 text-gray-600 dark:border-dark-500 dark:text-gray-300">{{ citation.excerpt }}</blockquote>
@@ -143,6 +149,14 @@ function evidenceLabel(status: string) {
 function reasonLabel(reason: string) {
   const key = `support.reasons.${reason}`
   return te(key) ? t(key) : t('support.reasons.unknown')
+}
+function safeDocumentUrl(value?: string): string | undefined {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    const hosts = ['developers.openai.com', 'platform.openai.com', 'learn.chatgpt.com', 'docs.anthropic.com', 'platform.claude.com', 'ai.google.dev', 'docs.x.ai']
+    return url.protocol === 'https:' && hosts.includes(url.hostname) && !url.username && !url.password ? url.href : undefined
+  } catch { return undefined }
 }
 async function submit() {
   if (busy.value) return

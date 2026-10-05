@@ -35,6 +35,19 @@ beforeEach(() => {
 })
 
 describe('SupportConversation', () => {
+  it('shows official source provenance and rejects unsafe source links', () => {
+    support.turns = [{ role: 'assistant', content: 'Response', generation: { mode: 'model' }, citations: [
+      { source: 'official.md', url: 'https://developers.openai.com/api/docs/guides/text', fetched_at: '2026-10-05T00:00:00Z', scope: 'official' },
+      { source: 'unsafe.md', url: 'javascript:alert(1)' },
+      { source: 'spoof.md', url: 'https://developers.openai.com.evil.example/' },
+    ] }]
+    const wrapper = mountConversation()
+    expect(wrapper.findAll('[data-testid="source-link"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="source-link"]').attributes('rel')).toBe('noopener noreferrer')
+    expect(wrapper.text()).toContain('2026-10-05')
+    expect(wrapper.text()).toContain('support.officialScope')
+    expect(wrapper.get('[data-testid="answer-generation"]').text()).toBe('support.modelAnswer')
+  })
   it('never reports success when confirmation fails', async () => {
     support.confirmTicket.mockResolvedValueOnce(false)
     const wrapper = mountConversation()

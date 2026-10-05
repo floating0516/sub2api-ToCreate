@@ -110,6 +110,11 @@ export default {
     retrievedSources: '检索来源',
     supportedSource: '支持本次答复',
     viewExcerpt: '查看文档片段',
+    originalDocument: '打开原始文档',
+    sourceSnapshot: '文档抓取日期',
+    officialScope: '适用于厂商官方服务，网关支持情况需另行确认',
+    modelAnswer: 'AI 根据知识库生成',
+    localReference: '知识库参考',
     reasons: {
       supported: '已找到与问题相关的文档依据。',
       specific_cause_not_established: '现有信息不足以确定具体故障原因。',

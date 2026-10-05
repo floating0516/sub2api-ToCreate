@@ -10,9 +10,15 @@ export interface SupportCitation {
   chunk_id?: string
   score?: number
   excerpt?: string
+  url?: string
+  fetched_at?: string
+  provider?: string
+  scope?: string
+  knowledge_release?: string
 }
 
 export interface SupportEvidenceDecision {
+  generation?: { mode: 'local' | 'model' | 'fallback'; model?: string; reason?: string; usage?: { input_tokens?: number; output_tokens?: number } }
   evidence_action?: 'answer' | 'clarify' | 'refuse' | null
   evidence_reason_code?: string
   supported_source_ids?: string[]

@@ -110,6 +110,11 @@ export default {
     retrievedSources: 'Retrieved sources',
     supportedSource: 'Supports this response',
     viewExcerpt: 'View document excerpt',
+    originalDocument: 'Open original document',
+    sourceSnapshot: 'Document fetched',
+    officialScope: 'Official vendor service; gateway support requires separate verification',
+    modelAnswer: 'AI answer based on the knowledge base',
+    localReference: 'Knowledge base reference',
     reasons: {
       supported: 'Relevant supporting documentation was found.',
       specific_cause_not_established: 'The available information does not establish the specific cause.',
