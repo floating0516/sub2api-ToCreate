@@ -35,6 +35,19 @@ beforeEach(() => {
 })
 
 describe('SupportConversation', () => {
+  it('shows saved business steps and hides unrecognized tool names', () => {
+    support.turns = [{ role: 'assistant', content: 'Response', tool_events: [
+      { name: 'search_knowledge', status: 'completed' },
+      { name: 'create_ticket_draft', status: 'completed' },
+      { name: 'internal-private-operation', status: 'blocked' },
+    ] }]
+    const wrapper = mountConversation()
+    const steps = wrapper.get('[data-testid="agent-steps"]')
+    expect(steps.text()).toContain('support.tools.search_knowledge')
+    expect(steps.text()).toContain('support.tools.create_ticket_draft')
+    expect(steps.text()).toContain('support.toolStatus.blocked')
+    expect(steps.text()).not.toContain('internal-private-operation')
+  })
   it('shows official source provenance and rejects unsafe source links', () => {
     support.turns = [{ role: 'assistant', content: 'Response', generation: { mode: 'model' }, citations: [
       { source: 'official.md', url: 'https://developers.openai.com/api/docs/guides/text', fetched_at: '2026-10-05T00:00:00Z', scope: 'official' },

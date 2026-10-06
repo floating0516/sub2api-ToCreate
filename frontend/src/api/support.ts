@@ -18,6 +18,7 @@ export interface SupportCitation {
 }
 
 export interface SupportEvidenceDecision {
+  tool_events?: { name: string; status: 'completed' | 'failed' | 'blocked'; reason?: string; source_count?: number; duration_ms?: number }[]
   generation?: { mode: 'local' | 'model' | 'fallback'; model?: string; reason?: string; usage?: { input_tokens?: number; output_tokens?: number } }
   evidence_action?: 'answer' | 'clarify' | 'refuse' | null
   evidence_reason_code?: string

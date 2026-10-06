@@ -56,6 +56,7 @@ describe('useSupportStore', () => {
 
   it.each(['answer', 'clarify', 'refuse'] as const)('preserves %s decisions and excerpts on send and refresh', async (action) => {
     const evidence = {
+      tool_events: [{ name: "search_knowledge", status: "completed", source_count: 2 }],
       evidence_action: action,
       evidence_reason_code: action === 'answer' ? 'supported' : 'specific_cause_not_established',
       supported_source_ids: action === 'answer' ? ['guide:1'] : [],

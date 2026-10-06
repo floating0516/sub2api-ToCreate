@@ -115,6 +115,9 @@ export default {
     officialScope: '适用于厂商官方服务，网关支持情况需另行确认',
     modelAnswer: 'AI 根据知识库生成',
     localReference: '知识库参考',
+    agentSteps: '查看处理步骤',
+    tools: { search_knowledge: '查询知识库', create_ticket_draft: '生成工单草稿', validate_ticket: '校验工单参数', agent_limit: '调用次数限制', unknown_tool: '未授权操作' },
+    toolStatus: { completed: '已完成', failed: '未完成', blocked: '已阻止' },
     reasons: {
       supported: '已找到与问题相关的文档依据。',
       specific_cause_not_established: '现有信息不足以确定具体故障原因。',

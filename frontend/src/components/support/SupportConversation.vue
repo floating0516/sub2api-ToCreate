@@ -25,6 +25,14 @@
           <div :class="['rounded-xl px-4 py-3 text-sm leading-6 text-gray-800 dark:text-gray-100', turn.role === 'user' ? 'bg-primary-50 dark:bg-primary-950/40' : 'bg-gray-50 dark:bg-dark-800']">
             <p class="whitespace-pre-wrap break-words">{{ turn.content }}</p>
             <p v-if="turn.generation" class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-testid="answer-generation">{{ t(turn.generation.mode === 'model' ? 'support.modelAnswer' : 'support.localReference') }}</p>
+            <details v-if="turn.tool_events?.length" class="mt-3 text-xs text-gray-600 dark:text-gray-300" data-testid="agent-steps">
+              <summary class="cursor-pointer font-medium">{{ t('support.agentSteps') }}</summary>
+              <ol class="mt-2 list-decimal space-y-1 pl-5">
+                <li v-for="(event, step) in turn.tool_events" :key="step">
+                  {{ toolLabel(event.name) }} · {{ t(`support.toolStatus.${event.status}`) }}
+                </li>
+              </ol>
+            </details>
             <div v-if="turn.evidence_action" class="mt-3 text-xs text-gray-600 dark:text-gray-300" data-testid="evidence-decision">
               <p class="font-medium">{{ t(`support.decisions.${turn.evidence_action}`) }}</p>
               <p v-if="turn.evidence_reason_code" class="mt-1">{{ reasonLabel(turn.evidence_reason_code) }}</p>
@@ -149,6 +157,10 @@ function evidenceLabel(status: string) {
 function reasonLabel(reason: string) {
   const key = `support.reasons.${reason}`
   return te(key) ? t(key) : t('support.reasons.unknown')
+}
+function toolLabel(name: string) {
+  const allowed = ['search_knowledge', 'create_ticket_draft', 'validate_ticket', 'agent_limit']
+  return t(`support.tools.${allowed.includes(name) ? name : 'unknown_tool'}`)
 }
 function safeDocumentUrl(value?: string): string | undefined {
   if (!value) return undefined

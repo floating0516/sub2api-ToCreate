@@ -115,6 +115,9 @@ export default {
     officialScope: 'Official vendor service; gateway support requires separate verification',
     modelAnswer: 'AI answer based on the knowledge base',
     localReference: 'Knowledge base reference',
+    agentSteps: 'View processing steps',
+    tools: { search_knowledge: 'Search knowledge base', create_ticket_draft: 'Prepare ticket draft', validate_ticket: 'Validate ticket fields', agent_limit: 'Call limit', unknown_tool: 'Unauthorized operation' },
+    toolStatus: { completed: 'Completed', failed: 'Incomplete', blocked: 'Blocked' },
     reasons: {
       supported: 'Relevant supporting documentation was found.',
       specific_cause_not_established: 'The available information does not establish the specific cause.',
