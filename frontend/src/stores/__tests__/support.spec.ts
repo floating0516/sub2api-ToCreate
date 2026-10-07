@@ -136,6 +136,19 @@ describe('useSupportStore', () => {
     expect(store.turns[0]!.content).toBe('Existing question')
   })
 
+  it('restores the current conversation while a slow history request is pending', async () => {
+    localStorage.setItem('support.thread.42', 'current-thread')
+    let finishHistory!: (result: object) => void
+    supportMocks.listThreads.mockImplementation(() => new Promise(resolve => { finishHistory = resolve }))
+    supportMocks.getThread.mockResolvedValue({ thread_id: 'current-thread', turns: [{ role: 'user', content: 'Existing question' }] })
+    const store = useSupportStore()
+    await store.refresh()
+    expect(store.turns[0]!.content).toBe('Existing question')
+    expect(store.switching).toBe(false)
+    expect(store.historyLoading).toBe(true)
+    finishHistory({ items: [], total: 0, page: 1, pages: 0 })
+  })
+
   it.each(['answer', 'clarify', 'refuse'] as const)('preserves %s decisions and excerpts on send and refresh', async (action) => {
     const evidence = {
       tool_events: [{ name: "search_knowledge", status: "completed", source_count: 2 }],

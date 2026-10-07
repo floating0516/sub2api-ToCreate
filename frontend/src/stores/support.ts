@@ -201,13 +201,16 @@ export const useSupportStore = defineStore('support', () => {
     error.value = ''
     switching.value = true
     try {
-      await loadHistory()
-      if (version !== accountVersion) return
+      const history = loadHistory()
       const stored = localStorage.getItem(threadKey(authStore.user!.id))
       restoreLocalThread()
       // On a new device restore the newest server session. An explicit new
       // conversation remains empty across refreshes until its first message.
-      if (!stored && threads.value.length) threadId.value = threads.value[0]!.thread_id
+      if (!stored) {
+        await history
+        if (version !== accountVersion) return
+        if (threads.value.length) threadId.value = threads.value[0]!.thread_id
+      }
       if (!threadId.value) return
       const result = await supportAPI.getThread(threadId.value)
       if (version !== accountVersion) return
