@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { supportAPI, type SupportChatResult, type SupportCitation, type SupportEvidenceDecision, type SupportThread, type SupportTicketDraft } from '@/api/support'
+import { supportAPI, type SupportChatResult, type SupportCitation, type SupportEvidenceDecision, type SupportThread, type SupportThreadSummary, type SupportTicketDraft } from '@/api/support'
 import { useAuthStore } from './auth'
 
 export interface SupportTurn extends SupportEvidenceDecision {
@@ -20,6 +20,7 @@ interface PendingSupportMessage {
 }
 
 const threadKey = (userId: number | string) => `support.thread.${userId}`
+const NEW_THREAD = 'new'
 
 function evidenceDecision(result: SupportEvidenceDecision): SupportEvidenceDecision {
   return {
@@ -41,9 +42,19 @@ export const useSupportStore = defineStore('support', () => {
   const status = ref<string>('')
   const loading = ref(false)
   const error = ref('')
+  const threads = ref<SupportThreadSummary[]>([])
+  const historyLoading = ref(false)
+  const historyError = ref('')
+  const historyPage = ref(1)
+  const historyPages = ref(0)
+  const historyTotal = ref(0)
+  const switching = ref(false)
+  const switchError = ref('')
+  const conversationVersion = ref(0)
   const pendingMessage = ref<PendingSupportMessage | null>(null)
   const hasDraft = computed(() => !!draft.value && !ticketId.value && status.value === 'ticket_drafted')
   let accountVersion = 0
+  let historyVersion = 0
 
   watch(() => authStore.user?.id, () => {
     accountVersion++
@@ -55,11 +66,22 @@ export const useSupportStore = defineStore('support', () => {
     pendingMessage.value = null
     error.value = ''
     loading.value = false
+    threads.value = []
+    historyVersion++
+    historyLoading.value = false
+    historyError.value = ''
+    historyPage.value = 1
+    historyPages.value = 0
+    historyTotal.value = 0
+    switching.value = false
+    switchError.value = ''
+    conversationVersion.value++
   }, { flush: 'sync' })
 
   function restoreLocalThread() {
     const userId = authStore.user?.id
-    threadId.value = userId ? localStorage.getItem(threadKey(userId)) : null
+    const stored = userId ? localStorage.getItem(threadKey(userId)) : null
+    threadId.value = stored === NEW_THREAD ? null : stored
   }
 
   function persistThread(id: string) {
@@ -76,6 +98,61 @@ export const useSupportStore = defineStore('support', () => {
     draft.value = null
     ticketId.value = null
     status.value = ''
+  }
+
+  function startNewThread() {
+    if (loading.value || switching.value || !authStore.user?.id) return false
+    clearStoredThread()
+    localStorage.setItem(threadKey(authStore.user.id), NEW_THREAD)
+    pendingMessage.value = null
+    error.value = ''
+    switchError.value = ''
+    conversationVersion.value++
+    return true
+  }
+
+  async function loadHistory(page = 1) {
+    if (!authStore.user?.id) return false
+    const account = accountVersion
+    const version = ++historyVersion
+    historyLoading.value = true
+    historyError.value = ''
+    try {
+      const result = await supportAPI.listThreads({ page, page_size: 20 })
+      if (account !== accountVersion || version !== historyVersion) return false
+      threads.value = result.items
+      historyPage.value = result.page
+      historyPages.value = result.pages
+      historyTotal.value = result.total
+      return true
+    } catch {
+      if (account === accountVersion && version === historyVersion) historyError.value = 'support.errors.loadHistory'
+      return false
+    } finally {
+      if (account === accountVersion && version === historyVersion) historyLoading.value = false
+    }
+  }
+
+  async function selectThread(id: string) {
+    if (loading.value || switching.value || !authStore.user?.id) return false
+    if (id === threadId.value && !error.value) return true
+    const version = accountVersion
+    switching.value = true
+    switchError.value = ''
+    try {
+      const result = await supportAPI.getThread(id)
+      if (version !== accountVersion) return false
+      applyThread(result)
+      pendingMessage.value = null
+      error.value = ''
+      conversationVersion.value++
+      return true
+    } catch {
+      if (version === accountVersion) switchError.value = 'support.errors.switchThread'
+      return false
+    } finally {
+      if (version === accountVersion) switching.value = false
+    }
   }
 
   function applyThread(result: SupportThread) {
@@ -119,11 +196,19 @@ export const useSupportStore = defineStore('support', () => {
   }
 
   async function refresh() {
+    if (loading.value || switching.value || !authStore.user?.id) return
     const version = accountVersion
     error.value = ''
-    restoreLocalThread()
-    if (!threadId.value) return
+    switching.value = true
     try {
+      await loadHistory()
+      if (version !== accountVersion) return
+      const stored = localStorage.getItem(threadKey(authStore.user!.id))
+      restoreLocalThread()
+      // On a new device restore the newest server session. An explicit new
+      // conversation remains empty across refreshes until its first message.
+      if (!stored && threads.value.length) threadId.value = threads.value[0]!.thread_id
+      if (!threadId.value) return
       const result = await supportAPI.getThread(threadId.value)
       if (version !== accountVersion) return
       applyThread(result)
@@ -135,12 +220,14 @@ export const useSupportStore = defineStore('support', () => {
       } else {
         error.value = 'support.errors.loadThread'
       }
+    } finally {
+      if (version === accountVersion) switching.value = false
     }
   }
 
   async function send(message: string) {
     const text = message.trim()
-    if (!text || loading.value || !authStore.user?.id) return false
+    if (!text || loading.value || switching.value || !authStore.user?.id) return false
     const version = accountVersion
     const retry = pendingMessage.value?.message === text ? pendingMessage.value : null
     const requestThreadId = retry?.threadId || threadId.value || crypto.randomUUID()
@@ -193,11 +280,12 @@ export const useSupportStore = defineStore('support', () => {
     } finally {
       if (version === accountVersion) loading.value = false
     }
+    if (completed && version === accountVersion) void loadHistory()
     return completed
   }
 
   async function confirmTicket(confirm: boolean) {
-    if (!threadId.value || loading.value || !authStore.user?.id) return false
+    if (!threadId.value || loading.value || switching.value || !authStore.user?.id) return false
     const version = accountVersion
     loading.value = true
     error.value = ''
@@ -212,6 +300,7 @@ export const useSupportStore = defineStore('support', () => {
       status.value = result.status
       ticketId.value = result.ticket_id || null
       draft.value = null
+      void loadHistory(historyPage.value)
       return true
     } catch {
       if (version === accountVersion) error.value = 'support.errors.ticketAction'
@@ -221,5 +310,7 @@ export const useSupportStore = defineStore('support', () => {
     }
   }
 
-  return { threadId, turns, draft, ticketId, status, loading, error, pendingMessage, hasDraft, restoreLocalThread, refresh, send, confirmTicket }
+  return { threadId, turns, draft, ticketId, status, loading, error, pendingMessage, hasDraft,
+    threads, historyLoading, historyError, historyPage, historyPages, historyTotal, switching, switchError, conversationVersion,
+    restoreLocalThread, refresh, send, confirmTicket, startNewThread, loadHistory, selectThread }
 })

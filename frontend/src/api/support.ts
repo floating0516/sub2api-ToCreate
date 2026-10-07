@@ -55,6 +55,23 @@ export interface SupportThread {
   updated_at?: string
 }
 
+export interface SupportThreadSummary {
+  thread_id: string
+  title: string
+  status: string
+  has_draft: boolean
+  ticket_id?: string | null
+  updated_at: string
+}
+
+export interface SupportThreadList {
+  items: SupportThreadSummary[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
 export interface SupportThreadTurn extends SupportEvidenceDecision {
   role?: string
   content?: string
@@ -135,6 +152,9 @@ export const supportAPI = {
   },
   getThread(threadId: string) {
     return apiClient.get<SupportThread>(`/support/threads/${encodeURIComponent(threadId)}`, { timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)
+  },
+  listThreads(params: { page: number; page_size: number }) {
+    return apiClient.get<SupportThreadList>('/support/threads', { params, timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)
   },
   getTicket(ticketId: string) {
     return apiClient.get<SupportTicketRecord>(`/support/tickets/${encodeURIComponent(ticketId)}`, { timeout: SUPPORT_REQUEST_TIMEOUT_MS }).then((r) => r.data)

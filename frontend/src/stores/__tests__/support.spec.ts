@@ -11,6 +11,7 @@ const supportMocks = vi.hoisted(() => ({
   chat: vi.fn(),
   confirmTicket: vi.fn(),
   getThread: vi.fn(),
+  listThreads: vi.fn(),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -33,6 +34,7 @@ describe('useSupportStore', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.resetAllMocks()
+    supportMocks.listThreads.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
     reactive(authStore).user = { id: 42 }
   })
 
@@ -52,6 +54,86 @@ describe('useSupportStore', () => {
     expect(store.threadId).toBe('7d5584bd-22d4-45af-9971-d1019f36a45d')
     expect(store.draft).toEqual(draft)
     expect(store.hasDraft).toBe(true)
+  })
+
+  it('starts an empty conversation without deleting the saved session or draft', async () => {
+    const store = useSupportStore()
+    store.threadId = 'old-thread'
+    store.turns = [{ role: 'user', content: 'Old question' }]
+    store.draft = draft
+    store.status = 'ticket_drafted'
+    expect(store.startNewThread()).toBe(true)
+    expect(store.turns).toEqual([])
+    expect(store.draft).toBeNull()
+    expect(store.threadId).toBeNull()
+    expect(localStorage.getItem('support.thread.42')).toBe('new')
+    supportMocks.listThreads.mockResolvedValue({ items: [{ thread_id: 'old-thread' }], total: 1, page: 1, pages: 1 })
+    await store.refresh()
+    expect(supportMocks.getThread).not.toHaveBeenCalled()
+    supportMocks.chat.mockResolvedValue({ thread_id: 'new-thread', answer: 'New answer', citations: [] })
+    await store.send('New topic')
+    expect(supportMocks.chat.mock.calls[0]![0].thread_id).not.toBe('old-thread')
+    supportMocks.getThread.mockResolvedValue({ thread_id: 'old-thread', turns: [{ role: 'user', content: 'Old question' }], ticket_draft: draft, status: 'ticket_drafted' })
+    expect(await store.selectThread('old-thread')).toBe(true)
+    expect(store.draft).toEqual(draft)
+    expect(store.turns).toEqual([expect.objectContaining({ content: 'Old question' })])
+  })
+
+  it('restores the latest server conversation on a device with no saved ID', async () => {
+    supportMocks.listThreads.mockResolvedValue({ items: [{ thread_id: 'latest-thread' }], total: 1, page: 1, pages: 1 })
+    supportMocks.getThread.mockResolvedValue({ thread_id: 'latest-thread', turns: [{ role: 'user', content: 'Server history' }] })
+    const store = useSupportStore()
+    await store.refresh()
+    expect(store.threadId).toBe('latest-thread')
+    expect(store.turns[0]!.content).toBe('Server history')
+    expect(localStorage.getItem('support.thread.42')).toBe('latest-thread')
+  })
+
+  it('preserves the current conversation if switching fails and blocks navigation during sending', async () => {
+    const store = useSupportStore()
+    store.threadId = 'current-thread'
+    store.draft = draft
+    store.turns = [{ role: 'user', content: 'Current question' }]
+    localStorage.setItem('support.thread.42', 'current-thread')
+    supportMocks.getThread.mockRejectedValue({ status: 403 })
+    expect(await store.selectThread('other-thread')).toBe(false)
+    expect(store.threadId).toBe('current-thread')
+    expect(store.draft).toEqual(draft)
+    expect(store.switchError).toBe('support.errors.switchThread')
+    expect(localStorage.getItem('support.thread.42')).toBe('current-thread')
+    store.loading = true
+    expect(store.startNewThread()).toBe(false)
+    expect(await store.selectThread('other-thread')).toBe(false)
+    expect(supportMocks.getThread).toHaveBeenCalledOnce()
+  })
+
+  it('ignores late session and history responses after an account change', async () => {
+    let finishHistory!: (result: object) => void
+    let finishThread!: (result: object) => void
+    supportMocks.listThreads.mockImplementation(() => new Promise(resolve => { finishHistory = resolve }))
+    supportMocks.getThread.mockImplementation(() => new Promise(resolve => { finishThread = resolve }))
+    const store = useSupportStore()
+    const history = store.loadHistory()
+    const switching = store.selectThread('private-thread')
+    reactive(authStore).user = { id: 43 }
+    finishThread({ thread_id: 'private-thread', turns: [{ role: 'user', content: 'Private' }] })
+    finishHistory({ items: [{ thread_id: 'private-thread' }], total: 1, page: 1, pages: 1 })
+    expect(await history).toBe(false)
+    expect(await switching).toBe(false)
+    expect(store.threads).toEqual([])
+    expect(store.turns).toEqual([])
+    expect(localStorage.getItem('support.thread.43')).toBeNull()
+  })
+
+  it('does not let a history failure block the stored conversation', async () => {
+    localStorage.setItem('support.thread.42', 'current-thread')
+    supportMocks.listThreads.mockRejectedValue({ status: 503 })
+    supportMocks.getThread.mockResolvedValue({ thread_id: 'current-thread', turns: [{ role: 'user', content: 'Existing question' }] })
+    const store = useSupportStore()
+    await store.refresh()
+    expect(store.historyError).toBe('support.errors.loadHistory')
+    expect(store.error).toBe('')
+    expect(store.turns[0]!.content).toBe('Existing question')
   })
 
   it.each(['answer', 'clarify', 'refuse'] as const)('preserves %s decisions and excerpts on send and refresh', async (action) => {

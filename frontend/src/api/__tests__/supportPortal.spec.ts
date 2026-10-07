@@ -7,6 +7,10 @@ vi.mock('../client', () => ({ apiClient: client }))
 beforeEach(() => { vi.resetAllMocks(); client.get.mockResolvedValue({ data: {} }); client.post.mockResolvedValue({ data: {} }) })
 
 describe('Support portal API contract', () => {
+  it('loads paginated conversation history through the authenticated BFF', async () => {
+    await supportAPI.listThreads({ page: 2, page_size: 20 })
+    expect(client.get).toHaveBeenCalledWith('/support/threads', { params: { page: 2, page_size: 20 }, timeout: 70000 })
+  })
   it('uses same-origin list and full-statistics paths', async () => {
     await supportAPI.listTickets({ q: '401', type: 'technical', status: 'pending_agent', page: 2, page_size: 20 })
     expect(client.get).toHaveBeenCalledWith('/support/tickets', { params: { q: '401', type: 'technical', status: 'pending_agent', page: 2, page_size: 20 } })

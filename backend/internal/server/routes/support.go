@@ -33,6 +33,7 @@ func RegisterSupportRoutes(
 	{
 		authenticated.POST("/chat", h.Chat)
 		authenticated.POST("/tickets/confirm", h.ConfirmTicket)
+		authenticated.GET("/threads", h.ListThreads)
 		authenticated.GET("/threads/:id", h.GetThread)
 		authenticated.GET("/tickets", h.ListTickets)
 		authenticated.GET("/tickets/stats", h.TicketStats)

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { SupportTurn } from '@/stores/support'
+import type { SupportThreadSummary } from '@/api/support'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import SupportConversation from '../SupportConversation.vue'
 
 const support = vi.hoisted(() => ({
@@ -9,6 +11,10 @@ const support = vi.hoisted(() => ({
   draft: { title: 'Draft title', description: 'Draft description', product: 'Codex', priority: 'normal' },
   ticketId: null as string | null, error: '', loading: false, hasDraft: true,
   send: vi.fn(), confirmTicket: vi.fn(),
+  startNewThread: vi.fn(), selectThread: vi.fn(), loadHistory: vi.fn(),
+  threads: [] as SupportThreadSummary[], threadId: null as string | null,
+  switching: false, switchError: '', historyError: '', historyLoading: false,
+  historyPage: 1, historyPages: 0, conversationVersion: 0,
 }))
 const app = vi.hoisted(() => ({ showSuccess: vi.fn() }))
 const auth = vi.hoisted(() => ({ user: { id: 42 } }))
@@ -31,10 +37,52 @@ beforeEach(() => {
   support.loading = false
   support.hasDraft = true
   support.ticketId = null
+  support.threads = []
+  support.threadId = null
+  support.switching = false
+  support.switchError = ''
+  support.historyError = ''
+  support.historyLoading = false
+  support.historyPage = 1
+  support.historyPages = 0
+  support.startNewThread.mockReturnValue(true)
+  support.selectThread.mockResolvedValue(true)
   reactive(auth).user = { id: 42 }
 })
 
 describe('SupportConversation', () => {
+  it('shows history, active selection, draft status and a new conversation action', async () => {
+    support.threadId = 'saved-thread'
+    support.threads = [{ thread_id: 'saved-thread', title: 'Saved question', status: 'ticket_drafted', has_draft: true, updated_at: '2026-10-07T01:00:00Z' }]
+    const wrapper = mountConversation()
+    expect(wrapper.get('[data-testid="history-thread"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.get('[data-testid="history-thread"]').text()).toContain('support.pendingDraft')
+    await wrapper.get('[data-testid="new-conversation"]').trigger('click')
+    expect(support.startNewThread).toHaveBeenCalledOnce()
+  })
+
+  it('asks before discarding an unsent message and preserves it when cancelled', async () => {
+    const wrapper = mountConversation()
+    await wrapper.get('textarea').setValue('Unsent question')
+    await wrapper.get('[data-testid="new-conversation"]').trigger('click')
+    expect(support.startNewThread).not.toHaveBeenCalled()
+    expect(wrapper.findComponent(ConfirmDialog).props('show')).toBe(true)
+    wrapper.findComponent(ConfirmDialog).vm.$emit('cancel')
+    await flushPromises()
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Unsent question')
+    await wrapper.get('[data-testid="new-conversation"]').trigger('click')
+    wrapper.findComponent(ConfirmDialog).vm.$emit('confirm')
+    await flushPromises()
+    expect(support.startNewThread).toHaveBeenCalledOnce()
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('disables new conversations while the current request is running', () => {
+    support.loading = true
+    const wrapper = mountConversation()
+    expect(wrapper.get('[data-testid="new-conversation"]').attributes('disabled')).toBeDefined()
+  })
+
   it('shows saved business steps and hides unrecognized tool names', () => {
     support.turns = [{ role: 'assistant', content: 'Response', tool_events: [
       { name: 'search_knowledge', status: 'completed' },

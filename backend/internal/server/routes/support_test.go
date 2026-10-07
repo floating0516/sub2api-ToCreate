@@ -27,6 +27,7 @@ func TestRegisterSupport_ExplicitPortalRoutes(t *testing.T) {
 		}
 	}
 	require.True(t, routes["POST /api/v1/support/tickets"])
+	require.True(t, routes["GET /api/v1/support/threads"])
 	for key := range routes {
 		require.NotContains(t, key, "*path")
 	}
