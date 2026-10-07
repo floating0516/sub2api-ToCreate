@@ -25,7 +25,7 @@
         <p v-else-if="store.historyLoading && !store.threads?.length" role="status" class="py-4 text-sm text-gray-500">{{ t('common.loading') }}</p>
         <p v-else-if="!store.threads?.length" class="py-4 text-sm text-gray-500 dark:text-gray-400">{{ t('support.noConversations') }}</p>
         <nav v-if="store.threads?.length" :aria-label="t('support.conversationHistory')" class="max-h-48 space-y-2 overflow-y-auto lg:max-h-[38rem]">
-          <button v-for="thread in store.threads" :key="thread.thread_id" type="button" data-testid="history-thread"
+          <button v-for="thread in store.threads" :key="thread.thread_id" type="button" data-testid="history-thread" :data-thread-id="thread.thread_id"
             :aria-current="thread.thread_id === store.threadId ? 'page' : undefined" :disabled="navigationBusy"
             :class="['w-full rounded-xl border px-3 py-3 text-left transition disabled:cursor-wait', thread.thread_id === store.threadId ? 'border-primary-200 bg-primary-50 dark:border-primary-800 dark:bg-primary-950/40' : 'border-transparent hover:border-gray-200 hover:bg-white dark:hover:border-dark-600 dark:hover:bg-dark-800']"
             @click="requestNavigation({ type: 'select', id: thread.thread_id })">

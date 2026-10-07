@@ -18,3 +18,9 @@ responses contain no full turns, draft contents or private idempotency keys.
 
 Base console: bff0f7aaf (tc1.53-rc.5). Agent base: 0acf8f2 (rc.20), retaining
 the quality fixes developed in parallel. Production release is a separate step.
+
+The existing security scan also found the registry SheetJS 0.18.5 advisories
+with exemptions that expired on October 6. SheetJS is now pinned to the
+maintainer's 0.20.3 distribution with a remotely generated integrity lock.
+The usage-export API is unchanged; a real workbook roundtrip supplements the
+existing export tests. No exemption dates or security checks were relaxed.
