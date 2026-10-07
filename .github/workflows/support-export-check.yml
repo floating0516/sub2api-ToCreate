@@ -1,0 +1,27 @@
+name: Support export compatibility
+on:
+  push:
+    branches: [verify/support-session-export-20261007]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 90bd85960b13dac5d5b729fa35900149cf28325f
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install pinned dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Verify real SheetJS workbook export from the staged commit
+        working-directory: frontend
+        run: pnpm exec vitest run src/views/admin/__tests__/sheetExport.spec.ts
