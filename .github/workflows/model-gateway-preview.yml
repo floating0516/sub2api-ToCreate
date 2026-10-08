@@ -1,0 +1,36 @@
+name: Model Gateway Preview
+on:
+  push:
+    branches: ['feature/model-gateway-demo-20261009']
+    paths: ['frontend/**', '.github/workflows/model-gateway-preview.yml']
+permissions:
+  contents: read
+concurrency:
+  group: model-gateway-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vue-tsc --noEmit -p tsconfig.preview.json
+      - run: pnpm exec vitest run src/components/home/__tests__/modelGatewayMotion.spec.ts src/i18n/__tests__/localeKeyCompleteness.spec.ts
+      - run: pnpm exec vite build --config vite.preview.config.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-gateway-preview
+          path: frontend/preview-dist
+          retention-days: 14

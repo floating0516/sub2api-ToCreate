@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["preview/**/*.ts", "preview/**/*.vue", "src/components/home/ModelGatewayDemo.vue", "src/components/home/modelGatewayMotion.ts", "src/vite-env.d.ts"],
+  "references": []
+}
