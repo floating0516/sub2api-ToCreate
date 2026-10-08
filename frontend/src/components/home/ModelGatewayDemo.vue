@@ -78,7 +78,7 @@ let morph: Animation | undefined, tabMotion: Animation | undefined
 const animations = new Set<Animation>()
 const motionAllowed = () => !reduced.value && visible.value && !document.hidden
 
-function animate(el: HTMLElement, frames: Keyframe[], duration: number) {
+function animate(el: HTMLElement, frames: ReturnType<typeof springFrames>, duration: number) {
   const animation = el.animate(frames, { duration, easing: 'linear', fill: 'none' })
   animations.add(animation)
   void animation.finished.catch(() => {}).finally(() => animations.delete(animation))

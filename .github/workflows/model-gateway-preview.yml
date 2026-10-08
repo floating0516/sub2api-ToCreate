@@ -26,6 +26,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec eslint preview src/components/home/ModelGatewayDemo.vue src/components/home/modelGatewayMotion.ts src/components/home/__tests__/modelGatewayMotion.spec.ts --ext .vue,.ts
       - run: pnpm exec vue-tsc --noEmit -p tsconfig.preview.json
       - run: pnpm exec vitest run src/components/home/__tests__/modelGatewayMotion.spec.ts src/i18n/__tests__/localeKeyCompleteness.spec.ts
       - run: pnpm exec vite build --config vite.preview.config.ts
