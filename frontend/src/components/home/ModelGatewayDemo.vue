@@ -230,9 +230,9 @@ onBeforeUnmount(() => {
 .mg-demo button { appearance: none; font: inherit; cursor: pointer; border: 0; -webkit-tap-highlight-color: transparent; }
 .mg-reset { width: 44px; height: 44px; display: grid; place-items: center; background: transparent; color: #74736e; border-radius: 12px; }
 .mg-demo :deep(svg) { width: 18px; height: 18px; flex: none; }
-.mg-stage { height: 384px; display: grid; place-items: center; }
-.mg-shape { width: 360px; max-width: 100%; height: 258px; background: #191919; border-radius: 24px; display: grid; place-items: center; overflow: clip; border: 1px solid rgb(0 0 0 / .08); box-shadow: 0 14px 30px -22px rgb(0 0 0 / .2); }
-.mg-content { width: calc(100% - 48px); color: #202020; padding: 0; }
+.mg-stage { position: relative; height: 384px; }
+.mg-shape { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 360px; max-width: 100%; height: 258px; background: #191919; border-radius: 24px; overflow: clip; border: 1px solid rgb(0 0 0 / .08); box-shadow: 0 14px 30px -22px rgb(0 0 0 / .2); }
+.mg-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: calc(100% - 48px); color: #202020; padding: 0; }
 .mg-light-text { color: #fafaf9; }
 .mg-topline { display: flex; align-items: center; gap: 8px; height: 24px; margin-bottom: 20px; font-size: 12px; font-weight: 500; }
 .mg-example, .mg-step { margin-left: auto; font-size: 10px; letter-spacing: .04em; color: #797975; }
