@@ -28,3 +28,31 @@ Desktop/mobile recordings include hover, pressing, language switch and keyboard
 focus. Only the test intercepts outbound login navigation to keep recording the
 preview; actual preview links navigate normally. MP4 and WebM are published as
 evidence. No live authentication/API requests are made by the test.
+
+## Authentication preview
+
+`?view=login` and `?view=register` now connect to an isolated authentication
+prototype. Home entry links stay within the preview; modifier-click and browser
+history work. Production authentication components are unchanged.
+
+Login: form → simulated processing → demo completion.
+Registration: form → simulated processing → sample verification code → completion.
+Recovery: email → simulated processing → explanation of the real reset email step.
+No authentication SDK, API requests, persistent storage or emails. “Use sample
+details” populates fictional input, and the fixed sample verification code is
+123456. The page is explicitly labeled as an interactive preview.
+
+AuthPreview reuses the existing spring/indicator functions and Icon component.
+A persistent surface resizes with a 400ms sampled spring, the tab indicator uses
+separate leading/trailing springs, and a shared SVG changes lock/envelope/check.
+Text exits before entering, using brief blur only during transitions. Submission
+feedback lives on the same button. Motion respects reduced-motion and visibility;
+Vue transitions are finite, request timers and WAAPI animations are canceled on
+unmount. Epoch tokens reject stale simulated requests; switching tabs or canceling
+invalidates the active request. Keyboard tab switching preserves scroll position.
+
+Remote browser verification covers registration, login, recovery, invalid inputs,
+keyboard focus, real touch/mouse recordings, rapid toggles, cancellation, reduced
+motion, narrow bilingual layouts, back/reload and cleanup after leaving the page.
+This is design validation; backend-dependent OAuth, CAPTCHA, invitation and
+agreement settings still require the later approved production integration.
