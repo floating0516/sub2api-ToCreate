@@ -20,8 +20,9 @@ geometry, color and typography are checked with and without added motion.
 
 The default email entry precedes login (one password field) or registration
 (password and confirmation). Verification uses a six-digit sample code. No
-three-row layout is introduced. The existing 340px stage keeps common steps
-stable; only genuinely larger content resizes. Extremely short windows retain
+three-row layout is introduced. A 370px stage reserves the original registration height using 30px from the empty
+footer area; short viewports reclaim another 34px of footer margins. Controls and
+brand sizes stay original. Only genuinely larger content resizes. Extremely short windows retain
 natural scrolling instead of hiding fields or compressing the original design.
 
 ?view=login or ?view=register selects the entry intent; ?lang=en selects English.

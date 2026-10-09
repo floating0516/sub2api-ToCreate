@@ -9,8 +9,17 @@
 .original-preview-tools button:disabled { opacity: .5; cursor: default; }
 .original-auth button:focus-visible, .original-auth a:focus-visible { outline: 2px solid #a87d5a; outline-offset: 3px; }
 
-/* Only interaction changes below. Static geometry, colors and typography are original. */
-.original-stage-window { min-height: 340px; overflow: clip; }
+/* Reserve the original registration height using existing empty footer space.
+   Controls, brand position, colors and typography keep the original style. */
+.original-auth .email-auth-stage, .original-stage-window { min-height: 370px; }
+.original-auth .tc-auth-footer { min-height: 0; }
+@media (max-width: 820px) and (max-height: 740px) {
+  .original-auth .tc-auth-footer { margin-top: 0; }
+  .original-auth .tc-auth-copyright { margin-top: 6px; }
+}
+
+/* Interaction-only feedback. */
+.original-stage-window { overflow: clip; }
 .original-auth .email-auth-stage { animation: none; position: relative; }
 .original-step-leave-active { transition: opacity 85ms ease, filter 85ms ease; }
 .original-step-enter-active { transition: opacity 170ms ease 100ms, transform 200ms cubic-bezier(.2,.8,.2,1) 100ms, filter 150ms ease 100ms; }

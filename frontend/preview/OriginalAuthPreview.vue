@@ -66,9 +66,10 @@
                       </button>
                     </form>
                     <div v-if="step === 'login' || step === 'register'" class="email-auth-switch">
-                      <span>{{ t(step === 'login' ? 'auth.dontHaveAccount' : 'auth.alreadyHaveAccount') }}</span><button type="button" data-action="switch" @click="switchMode">{{ t(step === 'login' ? 'auth.createAccount' : 'auth.signIn') }}</button>
+                      <template v-if="!busy"><span>{{ t(step === 'login' ? 'auth.dontHaveAccount' : 'auth.alreadyHaveAccount') }}</span><button type="button" data-action="switch" @click="switchMode">{{ t(step === 'login' ? 'auth.createAccount' : 'auth.signIn') }}</button></template>
+                      <button v-else type="button" data-action="cancel" @click="cancel">{{ t('home.authPreview.cancel') }}</button>
                     </div>
-                    <button v-if="busy" class="email-auth-text-button original-cancel" type="button" data-action="cancel" @click="cancel">{{ t('home.authPreview.cancel') }}</button>
+                    <button v-if="busy && step !== 'login' && step !== 'register'" class="email-auth-text-button original-cancel" type="button" data-action="cancel" @click="cancel">{{ t('home.authPreview.cancel') }}</button>
                   </div>
                 </Transition>
               </div>
