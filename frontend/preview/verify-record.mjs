@@ -41,7 +41,7 @@ try{
     const name=mobile?'mobile':'desktop',viewport=mobile?{width:390,height:844}:{width:1280,height:900}
     const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile,deviceScaleFactor:1,recordVideo:{dir:output,size:viewport}})
     const page=await setup(context)
-    await page.goto(origin);await page.waitForTimeout(700)
+    await page.goto(origin);await page.waitForTimeout(700);await page.screenshot({path:output+name+'-home.png'})
     await click(page,'[data-action=start]',mobile);await ready(page)
     await page.evaluate(()=>{window.initialShape=document.querySelector('.auth-shape');window.initialMark=document.querySelector('.auth-mark svg');window.scrolls=[];window.addEventListener('scroll',()=>window.scrolls.push(scrollY))})
     await layout(page,name+' login');await page.screenshot({path:output+name+'-login.png'})

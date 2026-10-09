@@ -4,7 +4,7 @@ Independent Vite entry based on production commit
 `ddc9be1e8343335b57dd2df232d447557097b59b`. The production homepage and router
 remain untouched. Build only in GitHub Actions; do not install or compile on the VPS.
 
-Current direction: a warm neutral canvas, Georgia brand heading, one primary
+Current direction: the original warm white/brown brand palette, Georgia brand heading, one primary
 Get started link and a header Login link. No model card, simulated requests,
 model names, marketing descriptions or feature cards are mounted. The previous
 ModelGatewayDemo source is retained as history but is not imported by this entry.
@@ -55,3 +55,10 @@ keyboard focus, real touch/mouse recordings, rapid toggles, cancellation, reduce
 motion, narrow bilingual layouts, back/reload and cleanup after leaving the page.
 This is design validation; backend-dependent OAuth, CAPTCHA, invitation and
 agreement settings still require the later approved production integration.
+
+## Original brand palette restored
+
+Homepage, login, registration and completion now share the original landing
+colors: paper #f6f4ef, surface #fffefb, accent #aa7149 and primary #895634.
+Focus rings, tabs and shared marks use warm brown accents. Completion uses a
+pale warm surface instead of a dark inversion. Geometry and motion are unchanged.
