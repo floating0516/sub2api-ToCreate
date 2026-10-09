@@ -9,24 +9,25 @@
               <path ref="markPath" :d="mark" />
             </svg>
           </div>
-          <span class="auth-kicker">{{ t('home.authPreview.demo') }}</span>
-        </div>
+          <span v-show="!tabsVisible" class="auth-kicker">{{ t('home.authPreview.demo') }}</span>
         <div v-show="tabsVisible" ref="tabs" class="auth-tabs" role="tablist" :aria-label="t('home.authPreview.choose')" @keydown="tabKey">
           <span ref="indicator" class="auth-indicator" aria-hidden="true" />
           <button id="login-tab" type="button" role="tab" :aria-selected="mode === 'login'" :tabindex="mode === 'login' ? 0 : -1" aria-controls="auth-panel" @click="choose('login')">{{ t('home.authPreview.login') }}</button>
           <button id="register-tab" type="button" role="tab" :aria-selected="mode === 'register'" :tabindex="mode === 'register' ? 0 : -1" aria-controls="auth-panel" @click="choose('register')">{{ t('home.authPreview.register') }}</button>
         </div>
+        </div>
         <Transition name="auth-content" mode="out-in" @before-leave="beforeLeave" @after-leave="afterLeave" @before-enter="beforeEnter" @enter="enterPanel" @after-enter="afterEnter">
           <div :key="contentKey" id="auth-panel" ref="panel" :role="step === 'form' ? 'tabpanel' : undefined" :aria-labelledby="step === 'form' ? `${mode}-tab` : 'auth-title'">
             <header class="auth-heading">
               <h1 id="auth-title" ref="heading" tabindex="-1">{{ title }}</h1>
-              <p>{{ subtitle }}</p>
+              <p v-if="step !== 'form'">{{ subtitle }}</p>
             </header>
             <template v-if="complete">
               <button type="button" class="entry-link auth-submit" data-action="restart" @click="restart"><span>{{ t('home.authPreview.again') }}</span><span class="entry-arrow"><Icon name="arrowRight" :stroke-width="1.6" aria-hidden="true" /></span></button>
               <a class="auth-home-link" :href="homeHref" @click.prevent="emit('home')">{{ t('home.authPreview.home') }}</a>
             </template>
             <form v-else novalidate :aria-busy="busy" @submit.prevent="submit">
+              <div class="auth-fields" :class="{ 'auth-fields--three': step === 'form', 'auth-fields--login': step === 'form' && mode === 'login' }">
               <template v-if="step === 'verify'">
                 <div class="auth-field">
                   <label for="auth-code">{{ t('home.authPreview.code') }}</label>
@@ -57,8 +58,10 @@
                   </div>
                 </template>
               </template>
+              </div>
               <div class="auth-form-tools">
-                <button type="button" data-action="fill" :disabled="busy" @click="fillExample">{{ t('home.authPreview.fill') }}</button>
+                <button v-if="busy" type="button" data-action="cancel" @click="cancelRequest">{{ t('home.authPreview.cancel') }}</button>
+                <button v-else type="button" data-action="fill" @click="fillExample">{{ t('home.authPreview.fill') }}</button>
                 <button v-if="step === 'form' && mode === 'login'" type="button" data-action="forgot" @click="navigate('forgot')">{{ t('home.authPreview.forgot') }}</button>
                 <button v-else-if="step !== 'form'" type="button" data-action="back" @click="navigate('form')">{{ t('home.authPreview.back') }}</button>
               </div>
@@ -66,7 +69,6 @@
                 <span aria-live="polite">{{ submitLabel }}</span>
                 <span class="entry-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path class="auth-submit-arrow" d="M5 12h14m-6-6 6 6-6 6"/><circle class="auth-submit-ring" cx="12" cy="12" r="7" /></svg></span>
               </button>
-              <button v-if="busy" type="button" class="auth-cancel" data-action="cancel" @click="cancelRequest">{{ t('home.authPreview.cancel') }}</button>
             </form>
           </div>
         </Transition>

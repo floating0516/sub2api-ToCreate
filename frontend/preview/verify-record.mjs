@@ -70,6 +70,34 @@ try{
     assert(await page.locator('#auth-email').evaluate(el=>el===document.activeElement));await layout(page,lang+width+' errors')
     await page.locator('[data-action=fill]').click();await page.locator('[data-action=submit]').click();await ready(page,'verify');await layout(page,lang+width+' code')
   }
+  // Real viewport heights: switching between two/three fields must not grow the page.
+  for(const [width,height] of [[1280,720],[1366,768],[390,844],[375,667],[360,640],[320,568]])for(const lang of ['zh','en']){
+    await page.setViewportSize({width,height});await page.goto(origin+'?view=login&lang='+lang);await ready(page)
+    const measure=()=>page.evaluate(()=>({
+      viewport:innerHeight,page:document.documentElement.scrollHeight,scrollY,
+      shape:document.querySelector('.auth-shape').getBoundingClientRect().toJSON(),
+      submit:document.querySelector('[data-action=submit]').getBoundingClientRect().toJSON(),
+      fields:[...document.querySelectorAll('.auth-field input')].map(el=>el.getBoundingClientRect().toJSON())
+    }))
+    const login=await measure()
+    await page.locator('#register-tab').click();await ready(page)
+    const register=await measure()
+    for(const [mode,metrics] of [['login',login],['register',register]]){
+      assert(metrics.page<=height+1,`${width}x${height} ${lang} ${mode} page overflow: ${metrics.page}`)
+      assert(metrics.submit.bottom<=height,`${mode} submit below fold`)
+      assert(metrics.fields.every(r=>r.height>=44&&r.top>=0&&r.bottom<=height))
+    }
+    assert(Math.abs(login.shape.height-register.shape.height)<1,'Switch changes shape height')
+    assert(Math.abs(login.submit.y-register.submit.y)<1,'Switch moves submit button')
+    assert.equal(register.scrollY,0)
+    checks.push({label:`fixed form ${lang} ${width}x${height}`,login,register})
+    if(lang==='zh'&&(width===1280||width===375||width===320))await page.screenshot({path:output+`fixed-${width}x${height}-register.png`})
+    await page.locator('[data-action=fill]').click();await page.locator('[data-action=submit]').click();await page.waitForTimeout(250)
+    const loading=await measure();assert.equal(loading.shape.height,register.shape.height,'Loading adds a row')
+    await page.locator('[data-action=cancel]').click();await page.waitForTimeout(100)
+    await page.locator('#login-tab').click();await ready(page)
+    if(lang==='zh'&&(width===1280||width===375||width===320))await page.screenshot({path:output+`fixed-${width}x${height}-login.png`})
+  }
   await page.setViewportSize({width:1280,height:900});await page.goto(origin+'?view=login');await ready(page)
   await page.locator('#login-tab').focus();await page.keyboard.press('ArrowRight');await ready(page)
   assert.equal(await page.locator('#register-tab').getAttribute('aria-selected'),'true')

@@ -1,5 +1,5 @@
 <template>
-  <div class="preview-home">
+  <div class="preview-home" :class="{ 'preview-home--auth': view !== 'home' }">
     <header class="preview-header">
       <nav aria-label="ToCreate">
         <a class="preview-brand" :href="viewHref('home')" @click.prevent="navigate('home')">

@@ -62,3 +62,19 @@ Homepage, login, registration and completion now share the original landing
 colors: paper #f6f4ef, surface #fffefb, accent #aa7149 and primary #895634.
 Focus rings, tabs and shared marks use warm brown accents. Completion uses a
 pale warm surface instead of a dark inversion. Geometry and motion are unchanged.
+
+## Stable login / registration layout
+
+The icon and tab switcher now share a row. Both forms reserve three field rows;
+the third login slot is an empty CSS grid item, with no hidden input or focus stop.
+Submit and cancel share their existing action rows, so a third field or loading
+state cannot push the button down. The redundant introductory sentence is omitted
+on the form step. The auth page header/footer and short-screen spacing are compact.
+Below 650px viewport height the secondary footer is hidden; no page scroll lock or
+fixed-height clipping is used. Very short windows, validation messages, text zoom
+and software keyboards can still use natural document scrolling.
+
+The browser regression measures page height, card height and submit position for
+login and registration at 1280×720, 1366×768, 390×844, 375×667, 360×640 and 320×568
+in both languages, including the loading/cancel row. Screenshots cover desktop and
+short phones.
