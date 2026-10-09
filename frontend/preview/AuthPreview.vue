@@ -16,7 +16,7 @@
           <button id="login-tab" type="button" role="tab" :aria-selected="mode === 'login'" :tabindex="mode === 'login' ? 0 : -1" aria-controls="auth-panel" @click="choose('login')">{{ t('home.authPreview.login') }}</button>
           <button id="register-tab" type="button" role="tab" :aria-selected="mode === 'register'" :tabindex="mode === 'register' ? 0 : -1" aria-controls="auth-panel" @click="choose('register')">{{ t('home.authPreview.register') }}</button>
         </div>
-        <Transition name="auth-content" mode="out-in" @before-leave="beforeLeave" @after-leave="afterLeave" @enter="enterPanel" @after-enter="afterEnter">
+        <Transition name="auth-content" mode="out-in" @before-leave="beforeLeave" @after-leave="afterLeave" @before-enter="beforeEnter" @enter="enterPanel" @after-enter="afterEnter">
           <div :key="contentKey" id="auth-panel" ref="panel" :role="step === 'form' ? 'tabpanel' : undefined" :aria-labelledby="step === 'form' ? `${mode}-tab` : 'auth-title'">
             <header class="auth-heading">
               <h1 id="auth-title" ref="heading" tabindex="-1">{{ title }}</h1>
@@ -167,7 +167,9 @@ function beforeLeave(el: Element) {
   if (node.contains(document.activeElement)) { shape.value?.focus({ preventScroll: true }) }
   node.inert = true
 }
+function beforeEnter(el: Element) { (el as HTMLElement).inert = true }
 function afterEnter() {
+  if (panel.value) panel.value.inert = false
   switching.value = false
   resizeShape()
   if (!tabs.value?.contains(document.activeElement)) heading.value?.focus({ preventScroll: true })
