@@ -30,6 +30,18 @@ jobs:
       - run: pnpm exec vue-tsc --noEmit -p tsconfig.preview.json
       - run: pnpm exec vitest run src/components/home/__tests__/modelGatewayMotion.spec.ts src/i18n/__tests__/localeKeyCompleteness.spec.ts
       - run: pnpm exec vite build --config vite.preview.config.ts
+      - name: Browser verification and complete interaction recordings
+        run: |
+          npm install --prefix /tmp/tocreate-preview-tools playwright@1.58.2
+          /tmp/tocreate-preview-tools/node_modules/.bin/playwright install --with-deps chromium
+          python3 -m http.server 18084 --bind 127.0.0.1 --directory preview-dist > /tmp/tocreate-preview-http.log 2>&1 &
+          node preview/verify-record.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-gateway-evidence
+          path: frontend/preview-evidence
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: model-gateway-preview
