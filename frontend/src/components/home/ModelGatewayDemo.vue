@@ -1,5 +1,5 @@
 <template>
-  <section ref="root" class="mg-demo" :data-state="state" :data-active="visible && pageVisible && !reduced" :aria-label="t('home.modelDemo.label')">
+  <section ref="root" class="mg-demo" :data-locale="locale" :data-state="state" :data-active="visible && pageVisible && !reduced" :aria-label="t('home.modelDemo.label')">
     <div class="mg-meta">
       <span><span class="mg-dot" />{{ t('home.modelDemo.label') }}</span>
       <button type="button" class="mg-reset" data-action="reset" :aria-label="t('home.modelDemo.reset')" @click="reset">
@@ -301,9 +301,9 @@ onBeforeUnmount(() => {
 .mg-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mg-secondary { background: #efeeeb; color: #40403d; }
 .mg-disclaimer { margin: 2px 0 0; min-height: 24px; text-align: center; color: #65645e; font-size: 12px; line-height: 1.65; text-wrap: balance; }
-:global(html[lang=en]) .mg-stage { height: 376px; }
+.mg-demo[data-locale=en] .mg-stage { height: 376px; }
 @media (max-width: 740px) { .mg-stage { height: 340px; } .mg-meta { height: 32px; } .mg-disclaimer { margin-top: 0; padding: 0 8px; } }
-@media (max-width: 380px) { :global(html[lang=en]) .mg-stage { height: 408px; } }
+@media (max-width: 380px) { .mg-demo[data-locale=en] .mg-stage { height: 376px; } }
 .mg-demo button:focus-visible, .mg-demo [tabindex='-1']:focus-visible { outline: 2px solid #858580; outline-offset: 3px; }
 .mg-light-text button:focus-visible { outline-color: #fff; }
 .mg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
