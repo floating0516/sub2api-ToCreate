@@ -30,6 +30,16 @@ jobs:
       - run: pnpm exec vue-tsc --noEmit -p tsconfig.preview.json
       - run: pnpm exec vitest run src/components/home/__tests__/modelGatewayMotion.spec.ts src/i18n/__tests__/localeKeyCompleteness.spec.ts
       - run: pnpm exec vite build --config vite.preview.config.ts
+      - name: Build frozen previous version for motion comparison
+        run: |
+          git fetch --depth=1 origin 3bab13e3d1efd66616f0ac49e79297c32a774f1e
+          mkdir -p /tmp/tocreate-motion-before
+          git archive 3bab13e3d1efd66616f0ac49e79297c32a774f1e frontend | tar -x -C /tmp/tocreate-motion-before
+          ln -s "$GITHUB_WORKSPACE/frontend/node_modules" /tmp/tocreate-motion-before/frontend/node_modules
+          pnpm --dir /tmp/tocreate-motion-before/frontend exec vite build --config vite.preview.config.ts
+          mkdir -p preview-dist/review/before
+          cp -R /tmp/tocreate-motion-before/frontend/preview-dist/. preview-dist/review/before/
+          cp preview/compare.html preview-dist/compare.html
       - name: Browser verification and complete interaction recordings
         run: |
           npm install --prefix /tmp/tocreate-preview-tools playwright@1.58.2
@@ -40,7 +50,7 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y ffmpeg
           fi
-          for device in desktop mobile; do
+          for device in desktop mobile comparison; do
             ffmpeg -hide_banner -loglevel error -i "preview-evidence/$device-full-flow.webm" -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p -movflags +faststart "preview-evidence/$device-full-flow.mp4"
           done
       - uses: actions/upload-artifact@v4

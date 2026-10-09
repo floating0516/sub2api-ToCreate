@@ -72,5 +72,16 @@ try{
  assert.equal(await page.locator('.original-auth').count(),0);assert.equal(await page.evaluate(()=>document.getAnimations().filter(a=>a.playState==='running').length),0);checks.push({label:'unmount cleans simulated request and animations',passed:true})
  await page.setViewportSize({width:375,height:667});await page.goto(origin+'?view=login');await ready(page);await page.locator('[data-action=fill]').click();await page.locator('[data-action=login]').click();await ready(page,'login');await page.screenshot({path:output+'short-login.png'})
  const start=await page.locator('.tc-auth-frame').boundingBox();await page.locator('[data-action=switch]').click();await ready(page,'register');await page.screenshot({path:output+'short-register.png'});const end=await page.locator('.tc-auth-frame').boundingBox();assert(Math.abs(start.height-end.height)<1,JSON.stringify({start,end}));assert(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),'375×667 keeps the form in one page');checks.push({label:'original email-first flow has no third field or height jump',start:start.height,end:end.height})
- assert.equal(errors.length,0);assert.equal(requests.length,0);await context.close()
+ // The same button must visibly morph without shifting adjacent controls.
+ await page.locator('[data-action=fill]').click();await page.evaluate(()=>window.submitBefore=document.querySelector('[data-action=submit]'))
+ await page.locator('[data-action=submit]').click();await page.waitForTimeout(450)
+ const capsule=await page.locator('[data-action=submit]').boundingBox();assert(Math.abs(capsule.width-176)<2)
+ await page.waitForFunction(()=>document.querySelector('.original-auth').dataset.confirmed==='true');await page.waitForTimeout(380)
+ const circle=await page.locator('[data-action=submit]').boundingBox();assert(Math.abs(circle.width-47)<2);assert(await page.evaluate(()=>window.submitBefore===document.querySelector('[data-action=submit]')))
+ checks.push({label:'same submit element: full width to loading capsule to check circle',capsuleWidth:capsule.width,circleWidth:circle.width})
+ await ready(page,'verify');await context.close()
+ const comparison=await browser.newContext({viewport:{width:880,height:900},recordVideo:{dir:output,size:{width:880,height:900}}}),compare=await setup(comparison)
+ await compare.goto(origin+'compare.html');await compare.locator('#play').click();await compare.waitForFunction(()=>document.body.dataset.playback==='finished',{},{timeout:20000});await compare.screenshot({path:output+'comparison-finished.png'})
+ const comparisonVideo=compare.video();await comparison.close();await comparisonVideo.saveAs(output+'comparison-full-flow.webm');checks.push({label:'frozen previous version and current version synchronized comparison',passed:true})
+ assert.equal(errors.length,0);assert.equal(requests.length,0)
 }finally{await writeFile(output+'verification.json',JSON.stringify({checks,errors,apiRequests:requests},null,2));await browser.close()}

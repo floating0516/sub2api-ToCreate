@@ -36,3 +36,17 @@ The workflow validates compilation, typing and existing unit tests, then records
 real desktop mouse / simulated mobile touch flows. It checks narrow bilingual
 layouts, static visual parity, email-first steps, keyboard focus, invalid input,
 repeated operations, stale callbacks, reduced motion and unmount cleanup.
+
+## Visible motion revision
+
+The submit element now morphs from its original full width into a 176px loading
+capsule, then a 47px check circle before advancing. Its 47px layout slot stays
+fixed. The mock response owns loading and confirmation; cancellation invalidates
+both callbacks. Login/register steps use directional 28px entry and 12px exit
+with sequential content, preserving the original resting appearance.
+
+compare.html runs both versions side by side only after a user presses Play.
+The frozen reference is commit 3bab13e3d1efd66616f0ac49e79297c32a774f1e, built
+remotely with the same dependency lock. CI records this comparison as well as
+complete desktop and mobile flows, and checks the same submit DOM element has
+the expected capsule/circle geometry.

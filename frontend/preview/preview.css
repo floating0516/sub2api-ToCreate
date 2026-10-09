@@ -37,19 +37,19 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--tc-brand-deep);
 .entry-link--quiet .entry-arrow svg { width: 16px; height: 16px; }
 .entry-link:focus-visible { border-radius: 22px; }
 .entry-link:focus-visible .entry-arrow { border-radius: 50%; background: #ae7a56; }
-.entry-link:focus-visible .entry-arrow svg { transform: translateX(2px); }
+.entry-link:focus-visible .entry-arrow svg { transform: translateX(5px); }
 .entry-link--quiet:focus-visible { background: var(--tc-warm-soft); border-radius: 12px; }
 .entry-link--quiet:focus-visible .entry-arrow { background: transparent; }
 @media (hover: hover) and (pointer: fine) {
   .entry-link:hover { border-radius: 22px; background: var(--tc-brand-hover); }
   .entry-link:hover .entry-arrow { border-radius: 50%; background: #ae7a56; }
-  .entry-link:hover .entry-arrow svg { transform: translateX(2px); }
+  .entry-link:hover .entry-arrow svg { transform: translateX(5px); }
   .entry-link--quiet:hover { border-radius: 12px; background: var(--tc-warm-soft); }
   .entry-link--quiet:hover .entry-arrow { background: transparent; }
   .preview-language:hover { background: var(--tc-warm-soft); color: #262823; }
   .preview-footer a:hover { color: #262823; text-decoration: underline; text-underline-offset: 4px; }
 }
-.entry-link:active { transform: translateY(1px) scale(.975); border-radius: 13px; background: var(--tc-brand-pressed); transition-duration: 100ms; }
+.entry-link:active { transform: translateY(2px) scale(.96); border-radius: 13px; background: var(--tc-brand-pressed); transition-duration: 100ms; }
 .entry-link:active .entry-arrow { border-radius: 9px; }
 .entry-link:active .entry-arrow svg { transform: translateX(3px); }
 .entry-link--quiet:active { background: var(--tc-warm-border); }

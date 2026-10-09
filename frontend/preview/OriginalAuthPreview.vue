@@ -1,5 +1,5 @@
 <template>
-  <div class="tc-auth-shell original-auth" :class="{ 'original-auth--still': still, 'original-auth--hidden': hidden }" :data-step="step" :data-busy="busy" @pointerup.capture="releaseButton" @keyup.capture="releaseKey">
+  <div class="tc-auth-shell original-auth" :class="{ 'original-auth--still': still, 'original-auth--hidden': hidden }" :data-step="step" :data-busy="busy" :data-confirmed="confirmed" :style="{ '--step-direction': direction }" @pointerup.capture="releaseButton" @keyup.capture="releaseKey">
     <a :href="homeHref" class="tc-auth-home" @click.prevent="emit('home')"><Icon name="arrowLeft" size="sm" /><span>{{ t('home.redesign.backHome') }}</span></a>
     <div class="original-preview-tools">
       <span :title="t('home.authPreview.notice')">{{ t('home.authPreview.demo') }}</span>
@@ -61,9 +61,14 @@
                         <button type="button" :class="mode === 'login' ? 'email-auth-primary' : 'email-auth-secondary'" data-action="login" @click="continueWith('login')">{{ t('auth.signIn') }}</button>
                         <button type="button" :class="mode === 'register' ? 'email-auth-primary' : 'email-auth-secondary'" data-action="register" @click="continueWith('register')">{{ t('auth.createAccount') }}</button>
                       </div>
-                      <button v-else type="submit" class="email-auth-primary" data-action="submit" :aria-disabled="busy || changing">
-                        <span class="original-button-copy" :class="{ 'is-busy': busy }"><span class="email-auth-spinner" aria-hidden="true" /><span aria-live="polite">{{ buttonText }}</span></span>
-                      </button>
+                      <div v-else class="original-submit-slot">
+                        <button type="submit" class="email-auth-primary original-submit" :class="{ 'is-busy': busy, 'is-confirmed': confirmed }" data-action="submit" :aria-disabled="busy || changing" :aria-label="confirmed ? t('auth.emailFirst.ready') : busy ? t('home.authPreview.working') : buttonText">
+                          <span class="original-submit-label" aria-hidden="true">{{ buttonText }}</span>
+                          <span class="original-submit-working" aria-hidden="true"><span class="email-auth-spinner" />{{ t('home.authPreview.working') }}</span>
+                          <svg class="original-submit-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-9" pathLength="1" /></svg>
+                        </button>
+                        <span class="original-sr-only" role="status">{{ confirmed ? t('auth.emailFirst.ready') : busy ? t('home.authPreview.working') : '' }}</span>
+                      </div>
                     </form>
                     <div v-if="step === 'login' || step === 'register'" class="email-auth-switch">
                       <template v-if="!busy"><span>{{ t(step === 'login' ? 'auth.dontHaveAccount' : 'auth.alreadyHaveAccount') }}</span><button type="button" data-action="switch" @click="switchMode">{{ t(step === 'login' ? 'auth.createAccount' : 'auth.signIn') }}</button></template>
@@ -98,7 +103,7 @@ type Mode = 'login' | 'register'
 const props = defineProps<{ mode: Mode; homeHref: string }>()
 const emit = defineEmits<{ mode: [value: Mode]; home: [] }>()
 const { t, locale } = useI18n()
-const step = ref<Step>('email'), busy = ref(false), changing = ref(false), hidden = ref(document.hidden)
+const step = ref<Step>('email'), busy = ref(false), confirmed = ref(false), direction = ref(1), changing = ref(false), hidden = ref(document.hidden)
 const still = new URLSearchParams(location.search).has('still')
 const email = ref(''), password = ref(''), confirmation = ref(''), code = ref(''), error = ref(''), showPassword = ref(false)
 const stage = ref<HTMLElement>(), dialog = ref<HTMLElement>(), windowEl = ref<HTMLElement>()
@@ -106,13 +111,13 @@ const eyebrow = computed(() => t(step.value === 'email' ? 'auth.emailFirst.welco
 const title = computed(() => t(step.value === 'email' ? 'auth.emailFirst.title' : step.value === 'login' ? 'auth.welcomeBack' : step.value === 'register' ? 'auth.createAccount' : step.value === 'verify' ? 'home.authPreview.verifyTitle' : 'home.authPreview.forgotTitle'))
 const subtitle = computed(() => step.value === 'verify' ? t('home.authPreview.verifySubtitle', {email:email.value}) : t(step.value === 'forgot' ? 'home.authPreview.forgotSubtitle' : 'auth.emailFirst.emailDescription'))
 const hint = computed(() => t(step.value === 'email' || step.value === 'forgot' ? 'auth.emailFirst.emailHint' : step.value === 'login' ? 'auth.emailFirst.passwordHint' : step.value === 'verify' ? 'home.authPreview.codeHint' : 'auth.passwordHint'))
-const buttonText = computed(() => t(busy.value ? 'home.authPreview.working' : step.value === 'login' ? 'auth.signIn' : step.value === 'register' ? 'auth.emailFirst.sendCode' : step.value === 'verify' ? 'auth.emailFirst.verifyCode' : 'home.authPreview.send'))
+const buttonText = computed(() => t(step.value === 'login' ? 'auth.signIn' : step.value === 'register' ? 'auth.emailFirst.sendCode' : step.value === 'verify' ? 'auth.emailFirst.verifyCode' : 'home.authPreview.send'))
 let timer: ReturnType<typeof setTimeout> | undefined, epoch = 0, disposed = false, knownHeight = 0
 let observer: ResizeObserver | undefined, query: MediaQueryList | undefined, heightMotion: Animation | undefined
 const animations = new Set<Animation>()
 const reduced = () => still || query?.matches || hidden.value
-function cancel() { epoch++; if (timer) clearTimeout(timer); timer = undefined; busy.value = false }
-function go(to: Step) { if (changing.value) return; cancel(); error.value = ''; showPassword.value = false; step.value = to }
+function cancel() { epoch++; if (timer) clearTimeout(timer); timer = undefined; busy.value = false; confirmed.value = false }
+function go(to: Step) { if (changing.value) return; cancel(); error.value = ''; showPassword.value = false; direction.value = ['email','login','register','verify','forgot','done','sent'].indexOf(to) < ['email','login','register','verify','forgot','done','sent'].indexOf(step.value) ? -1 : 1; step.value = to }
 function back() { go(step.value === 'verify' ? 'register' : 'email') }
 function continueWith(mode: Mode) {
   if (changing.value || busy.value) return
@@ -131,7 +136,15 @@ function submit() {
   if (step.value === 'verify' && code.value !== '123456') { error.value = 'home.authPreview.invalidCode'; focusField('email-auth-code'); return }
   if (step.value === 'forgot' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { error.value = 'auth.invalidEmail'; focusField('email-auth-email'); return }
   const token = ++epoch; busy.value = true
-  timer = setTimeout(() => { if (disposed || token !== epoch) return; timer = undefined; busy.value = false; step.value = step.value === 'register' ? 'verify' : step.value === 'forgot' ? 'sent' : 'done'; password.value = ''; confirmation.value = ''; code.value = '' }, 900)
+  const destination: Step = step.value === 'register' ? 'verify' : step.value === 'forgot' ? 'sent' : 'done'
+  timer = setTimeout(() => {
+    if (disposed || token !== epoch) return
+    confirmed.value = true
+    timer = setTimeout(() => {
+      if (disposed || token !== epoch) return
+      password.value = ''; confirmation.value = ''; code.value = ''; go(destination)
+    }, reduced() ? 0 : 480)
+  }, 900)
 }
 function beforeLeave(el: Element) { changing.value = true; if (el.contains(document.activeElement)) dialog.value?.focus({preventScroll:true}); (el as HTMLElement).inert = true }
 function beforeEnter(el: Element) { (el as HTMLElement).inert = true }
@@ -149,7 +162,7 @@ function releaseButton(event: Event) {
   if (reduced()) return
   const button = (event.target as Element).closest<HTMLButtonElement>('.email-auth-primary, .email-auth-secondary')
   if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return
-  const motion = button.animate(Array.from({length:25},(_,i) => { const p = springAt(i/24); return {offset:i/24,transform:`translateY(${1-p}px) scale(${.985+.015*p})`} }),{duration:220,easing:'linear'})
+  const motion = button.animate(Array.from({length:25},(_,i) => { const p = springAt(i/24); return {offset:i/24,transform:`translateY(${2*(1-p)}px) scale(${.965+.035*p})`} }),{duration:260,easing:'linear'})
   animations.add(motion); motion.onfinish = () => animations.delete(motion)
 }
 function releaseKey(event: KeyboardEvent) { if (event.key === 'Enter' || event.key === ' ') releaseButton(event) }

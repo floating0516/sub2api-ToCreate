@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ToCreate · 动效前后对照</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f1eb;color:#272923;font:14px/1.5 system-ui,sans-serif}main{max-width:880px;margin:0 auto;padding:22px 24px}h1{font:400 28px Georgia,serif;margin:0 0 8px}p{margin:8px 0;color:#72756e}.tools{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin:16px 0}button{border:0;border-radius:10px;background:#a87d5a;color:#fff;min-height:44px;padding:10px 20px;font:600 14px system-ui;cursor:pointer}button:disabled{opacity:.55;cursor:default}a{color:#9a623d;text-underline-offset:4px}button:focus-visible,a:focus-visible{outline:2px solid #9a623d;outline-offset:4px}.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}h2{font-size:14px;font-weight:600;margin:0 0 8px}.frame-shell{height:668px;border:1px solid #dedbd3;border-radius:9px;overflow:hidden;background:#f3f1eb}iframe{border:0;width:100%;height:100%;display:block}#status{min-height:24px}small{display:block;color:#72756e;margin-top:10px}@media(max-width:700px){main{padding:20px 12px}.compare-grid{grid-template-columns:1fr;gap:20px}.frame-shell{height:740px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style></head><body><main>
+<h1>同样的样式，直接比较动效</h1><p>点击播放，两边同步执行登录 → 注册 → 返回登录 → 提交。注意右侧按钮的收拢、加载和勾选过程。</p>
+<div class="tools"><button id="play" type="button">播放前后对照</button><a href="/?view=login">自己体验新版 ↗</a><a href="/review/auth/">查看完整录屏 ↗</a></div>
+<p id="status" role="status">左侧为上一版，右侧为本轮。两个表单均可直接操作。</p>
+<div class="compare-grid"><section><h2>上一版 · 轻微淡入淡出</h2><div class="frame-shell"><iframe id="before" title="上一版登录交互" src="./review/before/?view=login"></iframe></div></section><section><h2>本轮 · 方向切换与按钮变形</h2><div class="frame-shell"><iframe id="after" title="本轮登录交互" src="./?view=login"></iframe></div></section></div>
+<small>仅使用虚构示例，未接真实登录、注册或模型接口。手机上两栏纵向排列；并排效果可看录屏。</small>
+</main><script>
+const play=document.querySelector('#play'),status=document.querySelector('#status'),frames=[...document.querySelectorAll('iframe')];
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function ready(frame,step){for(let n=0;n<100;n++){const d=frame.contentDocument,s=d?.querySelector('.email-auth-stage');if(d?.querySelector('.original-auth')?.dataset.step===step&&s&&!s.inert&&!d.querySelector('.original-step-enter-active,.original-step-leave-active'))return;await wait(60)}throw Error('预览加载超时，请重试。')}
+async function clickBoth(action){for(const f of frames)f.contentDocument.querySelector(`[data-action="${action}"]`).click()}
+play.addEventListener('click',async()=>{play.disabled=true;document.body.dataset.playback='running';try{
+ status.textContent='准备两个版本…';for(const f of frames){await new Promise(resolve=>{f.addEventListener('load',resolve,{once:true});f.src=f.getAttribute('src').split('&replay=')[0]+'&replay='+Date.now()})}await Promise.all(frames.map(f=>ready(f,'email')));await wait(500);
+ await clickBoth('fill');await wait(500);status.textContent='进入登录：内容按方向滑入';await clickBoth('login');await Promise.all(frames.map(f=>ready(f,'login')));await wait(900);
+ status.textContent='切换注册：外框固定，内容向前切换';await clickBoth('switch');await Promise.all(frames.map(f=>ready(f,'register')));await wait(1100);
+ status.textContent='返回登录：方向反转';await clickBoth('switch');await Promise.all(frames.map(f=>ready(f,'login')));await wait(1000);
+ status.textContent='提交：长条 → 加载胶囊 → 完成勾选';await clickBoth('submit');await Promise.all(frames.map(f=>ready(f,'done')));await wait(1200);
+ status.textContent='对照完成。可以重新播放，或进入新版自己体验。';document.body.dataset.playback='finished';
+}catch(error){status.textContent=error.message;document.body.dataset.playback='error'}finally{play.disabled=false;play.textContent='重新播放对照'}})
+</script></body></html>
