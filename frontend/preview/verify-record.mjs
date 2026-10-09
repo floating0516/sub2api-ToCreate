@@ -22,9 +22,9 @@ async function click(page,selector,touch=false){
 async function layout(page,label){
  const result=await page.evaluate(()=>{
   const stage=document.querySelector('.email-auth-stage'),r=stage.getBoundingClientRect(),w=document.querySelector('.original-stage-window').getBoundingClientRect()
-  return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,height:innerHeight,pageHeight:document.documentElement.scrollHeight,fields:document.querySelectorAll('form input').length,stageHeight:r.height,windowHeight:w.height,fits:r.bottom<=w.bottom+1,blur:getComputedStyle(stage).filter,focus:document.activeElement.id}
+  return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,height:innerHeight,pageHeight:document.documentElement.scrollHeight,fields:document.querySelectorAll('form input').length,stageHeight:r.height,windowHeight:w.height,fits:r.bottom<=w.bottom+1,blur:getComputedStyle(stage).filter,focus:document.activeElement.id,toolbarClear:document.querySelector('.tc-auth-home').getBoundingClientRect().right+8<=document.querySelector('.original-preview-tools').getBoundingClientRect().left}
  })
- assert(result.scrollWidth<=result.width&&result.fits,label+JSON.stringify(result));assert(['none','blur(0px)'].includes(result.blur));checks.push({label,...result})
+ assert(result.scrollWidth<=result.width&&result.fits&&result.toolbarClear,label+JSON.stringify(result));assert(['none','blur(0px)'].includes(result.blur));checks.push({label,...result})
 }
 async function geometry(page){return page.evaluate(()=>Object.fromEntries(['.tc-auth-frame','.email-auth-brand','.email-auth-copy','.email-auth-input-shell','.email-auth-primary'].map(s=>{const e=document.querySelector(s),r=e.getBoundingClientRect(),c=getComputedStyle(e);return [s,{x:r.x,y:r.y,width:r.width,height:r.height,background:c.background,font:c.font,borderRadius:c.borderRadius}]})))}
 try{

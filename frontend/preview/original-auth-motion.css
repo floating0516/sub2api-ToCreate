@@ -19,7 +19,7 @@
 }
 
 /* Interaction-only feedback. */
-.original-stage-window { overflow: clip; }
+.original-stage-window { overflow: visible; }
 .original-auth .email-auth-stage { animation: none; position: relative; }
 .original-step-leave-active { transition: opacity 85ms ease, filter 85ms ease; }
 .original-step-enter-active { transition: opacity 170ms ease 100ms, transform 200ms cubic-bezier(.2,.8,.2,1) 100ms, filter 150ms ease 100ms; }
@@ -40,6 +40,10 @@
   .original-preview-tools { right: 12px; gap: 6px; }
   /* Prevent iOS focus zoom without changing input box geometry. */
   .original-auth input { font-size: 16px; }
+}
+@media (max-width:360px) {
+  .original-preview-tools, .original-preview-tools button { font-size: 10px; }
+  .original-preview-tools { gap: 4px; }
 }
 @media (prefers-reduced-motion:reduce) {
   .original-auth *, .original-auth *::before, .original-auth *::after { animation: none !important; transition: none !important; }
