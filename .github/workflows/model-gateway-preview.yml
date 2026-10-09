@@ -34,7 +34,7 @@ jobs:
         run: |
           git fetch --depth=1 origin 3bab13e3d1efd66616f0ac49e79297c32a774f1e
           mkdir -p /tmp/tocreate-motion-before
-          git archive 3bab13e3d1efd66616f0ac49e79297c32a774f1e frontend | tar -x -C /tmp/tocreate-motion-before
+          git -C .. archive 3bab13e3d1efd66616f0ac49e79297c32a774f1e frontend | tar -x -C /tmp/tocreate-motion-before
           ln -s "$GITHUB_WORKSPACE/frontend/node_modules" /tmp/tocreate-motion-before/frontend/node_modules
           pnpm --dir /tmp/tocreate-motion-before/frontend exec vite build --config vite.preview.config.ts
           mkdir -p preview-dist/review/before
