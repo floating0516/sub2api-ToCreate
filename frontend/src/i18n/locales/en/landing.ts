@@ -5,6 +5,12 @@ export default {
   },
   // Home Page
   home: {
+    simplePreview: {
+      start: 'Get started',
+      preview: 'Independent preview',
+      language: 'Switch to Chinese',
+      back: 'Visit live website'
+    },
     modelDemo: {
       "label": "INTERACTIVE DEMO",
       "sample": "DEMO",

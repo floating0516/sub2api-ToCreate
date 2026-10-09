@@ -5,6 +5,12 @@ export default {
   },
   // Home Page
   home: {
+    simplePreview: {
+      start: '开始使用',
+      preview: '独立预览',
+      language: '切换为英文',
+      back: '访问正式网站'
+    },
     modelDemo: {
       "label": "交互演示",
       "sample": "示例",
