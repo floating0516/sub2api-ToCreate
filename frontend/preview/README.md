@@ -8,8 +8,8 @@ Current direction: a warm neutral canvas, Georgia brand heading, one primary
 Get started link and a header Login link. No model card, simulated requests,
 model names, marketing descriptions or feature cards are mounted. The previous
 ModelGatewayDemo source is retained as history but is not imported by this entry.
-Both entry links go directly to https://api.lihe.chat/login using normal anchors;
-there is no fake loading state or navigation delay. Native modifier-click works.
+Both home entry links now open the isolated login preview using normal anchors
+and same-page navigation. Native modifier-click works on these entry links.
 
 EntryLink.vue reuses the existing Icon component. Shared button feedback uses
 180–240ms CSS transitions for corner radius, arrow movement, background and
@@ -24,10 +24,9 @@ selects English. Copy lives in home.simplePreview in both landing dictionaries.
 The preview workflow lints, type-checks, checks locale completeness, builds, then
 runs Playwright on remote CI. verify-record.mjs covers bilingual narrow layouts,
 keyboard navigation, touch, reduced motion, repeated activation and stable layout.
-Desktop/mobile recordings include hover, pressing, language switch and keyboard
-focus. Only the test intercepts outbound login navigation to keep recording the
-preview; actual preview links navigate normally. MP4 and WebM are published as
-evidence. No live authentication/API requests are made by the test.
+Desktop/mobile recordings cover the complete login, registration, sample email
+verification and recovery flows. MP4 and WebM are published as evidence. Neither
+the prototype nor its tests make live authentication/API requests.
 
 ## Authentication preview
 
