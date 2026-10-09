@@ -22,6 +22,20 @@ The tab edges use separate analytic springs. WAAPI animations terminate at rest.
 Visibility and reduced-motion changes finish active transitions; the loading
 indicator pauses when hidden. Unmount clears animations, observers and timers.
 
+Round 2: a persistent SVG marker carries the key ring through request progress
+into a success check. It sits outside the fading content and has its own geometry
+and stroke transitions. The desktop reserved stage is 352px; Chinese mobile is
+340px, English 376px for wrapping. Helper text is 12px with darker neutral colors.
+Model arrow-key focus uses preventScroll, and the demo excludes its moving
+descendants from browser scroll anchoring. No scroll position is forcibly restored,
+so the visitor can still scroll freely during a request.
+
+`verify-record.mjs` runs in remote CI with isolated Playwright tooling (no product
+dependency). It records uninterrupted, real-time mouse and touch flows, checks
+their scroll positions and persistent element identity, and covers bilingual
+narrow layouts, keyboard use, cancellation and reduced motion. MP4 and WebM
+recordings are published alongside the browser evidence artifact.
+
 Geist and its SIL OFL license are copied from the supplied one-shape reference.
 The public site logo is a snapshot of the existing site's public branding asset.
 Neither the music nor the fixed playback timeline is included.
