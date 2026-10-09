@@ -116,7 +116,11 @@ let timer: ReturnType<typeof setTimeout> | undefined, epoch = 0, disposed = fals
 let observer: ResizeObserver | undefined, query: MediaQueryList | undefined, heightMotion: Animation | undefined
 const animations = new Set<Animation>()
 const reduced = () => still || query?.matches || hidden.value
-function cancel() { epoch++; if (timer) clearTimeout(timer); timer = undefined; busy.value = false; confirmed.value = false }
+function cancel() {
+  const restoreFocus = document.activeElement?.getAttribute('data-action') === 'cancel'
+  epoch++; if (timer) clearTimeout(timer); timer = undefined; busy.value = false; confirmed.value = false
+  if (restoreFocus && !disposed) void nextTick(() => dialog.value?.querySelector<HTMLElement>('[data-action="submit"]')?.focus({preventScroll:true}))
+}
 function go(to: Step) { if (changing.value) return; cancel(); error.value = ''; showPassword.value = false; direction.value = ['email','login','register','verify','forgot','done','sent'].indexOf(to) < ['email','login','register','verify','forgot','done','sent'].indexOf(step.value) ? -1 : 1; step.value = to }
 function back() { go(step.value === 'verify' ? 'register' : 'email') }
 function continueWith(mode: Mode) {
