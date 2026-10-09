@@ -1,0 +1,39 @@
+/* Preview adapter: restore the original preflight/font/icon sizing without Tailwind. */
+.original-auth { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; line-height: 1.5; }
+.original-auth input, .original-auth button { font-family: inherit; line-height: inherit; }
+.original-auth svg { width: 16px; height: 16px; flex-shrink: 0; }
+.original-auth .email-auth-success-mark svg { width: 32px; height: 32px; }
+.original-auth .email-auth-dialog, .original-auth #email-auth-title { outline: none; }
+.original-preview-tools { position: absolute; top: 12px; right: 20px; z-index: 4; display: flex; align-items: center; gap: 10px; color: #72756e; font-size: 11px; }
+.original-preview-tools button { min-height: 40px; border: 0; padding: 0 5px; background: transparent; color: #9a623d; cursor: pointer; border-radius: 7px; font-size: 11px; }
+.original-preview-tools button:disabled { opacity: .5; cursor: default; }
+.original-auth button:focus-visible, .original-auth a:focus-visible { outline: 2px solid #a87d5a; outline-offset: 3px; }
+
+/* Only interaction changes below. Static geometry, colors and typography are original. */
+.original-stage-window { min-height: 340px; overflow: clip; }
+.original-auth .email-auth-stage { animation: none; position: relative; }
+.original-step-leave-active { transition: opacity 85ms ease, filter 85ms ease; }
+.original-step-enter-active { transition: opacity 170ms ease 100ms, transform 200ms cubic-bezier(.2,.8,.2,1) 100ms, filter 150ms ease 100ms; }
+.original-step-leave-to { opacity: 0; filter: blur(1px); }
+.original-step-enter-from { opacity: 0; transform: translateY(4px); filter: blur(1px); }
+.original-auth .email-auth-primary, .original-auth .email-auth-secondary { transition: filter 180ms ease, box-shadow 180ms ease, transform 200ms cubic-bezier(.2,.8,.2,1); touch-action: manipulation; }
+.original-auth .email-auth-primary:active, .original-auth .email-auth-secondary:active { transform: translateY(1px) scale(.985); transition-duration: 90ms; }
+.original-button-copy { position: relative; display: inline-block; padding-left: 0; transition: padding-left 180ms ease; }
+.original-button-copy.is-busy { padding-left: 24px; }
+.original-button-copy .email-auth-spinner { position: absolute; left: 0; top: calc(50% - 7.5px); opacity: 0; animation: none; transition: opacity 160ms ease; }
+.original-button-copy.is-busy .email-auth-spinner { opacity: 1; animation: email-auth-spin 800ms linear infinite; }
+.original-cancel { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
+.original-auth .email-auth-success-mark { animation: original-check-in 260ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes original-check-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.original-auth--hidden * { animation-play-state: paused !important; }
+.original-auth--still *, .original-auth--still *::before, .original-auth--still *::after { animation: none !important; transition: none !important; }
+@media (max-width:520px) {
+  .original-preview-tools { right: 12px; gap: 6px; }
+  /* Prevent iOS focus zoom without changing input box geometry. */
+  .original-auth input { font-size: 16px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .original-auth *, .original-auth *::before, .original-auth *::after { animation: none !important; transition: none !important; }
+  .original-step-enter-from, .original-step-leave-to { filter: none; transform: none; }
+  .original-auth .email-auth-primary:active, .original-auth .email-auth-secondary:active { transform: none; }
+}

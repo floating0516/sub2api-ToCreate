@@ -1,5 +1,6 @@
 <template>
-  <div class="preview-home" :class="{ 'preview-home--auth': view !== 'home' }">
+  <OriginalAuthPreview v-if="view !== 'home'" :mode="view" :home-href="viewHref('home')" @mode="navigate" @home="navigate('home')" />
+  <div v-else class="preview-home">
     <header class="preview-header">
       <nav aria-label="ToCreate">
         <a class="preview-brand" :href="viewHref('home')" @click.prevent="navigate('home')">
@@ -18,7 +19,6 @@
         <h1 id="brand-title">ToCreate<span aria-hidden="true">.</span></h1>
         <EntryLink data-action="start" :href="viewHref('login')" @click="openLogin">{{ t('home.simplePreview.start') }}</EntryLink>
       </section>
-      <AuthPreview v-else :mode="view" :home-href="viewHref('home')" @mode="navigate" @home="navigate('home')" />
     </main>
     <footer class="preview-footer">
       <span>© {{ new Date().getFullYear() }} ToCreate</span>
@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import AuthPreview from './AuthPreview.vue'
+import OriginalAuthPreview from './OriginalAuthPreview.vue'
 import { useI18n } from 'vue-i18n'
 import EntryLink from './EntryLink.vue'
 import logo from './logo.png'
@@ -46,7 +46,7 @@ function navigate(value: View) {
   view.value = value
   history.pushState(null, '', viewHref(value))
   if (wasHome || value === 'home') void nextTick(() => {
-    const target = document.querySelector<HTMLElement>(value === 'home' ? '#brand-title' : '#auth-title')
+    const target = document.querySelector<HTMLElement>(value === 'home' ? '#brand-title' : '#email-auth-title')
     target?.setAttribute('tabindex', '-1'); target?.focus({ preventScroll: true })
   })
 }
