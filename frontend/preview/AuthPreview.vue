@@ -11,12 +11,12 @@
           </div>
           <span class="auth-kicker">{{ t('home.authPreview.demo') }}</span>
         </div>
-        <div v-show="step === 'form'" ref="tabs" class="auth-tabs" role="tablist" :aria-label="t('home.authPreview.choose')" @keydown="tabKey">
+        <div v-show="tabsVisible" ref="tabs" class="auth-tabs" role="tablist" :aria-label="t('home.authPreview.choose')" @keydown="tabKey">
           <span ref="indicator" class="auth-indicator" aria-hidden="true" />
           <button id="login-tab" type="button" role="tab" :aria-selected="mode === 'login'" :tabindex="mode === 'login' ? 0 : -1" aria-controls="auth-panel" @click="choose('login')">{{ t('home.authPreview.login') }}</button>
           <button id="register-tab" type="button" role="tab" :aria-selected="mode === 'register'" :tabindex="mode === 'register' ? 0 : -1" aria-controls="auth-panel" @click="choose('register')">{{ t('home.authPreview.register') }}</button>
         </div>
-        <Transition name="auth-content" mode="out-in" @before-leave="beforeLeave" @enter="enterPanel" @after-enter="afterEnter">
+        <Transition name="auth-content" mode="out-in" @before-leave="beforeLeave" @after-leave="afterLeave" @enter="enterPanel" @after-enter="afterEnter">
           <div :key="contentKey" id="auth-panel" ref="panel" :role="step === 'form' ? 'tabpanel' : undefined" :aria-labelledby="step === 'form' ? `${mode}-tab` : 'auth-title'">
             <header class="auth-heading">
               <h1 id="auth-title" ref="heading" tabindex="-1">{{ title }}</h1>
@@ -87,7 +87,7 @@ type Step = 'form' | 'verify' | 'forgot' | 'done' | 'sent'
 const props = defineProps<{ mode: Mode; homeHref: string }>()
 const emit = defineEmits<{ mode: [value: Mode]; home: [] }>()
 const { t, locale } = useI18n()
-const step = ref<Step>('form'), busy = ref(false), switching = ref(false)
+const step = ref<Step>('form'), busy = ref(false), switching = ref(false), tabsVisible = ref(true)
 const email = ref(''), password = ref(''), confirmation = ref(''), code = ref(''), showPassword = ref(false)
 const errors = reactive({ email: '', password: '', confirmation: '', code: '' })
 const shape = ref<HTMLElement>(), inside = ref<HTMLElement>(), panel = ref<HTMLElement>(), heading = ref<HTMLElement>()
@@ -172,7 +172,8 @@ function afterEnter() {
   resizeShape()
   if (!tabs.value?.contains(document.activeElement)) heading.value?.focus({ preventScroll: true })
 }
-function enterPanel() { resizeShape(true) }
+function afterLeave() { tabsVisible.value = step.value === 'form' }
+function enterPanel() { void nextTick(() => { resizeShape(true); moveIndicator() }) }
 function resizeShape(force = false) {
   if (switching.value && !force) return
   if (!shape.value || !inside.value || disposed) return
@@ -186,7 +187,7 @@ function resizeShape(force = false) {
   if (initialized && !reduced()) heightAnimation = shape.value.animate(springFrames({height:from},{height:target}),{duration:400,easing:'linear'})
 }
 function moveIndicator() {
-  if (!tabs.value || !indicator.value || step.value !== 'form') return
+  if (!tabs.value || !indicator.value || step.value !== 'form' || !tabsVisible.value) return
   const selected = tabs.value.querySelector<HTMLElement>(`#${props.mode}-tab`)
   if (!selected) return
   const current = indicator.value.getBoundingClientRect(), parent = tabs.value.getBoundingClientRect()

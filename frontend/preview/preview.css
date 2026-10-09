@@ -120,7 +120,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid #56564f; outline-offs
 .auth-shape--complete .entry-arrow { background: #e7e6de; }
 .auth-home-link { display: flex; justify-content: center; align-items: center; min-height: 44px; margin-top: 8px; font-size: 12px; border-radius: 8px; }
 .auth-home-link:focus-visible, .auth-shape--complete .auth-submit:focus-visible { outline-color: #e9e7e0; }
-.auth-content-enter-active { transition: opacity 200ms ease, transform 250ms cubic-bezier(.2,.8,.2,1), filter 180ms ease; }
+.auth-content-enter-active { transition: opacity 160ms ease 250ms, transform 160ms cubic-bezier(.2,.8,.2,1) 250ms, filter 150ms ease 250ms; }
 .auth-content-leave-active { transition: opacity 85ms ease, filter 85ms ease; }
 .auth-content-enter-from { opacity: 0; transform: translateY(5px); filter: blur(2px); }
 .auth-content-leave-to { opacity: 0; filter: blur(2px); }
