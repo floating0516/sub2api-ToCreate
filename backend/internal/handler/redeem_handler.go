@@ -66,7 +66,7 @@ func (h *RedeemHandler) Redeem(c *gin.Context) {
 			response.ErrorFrom(c, err)
 			return
 		}
-		response.Success(c, dto.RedeemCodeFromService(result))
+		response.Success(c, dto.RedeemCodeFromService(result).Localized(c.GetHeader("Accept-Language")))
 		return
 	}
 	if !errors.Is(lookupErr, service.ErrRedeemCodeNotFound) {
@@ -77,7 +77,7 @@ func (h *RedeemHandler) Redeem(c *gin.Context) {
 	if h.promoService != nil {
 		usage, err := h.promoService.Redeem(ctx, subject.UserID, req.Code)
 		if err == nil {
-			response.Success(c, dto.RedeemCodeFromService(redeemCodeFromPromoUsage(usage)))
+			response.Success(c, dto.RedeemCodeFromService(redeemCodeFromPromoUsage(usage)).Localized(c.GetHeader("Accept-Language")))
 			return
 		}
 		if !errors.Is(err, service.ErrPromoCodeNotFound) {
@@ -92,7 +92,7 @@ func (h *RedeemHandler) Redeem(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, dto.RedeemCodeFromService(result))
+	response.Success(c, dto.RedeemCodeFromService(result).Localized(c.GetHeader("Accept-Language")))
 }
 
 // GetHistory returns the user's redemption history
@@ -131,7 +131,7 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 		}
 		out := make([]dto.RedeemCode, 0, len(codes))
 		for i := range codes {
-			out = append(out, *dto.RedeemCodeFromService(&codes[i]))
+			out = append(out, *dto.RedeemCodeFromService(&codes[i]).Localized(c.GetHeader("Accept-Language")))
 		}
 		response.Paginated(c, out, result.Total, page, pageSize)
 		return
@@ -149,7 +149,7 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 
 	out := make([]dto.RedeemCode, 0, len(codes)+limit)
 	for i := range codes {
-		out = append(out, *dto.RedeemCodeFromService(&codes[i]))
+		out = append(out, *dto.RedeemCodeFromService(&codes[i]).Localized(c.GetHeader("Accept-Language")))
 	}
 	if h.promoService != nil {
 		usages, usageErr := h.promoService.ListUserUsages(ctx, subject.UserID, limit)
