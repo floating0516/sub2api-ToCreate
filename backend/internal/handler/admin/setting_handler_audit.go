@@ -347,6 +347,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.QuickStartInstallerEnabled != after.QuickStartInstallerEnabled {
 		changed = append(changed, "quick_start_installer_enabled")
 	}
+	if before.SupportAgentEnabled != after.SupportAgentEnabled {
+		changed = append(changed, "support_agent_enabled")
+	}
 	if before.DefaultConcurrency != after.DefaultConcurrency {
 		changed = append(changed, "default_concurrency")
 	}

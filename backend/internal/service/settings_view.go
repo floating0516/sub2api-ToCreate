@@ -159,6 +159,7 @@ type SystemSettings struct {
 	CompactHomeEnabled          bool
 	HideCcsImportButton         bool
 	QuickStartInstallerEnabled  bool
+	SupportAgentEnabled         bool
 	PurchaseSubscriptionEnabled bool
 	PurchaseSubscriptionURL     string
 	TableDefaultPageSize        int
@@ -364,6 +365,7 @@ type PublicSettings struct {
 	CompactHomeEnabled                  bool
 	HideCcsImportButton                 bool
 	QuickStartInstallerEnabled          bool
+	SupportAgentEnabled                 bool
 
 	PurchaseSubscriptionEnabled bool
 	PurchaseSubscriptionURL     string

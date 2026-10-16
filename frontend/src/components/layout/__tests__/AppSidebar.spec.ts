@@ -87,6 +87,12 @@ describe('AppSidebar user-page switches', () => {
     expect(componentSource).toContain("path: '/orders'")
     expect(componentSource).toContain('featureFlag: flagUserOrders')
   })
+
+  it('gates the support entry with the opt-in support Agent flag', () => {
+    expect(componentSource).toContain('FeatureFlags.supportAgent')
+    expect(componentSource).toContain("path: '/support'")
+    expect(componentSource).toContain('featureFlag: flagSupportAgent')
+  })
 })
 
 describe('AppSidebar subscription entries', () => {

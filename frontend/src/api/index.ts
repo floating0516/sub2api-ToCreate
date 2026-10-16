@@ -23,6 +23,8 @@ export { totpAPI } from './totp'
 export { passkeyAPI, type PasskeyCredentialSummary } from './passkey'
 export { default as announcementsAPI } from './announcements'
 export { channelMonitorUserAPI } from './channelMonitor'
+export { supportAPI } from './support'
+export type { SupportChatResult, SupportCitation, SupportThread, SupportThreadTurn, SupportTicketDraft } from './support'
 export {
   installTokensAPI,
   type InstallClient,

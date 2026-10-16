@@ -92,6 +92,16 @@ func (s *SettingService) IsQuickStartInstallerEnabled(ctx context.Context) bool 
 	return value == "true"
 }
 
+// IsSupportAgentEnabled reports whether the user-facing support Agent is enabled.
+// Missing settings and repository errors fail closed.
+func (s *SettingService) IsSupportAgentEnabled(ctx context.Context) bool {
+	if s == nil || s.settingRepo == nil {
+		return false
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeySupportAgentEnabled)
+	return err == nil && value == "true"
+}
+
 // IsAffiliateEnabled 检查是否启用邀请返利功能（总开关）
 func (s *SettingService) IsAffiliateEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateEnabled)
