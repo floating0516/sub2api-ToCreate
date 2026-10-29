@@ -1,3 +1,4 @@
+import adminAccessKeys from './adminAccessKeys'
 import landing from './landing'
 import common from './common'
 import dashboard from './dashboard'
@@ -9,6 +10,7 @@ import quickstart from './quickstart'
 import support from './support'
 
 export default {
+  adminAccessKeys,
   ...landing,
   ...common,
   ...dashboard,
