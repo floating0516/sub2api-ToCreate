@@ -258,6 +258,7 @@ export default {
       USER_NOT_ACTIVE: 'Account has been disabled.',
       EMAIL_EXISTS: 'This email is already registered. Please sign in instead.',
       EMAIL_NOT_REGISTERED: 'This email is not registered yet.',
+      EMAIL_BLOCKED: 'This email address is not allowed. Please use a different one.',
     },
     registrationFailed: 'Registration failed. Please try again.',
     emailDomainRegistrationLimit:

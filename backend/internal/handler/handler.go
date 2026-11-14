@@ -52,6 +52,7 @@ type Handlers struct {
 	Auth             *AuthHandler
 	User             *UserHandler
 	Checkin          *CheckinHandler
+	MCPOAuth         *MCPOAuthHandler
 	APIKey           *APIKeyHandler
 	LiheOIDC         *LiheOIDCHandler
 	Usage            *UsageHandler

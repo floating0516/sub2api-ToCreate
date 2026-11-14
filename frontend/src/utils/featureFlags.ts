@@ -159,6 +159,12 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Lihe Chat Integration',
   }),
+  // Read-only: enabled by the deployment's MCP_PUBLIC_URL, not an admin toggle.
+  mcp: defineFlag({
+    key: 'mcp_enabled',
+    mode: 'opt-in',
+    label: 'MCP',
+  }),
 } as const
 
 export type RegisteredFeatureFlag = keyof typeof FeatureFlags

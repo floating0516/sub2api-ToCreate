@@ -258,6 +258,7 @@ export default {
       USER_NOT_ACTIVE: '账号已被禁用',
       EMAIL_EXISTS: '该邮箱已经存在，请返回登录',
       EMAIL_NOT_REGISTERED: '该邮箱还没注册',
+      EMAIL_BLOCKED: '该邮箱不允许注册，请更换其他邮箱。',
     },
     registrationFailed: '注册失败，请重试。',
     emailDomainRegistrationLimit:
