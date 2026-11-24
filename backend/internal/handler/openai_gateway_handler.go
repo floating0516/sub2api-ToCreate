@@ -1513,7 +1513,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					if service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeForward &&
-						!(failoverErr != nil && failoverErr.SafeToFailoverAfterWrite) {
+						(failoverErr == nil || !failoverErr.SafeToFailoverAfterWrite) {
 						h.gatewayService.ObserveOpenAIAccountHealthFailure(c.Request.Context(), account, err)
 						h.handleAnthropicFailoverExhausted(c, failoverErr, true)
 						return
