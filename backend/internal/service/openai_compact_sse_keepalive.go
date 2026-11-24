@@ -111,6 +111,12 @@ func startOpenAISSEKeepaliveWithPayload(c *gin.Context, key string, interval tim
 		// Anything written before Forward starts is a scheduler/concurrency
 		// keepalive, not model output. Include it in the transport-only byte
 		// budget so failover and fallback checks remain accurate.
+		// Stream-loop pings are already accounted for separately. A later
+		// upstream attempt must not subtract those bytes a second time.
+		if value, ok := c.Get(openAIStreamKeepaliveBytesKey); ok {
+			streamKeepaliveBytes, _ := value.(int)
+			writtenSize -= streamKeepaliveBytes
+		}
 		if writtenSize > 0 {
 			state.bytes += writtenSize
 		}
@@ -273,11 +279,11 @@ func openAISSEKeepaliveAdjustedWrittenSize(c *gin.Context, key string) int {
 		keepaliveBytes = state.bytes
 		state.mu.Unlock()
 	}
-	if key == openAICompactSSEKeepaliveKey {
-		if value, ok := c.Get(openAIStreamKeepaliveBytesKey); ok {
-			streamKeepaliveBytes, _ := value.(int)
-			keepaliveBytes += streamKeepaliveBytes
-		}
+	// Both Responses and Messages stream loops record transport-only pings
+	// here, separately from the pre-header heartbeat state.
+	if value, ok := c.Get(openAIStreamKeepaliveBytesKey); ok {
+		streamKeepaliveBytes, _ := value.(int)
+		keepaliveBytes += streamKeepaliveBytes
 	}
 	if size < 0 {
 		return size

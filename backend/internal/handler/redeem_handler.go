@@ -158,7 +158,7 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 			return
 		}
 		for i := range usages {
-			out = append(out, *dto.RedeemCodeFromService(redeemCodeFromPromoUsage(&usages[i])))
+			out = append(out, *dto.RedeemCodeFromService(redeemCodeFromPromoUsage(&usages[i])).Localized(c.GetHeader("Accept-Language")))
 		}
 	}
 

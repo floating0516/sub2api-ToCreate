@@ -1712,7 +1712,7 @@ func (h *OpenAIGatewayHandler) ensureAnthropicErrorResponse(c *gin.Context, stre
 	// A pre-header ping is transport-only and must not suppress the terminal
 	// Anthropic error event. Any non-heartbeat byte means a response already
 	// exists and the fallback must stay silent.
-	if service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) >= 0 || service.OpenAICompactKeepaliveAdjustedWrittenSize(c) >= 0 {
+	if service.OpenAIMessagesKeepaliveAdjustedWrittenSize(c) >= 0 {
 		return false
 	}
 	h.anthropicStreamingAwareError(c, http.StatusBadGateway, "api_error", "Upstream request failed", streamStarted || c.Writer.Written())

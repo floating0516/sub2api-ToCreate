@@ -100,3 +100,22 @@ func TestOpenAIMessagesKeepaliveAdjustedWrittenSize_ExcludesPriorWaitPing(t *tes
 	require.Equal(t, -1, OpenAIMessagesKeepaliveAdjustedWrittenSize(c))
 	require.Contains(t, recorder.Body.String(), "event: ping\n")
 }
+
+func TestOpenAIMessagesKeepaliveAdjustedWrittenSize_StreamPingAcrossRetry(t *testing.T) {
+	c, _ := newMessagesKeepaliveTestContext(t)
+	stopFirst := StartOpenAIMessagesSSEKeepalive(c, time.Hour)
+	stopFirst()
+
+	n, err := c.Writer.Write(openAIMessagesKeepalivePayload)
+	require.NoError(t, err)
+	recordOpenAIStreamKeepaliveBytes(c, n)
+	require.Equal(t, -1, OpenAIMessagesKeepaliveAdjustedWrittenSize(c))
+
+	stopSecond := StartOpenAIMessagesSSEKeepalive(c, time.Hour)
+	defer stopSecond()
+	require.Equal(t, -1, OpenAIMessagesKeepaliveAdjustedWrittenSize(c))
+
+	_, err = c.Writer.WriteString("output")
+	require.NoError(t, err)
+	require.Equal(t, len("output"), OpenAIMessagesKeepaliveAdjustedWrittenSize(c))
+}
